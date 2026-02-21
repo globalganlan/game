@@ -34,24 +34,69 @@ function DamagePopup({ value, position }) {
   )
 }
 
-function ZombiePart({ texture, offset = [0, 0], repeat = [1, 1], color, ...props }) {
-  const tex = texture ? texture.clone() : null
-  if (tex) {
-    tex.offset.set(offset[0], offset[1])
-    tex.repeat.set(repeat[0], repeat[1])
+function ZombiePart({ texture, offset = [0, 0], repeat = [1, 1], color, displacementScale = 0.25, ...props }) {
+  const materialRef = useRef()
+
+  const tex = useMemo(() => {
+    if (!texture) return null
+    const t = texture.clone()
+    t.offset.set(offset[0], offset[1])
+    t.repeat.set(repeat[0], repeat[1])
+    t.needsUpdate = true
+    return t
+  }, [texture, offset, repeat])
+
+  // Custom shader to clip white background
+  const onBeforeCompile = (shader) => {
+    shader.fragmentShader = shader.fragmentShader.replace(
+      '#include <map_fragment>',
+      `
+      #include <map_fragment>
+      // Chroma-keying for white background
+      float brightness = (diffuseColor.r + diffuseColor.g + diffuseColor.b) / 3.0;
+      if (diffuseColor.r > 0.95 && diffuseColor.g > 0.95 && diffuseColor.b > 0.95) {
+        discard;
+      }
+      `
+    )
   }
+
   return (
     <mesh {...props}>
-      <boxGeometry args={[1, 1, 1]} />
+      <planeGeometry args={[1, 1, 64, 64]} />
       <meshStandardMaterial
+        ref={materialRef}
         map={tex}
+        displacementMap={tex}
+        displacementScale={displacementScale}
         color={texture ? 'white' : color}
-        roughness={0.8}
-        transparent={!!texture}
-        alphaTest={0.5}
+        roughness={0.9}
+        metalness={0.1}
+        transparent={true}
+        onBeforeCompile={onBeforeCompile}
+        side={THREE.DoubleSide}
       />
     </mesh>
   )
+}
+
+const ZOMBIE_PROPORTIONS = {
+  player: {
+    torso: [1.2, 1.8], // W, H
+    head: [0.7, 0.7],
+    lArm: [0.4, 0.8],
+    rArm: [0.4, 0.8],
+    legs: [0.4, 1.2],
+    displacement: 0.2
+  },
+  enemy: {
+    torso: [1.5, 1.6],
+    head: [0.8, 0.8],
+    lArm: [0.5, 0.8],
+    rArm: [0.7, 1.0],
+    legs: [0.5, 1.1],
+    displacement: 0.35
+  }
 }
 
 function ZombieModel({ texture, color, state, isPlayer }) {
@@ -69,140 +114,103 @@ function ZombieModel({ texture, color, state, isPlayer }) {
   const rThighRef = useRef()
   const rCalfRef = useRef()
 
+  const props = isPlayer ? ZOMBIE_PROPORTIONS.player : ZOMBIE_PROPORTIONS.enemy
+
   useFrame((clockState, delta) => {
     const t = clockState.clock.getElapsedTime()
-    const noise = (Math.sin(t * 15) * 0.1) + (Math.sin(t * 22) * 0.05) // Twitchy noise
+    const noise = (Math.sin(t * 15) * 0.1) + (Math.sin(t * 22) * 0.05)
 
-    // Base Breathing/Swaying
+    if (state === 'DEAD') {
+      groupRef.current.position.y = THREE.MathUtils.lerp(groupRef.current.position.y, -1.8, 0.05)
+      groupRef.current.rotation.x = THREE.MathUtils.lerp(groupRef.current.rotation.x, -Math.PI / 2.2, 0.08)
+      torsoRef.current.rotation.z = THREE.MathUtils.lerp(torsoRef.current.rotation.z, 0.4, 0.05)
+      lUpperArmRef.current.rotation.x = THREE.MathUtils.lerp(lUpperArmRef.current.rotation.x, -1.2, 0.1)
+      rUpperArmRef.current.rotation.x = THREE.MathUtils.lerp(rUpperArmRef.current.rotation.x, -1.5, 0.1)
+      return
+    }
+
     if (state === 'IDLE' || state === 'READY') {
       groupRef.current.rotation.y = Math.sin(t * 0.8) * 0.05
-      torsoRef.current.rotation.x = Math.sin(t * 1.2) * 0.03 + noise * 0.2
-
-      // Neck twitching
+      torsoRef.current.rotation.x = (isPlayer ? 0 : 0.2) + Math.sin(t * 1.2) * 0.03 + noise * 0.2
       headRef.current.rotation.x = Math.sin(t * 2.5) * 0.1 + noise * 0.5
-      headRef.current.rotation.z = Math.sin(t * 1.8) * 0.05
-
-      // Arms - Jerky idle
+      headRef.current.rotation.z = (isPlayer ? 0 : 0.15) + Math.sin(t * 1.8) * 0.05
       lUpperArmRef.current.rotation.x = Math.PI * 0.2 + Math.sin(t * 1.5) * 0.1 + noise * 0.3
       lLowerArmRef.current.rotation.x = -Math.PI * 0.1 + Math.sin(t * 1.5) * 0.2
-
-      rUpperArmRef.current.rotation.x = Math.PI * 0.4 + Math.cos(t * 1.8) * 0.1
+      rUpperArmRef.current.rotation.x = (isPlayer ? Math.PI * 0.4 : Math.PI * 0.2) + Math.cos(t * 1.8) * 0.1
       rLowerArmRef.current.rotation.x = -Math.PI * 0.2 + noise * 0.5
-
-      // Leg limping
       lThighRef.current.rotation.x = Math.sin(t * 1.2) * 0.02
       rThighRef.current.rotation.z = 0.15 + noise * 0.1
     }
 
     if (state === 'ATTACKING') {
-      // Violent lunge
-      const attackPhase = Math.sin(t * 10)
       torsoRef.current.rotation.x = THREE.MathUtils.lerp(torsoRef.current.rotation.x, -0.6, 0.4)
       lUpperArmRef.current.rotation.x = THREE.MathUtils.lerp(lUpperArmRef.current.rotation.x, -Math.PI * 0.8, 0.5)
-      lLowerArmRef.current.rotation.x = THREE.MathUtils.lerp(lLowerArmRef.current.rotation.x, -Math.PI * 0.3, 0.5)
       rUpperArmRef.current.rotation.x = THREE.MathUtils.lerp(rUpperArmRef.current.rotation.x, -Math.PI * 0.7, 0.5)
     }
 
     if (state === 'HURT') {
-      // Snapping back
       groupRef.current.position.z = Math.sin(t * 60) * 0.12
       torsoRef.current.rotation.x = THREE.MathUtils.lerp(torsoRef.current.rotation.x, -0.8, 0.6)
-      headRef.current.rotation.x = -0.5
-    } else {
+    } else if (state !== 'DEAD') {
       groupRef.current.rotation.x = THREE.MathUtils.lerp(groupRef.current.rotation.x, 0, 0.1)
     }
   })
 
-  // Mapping realistic patches
-  // Torso: [0.2, 0.3], Head: [0.3, 0.65], Arms: [0.6, 0.3], [0.1, 0.3]
   return (
     <group ref={groupRef} rotation={[0, isPlayer ? Math.PI / 2 : -Math.PI / 2, 0]}>
-      {/* Torso Chain */}
-      <group ref={torsoRef} position={[0, 0.8, 0]}>
+      <group ref={torsoRef} position={[0, props.legs[1], 0]}>
+        {/* Torso Relief */}
         <ZombiePart
           texture={texture}
           offset={[0.2, 0.3]}
           repeat={[0.5, 0.45]}
-          position={[0, 0.6, 0]}
-          scale={[0.7, 1.2, 0.5]}
+          position={[0, props.torso[1] / 2, 0]}
+          scale={[props.torso[0], props.torso[1], 1]}
+          displacementScale={props.displacement}
           color={color}
         />
 
-        {/* Head and Neck */}
-        <group ref={headRef} position={[0, 1.3, 0]}>
+        {/* Head Relief */}
+        <group ref={headRef} position={[0, props.torso[1], 0.05]}>
           <ZombiePart
             texture={texture}
             offset={[0.3, 0.65]}
             repeat={[0.4, 0.35]}
-            position={[0, 0.3, 0]}
-            scale={[0.65, 0.65, 0.6]}
+            position={[0, props.head[1] / 2.5, 0.1]}
+            scale={[props.head[0], props.head[1], 1]}
+            displacementScale={props.displacement * 1.2}
             color={color}
           />
-          {/* Eyes */}
-          <mesh position={[0.22, 0.42, 0.31]}><boxGeometry args={[0.08, 0.08, 0.05]} /><meshBasicMaterial color="#ff0000" /></mesh>
-          <mesh position={[-0.18, 0.45, 0.31]}><boxGeometry args={[0.06, 0.06, 0.05]} /><meshBasicMaterial color="#ffff00" /></mesh>
         </group>
 
-        {/* Left Arm Chain */}
-        <group ref={lUpperArmRef} position={[0.45, 1.1, 0]}>
-          <ZombiePart
-            texture={texture}
-            offset={[0.6, 0.4]}
-            repeat={[0.2, 0.3]}
-            position={[0, -0.25, 0]}
-            scale={[0.25, 0.6, 0.25]}
-            color={color}
-          />
-          <group ref={lLowerArmRef} position={[0, -0.5, 0]}>
-            <ZombiePart
-              texture={texture}
-              offset={[0.6, 0.1]}
-              repeat={[0.2, 0.3]}
-              position={[0, -0.25, 0]}
-              scale={[0.2, 0.6, 0.2]}
-              color={color}
-            />
+        {/* Arm Reliefs */}
+        <group ref={lUpperArmRef} position={[props.torso[0] / 2 - 0.1, props.torso[1] - 0.2, 0.05]}>
+          <ZombiePart texture={texture} offset={[0.6, 0.4]} repeat={[0.2, 0.3]} position={[0, -props.lArm[1] / 2, 0.05]} scale={[props.lArm[0], props.lArm[1], 1]} displacementScale={props.displacement * 0.8} color={color} />
+          <group ref={lLowerArmRef} position={[0, -props.lArm[1], 0]}>
+            <ZombiePart texture={texture} offset={[0.6, 0.1]} repeat={[0.2, 0.3]} position={[0, -props.lArm[1] / 2, 0.05]} scale={[props.lArm[0] * 0.9, props.lArm[1], 1]} displacementScale={props.displacement * 0.7} color={color} />
           </group>
         </group>
 
-        {/* Right Arm Chain */}
-        <group ref={rUpperArmRef} position={[-0.45, 1.0, 0]}>
-          <ZombiePart
-            texture={texture}
-            offset={[0.1, 0.4]}
-            repeat={[0.2, 0.3]}
-            position={[0, -0.25, 0]}
-            scale={[0.3, 0.6, 0.3]}
-            color={color}
-          />
-          <group ref={rLowerArmRef} position={[0, -0.5, 0]}>
-            <ZombiePart
-              texture={texture}
-              offset={[0.1, 0.1]}
-              repeat={[0.2, 0.3]}
-              position={[0, -0.2, 0]}
-              scale={[0.22, 0.5, 0.22]}
-              color={color}
-            />
-            {/* Exposed Bone */}
-            <mesh position={[0, -0.45, 0]}><boxGeometry args={[0.12, 0.3, 0.12]} /><meshStandardMaterial color="#ddd" /></mesh>
+        <group ref={rUpperArmRef} position={[-(props.torso[0] / 2 - 0.1), props.torso[1] - 0.3, 0.05]}>
+          <ZombiePart texture={texture} offset={[0.1, 0.4]} repeat={[0.2, 0.3]} position={[0, -props.rArm[1] / 2, 0.05]} scale={[props.rArm[0], props.rArm[1], 1]} displacementScale={props.displacement * 1.5} color={color} />
+          <group ref={rLowerArmRef} position={[0, -props.rArm[1], 0]}>
+            <ZombiePart texture={texture} offset={[0.1, 0.1]} repeat={[0.2, 0.3]} position={[0, -props.rArm[1] / 2.5, 0.05]} scale={[props.rArm[0] * 0.9, props.rArm[1], 1]} displacementScale={props.displacement} color={color} />
           </group>
         </group>
       </group>
 
-      {/* Legs - Hip Joints */}
-      <group ref={lThighRef} position={[0.22, 0.8, 0]}>
-        <mesh position={[0, -0.4, 0]}><boxGeometry args={[0.3, 0.8, 0.3]} /><meshStandardMaterial color="#111" /></mesh>
-        <group ref={lCalfRef} position={[0, -0.8, 0]} rotation={[0.2, 0, 0]}>
-          <mesh position={[0, -0.4, 0]}><boxGeometry args={[0.28, 0.8, 0.28]} /><meshStandardMaterial color="#000" /></mesh>
+      {/* Leg Reliefs */}
+      <group ref={lThighRef} position={[0.2, props.legs[1], 0]}>
+        <ZombiePart texture={texture} offset={[0.3, 0.1]} repeat={[0.2, 0.4]} position={[0, -props.legs[1] / 2, 0]} scale={[props.legs[0], props.legs[1], 1]} displacementScale={props.displacement * 0.5} />
+        <group ref={lCalfRef} position={[0, -props.legs[1], 0]}>
+          <ZombiePart texture={texture} offset={[0.3, 0.0]} repeat={[0.2, 0.3]} position={[0, -props.legs[1] / 2, 0]} scale={[props.legs[0] * 0.9, props.legs[1], 1]} displacementScale={props.displacement * 0.4} />
         </group>
       </group>
 
-      <group ref={rThighRef} position={[-0.22, 0.8, 0]} rotation={[0.3, 0, -0.1]}>
-        <mesh position={[0, -0.3, 0]}><boxGeometry args={[0.35, 0.6, 0.35]} /><meshStandardMaterial color="#2d2d2d" /></mesh>
-        <group ref={rCalfRef} position={[0, -0.6, 0]} rotation={[-0.5, 0, 0]}>
-          <mesh position={[0, -0.3, 0]}><boxGeometry args={[0.35, 0.6, 0.35]} /><meshStandardMaterial color="#222" /></mesh>
-          <mesh position={[0, -0.65, 0]}><boxGeometry args={[0.38, 0.15, 0.45]} /><meshStandardMaterial color="#400" /></mesh>
+      <group ref={rThighRef} position={[-0.2, props.legs[1], 0]}>
+        <ZombiePart texture={texture} offset={[0.5, 0.1]} repeat={[0.2, 0.4]} position={[0, -props.legs[1] / 2, 0]} scale={[props.legs[0], props.legs[1], 1]} displacementScale={props.displacement * 0.5} />
+        <group ref={rCalfRef} position={[0, -props.legs[1], 0]}>
+          <ZombiePart texture={texture} offset={[0.5, 0.0]} repeat={[0.2, 0.3]} position={[0, -props.legs[1] / 2, 0]} scale={[props.legs[0] * 0.9, props.legs[1], 1]} displacementScale={props.displacement * 0.4} />
         </group>
       </group>
     </group>
@@ -216,8 +224,10 @@ function Hero({ position, heroData, isPlayer, gameState, damagePopups }) {
   const color = isPlayer ? '#2d5a27' : '#5a2727'
   const isAttacking = (isPlayer && gameState === 'PLAYER_ATTACKING') || (!isPlayer && gameState === 'ENEMY_ATTACKING')
   const isHurt = (isPlayer && gameState === 'ENEMY_STRIKING') || (!isPlayer && gameState === 'PLAYER_STRIKING')
+  const isDead = heroData.currentHP <= 0
 
   useFrame((state, delta) => {
+    if (isDead) return
     if (isAttacking && meshRef.current) {
       const targetX = isPlayer ? position[0] + 4 : position[0] - 4
       meshRef.current.position.x = THREE.MathUtils.lerp(meshRef.current.position.x, targetX, 0.2)
@@ -226,12 +236,14 @@ function Hero({ position, heroData, isPlayer, gameState, damagePopups }) {
     }
   })
 
+  const currentState = isDead ? 'DEAD' : (isAttacking ? 'ATTACKING' : (isHurt ? 'HURT' : 'IDLE'))
+
   return (
     <group position={position} ref={meshRef}>
       <ZombieModel
         texture={texture}
         color={color}
-        state={isAttacking ? 'ATTACKING' : (isHurt ? 'HURT' : 'IDLE')}
+        state={currentState}
         isPlayer={isPlayer}
       />
 
