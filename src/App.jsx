@@ -211,7 +211,7 @@ function ZombieModel({ texture, color, state, isPlayer }) {
 
 function Hero({ position, heroData, isPlayer, gameState, damagePopups }) {
   const meshRef = useRef()
-  const texture = useTexture(isPlayer ? '/player_zombie_realistic.png' : '/enemy_zombie_realistic.png')
+  const texture = useTexture(`${import.meta.env.BASE_URL}${isPlayer ? 'player_zombie_realistic.png' : 'enemy_zombie_realistic.png'}`)
 
   const color = isPlayer ? '#2d5a27' : '#5a2727'
   const isAttacking = (isPlayer && gameState === 'PLAYER_ATTACKING') || (!isPlayer && gameState === 'ENEMY_ATTACKING')
