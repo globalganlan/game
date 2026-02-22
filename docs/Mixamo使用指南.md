@@ -184,46 +184,53 @@ D:\Blender\blender-5.0.1-windows-x64\blender.exe --background --python D:\Global
 
 ### 步骤8: Three.js加载Mixamo模型
 
+> ⚠️ **重要更新**: 以下展示的是正确的载入方式。关于 SkeletonUtils.clone、crossFadeTo 等细节，
+> 请参见 `docs/Three.js場景與模型整合筆記.md`。
+
 ```javascript
-import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader'
+import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader'
+import * as SkeletonUtils from 'three/examples/jsm/utils/SkeletonUtils'
 import { useAnimations } from '@react-three/drei'
 
 function MixamoZombie({ isPlayer, state }) {
-  const modelPath = `${import.meta.env.BASE_URL}models/${isPlayer ? 'zombie_1' : 'zombie_2'}/mixamo_rigged.glb`
-  const gltf = useLoader(GLTFLoader, modelPath)
-  const { actions, mixer } = useAnimations(gltf.animations, gltf.scene)
-  
+  const idle = useLoader(FBXLoader, `models/zombie_1/zombie_1_idle.fbx`)
+  const attack = useLoader(FBXLoader, `models/zombie_1/zombie_1_attack.fbx`)
+  // ... 其他动画
+
+  const scene = useMemo(() => SkeletonUtils.clone(idle), [idle])
+  // ⚠️ 不要用 idle.clone()，SkinnedMesh 会共享 Skeleton
+
+  const animations = useMemo(() => {
+    const clips = []
+    idle.animations.forEach(a => { const c = a.clone(); c.name = 'IDLE'; clips.push(c) })
+    attack.animations.forEach(a => { const c = a.clone(); c.name = 'ATTACKING'; clips.push(c) })
+    return clips
+  }, [idle, attack])
+
+  const { actions } = useAnimations(animations, scene)
+  const prevActionRef = useRef(null)
+
   useEffect(() => {
-    // 根据状态播放动画
-    const animationName = {
-      'IDLE': 'Zombie Idle',
-      'ATTACKING': 'Zombie Attack',
-      'HURT': 'Zombie Reaction',
-      'DEAD': 'Zombie Death'
-    }[state]
-    
-    if (actions[animationName]) {
-      // 停止所有动画
-      Object.values(actions).forEach(action => action.stop())
-      
-      // 播放当前动画
-      const action = actions[animationName]
-      action.reset()
-      action.play()
-      
-      // 死亡动画只播放一次
-      if (state === 'DEAD') {
-        action.setLoop(THREE.LoopOnce)
-        action.clampWhenFinished = true
-      }
+    const newAction = actions[state]
+    if (!newAction) return
+
+    if (state === 'DEAD') {
+      newAction.setLoop(THREE.LoopOnce, 1)
+      newAction.clampWhenFinished = true
     }
+
+    // ⚠️ 用 crossFadeTo 而非 stop() → play()，避免 bind-pose 闪现
+    if (prevActionRef.current && prevActionRef.current !== newAction) {
+      newAction.reset()
+      prevActionRef.current.crossFadeTo(newAction, 0.2, true)
+      newAction.play()
+    } else {
+      newAction.reset().fadeIn(0.2).play()
+    }
+    prevActionRef.current = newAction
   }, [state, actions])
-  
-  return (
-    <group scale={[3, 3, 3]} rotation={[0, isPlayer ? 0 : Math.PI, 0]}>
-      <primitive object={gltf.scene} />
-    </group>
-  )
+
+  return <primitive object={scene} />
 }
 ```
 

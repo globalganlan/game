@@ -1,8 +1,9 @@
 #root {
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 2rem;
-  text-align: center;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
 }
 
 .logo {
@@ -39,4 +40,252 @@
 
 .read-the-docs {
   color: #888;
+}
+
+/* ── Game HUD Responsive ── */
+
+.game-hud {
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  z-index: 10;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  background: linear-gradient(to bottom, rgba(0,0,0,0.85), transparent);
+  pointer-events: none;
+  box-sizing: border-box;
+  color: #eee;
+  padding: 20px clamp(12px, 4vw, 60px);
+  padding-top: max(20px, env(safe-area-inset-top));
+  padding-left: max(clamp(12px, 4vw, 60px), env(safe-area-inset-left));
+  padding-right: max(clamp(12px, 4vw, 60px), env(safe-area-inset-right));
+}
+
+.hud-hero {
+  flex: 0 0 auto;
+  min-width: 0;
+}
+
+.hud-hero-name {
+  margin: 0;
+  font-size: clamp(0.65rem, 1.8vw, 1rem);
+  opacity: 0.8;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.hud-hero-hp {
+  font-weight: 900;
+  font-size: clamp(1.2rem, 5vw, 2.5rem);
+  line-height: 1.1;
+}
+
+.hud-center {
+  flex: 1;
+  text-align: center;
+  pointer-events: auto;
+  min-width: 0;
+  padding: 0 8px;
+}
+
+.hud-title {
+  margin: 0;
+  color: #ff1111;
+  letter-spacing: clamp(3px, 1.5vw, 10px);
+  font-size: clamp(1rem, 3.5vw, 2rem);
+  text-shadow: 0 0 20px rgba(255,0,0,0.6);
+  white-space: nowrap;
+}
+
+.hud-log {
+  background: rgba(0,0,0,0.6);
+  padding: clamp(4px, 1vw, 10px) clamp(8px, 2vw, 25px);
+  margin-top: clamp(4px, 1vh, 15px);
+  border-radius: 2px;
+  display: inline-block;
+  border: 1px solid #444;
+  color: white;
+  font-weight: bold;
+  font-size: clamp(0.6rem, 1.8vw, 0.9rem);
+  max-width: 100%;
+  word-break: keep-all;
+}
+
+.hud-round {
+  color: #ffcc00;
+  margin-top: clamp(2px, 0.5vh, 8px);
+  font-size: clamp(0.8rem, 2vw, 1.2rem);
+  font-weight: bold;
+}
+
+/* ── Buttons ── */
+
+.btn-start {
+  padding: clamp(10px, 2vh, 18px) clamp(30px, 8vw, 70px);
+  font-size: clamp(1rem, 3vw, 1.5rem);
+  cursor: pointer;
+  background: #990000;
+  color: white;
+  border: 2px solid #ff0000;
+  border-radius: 4px;
+  font-weight: 900;
+  box-shadow: 0 0 30px rgba(153,0,0,0.5);
+  transition: transform 0.1s;
+  touch-action: manipulation;
+}
+
+.btn-reset {
+  padding: clamp(8px, 1.5vh, 15px) clamp(20px, 5vw, 40px);
+  font-size: clamp(0.85rem, 2.2vw, 1.1rem);
+  cursor: pointer;
+  background: white;
+  color: black;
+  border: none;
+  font-weight: bold;
+  border-radius: 4px;
+  touch-action: manipulation;
+}
+
+.btn-speed {
+  padding: clamp(6px, 1vh, 8px) clamp(12px, 2vw, 18px);
+  font-size: clamp(0.8rem, 1.8vw, 1rem);
+  cursor: pointer;
+  background: rgba(50,50,50,0.85);
+  color: #ff4444;
+  border: 1px solid #666;
+  border-radius: 4px;
+  font-weight: bold;
+  touch-action: manipulation;
+}
+
+.btn-bottom-center {
+  position: absolute;
+  bottom: max(clamp(20px, 5vh, 60px), env(safe-area-inset-bottom, 0px));
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  z-index: 10;
+}
+
+.btn-speed-wrap {
+  position: absolute;
+  bottom: max(clamp(10px, 2vh, 20px), env(safe-area-inset-bottom, 0px));
+  right: max(clamp(10px, 3vw, 30px), env(safe-area-inset-right, 0px));
+  z-index: 10;
+}
+
+/* ── Transition Overlay ── */
+
+.transition-text {
+  color: #cc1111;
+  font-size: clamp(1rem, 3.5vw, 1.8rem);
+  font-weight: bold;
+  letter-spacing: clamp(3px, 1vw, 8px);
+  font-family: monospace;
+  animation: textFlicker 2s ease-in-out infinite;
+  text-shadow: 0 0 30px rgba(255,0,0,0.6), 0 0 60px rgba(255,0,0,0.3);
+  z-index: 1;
+  text-align: center;
+  padding: 0 20px;
+}
+
+/* ── Mobile-specific ── */
+
+@media (max-width: 480px) {
+  .game-hud {
+    padding: 8px 8px;
+    padding-top: max(8px, env(safe-area-inset-top));
+    align-items: center;
+  }
+  .hud-center {
+    padding: 0 4px;
+  }
+}
+
+/* 直式手機：HUD 改為上下堆疊避免擠壓 */
+@media (max-width: 480px) and (orientation: portrait) {
+  .game-hud {
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 2px 12px;
+    padding-bottom: 4px;
+  }
+  .hud-hero {
+    order: 1;
+    flex: 0 0 45%;
+  }
+  .hud-center {
+    order: 0;
+    flex: 0 0 100%;
+  }
+  .hud-title {
+    font-size: clamp(0.85rem, 5vw, 1.3rem);
+  }
+  .hud-hero-hp {
+    font-size: clamp(1rem, 6vw, 1.6rem);
+  }
+}
+
+@media (max-height: 500px) and (orientation: landscape) {
+  .game-hud {
+    padding: 4px clamp(8px, 2vw, 20px);
+    padding-left: max(clamp(8px, 2vw, 20px), env(safe-area-inset-left));
+    padding-right: max(clamp(8px, 2vw, 20px), env(safe-area-inset-right));
+  }
+  .hud-hero-hp {
+    font-size: clamp(1rem, 4vw, 1.8rem);
+  }
+}
+
+/* ── Orientation Hint (portrait mobile) ── */
+
+.orient-hint {
+  position: absolute;
+  bottom: max(60px, env(safe-area-inset-bottom, 0px));
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 15;
+  color: rgba(255,255,255,0.5);
+  font-size: 0.75rem;
+  text-align: center;
+  pointer-events: none;
+  animation: orientPulse 3s ease-in-out infinite;
+  white-space: nowrap;
+}
+
+.orient-icon {
+  display: block;
+  font-size: 1.5rem;
+  margin-bottom: 4px;
+}
+
+@keyframes orientPulse {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 0.15; }
+}
+
+/* ── Transition Overlay Keyframes ── */
+
+@keyframes curtainFadeOut {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+@keyframes textFlicker {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+  92% { opacity: 1; }
+  94% { opacity: 0.2; }
+  96% { opacity: 1; }
+}
+
+@keyframes loadingSlide {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(350%); }
+}
+
+@keyframes scanDown {
+  0% { transform: translateY(-120px); }
+  100% { transform: translateY(100vh); }
 }

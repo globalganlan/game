@@ -251,9 +251,12 @@ cd D:\GlobalGanLan\TripoSR
 
 ## Three.js集成
 
-### 方案A: 使用OBJ + 程序化动画 (推荐)
+### 方案A: 使用OBJ + 程序化动画 (简单场景)
 
-**优点**: 稳定、灵活、无骨骼绑定问题
+**优点**: 无需骨骼绑定
+**缺点**: 动画效果有限，仅适合极简需求
+
+> ⚠️ 不推荐用于有 Mixamo 动画的项目。若已有 FBX 骨骼动画，请直接用方案 B。
 
 ```javascript
 import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader'
@@ -321,7 +324,48 @@ function ZombieModel({ isPlayer, state }) {
 3. **平滑过渡**: 使用距离因子实现变形渐变
 4. **法线更新**: 每帧重新计算法线保持光照正确
 
-### 方案B: 使用GLB + 骨骼动画 (需要正确绑定)
+### 方案B: 使用 FBX 动画 + OBJ 顶点颜色 (推荐)
+
+**优点**: 专业 Mixamo 动画 + TripoSR 顶点色彩，效果最好
+
+```javascript
+import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader'
+import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader'
+import * as SkeletonUtils from 'three/examples/jsm/utils/SkeletonUtils'
+import { useAnimations } from '@react-three/drei'
+
+function ZombieModel({ isPlayer, state }) {
+  const objModel = useLoader(OBJLoader, `${modelFolder}/mesh.obj`)
+  const idle = useLoader(FBXLoader, `${modelFolder}/${zombieId}_idle.fbx`)
+  // ... 载入其他 FBX 动画
+
+  const { scene, modelScale } = useMemo(() => {
+    // ⚠️ 必须用 SkeletonUtils.clone()，不能用 idle.clone()
+    const cloned = SkeletonUtils.clone(idle)
+    transferVertexColors(cloned, objModel)  // 1:1 顶点色复制
+
+    const bbox = new THREE.Box3().setFromObject(cloned)
+    const height = bbox.max.y - bbox.min.y
+    const s = height > 0 ? 2.5 / height : 1
+    return { scene: cloned, modelScale: s }
+  }, [idle, objModel])
+
+  // 动画切换用 crossFadeTo，避免 bind-pose 闪现
+  useEffect(() => {
+    const newAction = actions[state]
+    if (prevActionRef.current && prevActionRef.current !== newAction) {
+      newAction.reset()
+      prevActionRef.current.crossFadeTo(newAction, 0.2, true)
+      newAction.play()
+    } else {
+      newAction.reset().fadeIn(0.2).play()
+    }
+    prevActionRef.current = newAction
+  }, [state, actions])
+}
+```
+
+> 详见 `docs/Three.js場景與模型整合筆記.md` 中完整的技术说明。
 
 ```javascript
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader'

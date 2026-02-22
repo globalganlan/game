@@ -1,5 +1,6 @@
-import { useState, useEffect, useRef, Suspense, useMemo } from 'react'
-import { Canvas, useFrame, useLoader } from '@react-three/fiber'
+import { useState, useEffect, useRef, useCallback, Suspense, useMemo } from 'react'
+import './App.css'
+import { Canvas, useFrame, useLoader, useThree } from '@react-three/fiber'
 import { OrbitControls, Billboard, Text, Sparkles, Sky, useAnimations } from '@react-three/drei'
 import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader'
 import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader'
@@ -15,7 +16,62 @@ console.warn = (...args) => {
 
 const API_URL = 'https://script.google.com/macros/s/AKfycbxXdy3QCvgX7knCCnxfmVY0CMqmUgcG422nVgFDlx5l9CsyldFZ4bwLVHPHxbtXp0LaTw/exec'
 
-function DamagePopup({ value, position }) {
+/** 螢幕尺寸分級 hook */
+function useResponsive() {
+  const getInfo = () => {
+    const w = window.innerWidth
+    const h = window.innerHeight
+    const isPortrait = h > w
+    const aspect = w / h
+    let device
+    if (w <= 480 || (isPortrait && w <= 600))  device = 'mobile'
+    else if (w <= 1024 || (isPortrait && w <= 800)) device = 'tablet'
+    else device = 'desktop'
+    return { device, isPortrait, aspect }
+  }
+  const [info, setInfo] = useState(getInfo)
+  useEffect(() => {
+    const onResize = () => setInfo(getInfo())
+    window.addEventListener('resize', onResize)
+    window.addEventListener('orientationchange', () => setTimeout(onResize, 150))
+    return () => {
+      window.removeEventListener('resize', onResize)
+      window.removeEventListener('orientationchange', onResize)
+    }
+  }, [])
+
+  return useMemo(() => {
+    const { device, isPortrait, aspect } = info
+    // 直式手機需要更高的鏡頭 + 更廣的 FOV 才能看到整個戰場
+    if (device === 'mobile' && isPortrait) {
+      return { device, isPortrait, fov: 72, camPos: [0, 5, 15], camTarget: [0, 1.0, 0], textScale: 0.55, dpr: [1, 1.5] }
+    }
+    if (device === 'mobile') {
+      return { device, isPortrait, fov: 60, camPos: [0, 3.5, 13], camTarget: [0, 1.2, 0], textScale: 0.6, dpr: [1, 1.5] }
+    }
+    if (device === 'tablet' && isPortrait) {
+      return { device, isPortrait, fov: 62, camPos: [0, 4.5, 14], camTarget: [0, 1.2, 0], textScale: 0.7, dpr: [1, 2] }
+    }
+    if (device === 'tablet') {
+      return { device, isPortrait, fov: 50, camPos: [0, 3.2, 11], camTarget: [0, 1.3, 0], textScale: 0.8, dpr: [1, 2] }
+    }
+    // desktop
+    return { device, isPortrait: false, fov: 45, camPos: [0, 3, 10], camTarget: [0, 1.5, 0], textScale: 1.0, dpr: [1, 2] }
+  }, [info])
+}
+
+/** 根據螢幕自動調整鏡頭 */
+function ResponsiveCamera({ fov, position, target }) {
+  const { camera } = useThree()
+  useEffect(() => {
+    camera.fov = fov
+    camera.position.set(...position)
+    camera.updateProjectionMatrix()
+  }, [fov, position, camera])
+  return <OrbitControls target={target} enableRotate={false} enablePan={false} enableZoom={false} />
+}
+
+function DamagePopup({ value, position, textScale = 1 }) {
   const ref = useRef()
   const [opacity, setOpacity] = useState(1)
 
@@ -30,10 +86,60 @@ function DamagePopup({ value, position }) {
 
   return (
     <Billboard position={position} ref={ref}>
-      <Text fontSize={0.8} color="#ff0000" outlineColor="white" outlineWidth={0.05} fillOpacity={opacity} outlineOpacity={opacity}>
+      <Text fontSize={0.8 * textScale} color="#ff0000" outlineColor="white" outlineWidth={0.05} fillOpacity={opacity} outlineOpacity={opacity}>
         -{value}
       </Text>
     </Billboard>
+  )
+}
+
+/**
+ * 過場幕 — 遮蔽模型載入 / 重啟的不合理畫面
+ */
+function TransitionOverlay({ visible, fading, text }) {
+  if (!visible) return null
+
+  return (
+    <div style={{
+      position: 'absolute', inset: 0, zIndex: 100,
+      background: 'radial-gradient(ellipse at center, #1a0505 0%, #050000 70%, #000 100%)',
+      display: 'flex', flexDirection: 'column',
+      alignItems: 'center', justifyContent: 'center',
+      opacity: fading ? undefined : 1,
+      animation: fading ? 'curtainFadeOut 1s ease-in forwards' : undefined,
+      pointerEvents: fading ? 'none' : 'auto',
+    }}>
+      {/* CRT 掃描線 */}
+      <div style={{
+        position: 'absolute', inset: 0,
+        background: 'repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(255,0,0,0.03) 2px, rgba(255,0,0,0.03) 4px)',
+        pointerEvents: 'none',
+      }} />
+      {/* 移動掃描光條 */}
+      <div style={{
+        position: 'absolute', top: 0, left: 0, right: 0, height: '120px',
+        background: 'linear-gradient(180deg, transparent, rgba(255,0,0,0.07), transparent)',
+        animation: 'scanDown 3s linear infinite',
+        pointerEvents: 'none',
+      }} />
+      {/* 暗角 */}
+      <div style={{
+        position: 'absolute', inset: 0,
+        background: 'radial-gradient(ellipse at center, transparent 40%, rgba(0,0,0,0.8) 100%)',
+        pointerEvents: 'none',
+      }} />
+      <div className="transition-text">{text}</div>
+      <div style={{
+        width: 'clamp(120px, 30vw, 200px)', height: '2px', background: 'rgba(80,0,0,0.5)',
+        marginTop: '24px', overflow: 'hidden', borderRadius: '1px', zIndex: 1,
+      }}>
+        <div style={{
+          width: '40%', height: '100%',
+          background: 'linear-gradient(90deg, transparent, #ff2200, transparent)',
+          animation: 'loadingSlide 1.5s ease-in-out infinite',
+        }} />
+      </div>
+    </div>
   )
 }
 
@@ -80,7 +186,7 @@ function transferVertexColors(fbxScene, objModel) {
   })
 }
 
-function ZombieModel({ isPlayer, state }) {
+function ZombieModel({ isPlayer, state, onReady }) {
   const zombieId = isPlayer ? 'zombie_1' : 'zombie_2'
   const modelFolder = `${import.meta.env.BASE_URL}models/${zombieId}`
 
@@ -119,6 +225,9 @@ function ZombieModel({ isPlayer, state }) {
   const prevActionRef = useRef(null)
   const { actions } = useAnimations(animations, scene)
 
+  // 模型載入完成通知（Suspense resolve 後首次 mount 時觸發）
+  useEffect(() => { if (onReady) onReady() }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
   // 播放對應狀態的動畫 — 用 crossFade 避免切換時回到 bind pose 造成下蹲
   useEffect(() => {
     if (!actions || !actions[state]) return
@@ -154,7 +263,7 @@ function ZombieModel({ isPlayer, state }) {
   )
 }
 
-function Hero({ position, heroData, isPlayer, gameState, damagePopups }) {
+function Hero({ position, heroData, isPlayer, gameState, damagePopups, onModelReady, textScale = 1 }) {
   const meshRef = useRef()
   const [basePosition] = useState(position)
 
@@ -178,18 +287,18 @@ function Hero({ position, heroData, isPlayer, gameState, damagePopups }) {
   return (
     <group position={basePosition} ref={meshRef} renderOrder={10}>
       <Suspense fallback={null}>
-        <ZombieModel isPlayer={isPlayer} state={currentState} />
+        <ZombieModel isPlayer={isPlayer} state={currentState} onReady={onModelReady} />
       </Suspense>
 
       {damagePopups.map(pop => (
-        <DamagePopup key={pop.id} value={pop.value} position={[0, 4.5, 0]} />
+        <DamagePopup key={pop.id} value={pop.value} position={[0, 4.5, 0]} textScale={textScale} />
       ))}
 
       <Billboard position={[0, 3.5, 0]} renderOrder={15}>
-        <Text fontSize={0.4} color="white" outlineColor="black" outlineWidth={0.06}>
+        <Text fontSize={0.4 * textScale} color="white" outlineColor="black" outlineWidth={0.06}>
           {heroData.Name}
         </Text>
-        <Text position={[0, -0.5, 0]} fontSize={0.3} color={isPlayer ? '#4ade80' : '#f87171'} outlineColor="black" outlineWidth={0.03}>
+        <Text position={[0, -0.5, 0]} fontSize={0.3 * textScale} color={isPlayer ? '#4ade80' : '#f87171'} outlineColor="black" outlineWidth={0.03}>
           HP: {Math.max(0, heroData.currentHP)}
         </Text>
       </Billboard>
@@ -279,6 +388,79 @@ function Debris({ position, scale, rotation, color = '#222', type = 'box' }) {
   )
 }
 
+function Rain({ count = 1200, area = 30, height = 15, speed = 14 }) {
+  const meshRef = useRef()
+  // 每條雨絲 = 2 個頂點（上端 + 下端），形成細長線段
+  const streakLen = 0.6          // 雨絲長度
+  const windX = 4                // 水平風速（X 方向）→ 決定傾斜角度
+  const windZ = -1.5             // 微量 Z 風
+
+  const { positions, velocities } = useMemo(() => {
+    const pos = new Float32Array(count * 2 * 3)   // count 條線 × 2 端點 × xyz
+    const vel = new Float32Array(count)
+    for (let i = 0; i < count; i++) {
+      const x = (Math.random() - 0.5) * area
+      const y = Math.random() * height
+      const z = (Math.random() - 0.5) * area
+      vel[i] = 0.8 + Math.random() * 0.4
+      // 線段上端
+      const bi = i * 6
+      pos[bi]     = x;  pos[bi + 1] = y;  pos[bi + 2] = z
+      // 線段下端（沿落下方向偏移 → 傾斜雨絲）
+      const dx = (windX / speed) * streakLen
+      const dz = (windZ / speed) * streakLen
+      pos[bi + 3] = x + dx;  pos[bi + 4] = y - streakLen;  pos[bi + 5] = z + dz
+    }
+    return { positions: pos, velocities: vel }
+  }, [count, area, height])
+
+  useFrame((_, delta) => {
+    if (!meshRef.current) return
+    const pos = meshRef.current.geometry.attributes.position.array
+    const dy = speed * delta
+    const dx = windX * delta
+    const dz = windZ * delta
+    for (let i = 0; i < count; i++) {
+      const bi = i * 6
+      // 移動兩端
+      pos[bi]     += dx;  pos[bi + 1] -= dy * velocities[i];  pos[bi + 2] += dz
+      pos[bi + 3] += dx;  pos[bi + 4] -= dy * velocities[i];  pos[bi + 5] += dz
+      // 觸地重置
+      if (pos[bi + 1] < -0.5) {
+        const nx = (Math.random() - 0.5) * area
+        const ny = height + Math.random() * 3
+        const nz = (Math.random() - 0.5) * area
+        const sdx = (windX / speed) * streakLen
+        const sdz = (windZ / speed) * streakLen
+        pos[bi]     = nx;       pos[bi + 1] = ny;              pos[bi + 2] = nz
+        pos[bi + 3] = nx + sdx; pos[bi + 4] = ny - streakLen;  pos[bi + 5] = nz + sdz
+      }
+    }
+    meshRef.current.geometry.attributes.position.needsUpdate = true
+  })
+
+  const material = useMemo(() => new THREE.LineBasicMaterial({
+    color: '#99aabb',
+    transparent: true,
+    opacity: 0.35,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+  }), [])
+
+  return (
+    <lineSegments ref={meshRef} material={material}>
+      <bufferGeometry>
+        <bufferAttribute
+          attach="attributes-position"
+          array={positions}
+          count={count * 2}
+          itemSize={3}
+        />
+      </bufferGeometry>
+    </lineSegments>
+  )
+}
+
 function Arena() {
   const debris = useMemo(() => {
     const items = []
@@ -299,13 +481,13 @@ function Arena() {
       rebar:  ['#b87333', '#c08040', '#8b5a2b', '#d4874a'],   // 鏽橘色鋼筋
     }
 
-    while (items.length < 200) {
-      const x = (Math.random() - 0.5) * 70
-      const z = (Math.random() - 0.5) * 70
+    while (items.length < 80) {
+      const x = (Math.random() - 0.5) * 35
+      const z = (Math.random() - 0.5) * 35
       // 排除區 = 可視戰場範圍 + 一點點餘裕
       if (Math.abs(x) < 5 && z > -5 && z < 13) continue
 
-      const isWall = items.length < 30
+      const isWall = items.length < 12
       const type = isWall
         ? wallTypes[Math.floor(Math.random() * wallTypes.length)]
         : rubbleTypes[Math.floor(Math.random() * rubbleTypes.length)]
@@ -355,7 +537,7 @@ function Arena() {
   }, [])
 
   const groundGeo = useMemo(() => {
-    const geo = new THREE.PlaneGeometry(200, 200, 128, 128)
+    const geo = new THREE.PlaneGeometry(60, 60, 64, 64)
     const pos = geo.attributes.position
     const colors = new Float32Array(pos.count * 3)
 
@@ -402,9 +584,10 @@ function Arena() {
 
   return (
     <>
-      <Sky distance={450000} sunPosition={[0, 0.1, 0]} inclination={0} azimuth={1.25} rayleigh={6} turbidity={10} />
-      <Sparkles count={200} scale={40} size={1.5} speed={0.4} opacity={0.3} color="#ff6666" />
-      <fog attach="fog" args={['#1a0e06', 10, 60]} />
+      <Sky distance={450000} sunPosition={[0, -0.15, 0]} inclination={0} azimuth={1.25} rayleigh={0.2} turbidity={20} />
+      <Sparkles count={80} scale={20} size={1.5} speed={0.4} opacity={0.3} color="#ff6666" />
+      <Rain />
+      <fog attach="fog" args={['#1a0e06', 8, 35]} />
 
       <mesh rotation={[-Math.PI / 2, 0, 0]} geometry={groundGeo} receiveShadow>
         <meshStandardMaterial vertexColors roughness={0.95} metalness={0.0} flatShading />
@@ -444,6 +627,36 @@ function App() {
   const speedRef = useRef(1)
   useEffect(() => { speedRef.current = speed }, [speed])
 
+  // ── 過場幕狀態 ──
+  const [curtainVisible, setCurtainVisible] = useState(true)
+  const [curtainFading, setCurtainFading] = useState(false)
+  const [curtainText, setCurtainText] = useState('掃描倖存者中...')
+  const initialReady = useRef(false)
+  const modelsReadyCount = useRef(0)
+
+  const handleModelReady = useCallback(() => {
+    modelsReadyCount.current++
+    if (!initialReady.current && modelsReadyCount.current >= 2) {
+      initialReady.current = true
+      setTimeout(() => {
+        setCurtainFading(true)
+        setTimeout(() => setCurtainVisible(false), 1000)
+      }, 500)
+    }
+  }, [])
+
+  // 安全閥：8 秒內模型未就緒則強制收起
+  useEffect(() => {
+    const t = setTimeout(() => {
+      if (!initialReady.current) {
+        initialReady.current = true
+        setCurtainFading(true)
+        setTimeout(() => setCurtainVisible(false), 1000)
+      }
+    }, 8000)
+    return () => clearTimeout(t)
+  }, [])
+
   const fetchData = useRef(null)
   fetchData.current = () => {
     return fetch(API_URL)
@@ -469,12 +682,26 @@ function App() {
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const resetGame = () => {
-    setGameState('FETCHING')
-    setTurn(0)
-    setLog('正在尋找倖存的人類樣本...')
-    setPlayerDamage([])
-    setEnemyDamage([])
-    fetchData.current()
+    // 先拉起過場幕，遮蔽死亡 → idle 的不合理切換
+    setCurtainVisible(true)
+    setCurtainFading(false)
+    setCurtainText('重新啟動循環...')
+
+    // 幕完全不透明後再重置狀態
+    setTimeout(() => {
+      setGameState('FETCHING')
+      setTurn(0)
+      setLog('正在尋找倖存的人類樣本...')
+      setPlayerDamage([])
+      setEnemyDamage([])
+      fetchData.current().finally(() => {
+        // 等 crossFade 動畫完成後再收幕
+        setTimeout(() => {
+          setCurtainFading(true)
+          setTimeout(() => setCurtainVisible(false), 1000)
+        }, 800)
+      })
+    }, 600)
   }
 
   const addDamage = (target, value) => {
@@ -537,78 +764,12 @@ function App() {
     runBattleStep(1, playerHero, enemyHero)
   }
 
+  const responsive = useResponsive()
+
   return (
-    <div style={{ width: '100vw', height: '100vh', background: '#020202', position: 'relative', overflow: 'hidden' }}>
-      <div style={{
-        position: 'absolute', top: 0, left: 0, right: 0, padding: '30px 60px',
-        zIndex: 10, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start',
-        background: 'linear-gradient(to bottom, rgba(0,0,0,0.8), transparent)',
-        pointerEvents: 'none',
-        boxSizing: 'border-box',
-        color: '#eee'
-      }}>
-        <div style={{ width: '300px' }}>
-          <h2 style={{ margin: 0, color: '#4ade80', fontSize: '1rem', opacity: 0.8 }}>{playerHero?.Name}</h2>
-          <div style={{ fontSize: '2.5rem', fontWeight: '900', color: '#4ade80' }}>HP {playerHero?.currentHP}</div>
-        </div>
-
-        <div style={{ flex: 1, textAlign: 'center', pointerEvents: 'auto' }}>
-          <h1 style={{ margin: 0, color: '#ff1111', letterSpacing: '10px', fontSize: '2rem', textShadow: '0 0 20px rgba(255,0,0,0.6)' }}>ZOMBIE ARENA</h1>
-          <div style={{
-            background: 'rgba(0,0,0,0.6)', padding: '10px 25px', marginTop: '15px',
-            borderRadius: '2px', display: 'inline-block', border: '1px solid #444',
-            color: 'white', fontWeight: 'bold', fontSize: '0.9rem'
-          }}>
-            {gameState === 'IDLE' ? '等待指令' : log}
-          </div>
-          {turn > 0 && <div style={{ color: '#ffcc00', marginTop: '8px', fontSize: '1.2rem', fontWeight: 'bold' }}>ROUND {turn}</div>}
-        </div>
-
-        <div style={{ width: '300px', textAlign: 'right' }}>
-          <h2 style={{ margin: 0, color: '#f87171', fontSize: '1rem', opacity: 0.8 }}>{enemyHero?.Name}</h2>
-          <div style={{ fontSize: '2.5rem', fontWeight: '900', color: '#f87171' }}>HP {enemyHero?.currentHP}</div>
-        </div>
-      </div>
-
-      {gameState === 'IDLE' && turn === 0 && (
-        <div style={{ position: 'absolute', bottom: 60, width: '100%', display: 'flex', justifyContent: 'center', zIndex: 10 }}>
-          <button onClick={startAutoBattle} style={{
-            padding: '18px 70px', fontSize: '1.5rem', cursor: 'pointer', background: '#990000',
-            color: 'white', border: '2px solid #ff0000', borderRadius: '4px', fontWeight: '900',
-            boxShadow: '0 0 30px rgba(153,0,0,0.5)', transition: 'transform 0.1s'
-          }}>
-            進入屠殺
-          </button>
-        </div>
-      )}
-
-      {gameState === 'GAMEOVER' && (
-        <div style={{ position: 'absolute', bottom: 60, width: '100%', display: 'flex', justifyContent: 'center', zIndex: 10 }}>
-          <button onClick={resetGame} style={{
-            padding: '15px 40px', fontSize: '1.1rem', cursor: 'pointer', background: 'white',
-            color: 'black', border: 'none', fontWeight: 'bold'
-          }}>
-            重啟循環
-          </button>
-        </div>
-      )}
-
-      {gameState !== 'IDLE' && gameState !== 'FETCHING' && gameState !== 'GAMEOVER' && (
-        <div style={{ position: 'absolute', bottom: 20, right: 30, zIndex: 10 }}>
-          <button
-            onClick={() => setSpeed(s => { const order = [1, 2, 4]; return order[(order.indexOf(s) + 1) % 3] })}
-            style={{
-              padding: '8px 18px', fontSize: '1rem', cursor: 'pointer',
-              background: 'rgba(50,50,50,0.85)', color: '#ff4444',
-              border: '1px solid #666', borderRadius: '4px', fontWeight: 'bold',
-            }}
-          >
-            x{speed}
-          </button>
-        </div>
-      )}
-
-      <Canvas camera={{ position: [0, 3, 10], fov: 45 }} shadows>
+    <div style={{ width: '100vw', height: '100dvh', background: '#020202', position: 'relative', overflow: 'hidden', touchAction: 'none' }}>
+      {/* ── 3D Canvas (底層) ── */}
+      <Canvas style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' }} camera={{ position: responsive.camPos, fov: responsive.fov }} shadows dpr={responsive.dpr}>
         <Suspense fallback={null}>
           <Arena />
           {!loading && playerHero && (
@@ -618,6 +779,8 @@ function App() {
               isPlayer={true}
               gameState={gameState}
               damagePopups={playerDamage}
+              onModelReady={handleModelReady}
+              textScale={responsive.textScale}
             />
           )}
           {!loading && enemyHero && (
@@ -627,16 +790,67 @@ function App() {
               isPlayer={false}
               gameState={gameState}
               damagePopups={enemyDamage}
+              onModelReady={handleModelReady}
+              textScale={responsive.textScale}
             />
           )}
-          <OrbitControls
-            target={[0, 1.5, 0]}
-            enableRotate={false}
-            enablePan={false}
-            enableZoom={false}
-          />
+          <ResponsiveCamera fov={responsive.fov} position={responsive.camPos} target={responsive.camTarget} />
         </Suspense>
       </Canvas>
+
+      {/* ── 直式提示 ── */}
+      {responsive.device === 'mobile' && responsive.isPortrait && (
+        <div className="orient-hint">
+          <span className="orient-icon">📱↻</span>
+          橫向持握體驗更佳
+        </div>
+      )}
+
+      {/* ── HUD ── */}
+      <div className="game-hud">
+        <div className="hud-hero">
+          <h2 className="hud-hero-name" style={{ color: '#4ade80' }}>{playerHero?.Name}</h2>
+          <div className="hud-hero-hp" style={{ color: '#4ade80' }}>HP {playerHero?.currentHP}</div>
+        </div>
+
+        <div className="hud-center">
+          <h1 className="hud-title">全球感染</h1>
+          <div className="hud-log">
+            {gameState === 'IDLE' ? '等待指令' : log}
+          </div>
+          {turn > 0 && <div className="hud-round">ROUND {turn}</div>}
+        </div>
+
+        <div className="hud-hero" style={{ textAlign: 'right' }}>
+          <h2 className="hud-hero-name" style={{ color: '#f87171' }}>{enemyHero?.Name}</h2>
+          <div className="hud-hero-hp" style={{ color: '#f87171' }}>HP {enemyHero?.currentHP}</div>
+        </div>
+      </div>
+
+      {gameState === 'IDLE' && turn === 0 && (
+        <div className="btn-bottom-center">
+          <button onClick={startAutoBattle} className="btn-start">進入屠殺</button>
+        </div>
+      )}
+
+      {gameState === 'GAMEOVER' && (
+        <div className="btn-bottom-center">
+          <button onClick={resetGame} className="btn-reset">重啟循環</button>
+        </div>
+      )}
+
+      {gameState !== 'IDLE' && gameState !== 'FETCHING' && gameState !== 'GAMEOVER' && (
+        <div className="btn-speed-wrap">
+          <button
+            onClick={() => setSpeed(s => { const order = [1, 2, 4]; return order[(order.indexOf(s) + 1) % 3] })}
+            className="btn-speed"
+          >
+            x{speed}
+          </button>
+        </div>
+      )}
+
+      <TransitionOverlay visible={curtainVisible} fading={curtainFading} text={curtainText} />
     </div>
   )
 }
