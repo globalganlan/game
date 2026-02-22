@@ -77,7 +77,7 @@ function DamagePopup({ value, position, textScale = 1 }) {
 
   useFrame((state, delta) => {
     if (ref.current) {
-      ref.current.position.y += delta * 1.5
+      ref.current.position.y = ref.current.position.y + delta * 0.2
       setOpacity(prev => Math.max(0, prev - delta * 0.8))
     }
   })
@@ -263,6 +263,55 @@ function ZombieModel({ isPlayer, state, onReady }) {
   )
 }
 
+/** 建立圓角矩形 Shape（中心為原點） */
+function makeRoundedRect(w, h, r) {
+  r = Math.min(r, w / 2, h / 2)
+  const shape = new THREE.Shape()
+  shape.moveTo(-w / 2 + r, -h / 2)
+  shape.lineTo(w / 2 - r, -h / 2)
+  shape.quadraticCurveTo(w / 2, -h / 2, w / 2, -h / 2 + r)
+  shape.lineTo(w / 2, h / 2 - r)
+  shape.quadraticCurveTo(w / 2, h / 2, w / 2 - r, h / 2)
+  shape.lineTo(-w / 2 + r, h / 2)
+  shape.quadraticCurveTo(-w / 2, h / 2, -w / 2, h / 2 - r)
+  shape.lineTo(-w / 2, -h / 2 + r)
+  shape.quadraticCurveTo(-w / 2, -h / 2, -w / 2 + r, -h / 2)
+  return shape
+}
+
+/** 3D 血條：背景灰 + 前景色，始終面向鏡頭（圓角） */
+function HealthBar3D({ position, ratio, width = 1.6, height = 0.12, color = '#1aff50' }) {
+  const bgMat = useMemo(() => new THREE.MeshBasicMaterial({ color: '#333', transparent: true, opacity: 0.6, depthTest: false }), [])
+  const fgMat = useMemo(() => new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.9, depthTest: false }), [color])
+
+  const clampedRatio = Math.max(0, Math.min(1, ratio))
+  const radius = height * 0.5  // 全圓角（藥丸形）
+
+  const bgGeo = useMemo(() => new THREE.ShapeGeometry(makeRoundedRect(width, height, radius)), [width, height, radius])
+  const fgGeo = useMemo(() => {
+    if (clampedRatio <= 0) return null
+    const fgW = width * clampedRatio
+    const fgH = height * 0.8
+    return new THREE.ShapeGeometry(makeRoundedRect(fgW, fgH, Math.min(radius, fgW / 2, fgH / 2)))
+  }, [width, height, clampedRatio, radius])
+
+  return (
+    <Billboard position={position} renderOrder={16}>
+      {/* 背景條 */}
+      <mesh position={[0, 0, 0]} geometry={bgGeo} material={bgMat} renderOrder={16} />
+      {/* 前景條（從左側開始縮短） */}
+      {clampedRatio > 0 && fgGeo && (
+        <mesh
+          position={[(clampedRatio - 1) * width * 0.5, 0, 0.001]}
+          geometry={fgGeo}
+          material={fgMat}
+          renderOrder={17}
+        />
+      )}
+    </Billboard>
+  )
+}
+
 function Hero({ position, heroData, isPlayer, gameState, damagePopups, onModelReady, textScale = 1 }) {
   const meshRef = useRef()
   const [basePosition] = useState(position)
@@ -298,10 +347,15 @@ function Hero({ position, heroData, isPlayer, gameState, damagePopups, onModelRe
         <Text fontSize={0.4 * textScale} color="white" outlineColor="black" outlineWidth={0.06}>
           {heroData.Name}
         </Text>
-        <Text position={[0, -0.5, 0]} fontSize={0.3 * textScale} color={isPlayer ? '#4ade80' : '#f87171'} outlineColor="black" outlineWidth={0.03}>
-          HP: {Math.max(0, heroData.currentHP)}
-        </Text>
       </Billboard>
+      {/* 3D 血條 */}
+      <HealthBar3D
+        position={[0, 3.0, 0]}
+        ratio={Math.max(0, heroData.currentHP) / (heroData.HP || 1)}
+        width={1.6 * textScale}
+        height={0.12 * textScale}
+        color={isPlayer ? '#1aff50' : '#f00'}
+      />
     </group>
   )
 }
@@ -809,8 +863,14 @@ function App() {
       {/* ── HUD ── */}
       <div className="game-hud">
         <div className="hud-hero">
-          <h2 className="hud-hero-name" style={{ color: '#4ade80' }}>{playerHero?.Name}</h2>
-          <div className="hud-hero-hp" style={{ color: '#4ade80' }}>HP {playerHero?.currentHP}</div>
+          <h2 className="hud-hero-name" style={{ color: '#1aff50' }}>{playerHero?.Name}</h2>
+          <div className="hud-hp-bar-wrap">
+            <div className="hud-hp-bar" style={{
+              width: `${Math.max(0, (playerHero?.currentHP ?? 0) / (playerHero?.HP || 1)) * 100}%`,
+              background: '#1aff50',
+            }} />
+          </div>
+          <div className="hud-hp-text" style={{ color: '#1aff50' }}>{Math.max(0, playerHero?.currentHP ?? 0)} / {playerHero?.HP}</div>
         </div>
 
         <div className="hud-center">
@@ -822,8 +882,14 @@ function App() {
         </div>
 
         <div className="hud-hero" style={{ textAlign: 'right' }}>
-          <h2 className="hud-hero-name" style={{ color: '#f87171' }}>{enemyHero?.Name}</h2>
-          <div className="hud-hero-hp" style={{ color: '#f87171' }}>HP {enemyHero?.currentHP}</div>
+          <h2 className="hud-hero-name" style={{ color: '#f00' }}>{enemyHero?.Name}</h2>
+          <div className="hud-hp-bar-wrap">
+            <div className="hud-hp-bar" style={{
+              width: `${Math.max(0, (enemyHero?.currentHP ?? 0) / (enemyHero?.HP || 1)) * 100}%`,
+              background: '#f00',
+            }} />
+          </div>
+          <div className="hud-hp-text" style={{ color: '#f00' }}>{Math.max(0, enemyHero?.currentHP ?? 0)} / {enemyHero?.HP}</div>
         </div>
       </div>
 
