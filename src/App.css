@@ -211,7 +211,7 @@
 
 /* ── Mobile-specific ── */
 
-@media (max-width: 480px) {
+@media (max-width: 640px) {
   .game-hud {
     padding: 8px 8px;
     padding-top: max(8px, env(safe-area-inset-top));
@@ -223,26 +223,41 @@
 }
 
 /* 直式手機：HUD 改為上下堆疊避免擠壓 */
-@media (max-width: 480px) and (orientation: portrait) {
+@media (max-width: 640px) and (orientation: portrait) {
   .game-hud {
     flex-wrap: wrap;
-    justify-content: center;
-    gap: 2px 12px;
+    justify-content: space-between;
+    gap: 4px 0;
     padding-bottom: 4px;
-  }
-  .hud-hero {
-    order: 1;
-    flex: 0 0 45%;
   }
   .hud-center {
     order: 0;
     flex: 0 0 100%;
   }
+  .hud-hero.hud-left {
+    order: 1;
+    flex: 0 1 48%;
+    text-align: left;
+  }
+  .hud-hero.hud-right {
+    order: 2;
+    flex: 0 1 48%;
+    text-align: right;
+  }
+  .hud-hero.hud-right .hud-hp-bar-wrap {
+    margin-left: auto;
+  }
+  .hud-hp-bar-wrap {
+    width: clamp(80px, 22vw, 160px);
+  }
   .hud-title {
     font-size: clamp(0.85rem, 5vw, 1.3rem);
   }
-  .hud-hero-hp {
-    font-size: clamp(1rem, 6vw, 1.6rem);
+  .hud-hero-name {
+    font-size: clamp(0.6rem, 2.5vw, 0.9rem);
+  }
+  .hud-hp-text {
+    font-size: clamp(0.5rem, 2vw, 0.75rem);
   }
 }
 

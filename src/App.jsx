@@ -44,19 +44,19 @@ function useResponsive() {
     const { device, isPortrait, aspect } = info
     // 直式手機需要更高的鏡頭 + 更廣的 FOV 才能看到整個戰場
     if (device === 'mobile' && isPortrait) {
-      return { device, isPortrait, fov: 72, camPos: [0, 5, 15], camTarget: [0, 1.0, 0], textScale: 0.55, dpr: [1, 1.5] }
+      return { device, isPortrait, fov: 72, camPos: [0, 5, 15], camTarget: [0, 2.6, 0], textScale: 0.55, dpr: [1, 1.5] }
     }
     if (device === 'mobile') {
-      return { device, isPortrait, fov: 60, camPos: [0, 3.5, 13], camTarget: [0, 1.2, 0], textScale: 0.6, dpr: [1, 1.5] }
+      return { device, isPortrait, fov: 60, camPos: [0, 3.5, 13], camTarget: [0, 2.6, 0], textScale: 0.6, dpr: [1, 1.5] }
     }
     if (device === 'tablet' && isPortrait) {
-      return { device, isPortrait, fov: 62, camPos: [0, 4.5, 14], camTarget: [0, 1.2, 0], textScale: 0.7, dpr: [1, 2] }
+      return { device, isPortrait, fov: 62, camPos: [0, 4.5, 14], camTarget: [0, 2.6, 0], textScale: 0.7, dpr: [1, 2] }
     }
     if (device === 'tablet') {
-      return { device, isPortrait, fov: 50, camPos: [0, 3.2, 11], camTarget: [0, 1.3, 0], textScale: 0.8, dpr: [1, 2] }
+      return { device, isPortrait, fov: 50, camPos: [0, 3.2, 11], camTarget: [0, 2.6, 0], textScale: 0.8, dpr: [1, 2] }
     }
     // desktop
-    return { device, isPortrait: false, fov: 45, camPos: [0, 3, 10], camTarget: [0, 1.5, 0], textScale: 1.0, dpr: [1, 2] }
+    return { device, isPortrait: false, fov: 45, camPos: [0, 3, 10], camTarget: [0, 2.6, 0], textScale: 1.0, dpr: [1, 2] }
   }, [info])
 }
 
@@ -340,7 +340,7 @@ function Hero({ position, heroData, isPlayer, gameState, damagePopups, onModelRe
       </Suspense>
 
       {damagePopups.map(pop => (
-        <DamagePopup key={pop.id} value={pop.value} position={[0, 4.5, 0]} textScale={textScale} />
+        <DamagePopup key={pop.id} value={pop.value} position={[0, 2.5, 0]} textScale={textScale} />
       ))}
 
       <Billboard position={[0, 3.5, 0]} renderOrder={15}>
@@ -539,7 +539,7 @@ function Arena() {
       const x = (Math.random() - 0.5) * 35
       const z = (Math.random() - 0.5) * 35
       // 排除區 = 可視戰場範圍 + 一點點餘裕
-      if (Math.abs(x) < 5 && z > -5 && z < 13) continue
+      if (Math.abs(x) < 6 && z > -16 && z < 16) continue
 
       const isWall = items.length < 12
       const type = isWall
@@ -862,7 +862,7 @@ function App() {
 
       {/* ── HUD ── */}
       <div className="game-hud">
-        <div className="hud-hero">
+        <div className="hud-hero hud-left">
           <h2 className="hud-hero-name" style={{ color: '#1aff50' }}>{playerHero?.Name}</h2>
           <div className="hud-hp-bar-wrap">
             <div className="hud-hp-bar" style={{
@@ -881,7 +881,7 @@ function App() {
           {turn > 0 && <div className="hud-round">ROUND {turn}</div>}
         </div>
 
-        <div className="hud-hero" style={{ textAlign: 'right' }}>
+        <div className="hud-hero hud-right" style={{ textAlign: 'right' }}>
           <h2 className="hud-hero-name" style={{ color: '#f00' }}>{enemyHero?.Name}</h2>
           <div className="hud-hp-bar-wrap">
             <div className="hud-hp-bar" style={{
