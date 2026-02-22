@@ -775,7 +775,7 @@ function App() {
 
     setGameState('PLAYER_ATTACKING')
     setLog(`ROUND ${currentTurn}：玩家發起進攻！`)
-    await delay(600)
+    await delay(1200)
 
     setGameState('PLAYER_STRIKING')
     const dmgToEnemy = pHero.ATK
@@ -794,7 +794,7 @@ function App() {
 
     setGameState('ENEMY_ATTACKING')
     setLog(`ROUND ${currentTurn}：敵人瘋狂撕咬！`)
-    await delay(600)
+    await delay(1200)
 
     setGameState('ENEMY_STRIKING')
     const dmgToPlayer = eHero.ATK
