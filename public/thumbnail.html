@@ -80,12 +80,15 @@ if (!model) {
     const center = new THREE.Vector3();
     box.getCenter(center);
 
-    // aim at upper body: shift target upward and move camera closer
-    const upperCenterY = center.y + sizeVec.y * 0.25;
+    // aim at head (approx 80-85% height) and zoom in
+    const headTargetY = box.min.y + sizeVec.y * 0.82; 
     const maxDim = Math.max(sizeVec.x, sizeVec.y, sizeVec.z);
-    const distance = maxDim * 0.9;
-    camera.position.set(center.x, upperCenterY + sizeVec.y * 0.15, center.z + distance);
-    camera.lookAt(center.x, upperCenterY, center.z);
+    // closer distance for headshot
+    const distance = maxDim * 0.6; 
+    
+    // Position camera at head height but pulled back
+    camera.position.set(center.x, headTargetY + sizeVec.y * 0.05, center.z + distance);
+    camera.lookAt(center.x, headTargetY, center.z);
 
     const amb = new THREE.AmbientLight(0xffffff, 0.3);
     scene.add(amb);

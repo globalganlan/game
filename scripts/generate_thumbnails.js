@@ -53,6 +53,13 @@ function writeDataUrlToFile(dataUrl, outPath) {
       if (!/^zombie/i.test(name)) continue;
       const dir = path.join(modelsRoot, name);
       const files = fs.readdirSync(dir);
+      
+      const outPath = path.join(dir, 'thumbnail.png');
+      if (fs.existsSync(outPath)) {
+        console.log('Thumbnail exists, skipping:', name);
+        continue;
+      }
+
       const fbx = files.find(f => /idle.*\.fbx$/i.test(f)) || files.find(f => /\.fbx$/i.test(f));
       if (!fbx) {
         console.log('no fbx for', name); continue;
@@ -77,7 +84,7 @@ function writeDataUrlToFile(dataUrl, outPath) {
         return c.toDataURL('image/png');
       });
 
-      const outPath = path.join(dir, `${name}_thumbnail.png`);
+      // outPath is defined at top of loop
       writeDataUrlToFile(dataUrl, outPath);
       console.log('Saved', outPath);
     }

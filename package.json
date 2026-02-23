@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
     "generate:thumbnails": "node scripts/generate_thumbnails.js"
@@ -22,6 +22,7 @@
     "@eslint/js": "^9.39.1",
     "@types/react": "^19.2.7",
     "@types/react-dom": "^19.2.3",
+    "@types/three": "^0.183.1",
     "@vitejs/plugin-react": "^4.7.0",
     "eslint": "^9.39.1",
     "eslint-plugin-react-hooks": "^7.0.1",
@@ -29,6 +30,7 @@
     "express": "^5.2.1",
     "globals": "^16.5.0",
     "puppeteer": "^24.37.5",
+    "typescript": "^5.9.3",
     "vite": "^5.4.21"
   }
 }

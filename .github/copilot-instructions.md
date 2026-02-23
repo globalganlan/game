@@ -6,14 +6,19 @@
 ## 專案概覽
 
 - **名稱**：全球感染 (GlobalGanLan) — 3D 喪屍對戰競技場
-- **技術棧**：React 18 + Vite + @react-three/fiber + @react-three/drei + Three.js
-- **主程式**：`src/App.jsx`（所有 3D 元件與遊戲邏輯）
+- **技術棧**：React 18 + Vite + @react-three/fiber + @react-three/drei + Three.js + TypeScript
+- **主程式**：`src/App.tsx`（遊戲邏輯）+ `src/components/`（3D 元件拆分）
 - **樣式**：`src/App.css`（HUD、按鈕、RWD media queries）
-- **模型**：`public/models/zombie_1/` 和 `zombie_2/`（OBJ + FBX）
+- **模型**：`public/models/zombie_1/` ~ `zombie_6/`（FBX 原始 + GLB 壓縮）
 
 ## 架構重點
 
-1. **模型**：OBJ（TripoSR 頂點色彩）+ FBX（Mixamo 骨骼動畫），用 `SkeletonUtils.clone()` 克隆（不可用 `.clone()`）
+1. **模型格式**：GLB（Draco 壓縮 + JPEG 貼圖），由 FBX 透過 Blender 批次轉換而來
+   - `zombie_X.glb` — Mesh + 骨架（Draco 壓縮）
+   - `zombie_X_{idle|attack|hurt|dying}.glb` — 只含動畫（無幾何體，~100 KB）
+   - 前端使用 `GLTFLoader` + `DRACOLoader`（本地 WASM 解碼器在 `public/draco/`）
+   - 載入器：`src/loaders/glbLoader.ts`（全域快取 + Suspense 整合）
+2. **克隆**：`SkeletonUtils.clone()`（不可用 `.clone()`，SkinnedMesh 必用前者）
 2. **動畫**：切換用 `crossFadeTo()`，不可用 `stop()→play()`（會 bind-pose 閃現）
 3. **場景要素**（五者連動，改一個必全調）：
    - Ground: `PlaneGeometry(60, 60, 64, 64)`
@@ -28,6 +33,9 @@
 ## 關鍵陷阱（每次修改前請回顧）
 
 - `idle.clone()` ≠ `SkeletonUtils.clone(idle)`（SkinnedMesh 必用後者）
+- GLB Armature 保留 Blender Z-up 座標系 — `Box3` 站立高度在 **Z 軸** 而非 Y 軸
+- GLB 匯入需 `global_scale=100.0` 抵消 FBX 的 cm→m 0.01 縮放
+- Draco WASM 解碼器必須本地（`public/draco/`），不可用 CDN
 - `PointsMaterial` 只渲染方塊，雨用 `LineSegments` + `LineBasicMaterial`
 - PlaneGeometry X/Y → 世界 X/Z，Z → 世界 Y（高度）
 - Debris Y 要 `scale.y * 0.5`，否則漂浮
@@ -48,6 +56,15 @@
 
 | 文件 | 內容 |
 |------|------|
-| `docs/Three.js場景與模型整合筆記.md` | 完整技術知識點（13 節 + FAQ） |
+| `docs/FBX轉GLB壓縮指南.md` | FBX→GLB 批次轉換流程、Draco/Decimate/JPEG 壓縮、前端載入架構 |
+| `docs/大頭照生成指南.md` | Puppeteer + Three.js 離線渲染角色大頭照 |
 | `docs/2D-to-3D-Model-Generation-Guide.md` | TripoSR 模型生成流程 |
 | `docs/Mixamo使用指南.md` | Mixamo 動畫下載與整合 |
+
+## 工具腳本索引
+
+| 腳本 | 用途 | 使用方式 |
+|------|------|----------|
+| `scripts/fbx_to_glb.py` | FBX→GLB 批次轉換（Blender Python） | `blender --background --python scripts/fbx_to_glb.py` |
+| `scripts/convert_models.ps1` | 上述腳本的 PowerShell 包裝器 | `.\scripts\convert_models.ps1` |
+| `scripts/generate_thumbnails.js` | 角色大頭照生成（Puppeteer） | `node scripts/generate_thumbnails.js` |
