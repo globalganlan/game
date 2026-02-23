@@ -7,10 +7,18 @@ import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader'
 import * as SkeletonUtils from 'three/examples/jsm/utils/SkeletonUtils'
 import * as THREE from 'three'
 
-// Suppress THREE.Clock deprecation warning (internal to R3F)
+// Debugging disabled in production / by user request
+function pushDebug(msg) {
+  // no-op: debug overlay removed
+}
+
+// Suppress a couple noisy three.js deprecation warnings (internal to R3F)
 const originalWarn = console.warn;
 console.warn = (...args) => {
-  if (args[0] && typeof args[0] === 'string' && args[0].includes('THREE.Clock: This module has been deprecated')) return;
+  if (!args || !args[0] || typeof args[0] !== 'string') return originalWarn(...args);
+  const msg = args[0];
+  // suppress the known THREE.Clock deprecation and PCFSoftShadowMap deprecation messages
+  if (msg.includes('THREE.Clock: This module has been deprecated') || msg.includes('PCFSoftShadowMap has been deprecated')) return;
   originalWarn(...args);
 };
 
@@ -44,19 +52,19 @@ function useResponsive() {
     const { device, isPortrait, aspect } = info
     // 直式手機需要更高的鏡頭 + 更廣的 FOV 才能看到整個戰場
     if (device === 'mobile' && isPortrait) {
-      return { device, isPortrait, fov: 72, camPos: [0, 5, 15], camTarget: [0, 2.6, 0], textScale: 0.55, dpr: [1, 1.5] }
+      return { device, isPortrait, fov: 72, camPos: [0, 6, 18], camTarget: [0, 2.6, 0], textScale: 0.55, dpr: [1, 1.5] }
     }
     if (device === 'mobile') {
-      return { device, isPortrait, fov: 60, camPos: [0, 3.5, 13], camTarget: [0, 2.6, 0], textScale: 0.6, dpr: [1, 1.5] }
+      return { device, isPortrait, fov: 60, camPos: [0, 4.5, 15], camTarget: [0, 2.6, 0], textScale: 0.6, dpr: [1, 1.5] }
     }
     if (device === 'tablet' && isPortrait) {
-      return { device, isPortrait, fov: 62, camPos: [0, 4.5, 14], camTarget: [0, 2.6, 0], textScale: 0.7, dpr: [1, 2] }
+      return { device, isPortrait, fov: 62, camPos: [0, 5.5, 16], camTarget: [0, 2.6, 0], textScale: 0.7, dpr: [1, 2] }
     }
     if (device === 'tablet') {
-      return { device, isPortrait, fov: 50, camPos: [0, 3.2, 11], camTarget: [0, 2.6, 0], textScale: 0.8, dpr: [1, 2] }
+      return { device, isPortrait, fov: 50, camPos: [0, 4, 13], camTarget: [0, 2.6, 0], textScale: 0.8, dpr: [1, 2] }
     }
     // desktop
-    return { device, isPortrait: false, fov: 45, camPos: [0, 3, 10], camTarget: [0, 2.6, 0], textScale: 1.0, dpr: [1, 2] }
+    return { device, isPortrait: false, fov: 45, camPos: [0, 3.8, 13], camTarget: [0, 2.6, 0], textScale: 1.0, dpr: [1, 2] }
   }, [info])
 }
 
@@ -143,55 +151,16 @@ function TransitionOverlay({ visible, fading, text }) {
   )
 }
 
-/**
- * OBJ 與 FBX 頂點數完全一致（同一個 mesh），直接按索引 1:1 複製頂點色彩
- */
-function transferVertexColors(fbxScene, objModel) {
-  // 從 OBJ 收集頂點色彩
-  const objColors = []
-  objModel.traverse((child) => {
-    if (child.isMesh && child.geometry.attributes.color) {
-      objColors.push(child.geometry.attributes.color)
-    }
-  })
-  if (objColors.length === 0) return
-
-  // 對每個 FBX mesh 套用色彩
-  let colorIdx = 0
-  fbxScene.traverse((child) => {
-    if (!(child.isMesh || child.isSkinnedMesh)) return
-    const fbxPos = child.geometry.attributes.position
-    if (!fbxPos || colorIdx >= objColors.length) return
-
-    const objCol = objColors[colorIdx]
-    const count = Math.min(fbxPos.count, objCol.count)
-    const colors = new Float32Array(fbxPos.count * 3)
-
-    for (let i = 0; i < count; i++) {
-      colors[i * 3] = objCol.getX(i)
-      colors[i * 3 + 1] = objCol.getY(i)
-      colors[i * 3 + 2] = objCol.getZ(i)
-    }
-
-    child.geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3))
-    child.material = new THREE.MeshStandardMaterial({
-      vertexColors: true,
-      roughness: 0.7,
-      metalness: 0.1,
-      side: THREE.DoubleSide,
-    })
-    child.castShadow = true
-    child.receiveShadow = true
-    colorIdx++
-  })
-}
-
-function ZombieModel({ isPlayer, state, onReady }) {
-  const zombieId = isPlayer ? 'zombie_1' : 'zombie_2'
+function ZombieModel({ modelId, isPlayer, state, onReady, onActionDone, hurtSignal, isDragging = false }) {
+  // Stable ref for onActionDone — prevents useEffect re-fire when parent re-renders
+  const onActionDoneRef = useRef(onActionDone)
+  useEffect(() => { onActionDoneRef.current = onActionDone })
+  // modelId provided by parent via hero data; fallback to player/enemy defaults
+  const zombieId = modelId || (isPlayer ? 'zombie_1' : 'zombie_2')
   const modelFolder = `${import.meta.env.BASE_URL}models/${zombieId}`
 
   // 載入 OBJ（頂點色彩來源）
-  const objModel = useLoader(OBJLoader, `${modelFolder}/mesh.obj`)
+  // const objModel = useLoader(OBJLoader, `${modelFolder}/mesh.obj`)
 
   // 載入 Mixamo FBX 動畫
   const idle = useLoader(FBXLoader, `${modelFolder}/${zombieId}_idle.fbx`)
@@ -202,14 +171,13 @@ function ZombieModel({ isPlayer, state, onReady }) {
   // 用 SkeletonUtils.clone 正確克隆 SkinnedMesh + 骨骼，再轉移頂點色彩
   const { scene, modelScale } = useMemo(() => {
     const cloned = SkeletonUtils.clone(idle)
-    transferVertexColors(cloned, objModel)
 
     // 計算模型高度，動態決定 scale 讓角色約 2.5 單位高
     const bbox = new THREE.Box3().setFromObject(cloned)
     const height = bbox.max.y - bbox.min.y
     const s = height > 0 ? 2.5 / height : 1
     return { scene: cloned, modelScale: s }
-  }, [idle, objModel])
+  }, [idle])
 
   // 合併全部動畫 clip（正確克隆 AnimationClip）
   const animations = useMemo(() => {
@@ -223,34 +191,121 @@ function ZombieModel({ isPlayer, state, onReady }) {
 
   const groupRef = useRef()
   const prevActionRef = useRef(null)
-  const { actions } = useAnimations(animations, scene)
+  const { actions, mixer } = useAnimations(animations, scene)
 
   // 模型載入完成通知（Suspense resolve 後首次 mount 時觸發）
   useEffect(() => { if (onReady) onReady() }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   // 播放對應狀態的動畫 — 用 crossFade 避免切換時回到 bind pose 造成下蹲
+  // If the model is being dragged, skip switching animations to avoid visual glitches.
   useEffect(() => {
-    if (!actions || !actions[state]) return
+    if (isDragging) {
+      pushDebug('ZombieModel: dragging — skip state change')
+      return
+    }
+    if (!actions || !actions[state]) {
+      pushDebug(`ZombieModel: no action for state ${state} available: ${Object.keys(actions || {}).join(',')}`)
+      return
+    }
 
     const newAction = actions[state]
 
-    if (state === 'DEAD') {
+    // For single-run actions (attack, hurt, dead) play once and clamp; idle loops
+    const singleRun = state === 'DEAD' || state === 'ATTACKING' || state === 'HURT'
+    if (singleRun) {
       newAction.setLoop(THREE.LoopOnce, 1)
       newAction.clampWhenFinished = true
     } else {
       newAction.setLoop(THREE.LoopRepeat, Infinity)
     }
 
-    if (prevActionRef.current && prevActionRef.current !== newAction) {
-      newAction.reset()
-      prevActionRef.current.crossFadeTo(newAction, 0.2, true)
-      newAction.play()
-    } else {
-      newAction.reset().fadeIn(0.2).play()
+    const playAction = () => {
+      try {
+        const clipName = newAction._clip && newAction._clip.name
+        const dur = newAction._clip && newAction._clip.duration
+        // For HURT we force immediate, full-weight playback to ensure it's visible
+        if (state === 'HURT') {
+          newAction.reset()
+          newAction.time = 0
+          newAction.setEffectiveTimeScale(1)
+          newAction.setEffectiveWeight(1)
+          newAction.play()
+          pushDebug(`ZombieModel: force-play HURT clip=${clipName} dur=${dur}`)
+        } else if (prevActionRef.current && prevActionRef.current !== newAction) {
+          newAction.reset()
+          prevActionRef.current.crossFadeTo(newAction, 0.2, true)
+          newAction.play()
+          pushDebug(`ZombieModel: crossfade to ${state} clip=${clipName} dur=${dur}`)
+        } else {
+          newAction.reset().fadeIn(0.2).play()
+          pushDebug(`ZombieModel: fadeIn play ${state} clip=${clipName} dur=${dur}`)
+        }
+        prevActionRef.current = newAction
+      } catch (err) {
+        pushDebug(`ZombieModel: playAction error ${err}`)
+      }
     }
 
-    prevActionRef.current = newAction
-  }, [state, actions])
+    playAction()
+
+    // If this is a single-run action, wait for mixer 'finished' event and notify
+    let handler = null
+    if (singleRun && mixer) {
+      handler = (e) => {
+        try {
+          if (e.action === newAction) {
+            pushDebug(`ZombieModel: finished action ${state}`)
+            if (onActionDoneRef.current) onActionDoneRef.current(state)
+          }
+        } catch (err) {
+          // ignore
+        }
+      }
+      mixer.addEventListener('finished', handler)
+    }
+
+    // nothing here for external hurtSignal in this effect
+
+    return () => {
+      if (mixer && handler) mixer.removeEventListener('finished', handler)
+    }
+  }, [state, actions, mixer, isDragging])  // onActionDone excluded — read from ref
+
+  // Watch external hurtSignal and force-play HURT when it increments
+  useEffect(() => {
+    if (typeof hurtSignal === 'undefined') return
+    try {
+      const act = actions && actions['HURT']
+      if (act) {
+        act.reset()
+        act.time = 0
+        act.setEffectiveTimeScale(1)
+        act.setEffectiveWeight(1)
+        act.play()
+        pushDebug(`ZombieModel: external hurtSignal play HURT`) 
+      } else {
+        pushDebug('ZombieModel: external hurtSignal but HURT action missing')
+      }
+    } catch (err) {
+      pushDebug(`ZombieModel: external hurtSignal error ${err}`)
+    }
+  }, [hurtSignal, actions])
+
+  // Pause/resume mixer while dragging so the animation freezes in-place
+  useEffect(() => {
+    if (!mixer) return
+    try {
+      if (isDragging) {
+        mixer.timeScale = 0
+        pushDebug('ZombieModel: mixer paused for drag')
+      } else {
+        mixer.timeScale = 1
+        pushDebug('ZombieModel: mixer resumed')
+      }
+    } catch (err) {
+      pushDebug(`ZombieModel: pause/resume error ${err}`)
+    }
+  }, [isDragging, mixer])
 
   return (
     <group
@@ -312,32 +367,201 @@ function HealthBar3D({ position, ratio, width = 1.6, height = 0.12, color = '#1a
   )
 }
 
-function Hero({ position, heroData, isPlayer, gameState, damagePopups, onModelReady, textScale = 1 }) {
+/** Slot marker with optional highlight/pulse */
+function SlotMarker({ position, index, selected, color = '#ffffff', onClick, onDragStart, onDrop }) {
+  const ref = useRef()
+  useFrame((state) => {
+    if (!ref.current) return
+    const t = state.clock.getElapsedTime()
+    const pulse = selected ? 1 + Math.sin(t * 6) * 0.06 : 1
+    ref.current.scale.set(pulse, 1, pulse)
+  })
+
+  // flat, embedded on ground (rotate to lie on XZ plane). smaller y-offset to sit on ground
+  // non-interactive visual marker (slots are not directly clickable)
+  return (
+    <mesh
+      ref={ref}
+      rotation={[-Math.PI / 2, 0, 0]}
+      position={[position[0], position[1] + 0.02, position[2]]}
+      raycast={undefined}
+    >
+      <ringGeometry args={[0.62, 0.9, 64]} />
+      <meshBasicMaterial color={selected ? '#1aff50' : color} transparent opacity={selected ? 0.95 : 0.18} depthTest={false} />
+    </mesh>
+  )
+}
+
+// Thumbnail 3D preview (small Canvas) -------------------------------------------------
+function ModelPreview({ modelId }) {
+  const modelFolder = `${import.meta.env.BASE_URL}models/${modelId}`
+  const thumbName = `${modelId}_thumbnail.png`
+  const thumbUrl = `${modelFolder}/${thumbName}`
+  const [texture, setTexture] = useState(null)
+
+  useEffect(() => {
+    let mounted = true
+    // Check existence quickly, then load with TextureLoader to avoid OBJ parsing and HTML responses
+    fetch(thumbUrl, { method: 'HEAD' }).then(res => {
+      if (!mounted) return
+      if (!res.ok) {
+        setTexture(null)
+        return
+      }
+      const loader = new THREE.TextureLoader()
+      loader.load(
+        thumbUrl,
+        (tex) => { if (mounted) { tex.needsUpdate = true; setTexture(tex) } },
+        undefined,
+        () => { if (mounted) setTexture(null) }
+      )
+    }).catch(() => { if (mounted) setTexture(null) })
+
+    return () => { mounted = false }
+  }, [thumbUrl])
+
+  if (!texture) return null
+
+  return (
+    <mesh scale={[1.6, 1.6, 1]} rotation={[0, Math.PI, 0]}>
+      <planeGeometry args={[1, 1]} />
+      <meshBasicMaterial map={texture} transparent={true} />
+    </mesh>
+  )
+}
+
+function Thumbnail3D({ modelId }) {
+  const thumbUrl = `${import.meta.env.BASE_URL}models/${modelId}/${modelId}_thumbnail.png`
+  const [imgReady, setImgReady] = useState(false)
+
+  useEffect(() => {
+    let mounted = true
+    const img = new Image()
+    img.onload = () => { if (mounted) setImgReady(true) }
+    img.onerror = () => { if (mounted) setImgReady(false) }
+    img.src = thumbUrl
+    return () => { mounted = false }
+  }, [thumbUrl])
+
+  return (
+    <div className="thumb-canvas" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
+      {imgReady ? (
+        <img src={thumbUrl} alt={modelId} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+      ) : (
+        <Canvas orthographic camera={{ position: [0, 0, 5], zoom: 60 }}>
+          <ambientLight intensity={0.8} />
+          <directionalLight position={[5, 5, 5]} />
+          <Suspense fallback={null}>
+            <ModelPreview modelId={modelId} />
+          </Suspense>
+        </Canvas>
+      )}
+    </div>
+  )
+}
+
+function ThumbnailList({ heroes = [], onThumbClick, selectedIds = [] }) {
+  if (!heroes || heroes.length === 0) return null
+  return (
+    <div className="thumb-bar">
+      {heroes.map((h, i) => {
+        const id = h.ModelID || h.id || `zombie_${i + 1}`
+        const modelId = id.toString().startsWith('zombie') ? id : `zombie_${i + 1}`
+        const uid = h.id || h.ModelID || h.Name
+        const selected = selectedIds.includes(uid)
+        return (
+          <div key={i} className="thumb-card" style={{ position: 'relative', cursor: onThumbClick ? 'pointer' : 'default' }} onClick={() => onThumbClick && onThumbClick(h)}>
+            <Thumbnail3D modelId={modelId} />
+            <div className="thumb-name">{h.Name || `喪屍 ${i + 1}`}</div>
+            {selected && (
+              <div style={{ position: 'absolute', top: 6, right: 6, background: 'rgba(0,0,0,0.6)', color: '#1aff50', padding: '2px 6px', borderRadius: '6px', fontSize: '12px' }}>已上陣</div>
+            )}
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+function Hero({ position, heroData, isPlayer, gameState, actorState, uid, damagePopups, onModelReady, onActionDone, onMoveDone, hurtSignal = 0, textScale = 1, onDragStart, onDrop, slotIndex, dragSourceRef, dragPosRef, dragOffsetRef, isDragActive }) {
   const meshRef = useRef()
   const [basePosition] = useState(position)
-
-  const isAttacking = (isPlayer && gameState === 'PLAYER_ATTACKING') || (!isPlayer && gameState === 'ENEMY_ATTACKING')
-  const isHurt = (isPlayer && gameState === 'ENEMY_STRIKING') || (!isPlayer && gameState === 'PLAYER_STRIKING')
+  const isAdvancing = actorState === 'ADVANCING'
+  const isAttacking = actorState ? actorState === 'ATTACKING' : ((isPlayer && gameState === 'PLAYER_ATTACKING') || (!isPlayer && gameState === 'ENEMY_ATTACKING'))
+  const isRetreating = actorState === 'RETREATING'
+  const isHurt = actorState ? actorState === 'HURT' : ((isPlayer && gameState === 'ENEMY_STRIKING') || (!isPlayer && gameState === 'PLAYER_STRIKING'))
   const isDead = heroData.currentHP <= 0
+
+  // Check if THIS hero is being dragged by reading refs directly (not via props/state)
+  const amIDragged = () => isDragActive && dragSourceRef && dragSourceRef.current === slotIndex
+
+  // Stable refs for callbacks to avoid stale closure in useFrame
+  const onMoveDoneRef = useRef(onMoveDone)
+  useEffect(() => { onMoveDoneRef.current = onMoveDone })
+  const uidRef = useRef(uid)
+  useEffect(() => { uidRef.current = uid })
+  const moveDoneCalledRef = useRef(false)
+
+  // Reset moveDoneCalled when state changes
+  useEffect(() => {
+    moveDoneCalledRef.current = false
+  }, [actorState])
 
   useFrame((state, delta) => {
     if (isDead || !meshRef.current) return
+    if (amIDragged()) {
+      // Read drag position directly from shared ref — updated every pointermove, no re-render needed
+      const wx = dragPosRef.current.x + dragOffsetRef.current.x
+      const wz = dragPosRef.current.z + dragOffsetRef.current.z
+      meshRef.current.position.x = wx - basePosition[0]
+      meshRef.current.position.y = 0  // model stays grounded; DragPlane at y=1.25 handles the visual offset
+      meshRef.current.position.z = wz - basePosition[2]
+      return
+    }
 
-    if (isAttacking) {
-      const targetX = isPlayer ? basePosition[0] + 4 : basePosition[0] - 4
-      meshRef.current.position.x = THREE.MathUtils.lerp(meshRef.current.position.x, targetX, 0.2)
+    if (isAdvancing) {
+      // Move toward center of arena (world x=0 → local x = -basePosition[0])
+      const targetLocalX = -basePosition[0]
+      meshRef.current.position.x = THREE.MathUtils.lerp(meshRef.current.position.x, targetLocalX, 0.12)
+      meshRef.current.position.y = THREE.MathUtils.lerp(meshRef.current.position.y, 0, 0.1)
+      meshRef.current.position.z = THREE.MathUtils.lerp(meshRef.current.position.z, 0, 0.1)
+      // Signal when close enough
+      if (!moveDoneCalledRef.current && Math.abs(meshRef.current.position.x - targetLocalX) < 0.15) {
+        moveDoneCalledRef.current = true
+        if (onMoveDoneRef.current) onMoveDoneRef.current(uidRef.current)
+      }
+    } else if (isAttacking) {
+      // Stay at current position while attacking (no lerp)
+    } else if (isRetreating) {
+      // Lerp back to base (local 0,0,0)
+      meshRef.current.position.x = THREE.MathUtils.lerp(meshRef.current.position.x, 0, 0.12)
+      meshRef.current.position.y = THREE.MathUtils.lerp(meshRef.current.position.y, 0, 0.1)
+      meshRef.current.position.z = THREE.MathUtils.lerp(meshRef.current.position.z, 0, 0.1)
+      // Signal when close enough
+      if (!moveDoneCalledRef.current && Math.abs(meshRef.current.position.x) < 0.15) {
+        moveDoneCalledRef.current = true
+        if (onMoveDoneRef.current) onMoveDoneRef.current(uidRef.current)
+      }
     } else {
-      meshRef.current.position.x = THREE.MathUtils.lerp(meshRef.current.position.x, basePosition[0], 0.1)
+      // IDLE / HURT / DEAD — lerp back to base
+      meshRef.current.position.x = THREE.MathUtils.lerp(meshRef.current.position.x, 0, 0.1)
+      meshRef.current.position.y = THREE.MathUtils.lerp(meshRef.current.position.y, 0, 0.1)
+      meshRef.current.position.z = THREE.MathUtils.lerp(meshRef.current.position.z, 0, 0.1)
     }
   })
 
+  // Map actorState to ZombieModel animation state
+  // ADVANCING/RETREATING use IDLE animation (model walks via position lerp while in idle pose)
   const currentState = isDead ? 'DEAD' : (isAttacking ? 'ATTACKING' : (isHurt ? 'HURT' : 'IDLE'))
 
+  const modelId = heroData._modelId || heroData.ModelID || heroData.id || 'zombie_1'
+
   return (
-    <group position={basePosition} ref={meshRef} renderOrder={10}>
-      <Suspense fallback={null}>
-        <ZombieModel isPlayer={isPlayer} state={currentState} onReady={onModelReady} />
-      </Suspense>
+    <group position={basePosition}>
+      <group ref={meshRef} renderOrder={10} onPointerDown={(e) => { e.stopPropagation(); onDragStart && onDragStart(e); }}>
+          <Suspense fallback={null}>
+          <ZombieModel key={`${modelId}_${uid}`} modelId={modelId} isPlayer={isPlayer} state={currentState} onReady={onModelReady} onActionDone={onActionDone} hurtSignal={hurtSignal} isDragging={amIDragged()} />
+        </Suspense>
 
       {damagePopups.map(pop => (
         <DamagePopup key={pop.id} value={pop.value} position={[0, 2.5, 0]} textScale={textScale} />
@@ -356,7 +580,8 @@ function Hero({ position, heroData, isPlayer, gameState, damagePopups, onModelRe
         height={0.12 * textScale}
         color={isPlayer ? '#1aff50' : '#f00'}
       />
-    </group>
+        </group>
+      </group>
   )
 }
 
@@ -383,7 +608,6 @@ function Debris({ position, scale, rotation, color = '#222', type = 'box' }) {
         geo = new THREE.BoxGeometry(1, 1, 1, 5, 5, 5)
     }
 
-    // 簡易 hash 讓相鄰頂點位移有連貫性（模擬粗糙起伏表面）
     const hash = (x, y, z) => {
       let h = Math.sin(x * 127.1 + y * 311.7 + z * 74.7) * 43758.5453
       return h - Math.floor(h)
@@ -673,13 +897,46 @@ function App() {
   const [gameState, setGameState] = useState('FETCHING')
   const [playerHero, setPlayerHero] = useState(null)
   const [enemyHero, setEnemyHero] = useState(null)
+  const [heroesList, setHeroesList] = useState([])
   const [turn, setTurn] = useState(0)
+  const turnRef = useRef(0)
   const [log, setLog] = useState('正在尋找倖存的人類樣本...')
-  const [playerDamage, setPlayerDamage] = useState([])
-  const [enemyDamage, setEnemyDamage] = useState([])
+  const [damagePopups, setDamagePopups] = useState([])
+  const [playerHurtSignal, setPlayerHurtSignal] = useState(0)
+  const [enemyHurtSignal, setEnemyHurtSignal] = useState(0)
   const [speed, setSpeed] = useState(1)
   const speedRef = useRef(1)
   useEffect(() => { speedRef.current = speed }, [speed])
+
+  // 6 slots per side: 3 rows × 2 columns (indices: row0:0-1, row1:2-3, row2:4-5)
+  const emptySlots = Array(6).fill(null)
+  const [playerSlots, setPlayerSlots] = useState(emptySlots)
+  const [enemySlots, setEnemySlots] = useState(emptySlots)
+  // refs that always mirror latest slot state (avoid stale closure in async battle loop)
+  const pSlotsRef = useRef(emptySlots)
+  const eSlotsRef = useRef(emptySlots)
+  // Wrapper setters that keep refs in immediate sync (useEffect is too late for async loops)
+  const updatePlayerSlots = useCallback((updater) => {
+    setPlayerSlots(prev => {
+      const next = typeof updater === 'function' ? updater(prev) : updater
+      pSlotsRef.current = next
+      return next
+    })
+  }, [])
+  const updateEnemySlots = useCallback((updater) => {
+    setEnemySlots(prev => {
+      const next = typeof updater === 'function' ? updater(prev) : updater
+      eSlotsRef.current = next
+      return next
+    })
+  }, [])
+  // per-actor state map + ref helper for synchronous updates
+  const [actorStates, setActorStates] = useState({})
+  const actorStatesRef = useRef({})
+  const setActorState = (id, s) => {
+    actorStatesRef.current = { ...actorStatesRef.current, [id]: s }
+    setActorStates(actorStatesRef.current)
+  }
 
   // ── 過場幕狀態 ──
   const [curtainVisible, setCurtainVisible] = useState(true)
@@ -699,6 +956,39 @@ function App() {
     }
   }, [])
 
+  // Refs used to await model action completion during battle (per-actor)
+  const actionResolveRefs = useRef({})
+  const waitForAction = useCallback((uid) => {
+    return new Promise(resolve => { actionResolveRefs.current[uid] = resolve })
+  }, [])
+  const handleActorActionDone = useCallback((uid) => {
+    try {
+      const r = actionResolveRefs.current[uid]
+      if (r) {
+        r()
+        delete actionResolveRefs.current[uid]
+      }
+    } catch (e) { }
+  }, [])
+
+  // Refs used to await movement (advance to center / retreat to base)
+  const moveResolveRefs = useRef({})
+  const waitForMove = useCallback((uid) => {
+    return new Promise(resolve => { moveResolveRefs.current[uid] = resolve })
+  }, [])
+  const handleMoveDone = useCallback((uid) => {
+    try {
+      const r = moveResolveRefs.current[uid]
+      if (r) { r(); delete moveResolveRefs.current[uid] }
+    } catch (e) { }
+  }, [])
+
+  const addDamage = (targetUid, value) => {
+    const id = Math.random()
+    setDamagePopups(prev => [...prev, { id, uid: targetUid, value }])
+    setTimeout(() => setDamagePopups(prev => prev.filter(p => p.id !== id)), 1500)
+  }
+
   // 安全閥：8 秒內模型未就緒則強制收起
   useEffect(() => {
     const t = setTimeout(() => {
@@ -716,9 +1006,31 @@ function App() {
     return fetch(API_URL)
       .then(res => res.json())
       .then(data => {
+        setHeroesList(data || [])
         if (data && data.length > 0) {
           setPlayerHero({ ...data[0], currentHP: data[0].HP })
           setEnemyHero(data[1] ? { ...data[1], currentHP: data[1].HP } : { ...data[0], Name: '複製喪屍', currentHP: data[0].HP })
+
+          // Auto-fill enemy slots: choose random 1..min(6, data.length) unique entries
+          try {
+            const avail = [...data]
+            const maxPick = Math.min(6, avail.length)
+            const pickCount = Math.floor(Math.random() * maxPick) + 1
+            const chosen = []
+            for (let i = 0; i < pickCount; i++) {
+              const idx = Math.floor(Math.random() * avail.length)
+              chosen.push(avail.splice(idx, 1)[0])
+            }
+            const newEnemySlots = Array(6).fill(null)
+            for (let i = 0; i < chosen.length; i++) {
+              const mid = normalizeModelId(chosen[i], i)
+              newEnemySlots[i] = { ...chosen[i], slot: i, currentHP: chosen[i].HP, _uid: `${mid}_${Date.now()}_${i}`, _modelId: mid, ModelID: mid }
+            }
+            updateEnemySlots(newEnemySlots)
+          } catch (e) {
+            // ignore if anything goes wrong
+          }
+
           setGameState('IDLE')
           setLog('戰鬥準備就緒')
         }
@@ -736,20 +1048,23 @@ function App() {
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const resetGame = () => {
-    // 先拉起過場幕，遮蔽死亡 → idle 的不合理切換
     setCurtainVisible(true)
     setCurtainFading(false)
     setCurtainText('重新啟動循環...')
 
-    // 幕完全不透明後再重置狀態
     setTimeout(() => {
       setGameState('FETCHING')
       setTurn(0)
+      turnRef.current = 0
       setLog('正在尋找倖存的人類樣本...')
-      setPlayerDamage([])
-      setEnemyDamage([])
+      setDamagePopups([])
+      updatePlayerSlots(emptySlots)
+      updateEnemySlots(emptySlots)
+      actorStatesRef.current = {}
+      setActorStates({})
+      setPlayerHurtSignal(0)
+      setEnemyHurtSignal(0)
       fetchData.current().finally(() => {
-        // 等 crossFade 動畫完成後再收幕
         setTimeout(() => {
           setCurtainFading(true)
           setTimeout(() => setCurtainVisible(false), 1000)
@@ -758,96 +1073,484 @@ function App() {
     }, 600)
   }
 
-  const addDamage = (target, value) => {
-    const id = Math.random()
-    if (target === 'player') {
-      setPlayerDamage(prev => [...prev, { id, value }])
-      setTimeout(() => setPlayerDamage(prev => prev.filter(p => p.id !== id)), 1500)
-    } else {
-      setEnemyDamage(prev => [...prev, { id, value }])
-      setTimeout(() => setEnemyDamage(prev => prev.filter(p => p.id !== id)), 1500)
-    }
-  }
-
-  const runBattleStep = async (currentTurn, pHero, eHero) => {
+  // Battle loop: process actors from both sides (slots) in speed order until one side is wiped
+  const runBattleLoop = async () => {
+    setGameState('BATTLE')
+    turnRef.current = 1
+    setTurn(1)
+    // helper to compute speed
+    const getSpeed = (h) => h.SPD || h.SPEED || h.AGI || h.ATK || 1
     const delay = (ms) => new Promise(r => setTimeout(r, ms / speedRef.current))
-    setTurn(currentTurn)
 
-    setGameState('PLAYER_ATTACKING')
-    setLog(`ROUND ${currentTurn}：玩家發起進攻！`)
-    await delay(1200)
+    while (true) {
+      const players = pSlotsRef.current.map((p, i) => p ? ({ side: 'player', slot: i, hero: p }) : null).filter(Boolean)
+      const enemies = eSlotsRef.current.map((e, i) => e ? ({ side: 'enemy', slot: i, hero: e }) : null).filter(Boolean)
+      if (players.length === 0 || enemies.length === 0) break
 
-    setGameState('PLAYER_STRIKING')
-    const dmgToEnemy = pHero.ATK
-    addDamage('enemy', dmgToEnemy)
-    const nextEHP = Math.max(0, eHero.currentHP - dmgToEnemy)
-    const updatedEHero = { ...eHero, currentHP: nextEHP }
-    setEnemyHero(updatedEHero)
+      // build actor list
+      const actors = [...players, ...enemies].map(a => ({ ...a, speed: getSpeed(a.hero) }))
+      actors.sort((a, b) => b.speed - a.speed)
 
-    if (nextEHP <= 0) {
+      for (const actor of actors) {
+        // re-check alive (slot may have changed)
+        const curSideSlots = actor.side === 'player' ? pSlotsRef.current : eSlotsRef.current
+        const actorEntry = curSideSlots[actor.slot]
+        if (!actorEntry || actorEntry.currentHP <= 0) continue
+
+        const uid = actorEntry._uid
+        setLog(`ROUND ${turnRef.current}：${actor.side === 'player' ? '玩家' : '敵人'} ${actorEntry.Name} 發動攻擊`)
+
+        // ── select target FIRST (before movement) ──
+        // 2-column × 3-row layout
+        // Slot indices: row0: 0-1, row1: 2-3, row2: 4-5
+        // Front column = closer to center of arena:
+        //   Enemy front col = col 0 (x=2.0) → indices 0,2,4; back col = col 1 (x=4.5) → indices 1,3,5
+        //   Player front col = col 1 (x=-2.0) → indices 1,3,5; back col = col 0 (x=-4.5) → indices 0,2,4
+        const targetSlotsSnap = actor.side === 'player' ? eSlotsRef.current : pSlotsRef.current
+        const actorRow = Math.floor(actor.slot / 2)  // 0,1,2
+
+        // Determine front/back column indices for the TARGET side
+        let frontIndices, backIndices
+        if (actor.side === 'player') {
+          frontIndices = [0, 2, 4]
+          backIndices = [1, 3, 5]
+        } else {
+          frontIndices = [1, 3, 5]
+          backIndices = [0, 2, 4]
+        }
+
+        let target = null
+
+        // Priority 1: front column — same row first (對位), then other rows
+        const frontSameRow = frontIndices.find(idx => Math.floor(idx / 2) === actorRow)
+        if (frontSameRow !== undefined) {
+          const cand = targetSlotsSnap[frontSameRow]
+          if (cand && cand.currentHP > 0) target = { ...cand, slot: frontSameRow }
+        }
+        if (!target) {
+          for (const idx of frontIndices) {
+            if (idx === frontSameRow) continue
+            const cand = targetSlotsSnap[idx]
+            if (cand && cand.currentHP > 0) { target = { ...cand, slot: idx }; break }
+          }
+        }
+
+        // Priority 2: back column — ONLY if NO front column targets alive
+        if (!target) {
+          const anyFrontAlive = frontIndices.some(idx => {
+            const c = targetSlotsSnap[idx]
+            return c && c.currentHP > 0
+          })
+          if (!anyFrontAlive) {
+            const backSameRow = backIndices.find(idx => Math.floor(idx / 2) === actorRow)
+            if (backSameRow !== undefined) {
+              const cand = targetSlotsSnap[backSameRow]
+              if (cand && cand.currentHP > 0) target = { ...cand, slot: backSameRow }
+            }
+            if (!target) {
+              for (const idx of backIndices) {
+                if (idx === backSameRow) continue
+                const cand = targetSlotsSnap[idx]
+                if (cand && cand.currentHP > 0) { target = { ...cand, slot: idx }; break }
+              }
+            }
+          }
+        }
+
+        // Fallback: any alive at all
+        if (!target) {
+          for (let si = 0; si < targetSlotsSnap.length; si++) {
+            const cand = targetSlotsSnap[si]
+            if (cand && cand.currentHP > 0) { target = { ...cand, slot: si }; break }
+          }
+        }
+        if (!target) continue
+
+        // ── 1) ADVANCE to center ──
+        setActorState(uid, 'ADVANCING')
+        await waitForMove(uid)
+
+        // ── 2) Play ATTACK animation at center ──
+        setActorState(uid, 'ATTACKING')
+        await waitForAction(uid)
+
+        // ── 3) Apply damage to target (while attacker is still at center) ──
+        // trigger hurt animation on target
+        setActorState(target._uid, 'HURT')
+        if (actor.side === 'player') setEnemyHurtSignal(s => s + 1)
+        else setPlayerHurtSignal(s => s + 1)
+        await new Promise(r => requestAnimationFrame(() => r()))
+
+        const dmg = actorEntry.ATK || actorEntry.hero?.ATK || 1
+        addDamage(target._uid, dmg)
+        let died = false
+        if (actor.side === 'player') {
+          await new Promise(resolve => {
+            updateEnemySlots(prev => {
+              const ns = [...prev]
+              if (!ns[target.slot]) { resolve(); return ns }
+              const curHP = ns[target.slot].currentHP || 0
+              const nextHP = Math.max(0, curHP - dmg)
+              ns[target.slot] = { ...ns[target.slot], currentHP: nextHP }
+              died = nextHP <= 0
+              resolve()
+              return ns
+            })
+          })
+          if (died) {
+            const deadUid = target._uid
+            setActorState(deadUid, 'DEAD')
+            await waitForAction(deadUid)
+            updateEnemySlots(prev => { const ns = [...prev]; ns[target.slot] = null; return ns })
+          }
+        } else {
+          await new Promise(resolve => {
+            updatePlayerSlots(prev => {
+              const ns = [...prev]
+              if (!ns[target.slot]) { resolve(); return ns }
+              const curHP = ns[target.slot].currentHP || 0
+              const nextHP = Math.max(0, curHP - dmg)
+              ns[target.slot] = { ...ns[target.slot], currentHP: nextHP }
+              died = nextHP <= 0
+              resolve()
+              return ns
+            })
+          })
+          if (died) {
+            const deadUid = target._uid
+            setActorState(deadUid, 'DEAD')
+            await waitForAction(deadUid)
+            updatePlayerSlots(prev => { const ns = [...prev]; ns[target.slot] = null; return ns })
+          }
+        }
+
+        // ── 4) RETREAT back to base ──
+        setActorState(uid, 'RETREATING')
+        await waitForMove(uid)
+        // 5) Return to idle
+        setActorState(uid, 'IDLE')
+        await delay(120)
+      }
+
+      turnRef.current += 1
+      setTurn(turnRef.current)
+    }
+
+    // decide winner (read from refs for latest state)
+    const leftAlive = pSlotsRef.current.some(s => s && s.currentHP > 0)
+    const rightAlive = eSlotsRef.current.some(s => s && s.currentHP > 0)
+    if (leftAlive && !rightAlive) {
       setLog('戰鬥結果：你生存了下來，但代價是什麼？')
       setGameState('GAMEOVER')
-      return
-    }
-
-    await delay(1000)
-
-    setGameState('ENEMY_ATTACKING')
-    setLog(`ROUND ${currentTurn}：敵人瘋狂撕咬！`)
-    await delay(1200)
-
-    setGameState('ENEMY_STRIKING')
-    const dmgToPlayer = eHero.ATK
-    addDamage('player', dmgToPlayer)
-    const nextPHP = Math.max(0, pHero.currentHP - dmgToPlayer)
-    const updatedPHero = { ...pHero, currentHP: nextPHP }
-    setPlayerHero(updatedPHero)
-
-    if (nextPHP <= 0) {
+    } else if (!leftAlive && rightAlive) {
       setLog('戰鬥結果：你淪為了它們的一員...')
       setGameState('GAMEOVER')
-      return
+    } else {
+      setLog('戰鬥結束')
+      setGameState('IDLE')
     }
-
-    await delay(1200)
-    runBattleStep(currentTurn + 1, updatedPHero, updatedEHero)
   }
 
   const startAutoBattle = () => {
     if (gameState !== 'IDLE') return
-    runBattleStep(1, playerHero, enemyHero)
+    runBattleLoop()
   }
 
   const responsive = useResponsive()
+  const [selectedSlot, setSelectedSlot] = useState(null)
+  const dragSourceRef = useRef(null)
+  const [dragging, setDragging] = useState(false)
+  const dragPosRef = useRef(new THREE.Vector3())
+  const dragOffsetRef = useRef(new THREE.Vector3())
+  const dragPointerIdRef = useRef(null)
+
+  // Slot positions (6 per side): 3 rows × 2 columns, player on LEFT, enemy on RIGHT
+  // Indices: row0: 0-1, row1: 2-3, row2: 4-5 (left->right within the side)
+  const rowZ = [-3.0, 0.0, 3.0]
+  const playerColsX = [-4.5, -2.0] // two columns for player (left side)
+  const enemyColsX = [2.0, 4.5]    // two columns for enemy (right side)
+
+  const playerSlotPositions = [
+    [playerColsX[0], 0, rowZ[0]], [playerColsX[1], 0, rowZ[0]],
+    [playerColsX[0], 0, rowZ[1]], [playerColsX[1], 0, rowZ[1]],
+    [playerColsX[0], 0, rowZ[2]], [playerColsX[1], 0, rowZ[2]],
+  ]
+
+  const enemySlotPositions = [
+    [enemyColsX[0], 0, rowZ[0]], [enemyColsX[1], 0, rowZ[0]],
+    [enemyColsX[0], 0, rowZ[1]], [enemyColsX[1], 0, rowZ[1]],
+    [enemyColsX[0], 0, rowZ[2]], [enemyColsX[1], 0, rowZ[2]],
+  ]
+
+  const normalizeModelId = (h, idx = 0) => {
+    let id = h && (h.ModelID || h.id || h.Model || h.ModelId)
+    if (!id) id = `zombie_${idx + 1}`
+    id = id.toString().trim()
+    // If id is a bare number (e.g. "1", "2", "3"), prefix with "zombie_"
+    if (/^\d+$/.test(id)) id = `zombie_${id}`
+    // If still not in zombie_N format, fallback
+    if (!id.startsWith('zombie')) id = `zombie_${idx + 1}`
+    return id
+  }
+
+  // Thumbnail click: toggle hero into first empty player slot or remove if already present
+  const handleThumbnailClick = (h) => {
+    if (!h) return
+    const uid = h.id || h.ModelID || h.Name
+    const existsIndex = playerSlots.findIndex(s => s && (s.id === uid || s.ModelID === h.ModelID || s.Name === h.Name))
+    if (existsIndex !== -1) {
+      // remove if already present
+      const ns = [...playerSlots]
+      ns[existsIndex] = null
+      updatePlayerSlots(ns)
+      return
+    }
+    // If a slot is selected, place into that slot; otherwise place into first empty
+    // Priority: prefer front row (numbers 1-3) then back row (4-6)
+    // Our index mapping is: right-col top->bottom = 1,2,3 => indices [1,3,5]; left-col top->bottom = 4,5,6 => [0,2,4]
+    const priorityOrder = [1, 3, 5, 0, 2, 4]
+    let targetIndex = (selectedSlot != null) ? selectedSlot : -1
+    if (targetIndex === -1 || targetIndex == null) {
+      for (let pi of priorityOrder) {
+        if (playerSlots[pi] == null) { targetIndex = pi; break }
+      }
+    }
+    if (targetIndex === -1 || targetIndex == null) {
+      setLog('已無可用上陣位置')
+      return
+    }
+    const idx = heroesList.indexOf(h)
+    const mid = normalizeModelId(h, idx >= 0 ? idx : 0)
+    const newHero = { ...h, currentHP: h.HP, _uid: `${mid}_${Date.now()}`, _modelId: mid, ModelID: mid }
+    const ns = [...playerSlots]
+    ns[targetIndex] = newHero
+    updatePlayerSlots(ns)
+    // clear selection after placing
+    setSelectedSlot(null)
+  }
+
+  const handleSlotClick = (i) => {
+    // slots are not clickable per new UX
+  }
+
+  // Drag lifecycle: start drag from hero at index i with event.point and base pos
+  const startDrag = (i, pointerOrPoint) => {
+    dragSourceRef.current = i
+    setDragging(true)
+    const basePos = new THREE.Vector3(...playerSlotPositions[i])
+    let ip = basePos
+    if (pointerOrPoint && pointerOrPoint.point) {
+      ip = pointerOrPoint.point
+      try { dragPointerIdRef.current = pointerOrPoint.pointerId } catch (e) { dragPointerIdRef.current = null }
+    } else if (pointerOrPoint && typeof pointerOrPoint.x === 'number') {
+      ip = pointerOrPoint
+    }
+    // Force y=0 to match the ground plane used by subsequent pointermove raycasts;
+    // otherwise clicking the model surface (e.g. y=1.2) creates a negative y offset
+    // that buries the model underground during drag.
+    const projected = (ip || basePos).clone()
+    projected.y = 0
+    dragPosRef.current.copy(projected)
+    dragOffsetRef.current.copy(new THREE.Vector3().subVectors(basePos, dragPosRef.current))
+  }
+
+  const clearDrag = () => {
+    dragSourceRef.current = null
+    setSelectedSlot(null)
+    setDragging(false)
+  }
+
+  const findNearestPlayerSlot = (point) => {
+    if (!point) return { idx: -1, dist: Infinity }
+    let best = -1
+    let bestD = Infinity
+    for (let i = 0; i < playerSlotPositions.length; i++) {
+      const p = playerSlotPositions[i]
+      const d = Math.hypot(p[0] - point.x, p[2] - point.z)
+      if (d < bestD) { bestD = d; best = i }
+    }
+    return { idx: best, dist: bestD }
+  }
+
+  const endDragAt = (point) => {
+    const s = dragSourceRef.current
+    if (s == null) { clearDrag(); return }
+    const dropPoint = point || dragPosRef.current
+    const { idx, dist } = findNearestPlayerSlot(dropPoint)
+    const threshold = 1.5
+    const ns = [...playerSlots]
+    if (idx !== -1 && dist <= threshold) {
+      // swap positions between s and idx
+      const tmp = ns[s]
+      ns[s] = ns[idx]
+      ns[idx] = tmp
+      updatePlayerSlots(ns)
+    } else {
+      // revert: nothing to do because Hero will render from base positions
+    }
+    clearDrag()
+  }
+
+  // DragPlane: when dragging is enabled, track pointer move and release in world space (y=0 plane)
+  function DragPlane({ enabled }) {
+    const { gl, camera } = useThree()
+    useEffect(() => {
+      if (!enabled) return
+      const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -1.25)  // intersect at y=1.25 (model center height)
+      const tmpV = new THREE.Vector3()
+      const onMove = (e) => {
+        const rect = gl.domElement.getBoundingClientRect()
+        const x = ((e.clientX - rect.left) / rect.width) * 2 - 1
+        const y = -((e.clientY - rect.top) / rect.height) * 2 + 1
+        const pointer = new THREE.Vector2(x, y)
+        const ray = new THREE.Raycaster()
+        ray.setFromCamera(pointer, camera)
+        const ip = ray.ray.intersectPlane(plane, tmpV)
+        if (ip) {
+          dragPosRef.current.copy(ip)
+        }
+      }
+      const onUp = (e) => {
+        const rect = gl.domElement.getBoundingClientRect()
+        const x = ((e.clientX - rect.left) / rect.width) * 2 - 1
+        const y = -((e.clientY - rect.top) / rect.height) * 2 + 1
+        const pointer = new THREE.Vector2(x, y)
+        const ray = new THREE.Raycaster()
+        ray.setFromCamera(pointer, camera)
+        const ip = ray.ray.intersectPlane(plane, tmpV)
+        endDragAt(ip)
+        try {
+          if (dragPointerIdRef.current != null && gl.domElement.releasePointerCapture) {
+            gl.domElement.releasePointerCapture(dragPointerIdRef.current)
+            dragPointerIdRef.current = null
+          }
+        } catch (err) { /* ignore */ }
+      }
+      // listen on both canvas and window: pointer capture may send events to the captured target
+      gl.domElement.addEventListener('pointermove', onMove)
+      window.addEventListener('pointermove', onMove)
+      window.addEventListener('pointerup', onUp)
+      // If we have a pointerId from startDrag, ensure the canvas captures it so we reliably receive events
+      try {
+        if (dragPointerIdRef.current != null && gl.domElement.setPointerCapture) {
+          gl.domElement.setPointerCapture(dragPointerIdRef.current)
+        }
+      } catch (err) { /* ignore */ }
+      
+      return () => {
+        gl.domElement.removeEventListener('pointermove', onMove)
+        window.removeEventListener('pointermove', onMove)
+        window.removeEventListener('pointerup', onUp)
+        try {
+          if (dragPointerIdRef.current != null && gl.domElement.releasePointerCapture) {
+            gl.domElement.releasePointerCapture(dragPointerIdRef.current)
+            dragPointerIdRef.current = null
+          }
+        } catch (err) { /* ignore */ }
+      }
+    }, [enabled, gl, camera])
+    return null
+  }
+
+  const removeFromSlot = (i) => {
+    const ns = [...playerSlots]
+    ns[i] = null
+    updatePlayerSlots(ns)
+    if (selectedSlot === i) setSelectedSlot(null)
+  }
+
+  const selectedIds = playerSlots.filter(Boolean).map(h => h._modelId || h.ModelID || h.id || h.Name)
+
+  // On-screen debug overlay (show recent debug events)
+  function DebugOverlay() {
+    const [tick, setTick] = useState(0)
+    useEffect(() => {
+      const id = setInterval(() => setTick(t => (t + 1) % 100000), 500)
+      return () => clearInterval(id)
+    }, [])
+    const items = (window.__GG_DEBUG_EVENTS || []).slice(-12).reverse()
+    return (
+      <div style={{ position: 'absolute', right: 8, top: 8, zIndex: 9999, pointerEvents: 'none', width: '320px' }}>
+        <div style={{ background: 'rgba(0,0,0,0.6)', color: '#fff', padding: '8px', fontSize: '12px', borderRadius: '6px', maxHeight: '220px', overflow: 'hidden' }}>
+          <div style={{ fontWeight: 700, marginBottom: '6px' }}>DBG</div>
+          {items.map((it, idx) => <div key={idx} style={{ opacity: 0.9, whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>{it}</div>)}
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div style={{ width: '100vw', height: '100dvh', background: '#020202', position: 'relative', overflow: 'hidden', touchAction: 'none' }}>
       {/* ── 3D Canvas (底層) ── */}
-      <Canvas style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' }} camera={{ position: responsive.camPos, fov: responsive.fov }} shadows dpr={responsive.dpr}>
+      <Canvas
+        style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' }}
+        camera={{ position: responsive.camPos, fov: responsive.fov }}
+        shadows
+        dpr={responsive.dpr}
+        onCreated={({ gl }) => {
+          if (gl && gl.shadowMap) {
+            gl.shadowMap.enabled = true
+            gl.shadowMap.type = THREE.PCFShadowMap
+          }
+        }}
+      >
         <Suspense fallback={null}>
           <Arena />
-          {!loading && playerHero && (
-            <Hero
-              position={[-3.5, 0, 0]}
-              heroData={playerHero}
+          {/* battlefield slot markers (visual only) */}
+          {!loading && playerSlotPositions.map((pos, i) => (
+            <SlotMarker key={`slot${i}`} position={pos} index={i} selected={false} />
+          ))}
+          {/* enemy slot markers (visual only) */}
+          {!loading && enemySlotPositions.map((pos, i) => (
+            <SlotMarker key={`enslot${i}`} position={pos} index={i} selected={false} color={'#ff4444'} onClick={() => { /* no-op */ }} onDragStart={() => {}} onDrop={() => {}} />
+          ))}
+          {/* Render player slots (Heroes are interactive/draggable) */}
+          {!loading && playerSlots.map((p, i) => p && (
+              <Hero
+              key={`p${i}`}
+              position={playerSlotPositions[i]}
+              heroData={p}
               isPlayer={true}
+              uid={p._uid}
+              actorState={actorStates[p._uid]}
               gameState={gameState}
-              damagePopups={playerDamage}
+              damagePopups={damagePopups.filter(d => d.uid === p._uid)}
               onModelReady={handleModelReady}
+              onActionDone={() => handleActorActionDone(p._uid)}
+              onMoveDone={handleMoveDone}
+              hurtSignal={playerHurtSignal}
               textScale={responsive.textScale}
+              onDragStart={(e) => { e && e.stopPropagation(); startDrag(i, e); }}
+              onDrop={(e) => { /* noop: global DragPlane handles release */ }}
+              slotIndex={i}
+              dragSourceRef={dragSourceRef}
+              dragPosRef={dragPosRef}
+              dragOffsetRef={dragOffsetRef}
+              isDragActive={dragging}
             />
-          )}
-          {!loading && enemyHero && (
+          ))}
+
+          {/* Global drag tracker (active only while dragging) */}
+          <DragPlane enabled={dragging} />
+
+          {/* Render enemy slots */}
+          {!loading && enemySlots.map((e, i) => e && (
             <Hero
-              position={[3.5, 0, 0]}
-              heroData={enemyHero}
+              key={`e${i}`}
+              position={enemySlotPositions[i]}
+              heroData={e}
               isPlayer={false}
+              uid={e._uid}
+              actorState={actorStates[e._uid]}
               gameState={gameState}
-              damagePopups={enemyDamage}
+              damagePopups={damagePopups.filter(d => d.uid === e._uid)}
               onModelReady={handleModelReady}
+              onActionDone={() => handleActorActionDone(e._uid)}
+              onMoveDone={handleMoveDone}
+              hurtSignal={enemyHurtSignal}
               textScale={responsive.textScale}
             />
-          )}
+          ))}
           <ResponsiveCamera fov={responsive.fov} position={responsive.camPos} target={responsive.camTarget} />
         </Suspense>
       </Canvas>
@@ -862,17 +1565,6 @@ function App() {
 
       {/* ── HUD ── */}
       <div className="game-hud">
-        <div className="hud-hero hud-left">
-          <h2 className="hud-hero-name" style={{ color: '#1aff50' }}>{playerHero?.Name}</h2>
-          <div className="hud-hp-bar-wrap">
-            <div className="hud-hp-bar" style={{
-              width: `${Math.max(0, (playerHero?.currentHP ?? 0) / (playerHero?.HP || 1)) * 100}%`,
-              background: '#1aff50',
-            }} />
-          </div>
-          <div className="hud-hp-text" style={{ color: '#1aff50' }}>{Math.max(0, playerHero?.currentHP ?? 0)} / {playerHero?.HP}</div>
-        </div>
-
         <div className="hud-center">
           <h1 className="hud-title">全球感染</h1>
           <div className="hud-log">
@@ -880,18 +1572,9 @@ function App() {
           </div>
           {turn > 0 && <div className="hud-round">ROUND {turn}</div>}
         </div>
-
-        <div className="hud-hero hud-right" style={{ textAlign: 'right' }}>
-          <h2 className="hud-hero-name" style={{ color: '#f00' }}>{enemyHero?.Name}</h2>
-          <div className="hud-hp-bar-wrap">
-            <div className="hud-hp-bar" style={{
-              width: `${Math.max(0, (enemyHero?.currentHP ?? 0) / (enemyHero?.HP || 1)) * 100}%`,
-              background: '#f00',
-            }} />
-          </div>
-          <div className="hud-hp-text" style={{ color: '#f00' }}>{Math.max(0, enemyHero?.currentHP ?? 0)} / {enemyHero?.HP}</div>
-        </div>
       </div>
+
+      {/* Player slot UI removed — slots are now on the battlefield as clickable markers */}
 
       {gameState === 'IDLE' && turn === 0 && (
         <div className="btn-bottom-center">
@@ -916,6 +1599,8 @@ function App() {
         </div>
       )}
 
+      <ThumbnailList heroes={heroesList} onThumbClick={handleThumbnailClick} selectedIds={selectedIds} />
+      {/* Debug overlay removed */}
       <TransitionOverlay visible={curtainVisible} fading={curtainFading} text={curtainText} />
     </div>
   )

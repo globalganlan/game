@@ -5,11 +5,10 @@
 ---
 
 ## 🤖 AI 上下文提示（新對話請先讀此區塊）
-
+請永遠用繁體中文回答我 分析也用繁體中文打印
 > **專案**：D:\GlobalGanLan — 3D 喪屍對戰競技場（React + Three.js / R3F）
 >
 > **核心架構**（全在 `src/App.jsx` 單一檔案）：
-> - OBJ（TripoSR 頂點色彩）+ FBX（Mixamo 骨骼動畫），用 `SkeletonUtils.clone()` 克隆
 > - 動畫切換用 `crossFadeTo()`，不可用 `stop()→play()`（會 bind-pose 閃現）
 > - 程序化廢墟 Debris（5 種幾何 + hash 噪波位移 + flatShading）— **80 個，spread 35**
 > - 程序化地面（**60×60, 64×64** PlaneGeometry + edgeFade 中心壓平）
@@ -37,7 +36,6 @@
 ---
 
 ## 目錄
-1. [FBX + OBJ 頂點色彩整合](#1-fbx--obj-頂點色彩整合)
 2. [SkeletonUtils.clone 正確克隆 SkinnedMesh](#2-skeletonutilsclone-正確克隆-skinnedmesh)
 3. [動畫切換：crossFadeTo 避免 bind-pose 閃現](#3-動畫切換crossfadeto-避免-bind-pose-閃現)
 4. [模型定位與朝向](#4-模型定位與朝向)
@@ -59,49 +57,6 @@
 - TripoSR 生成的 OBJ 檔有**嵌入式頂點色彩**（每行 `v x y z r g b`）
 - Mixamo 下載的 FBX 有**骨骼動畫**但**沒有顏色**
 - 兩者來自同一個 mesh，**頂點數完全一致**
-
-### 做法：1:1 索引複製
-```javascript
-function transferVertexColors(fbxScene, objModel) {
-  const objColors = []
-  objModel.traverse((child) => {
-    if (child.isMesh && child.geometry.attributes.color)
-      objColors.push(child.geometry.attributes.color)
-  })
-
-  let colorIdx = 0
-  fbxScene.traverse((child) => {
-    if (!(child.isMesh || child.isSkinnedMesh)) return
-    const fbxPos = child.geometry.attributes.position
-    if (!fbxPos || colorIdx >= objColors.length) return
-
-    const objCol = objColors[colorIdx]
-    const count = Math.min(fbxPos.count, objCol.count)
-    const colors = new Float32Array(fbxPos.count * 3)
-
-    for (let i = 0; i < count; i++) {
-      colors[i * 3]     = objCol.getX(i)
-      colors[i * 3 + 1] = objCol.getY(i)
-      colors[i * 3 + 2] = objCol.getZ(i)
-    }
-
-    child.geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3))
-    child.material = new THREE.MeshStandardMaterial({
-      vertexColors: true,
-      roughness: 0.7,
-      metalness: 0.1,
-      side: THREE.DoubleSide,
-    })
-    colorIdx++
-  })
-}
-```
-
-### ⚠️ 注意
-- 只有 OBJ 和 FBX 來自**同一個 mesh**（頂點數相同）才能 1:1 複製
-- 如果頂點數不同，需要用 **nearest-neighbor 匹配**（較慢且可能不準）
-- Material 必須設 `vertexColors: true`，否則顏色不會顯示
-- 記得 `child.isSkinnedMesh` 也要檢查，FBX 裡的 mesh 是 SkinnedMesh 不是普通 Mesh
 
 ---
 
@@ -570,7 +525,6 @@ D:\GlobalGanLan\
 ├── src\
 │   └── App.jsx                     # 主程式（所有元件）
 └── docs\
-    ├── 2D-to-3D-Model-Generation-Guide.md
     ├── Mixamo使用指南.md
     └── Three.js場景與模型整合筆記.md    ← 本文件
 ```
