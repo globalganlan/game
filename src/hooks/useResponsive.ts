@@ -1,65 +1,61 @@
 /**
  * useResponsive — 裝置分級 hook
  *
- * 偵測 mobile / tablet / desktop 及直式 / 橫式，
+ * 偵測 mobile / tablet / desktop，
  * 回傳 FOV、鏡頭位置、文字縮放、DPR 等即用設定。
+ * 遊戲統一直屏模式，桌機用 9:16 容器。
  */
 
 import { useState, useEffect, useMemo } from 'react'
 import type { DeviceType, ResponsiveInfo } from '../types'
 
-interface RawInfo {
+interface DeviceInfo {
   device: DeviceType
-  isPortrait: boolean
-  aspect: number
+  isLandscape: boolean
 }
 
-function getInfo(): RawInfo {
+function getDeviceInfo(): DeviceInfo {
   const w = window.innerWidth
   const h = window.innerHeight
   const isPortrait = h > w
-  const aspect = w / h
   let device: DeviceType
-  if (w <= 480 || (isPortrait && w <= 600)) device = 'mobile'
-  else if (w <= 1024 || (isPortrait && w <= 800)) device = 'tablet'
+  if (w <= 480 || (isPortrait && w <= 600) || (!isPortrait && h <= 480)) device = 'mobile'
+  else if (w <= 1024 || (isPortrait && w <= 800) || (!isPortrait && h <= 800)) device = 'tablet'
   else device = 'desktop'
-  return { device, isPortrait, aspect }
+  // 桌機不算 landscape（本身就能正常顯示）
+  const isLandscape = !isPortrait && device !== 'desktop'
+  return { device, isLandscape }
 }
 
 export function useResponsive(): ResponsiveInfo {
-  const [info, setInfo] = useState<RawInfo>(getInfo)
+  const [info, setInfo] = useState<DeviceInfo>(getDeviceInfo)
 
   useEffect(() => {
-    const onResize = () => setInfo(getInfo())
+    const onResize = () => {
+      // orientationchange 延遲才能拿到正確尺寸
+      setTimeout(() => setInfo(getDeviceInfo()), 100)
+    }
     window.addEventListener('resize', onResize)
-
-    // orientationchange 需延遲才能拿到正確尺寸
-    const onOrient = () => setTimeout(onResize, 150)
-    window.addEventListener('orientationchange', onOrient)
-
+    window.addEventListener('orientationchange', onResize)
     return () => {
       window.removeEventListener('resize', onResize)
-      window.removeEventListener('orientationchange', onOrient)
+      window.removeEventListener('orientationchange', onResize)
     }
   }, [])
 
   return useMemo((): ResponsiveInfo => {
-    const { device, isPortrait } = info
+    const { device, isLandscape } = info
+    const dpr: [number, number] = device === 'mobile' ? [1, 1.5] : [1, 2]
+    const textScale = device === 'mobile' ? 0.55 : device === 'tablet' ? 0.7 : 0.8
 
-    if (device === 'mobile' && isPortrait) {
-      return { device, isPortrait, fov: 72, camPos: [0, 6, 18], camTarget: [0, 2.6, 0], textScale: 0.55, dpr: [1, 1.5] }
+    return {
+      device,
+      isLandscape,
+      fov: 65,
+      camPos: [0, 14, 12],
+      camTarget: [0, 0, 0],
+      textScale,
+      dpr,
     }
-    if (device === 'mobile') {
-      return { device, isPortrait, fov: 60, camPos: [0, 4.5, 15], camTarget: [0, 2.6, 0], textScale: 0.6, dpr: [1, 1.5] }
-    }
-    if (device === 'tablet' && isPortrait) {
-      return { device, isPortrait, fov: 62, camPos: [0, 5.5, 16], camTarget: [0, 2.6, 0], textScale: 0.7, dpr: [1, 2] }
-    }
-    if (device === 'tablet') {
-      return { device, isPortrait, fov: 50, camPos: [0, 4, 13], camTarget: [0, 2.6, 0], textScale: 0.8, dpr: [1, 2] }
-    }
-
-    // desktop
-    return { device, isPortrait: false, fov: 45, camPos: [0, 3.8, 13], camTarget: [0, 2.6, 0], textScale: 1.0, dpr: [1, 2] }
   }, [info])
 }

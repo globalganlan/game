@@ -172,11 +172,13 @@ interface SlotMarkerProps {
 export function SlotMarker({ position, selected = false, color = '#ffffff' }: SlotMarkerProps) {
   const ref = useRef<THREE.Mesh>(null)
 
+  const SQUASH = 0.6 // Y 軸壓扁比例，讓圓環呈橢圓
+
   useFrame((state) => {
     if (!ref.current) return
     const t = state.clock.getElapsedTime()
     const pulse = selected ? 1 + Math.sin(t * 6) * 0.06 : 1
-    ref.current.scale.set(pulse, 1, pulse)
+    ref.current.scale.set(pulse, SQUASH * pulse, pulse)
   })
 
   return (
@@ -185,12 +187,13 @@ export function SlotMarker({ position, selected = false, color = '#ffffff' }: Sl
       rotation={[-Math.PI / 2, 0, 0]}
       position={[position[0], position[1] + 0.02, position[2]]}
     >
-      <ringGeometry args={[0.62, 0.9, 64]} />
+      <ringGeometry args={[0.75, 0.9, 64]} />
       <meshBasicMaterial
         color={selected ? '#1aff50' : color}
         transparent
-        opacity={selected ? 0.95 : 0.18}
-        depthTest={false}
+        opacity={selected ? 0.95 : 0.5}
+        depthWrite={false}
+        depthTest
       />
     </mesh>
   )

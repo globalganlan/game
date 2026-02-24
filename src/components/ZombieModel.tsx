@@ -90,7 +90,7 @@ export function ZombieModel({
 
     const bbox = new THREE.Box3().setFromObject(cloned)
     // GLB 模型的骨架帶有 90°X 旋轉（FBX Y-up→Blender Z-up 轉換），
-    // 所以模型站立高度沿 Z 軸，不是 Y 軸。
+    // 所以模型站立高度治Z 軸，不是 Y 軸。
     // Armature 的旋轉會在渲染時把 Z 映射到 Y（世界上方）。
     const height = bbox.max.z - bbox.min.z
     const s = height > 0 ? 2.5 / height : 1
@@ -302,7 +302,7 @@ export function ZombieModel({
     <group
       ref={groupRef}
       scale={modelScale}
-      rotation={[0, isPlayer ? Math.PI / 2 : -Math.PI / 2, 0]}
+      rotation={[0, isPlayer ? Math.PI : 0, 0]}
     >
       <primitive object={scene} />
     </group>

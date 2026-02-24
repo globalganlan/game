@@ -34,6 +34,8 @@ interface HeroProps {
   onMoveDone?: (uid: string) => void
   textScale?: number
   speed?: number
+  /** 前進目標位置 ref（世界座標） */
+  moveTargetsRef?: React.RefObject<Record<string, Vector3Tuple>>
   // 拖曳相關
   onDragStart?: (e: THREE.Event) => void
   slotIndex?: number
@@ -61,6 +63,7 @@ export function Hero({
   onMoveDone,
   textScale = 1,
   speed = 1,
+  moveTargetsRef,
   onDragStart,
   slotIndex,
   dragSourceRef,
@@ -112,8 +115,10 @@ export function Hero({
     const driftLerp = Math.min(0.1 * speed, 1)
 
     if (isAdvancing) {
-      const targetLocalX = -basePosition[0]
-      const targetLocalZ = -basePosition[2]
+      // 從 moveTargetsRef 讀取目標世界座標，轉換為相對於 basePosition 的區域偏移
+      const mt = moveTargetsRef?.current?.[uid]
+      const targetLocalX = mt ? mt[0] - basePosition[0] : -basePosition[0]
+      const targetLocalZ = mt ? mt[2] - basePosition[2] : -basePosition[2]
       meshRef.current.position.x = THREE.MathUtils.lerp(meshRef.current.position.x, targetLocalX, motionLerp)
       meshRef.current.position.y = THREE.MathUtils.lerp(meshRef.current.position.y, 0, driftLerp)
       meshRef.current.position.z = THREE.MathUtils.lerp(meshRef.current.position.z, targetLocalZ, driftLerp)
@@ -165,6 +170,13 @@ export function Hero({
           if (canAdjustFormation && onDragStart) onDragStart(e as unknown as THREE.Event)
         }}
       >
+        {/* 透明 hit area — SkinnedMesh 的 CPU bounding box 不準確，
+            用一個不可見的圓柱覆蓋整個英雄範圍來攔截 pointer 事件 */}
+        <mesh position={[0, 1.5, 0]} visible={false}>
+          <cylinderGeometry args={[0.8, 0.8, 3.2, 8]} />
+          <meshBasicMaterial />
+        </mesh>
+
         <Suspense fallback={null}>
           <ZombieModel
             key={`${modelId}_${uid}`}

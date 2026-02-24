@@ -48,21 +48,125 @@ const API_URL =
 /** 6 格空陣列 */
 const EMPTY_SLOTS: (SlotHero | null)[] = Array(6).fill(null)
 
-/** 格子列 Z 座標（3 列） */
-const ROW_Z: [number, number, number] = [-3.0, 0.0, 3.0]
+/** 格子欄 X 座標（3 欄） */
+const COL_X: [number, number, number] = [-2.5, 0.0, 2.5]
 
-/** 玩家兩欄 X 座標 */
-const PLAYER_COLS_X: [number, number] = [-4.5, -2.0]
-/** 敵方兩欄 X 座標 */
-const ENEMY_COLS_X: [number, number] = [2.0, 4.5]
+/** 敵方兩排 Z 座標（前排靠近中場，後排遠離） */
+const ENEMY_ROWS_Z: [number, number] = [-3.0, -6.0]
+/** 玩家兩排 Z 座標（前排靠近中場，後排遠離） */
+const PLAYER_ROWS_Z: [number, number] = [3.0, 6.0]
 
-/** 6 格座標（row0: 0–1, row1: 2–3, row2: 4–5） */
-function buildSlotPositions(colsX: [number, number]): Vector3Tuple[] {
-  return ROW_Z.flatMap((z) => colsX.map((x): Vector3Tuple => [x, 0, z]))
+/**
+ * 6 格座標（上下分割敵我陣型）
+ *
+ * 前排 idx 0,1,2（L→R），後排 idx 3,4,5（L→R）
+ *
+ * 敵方(上方):               我方(下方):
+ *   ●  ●  ●  ← 後排(3,4,5)     ●  ●  ●  ← 前排(0,1,2)
+ *   ●  ●  ●  ← 前排(0,1,2)     ●  ●  ●  ← 後排(3,4,5)
+ */
+function buildSlotPositions(rowsZ: [number, number]): Vector3Tuple[] {
+  return rowsZ.flatMap(z => COL_X.map((x): Vector3Tuple => [x, 0, z]))
 }
 
-const PLAYER_SLOT_POSITIONS = buildSlotPositions(PLAYER_COLS_X)
-const ENEMY_SLOT_POSITIONS = buildSlotPositions(ENEMY_COLS_X)
+const PLAYER_SLOT_POSITIONS = buildSlotPositions(PLAYER_ROWS_Z)
+const ENEMY_SLOT_POSITIONS = buildSlotPositions(ENEMY_ROWS_Z)
+
+/* ────────────────────────────
+   攻擊目標選擇策略
+   ──────────────────────────── */
+
+/** 前排 idx 0,1,2；後排 idx 3,4,5 */
+const FRONT_INDICES = [0, 1, 2]
+const BACK_INDICES  = [3, 4, 5]
+
+/** 攻擊者所在欄位 (0=左, 1=中, 2=右) */
+function slotColumn(slot: number): number { return slot % 3 }
+
+/** 從候選列表中找出活著的目標，優先對位欄，其次最近欄 */
+function pickFromIndices(
+  indices: number[],
+  targetSlots: (SlotHero | null)[],
+  preferCol: number,
+): (SlotHero & { slot: number }) | null {
+  // 優先同欄
+  const sameCol = indices.find(i => slotColumn(i) === preferCol)
+  if (sameCol !== undefined) {
+    const c = targetSlots[sameCol]
+    if (c && c.currentHP > 0) return { ...c, slot: sameCol }
+  }
+  // 按欄距排序，選最靠近對位的存活目標
+  const sorted = [...indices]
+    .filter(i => i !== sameCol)
+    .sort((a, b) => Math.abs(slotColumn(a) - preferCol) - Math.abs(slotColumn(b) - preferCol))
+  for (const idx of sorted) {
+    const c = targetSlots[idx]
+    if (c && c.currentHP > 0) return { ...c, slot: idx }
+  }
+  return null
+}
+
+/** 前排是否仍有存活單位 */
+function frontAlive(targetSlots: (SlotHero | null)[]): boolean {
+  return FRONT_INDICES.some(i => { const c = targetSlots[i]; return c != null && c.currentHP > 0 })
+}
+
+/**
+ * 目標選擇策略
+ *
+ * 每個策略接收 (攻擊者欄位, 敵方 slots) → 回傳目標陣列。
+ * 回傳陣列長度 > 1 代表 AOE，= 1 為單體。
+ * 回傳 [] 代表無可攻擊目標。
+ */
+export type TargetStrategy = (
+  attackerCol: number,
+  targetSlots: (SlotHero | null)[],
+) => (SlotHero & { slot: number })[]
+
+/** 預設普攻：前排對位 → 前排其它 → 後排對位 → 後排其它 */
+const TARGET_NORMAL: TargetStrategy = (col, slots) => {
+  let t = pickFromIndices(FRONT_INDICES, slots, col)
+  if (!t && !frontAlive(slots)) {
+    t = pickFromIndices(BACK_INDICES, slots, col)
+  }
+  // 最終 fallback：任意存活
+  if (!t) {
+    for (let i = 0; i < slots.length; i++) {
+      const c = slots[i]
+      if (c && c.currentHP > 0) { t = { ...c, slot: i }; break }
+    }
+  }
+  return t ? [t] : []
+}
+
+// ── 預留擴充策略（目前未使用，之後可直接啟用） ──
+
+// /** 直擊後排：優先後排對位，後排全滅才打前排 */
+// const TARGET_BACK_ROW: TargetStrategy = (col, slots) => {
+//   let t = pickFromIndices(BACK_INDICES, slots, col)
+//   if (!t) t = pickFromIndices(FRONT_INDICES, slots, col)
+//   if (!t) { for (let i = 0; i < slots.length; i++) { const c = slots[i]; if (c && c.currentHP > 0) { t = { ...c, slot: i }; break } } }
+//   return t ? [t] : []
+// }
+
+// /** 直擊前排：無視對位，掃前排有人就打 */
+// const TARGET_FRONT_ROW: TargetStrategy = (col, slots) => {
+//   let t = pickFromIndices(FRONT_INDICES, slots, col)
+//   if (!t) t = pickFromIndices(BACK_INDICES, slots, col)
+//   if (!t) { for (let i = 0; i < slots.length; i++) { const c = slots[i]; if (c && c.currentHP > 0) { t = { ...c, slot: i }; break } } }
+//   return t ? [t] : []
+// }
+
+// /** 隨機 N 體攻擊 */
+// function makeRandomTargets(count: number): TargetStrategy {
+//   return (_col, slots) => {
+//     const alive = slots
+//       .map((c, i) => (c && c.currentHP > 0 ? { ...c, slot: i } : null))
+//       .filter(Boolean) as (SlotHero & { slot: number })[]
+//     const shuffled = alive.sort(() => Math.random() - 0.5)
+//     return shuffled.slice(0, Math.min(count, shuffled.length))
+//   }
+// }
 
 /* ────────────────────────────
    工具函式
@@ -178,6 +282,7 @@ export default function App() {
   const [speed, setSpeed] = useState(1)
   const speedRef = useRef(1)
   useEffect(() => { speedRef.current = speed }, [speed])
+  const [battleResult, setBattleResult] = useState<'victory' | 'defeat' | null>(null)
 
   /* ── 預載追蹤 ── */
   const preloadedGlbUrls = useRef(new Set<string>())
@@ -210,6 +315,8 @@ export default function App() {
   /* ── 角色狀態 ── */
   const [actorStates, setActorStates] = useState<Record<string, ActorState>>({})
   const actorStatesRef = useRef<Record<string, ActorState>>({})
+  /** 前進目標位置（世界座標），uid → [x, y, z] */
+  const moveTargetsRef = useRef<Record<string, Vector3Tuple>>({})
   const setActorState = (id: string, s: ActorState) => {
     actorStatesRef.current = { ...actorStatesRef.current, [id]: s }
     setActorStates(actorStatesRef.current)
@@ -438,6 +545,7 @@ export default function App() {
       setTurn(0); turnRef.current = 0
       setLog('正在尋找倖存的人類樣本...')
       setDamagePopups([])
+      setBattleResult(null)
       updatePlayerSlots(() => EMPTY_SLOTS)
       updateEnemySlots(() => EMPTY_SLOTS)
       actorStatesRef.current = {}
@@ -477,40 +585,31 @@ export default function App() {
         const uid = actorEntry._uid
         setLog(`ROUND ${turnRef.current}：${actor.side === 'player' ? '玩家' : '敵人'} ${actorEntry.Name} 發動攻擊`)
 
-        // ── 選擇目標 ──
+        // ── 選擇目標（使用策略模式，預設普攻） ──
         const targetSlots = actor.side === 'player' ? eSlotsRef.current : pSlotsRef.current
-        const actorRow = Math.floor(actor.slot / 2)
-        const frontIndices = actor.side === 'player' ? [0, 2, 4] : [1, 3, 5]
-        const backIndices  = actor.side === 'player' ? [1, 3, 5] : [0, 2, 4]
-        let target: (SlotHero & { slot: number }) | null = null
-
-        // 前排同列 → 前排其它 → 後排同列 → 後排其它 → 任意
-        const tryPick = (indices: number[]) => {
-          const sameRow = indices.find((idx) => Math.floor(idx / 2) === actorRow)
-          if (sameRow !== undefined) {
-            const c = targetSlots[sameRow]
-            if (c && c.currentHP > 0) return { ...c, slot: sameRow }
-          }
-          for (const idx of indices) {
-            if (idx === sameRow) continue
-            const c = targetSlots[idx]
-            if (c && c.currentHP > 0) return { ...c, slot: idx }
-          }
-          return null
-        }
-        target = tryPick(frontIndices)
-        if (!target && !frontIndices.some((i) => { const c = targetSlots[i]; return c && c.currentHP > 0 })) {
-          target = tryPick(backIndices)
-        }
-        if (!target) {
-          for (let i = 0; i < targetSlots.length; i++) {
-            const c = targetSlots[i]
-            if (c && c.currentHP > 0) { target = { ...c, slot: i }; break }
-          }
-        }
+        const col = slotColumn(actor.slot)
+        const strategy: TargetStrategy = TARGET_NORMAL // 之後可依技能切換策略
+        const targets = strategy(col, targetSlots)
+        const target = targets[0] ?? null
         if (!target) continue
 
-        // ── 1) 前進 ──
+        // ── 1) 前進：移向目標前方 ──
+        const targetPos = actor.side === 'player'
+          ? ENEMY_SLOT_POSITIONS[target.slot]
+          : PLAYER_SLOT_POSITIONS[target.slot]
+        // 單體攻擊：跑到目標前方；複數攻擊：跑到中間
+        const STOP_DIST = 2.0 // 停在目標前方的距離
+        const dir = actor.side === 'player' ? 1 : -1 // 玩家往 -Z，敵人往 +Z
+        let advX: number, advZ: number
+        if (targets.length > 1) {
+          // AOE：跑到敵方陣型中心
+          advX = 0
+          advZ = 0
+        } else {
+          advX = targetPos[0]
+          advZ = targetPos[2] + STOP_DIST * dir
+        }
+        moveTargetsRef.current = { ...moveTargetsRef.current, [uid]: [advX, 0, advZ] }
         setActorState(uid, 'ADVANCING')
         await waitForMove(uid)
 
@@ -603,9 +702,16 @@ export default function App() {
     // 判定勝負
     const leftAlive = pSlotsRef.current.some((s) => s && s.currentHP > 0)
     const rightAlive = eSlotsRef.current.some((s) => s && s.currentHP > 0)
-    if (leftAlive && !rightAlive) setLog('戰鬥結果：你生存了下來，但代價是什麼？')
-    else if (!leftAlive && rightAlive) setLog('戰鬥結果：你淪為了它們的一員...')
-    else setLog('戰鬥結束')
+    if (leftAlive && !rightAlive) {
+      setLog('戰鬥結果：你生存了下來，但代價是什麼？')
+      setBattleResult('victory')
+    } else if (!leftAlive && rightAlive) {
+      setLog('戰鬥結果：你淪為了它們的一員...')
+      setBattleResult('defeat')
+    } else {
+      setLog('戰鬥結束')
+      setBattleResult('defeat')
+    }
     setGameState('GAMEOVER')
   }
 
@@ -692,7 +798,7 @@ export default function App() {
       updatePlayerSlots((prev) => { const ns = [...prev]; ns[existsIdx] = null; return ns })
       return
     }
-    const priorityOrder = [1, 3, 5, 0, 2, 4]
+    const priorityOrder = [0, 1, 2, 3, 4, 5]
     let targetIndex = selectedSlot ?? -1
     if (targetIndex < 0) {
       for (const pi of priorityOrder) {
@@ -733,10 +839,21 @@ export default function App() {
       style={{
         width: '100vw',
         height: '100dvh',
-        background: '#020202',
+        background: '#000',
         position: 'relative',
         overflow: 'hidden',
         touchAction: 'none',
+        display: 'flex',
+        justifyContent: 'center',
+      }}
+    >
+    {/* 直屏容器 — 桌機時限制為 9:16 比例，手機直接全螢幕 */}
+    <div
+      style={{
+        position: 'relative',
+        width: responsive.device !== 'mobile' ? 'min(100vw, calc(100dvh * 9 / 16))' : '100%',
+        height: '100%',
+        overflow: 'hidden',
       }}
     >
       {/* ── 3D Canvas ── */}
@@ -756,10 +873,10 @@ export default function App() {
 
           {/* 格子標記 */}
           {PLAYER_SLOT_POSITIONS.map((pos, i) => (
-            <SlotMarker key={`ps${i}`} position={pos} />
+            <SlotMarker key={`ps${i}`} position={pos} color="#00aaff" />
           ))}
           {ENEMY_SLOT_POSITIONS.map((pos, i) => (
-            <SlotMarker key={`es${i}`} position={pos} color="#ff4444" />
+            <SlotMarker key={`es${i}`} position={pos} color="#ff2222" />
           ))}
 
           {/* 玩家英雄 */}
@@ -780,6 +897,7 @@ export default function App() {
                 onMoveDone={handleMoveDone}
                 textScale={responsive.textScale}
                 speed={speed}
+                moveTargetsRef={moveTargetsRef}
                 onDragStart={(e) => { (e as unknown as { stopPropagation: () => void }).stopPropagation(); startDrag(i, e) }}
                 slotIndex={i}
                 dragSourceRef={dragSourceRef}
@@ -817,6 +935,7 @@ export default function App() {
                 onMoveDone={handleMoveDone}
                 textScale={responsive.textScale}
                 speed={speed}
+                moveTargetsRef={moveTargetsRef}
               />
             ) : null,
           )}
@@ -825,22 +944,24 @@ export default function App() {
         </Suspense>
       </Canvas>
 
-      {/* ── 直式提示 ── */}
-      {responsive.device === 'mobile' && responsive.isPortrait && (
-        <div className="orient-hint">
-          <span className="orient-icon">📱↻</span>
-          橫向持握體驗更佳
-        </div>
-      )}
+      {/* ── 橫屏遮罩（CSS 控制顯示） ── */}
+      <div className="landscape-block">
+        <div className="landscape-block-icon">📱</div>
+        <div className="landscape-block-text">請旋轉裝置至直屏模式</div>
+      </div>
 
       {/* ── HUD ── */}
       <div className="game-hud">
-        <div className="hud-center">
-          <h1 className="hud-title">全球感染</h1>
-          <div className="hud-log">{gameState === 'IDLE' ? '等待指令' : log}</div>
-          {turn > 0 && <div className="hud-round">ROUND {turn}</div>}
-        </div>
+        {turn > 0 && gameState !== 'GAMEOVER' && <div className="hud-round">ROUND {turn}</div>}
       </div>
+
+      {/* ── 勝負標語 ── */}
+      {gameState === 'GAMEOVER' && battleResult && (
+        <div className={`battle-result-banner ${battleResult}`}>
+          <span className="banner-text">{battleResult === 'victory' ? 'VICTORY' : 'DEFEAT'}</span>
+          <span className="banner-sub">{battleResult === 'victory' ? '你生存了下來' : '你淪為了它們的一員'}</span>
+        </div>
+      )}
 
       {/* ── GAMEOVER 按鈕 ── */}
       {gameState === 'GAMEOVER' && (
@@ -883,6 +1004,7 @@ export default function App() {
         text={curtainText}
         progress={preloadProgress}
       />
+    </div>
     </div>
   )
 }

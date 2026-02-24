@@ -79,12 +79,13 @@ export type DeviceType = 'mobile' | 'tablet' | 'desktop'
 
 export interface ResponsiveInfo {
   device: DeviceType
-  isPortrait: boolean
   fov: number
   camPos: Vector3Tuple
   camTarget: Vector3Tuple
   textScale: number
   dpr: [number, number]
+  /** 手機/平板橫屏（需旋轉 UI） */
+  isLandscape: boolean
 }
 
 /* ────────────────────────────
