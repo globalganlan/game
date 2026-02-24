@@ -8,7 +8,8 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "generate:thumbnails": "node scripts/generate_thumbnails.js"
+    "generate:thumbnails": "node scripts/generate_thumbnails.js",
+    "convert:models": "powershell -ExecutionPolicy Bypass -File ./scripts/convert_models.ps1 -CleanFbx"
   },
   "dependencies": {
     "@react-three/drei": "^10.7.7",

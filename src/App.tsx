@@ -24,7 +24,7 @@ import { loadGlbShared } from './loaders/glbLoader'
 import { Arena } from './components/Arena'
 import { Hero } from './components/Hero'
 import { ResponsiveCamera, SlotMarker } from './components/SceneWidgets'
-import { TransitionOverlay, ThumbnailList } from './components/UIOverlay'
+import { TransitionOverlay, ThumbnailList, useToast } from './components/UIOverlay'
 
 import type {
   GameState,
@@ -273,6 +273,7 @@ export default function App() {
   /* ── 遊戲狀態 ── */
   const [gameState, setGameState] = useState<GameState>('PRE_BATTLE')
   const [heroesList, setHeroesList] = useState<RawHeroData[]>([])
+  const { showToast, toastElements } = useToast()
   const [turn, setTurn] = useState(0)
   const turnRef = useRef(0)
   const [log, setLog] = useState('選擇你的英雄，準備戰鬥！')
@@ -717,7 +718,7 @@ export default function App() {
 
   const startAutoBattle = () => {
     if (gameState !== 'IDLE') return
-    if (!playerSlots.some(Boolean)) { setLog('戰場上沒有你的士兵，無法開始戰鬥！'); return }
+    if (!playerSlots.some(Boolean)) { showToast('請先選擇上陣英雄'); return }
     runBattleLoop()
   }
 
@@ -796,6 +797,7 @@ export default function App() {
     })
     if (existsIdx !== -1) {
       updatePlayerSlots((prev) => { const ns = [...prev]; ns[existsIdx] = null; return ns })
+      showToast(`${h.Name || '英雄'} 已下陣`)
       return
     }
     const priorityOrder = [0, 1, 2, 3, 4, 5]
@@ -805,7 +807,7 @@ export default function App() {
         if (!playerSlots[pi]) { targetIndex = pi; break }
       }
     }
-    if (targetIndex < 0) { setLog('已無可用上陣位置'); return }
+    if (targetIndex < 0) { showToast('上陣欄位已滿，請先下陣一位英雄'); return }
     const idx = heroesList.indexOf(h)
     const mid = normalizeModelId(h, idx >= 0 ? idx : 0)
     // 用 startTransition 降低 Suspense fallback 造成的延遲感
@@ -822,6 +824,7 @@ export default function App() {
         return ns
       })
     })
+    showToast(`${h.Name || '英雄'} 已上陣`)
     setSelectedSlot(null)
   }
 
@@ -899,6 +902,10 @@ export default function App() {
                 speed={speed}
                 moveTargetsRef={moveTargetsRef}
                 onDragStart={(e) => { (e as unknown as { stopPropagation: () => void }).stopPropagation(); startDrag(i, e) }}
+                onClickRemove={() => {
+                  updatePlayerSlots((prev) => { const ns = [...prev]; ns[i] = null; return ns })
+                  showToast(`${p.Name || '英雄'} 已下陣`)
+                }}
                 slotIndex={i}
                 dragSourceRef={dragSourceRef}
                 dragPosRef={dragPosRef}
@@ -954,6 +961,9 @@ export default function App() {
       <div className="game-hud">
         {turn > 0 && gameState !== 'GAMEOVER' && <div className="hud-round">ROUND {turn}</div>}
       </div>
+
+      {/* ── 浮動提示 ── */}
+      {toastElements}
 
       {/* ── 勝負標語 ── */}
       {gameState === 'GAMEOVER' && battleResult && (

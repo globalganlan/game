@@ -1,7 +1,7 @@
 /**
  * ZombieModel — GLB 骨骼動畫模型
  *
- * 載入 zombie_X.glb (Mesh + 骨架) 及 idle / attack / hurt / dying 四組動畫 GLB，
+ * 載入 zombie_X.glb (Mesh + 骨架) 及 idle / attack / hurt / dying / run 五組動畫 GLB，
  * 使用 SkeletonUtils.clone() 正確複製 SkinnedMesh + 骨骼。
  * 動畫切換使用 crossFadeTo 避免 bind-pose 閃現（HURT / DEAD 除外，需強制覆蓋權重）。
  */
@@ -56,12 +56,13 @@ export function ZombieModel({
 
   const modelFolder = `${import.meta.env.BASE_URL}models/${zombieId}`
 
-  // 載入 Mesh GLB (含骨架，無動畫) + 四組動畫 GLB（觸發 Suspense）
+  // 載入 Mesh GLB (含骨架，無動畫) + 五組動畫 GLB（觸發 Suspense）
   const meshAsset  = getGlbForSuspense(`${modelFolder}/${zombieId}.glb`)
   const idleAnim   = getGlbForSuspense(`${modelFolder}/${zombieId}_idle.glb`)
   const attackAnim = getGlbForSuspense(`${modelFolder}/${zombieId}_attack.glb`)
   const hurtAnim   = getGlbForSuspense(`${modelFolder}/${zombieId}_hurt.glb`)
   const dyingAnim  = getGlbForSuspense(`${modelFolder}/${zombieId}_dying.glb`)
+  const runAnim    = getGlbForSuspense(`${modelFolder}/${zombieId}_run.glb`)
 
   // 用 SkeletonUtils.clone 正確克隆 SkinnedMesh + 骨骼
   const { scene, modelScale } = useMemo(() => {
@@ -105,17 +106,27 @@ export function ZombieModel({
       [attackAnim, 'ATTACKING'],
       [hurtAnim, 'HURT'],
       [dyingAnim, 'DEAD'],
+      [runAnim, 'RUN'],
     ]
     for (const [src, label] of sources) {
       const anim = src.animations[0]
       if (anim) {
         const clip = anim.clone()
         clip.name = `${label}_${zombieId}`
+
+        // RUN 動畫需移除根骨骼的 position track（root motion），
+        // 否則 Mixamo 的位移 + useFrame lerp 會疊加，造成跑過頭和上下彈跳。
+        if (label === 'RUN') {
+          clip.tracks = clip.tracks.filter(
+            (t) => !t.name.endsWith('.position'),
+          )
+        }
+
         clips.push(clip)
       }
     }
     return clips
-  }, [idleAnim, attackAnim, hurtAnim, dyingAnim, zombieId])
+  }, [idleAnim, attackAnim, hurtAnim, dyingAnim, runAnim, zombieId])
 
   const groupRef = useRef<THREE.Group>(null)
   const prevActionRef = useRef<THREE.AnimationAction | null>(null)

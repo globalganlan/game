@@ -220,6 +220,34 @@
   100% { transform: translateY(100vh); }
 }
 
+/* ── Toast 浮動提示 ── */
+
+.toast-item {
+  position: absolute;
+  top: 40%;
+  left: 50%;
+  transform: translate(-50%, 0);
+  animation: toastFloat 1.8s ease-out forwards;
+  background: rgba(0, 0, 0, 0.72);
+  color: #ffcc00;
+  font-size: clamp(0.75rem, 2.2vw, 1rem);
+  font-weight: 700;
+  padding: 6px 20px;
+  border-radius: 20px;
+  border: 1px solid rgba(255, 204, 0, 0.3);
+  box-shadow: 0 2px 16px rgba(0, 0, 0, 0.5);
+  letter-spacing: 1px;
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 50;
+}
+
+@keyframes toastFloat {
+  0%   { opacity: 1; transform: translate(-50%, 0); }
+  70%  { opacity: 1; }
+  100% { opacity: 0; transform: translate(-50%, -60px); }
+}
+
 /* Bottom panel: stacks button above card bar */
 .bottom-panel {
   position: absolute;
@@ -262,7 +290,7 @@
   overflow-x: auto;
   overflow-y: hidden;
   gap: 6px;
-  width: min(92vw, 880px);
+  width: min(92%, 880px);
   margin: 0 auto;
   padding: 4px 8px;
   border-radius: 8px;
@@ -270,6 +298,8 @@
   -webkit-overflow-scrolling: touch; /* for smooth scrolling on iOS */
   scrollbar-width: none; /* for Firefox */
   pointer-events: auto;
+  touch-action: pan-x;
+  user-select: none;
 }
 
 .thumb-scroll-container::-webkit-scrollbar {
@@ -290,6 +320,7 @@
   position: relative;
   transition: border-color 0.2s, box-shadow 0.2s;
   box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+  pointer-events: none;
 }
 
 .thumb-card:not(.disabled):hover {

@@ -24,7 +24,7 @@
 
 ### 2.2 輸出結構
 
-每個 zombie 資料夾轉換後會產生 5 個 GLB：
+每個 zombie 資料夾轉換後會產生 6 個 GLB：
 
 ```
 public/models/zombie_X/
@@ -32,11 +32,13 @@ public/models/zombie_X/
 ├── attack.fbx
 ├── hurt.fbx
 ├── dying.fbx
+├── run.fbx
 ├── zombie_X.glb          ← Mesh + 骨架 (Draco 壓縮 + JPEG 貼圖)
 ├── zombie_X_idle.glb     ← 動畫 only（無幾何體，~100-170 KB）
 ├── zombie_X_attack.glb   ← 動畫 only
 ├── zombie_X_hurt.glb     ← 動畫 only
-└── zombie_X_dying.glb    ← 動畫 only
+├── zombie_X_dying.glb    ← 動畫 only
+└── zombie_X_run.glb      ← 動畫 only（跑步，用於前進/後退）
 ```
 
 ### 2.3 前端載入器
@@ -158,12 +160,13 @@ loader.setDRACOLoader(dracoLoader)
 ### 5.2 ZombieModel.tsx 載入方式
 
 ```typescript
-// 載入 1 個 Mesh GLB + 4 個 Animation GLB
+// 載入 1 個 Mesh GLB + 5 個 Animation GLB
 const meshAsset  = getGlbForSuspense(`${folder}/${zombieId}.glb`)
 const idleAnim   = getGlbForSuspense(`${folder}/${zombieId}_idle.glb`)
 const attackAnim = getGlbForSuspense(`${folder}/${zombieId}_attack.glb`)
 const hurtAnim   = getGlbForSuspense(`${folder}/${zombieId}_hurt.glb`)
 const dyingAnim  = getGlbForSuspense(`${folder}/${zombieId}_dying.glb`)
+const runAnim    = getGlbForSuspense(`${folder}/${zombieId}_run.glb`)
 ```
 
 ### 5.3 重要注意：Bbox 高度沿 Z 軸
@@ -191,7 +194,7 @@ Draco WASM 檔案放在 `public/draco/`，包含：
 
 ## 6. 新增 zombie 的完整流程
 
-1. 在 `public/models/zombie_N/` 放入 4 個 FBX：`idle.fbx`、`attack.fbx`、`hurt.fbx`、`dying.fbx`
+1. 在 `public/models/zombie_N/` 放入 5 個 FBX：`idle.fbx`、`attack.fbx`、`hurt.fbx`、`dying.fbx`、`run.fbx`
 2. 執行轉換：
    ```powershell
    .\scripts\convert_models.ps1 -Only zombie_N

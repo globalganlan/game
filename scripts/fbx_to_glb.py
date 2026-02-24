@@ -9,6 +9,7 @@ FBX → GLB 批次轉換腳本 (Blender Python)
      - zombie_X_attack.glb   → 只有動畫
      - zombie_X_hurt.glb     → 只有動畫
      - zombie_X_dying.glb    → 只有動畫
+     - zombie_X_run.glb      → 只有動畫
   2. 幾何體只存一份，動畫檔極小 (~幾十 KB)
 
 用法：
@@ -26,7 +27,7 @@ FBX → GLB 批次轉換腳本 (Blender Python)
 
 需求：
   - Blender 3.6+ (內建 glTF exporter 含 Draco)
-  - FBX 檔案結構：每個 zombie_X/ 下有 idle.fbx, attack.fbx, hurt.fbx, dying.fbx
+  - FBX 檔案結構：每個 zombie_X/ 下有 idle.fbx, attack.fbx, hurt.fbx, dying.fbx, run.fbx
 """
 
 import bpy
@@ -41,7 +42,7 @@ import time
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_ROOT = os.path.dirname(SCRIPT_DIR)
 DEFAULT_MODELS_DIR = os.path.join(PROJECT_ROOT, "public", "models")
-ANIM_NAMES = ["idle", "attack", "hurt", "dying"]
+ANIM_NAMES = ["idle", "attack", "hurt", "dying", "run"]
 
 
 def parse_args():
@@ -398,7 +399,8 @@ def main():
     print("   ├── zombie_X_idle.glb      ← 動畫 only")
     print("   ├── zombie_X_attack.glb    ← 動畫 only")
     print("   ├── zombie_X_hurt.glb      ← 動畫 only")
-    print("   └── zombie_X_dying.glb     ← 動畫 only")
+    print("   ├── zombie_X_dying.glb     ← 動畫 only")
+    print("   └── zombie_X_run.glb       ← 動畫 only")
     print("\n💡 接下來需要修改前端 loader 改用 GLTFLoader 載入 .glb 檔案")
 
 

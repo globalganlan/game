@@ -28,7 +28,7 @@ export type ActorState =
   | 'DEAD'
 
 /** ZombieModel 動畫狀態（對應 FBX 動畫名） */
-export type AnimationState = 'IDLE' | 'ATTACKING' | 'HURT' | 'DEAD'
+export type AnimationState = 'IDLE' | 'ATTACKING' | 'HURT' | 'DEAD' | 'RUN'
 
 /* ────────────────────────────
    英雄資料

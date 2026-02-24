@@ -38,6 +38,7 @@ interface HeroProps {
   moveTargetsRef?: React.RefObject<Record<string, Vector3Tuple>>
   // 拖曳相關
   onDragStart?: (e: THREE.Event) => void
+  onClickRemove?: () => void
   slotIndex?: number
   dragSourceRef?: React.RefObject<number | null>
   dragPosRef?: React.RefObject<THREE.Vector3>
@@ -65,6 +66,7 @@ export function Hero({
   speed = 1,
   moveTargetsRef,
   onDragStart,
+  onClickRemove,
   slotIndex,
   dragSourceRef,
   dragPosRef,
@@ -74,6 +76,9 @@ export function Hero({
 }: HeroProps) {
   const meshRef = useRef<THREE.Group>(null)
   const [basePosition] = useState<Vector3Tuple>(position)
+
+  /** 區分點擊 vs 拖曳：記錄 pointerdown 座標，pointerup 時比較位移量 */
+  const downPosRef = useRef<{ x: number; y: number } | null>(null)
 
   const isAdvancing = actorState === 'ADVANCING'
   const isAttacking = actorState === 'ATTACKING'
@@ -156,7 +161,9 @@ export function Hero({
       ? 'ATTACKING'
       : isHurt
         ? 'HURT'
-        : 'IDLE'
+        : (isAdvancing || isRetreating)
+          ? 'RUN'
+          : 'IDLE'
 
   const modelId = heroData._modelId || String(heroData.ModelID || heroData.HeroID || heroData.id || 'zombie_1')
 
@@ -167,7 +174,18 @@ export function Hero({
         renderOrder={10}
         onPointerDown={(e) => {
           e.stopPropagation()
+          downPosRef.current = { x: (e as any).clientX ?? (e as any).nativeEvent?.clientX ?? 0, y: (e as any).clientY ?? (e as any).nativeEvent?.clientY ?? 0 }
           if (canAdjustFormation && onDragStart) onDragStart(e as unknown as THREE.Event)
+        }}
+        onPointerUp={(e) => {
+          e.stopPropagation()
+          if (!canAdjustFormation || !onClickRemove || !downPosRef.current) return
+          const cx = (e as any).clientX ?? (e as any).nativeEvent?.clientX ?? 0
+          const cy = (e as any).clientY ?? (e as any).nativeEvent?.clientY ?? 0
+          const dx = cx - downPosRef.current.x
+          const dy = cy - downPosRef.current.y
+          downPosRef.current = null
+          if (Math.hypot(dx, dy) < 5) onClickRemove()
         }}
       >
         {/* 透明 hit area — SkinnedMesh 的 CPU bounding box 不準確，
