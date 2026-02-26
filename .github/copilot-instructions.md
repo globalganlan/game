@@ -52,10 +52,55 @@
 - 修改場景時先決定 fog far → 其他元素 spread/area ≤ fog far
 - mobile DPR 限 `[1, 1.5]`，desktop `[1, 2]`
 
+## Google Sheets 讀寫能力
+
+本專案以 Google Sheets 作為後端資料庫，AI 可直接讀寫。
+
+- **讀取（GET）**：`https://script.google.com/macros/s/AKfycbxXdy3QCvgX7knCCnxfmVY0CMqmUgcG422nVgFDlx5l9CsyldFZ4bwLVHPHxbtXp0LaTw/exec`
+- **寫入（POST）**：`https://script.google.com/macros/s/AKfycbzy3EHTCyTYjA9j1CvJGvWwDM_RrkCuzNYkMhP7T9DTJ6V6g7Sodrlo4uv3h9yx0HLdsg/exec`
+
+### 寫入格式（POST JSON）
+
+```json
+{
+  "action": "updateHeroes",
+  "newColumns": ["DEF", "CritRate"],
+  "data": [
+    { "HeroID": 1, "DEF": 15, "CritRate": 5 }
+  ]
+}
+```
+
+### PowerShell 範例
+
+```powershell
+$url = "https://script.google.com/macros/s/AKfycbzy3EHTCyTYjA9j1CvJGvWwDM_RrkCuzNYkMhP7T9DTJ6V6g7Sodrlo4uv3h9yx0HLdsg/exec"
+$body = @{ action="updateHeroes"; newColumns=@("NewCol"); data=@(@{HeroID=1; NewCol="value"}) } | ConvertTo-Json -Depth 3
+Invoke-RestMethod -Uri $url -Method Post -ContentType "application/json; charset=utf-8" -Body ([System.Text.Encoding]::UTF8.GetBytes($body))
+```
+
+- 回傳 `{ "success": true, "updated": N }` 表示成功
+- `newColumns` 會自動在 Sheet 建立不存在的欄位
+- `data` 陣列中每個物件以 `HeroID` 為 key 定位行，其餘欄位直接寫入對應欄
+- **當需要更新 Google Sheet 時，直接用 PowerShell POST，不需要請使用者手動操作**
+
+## AI 團隊調度
+
+- **調度中心**：`agents/README.md` — 自動分析需求、分配角色、各司其職
+- **規格系統**：`specs/README.md` — 模組化遊戲規格，可擴展、有版本、有衝突偵測
+- **記憶系統**：`memory/` — 跨對話持久化（changelog / decisions / dev-status / backlog）
+- **提示詞模板**：`agents/prompt-playbook.md` — 7 套常用提示詞（P-01~P-07），已標注對應角色
+- 收到需求時先讀取 `agents/README.md` 的調度規則，自動判斷要啟動哪些角色
+- 新對話啟動時先讀取 `memory/dev-status.md` + `specs/README.md` 恢復記憶
+- 各角色的專業提示詞：`agents/01~11-*.md`（11 位角色）
+
 ## 文件索引
 
 | 文件 | 內容 |
 |------|------|
+| `agents/README.md` | AI 團隊自動調度系統（11 位角色的路由與協作規則） |
+| `specs/README.md` | 遊戲規格總索引（模組化 spec 清單、格式規範、衝突處理流程） |
+| `memory/README.md` | 記憶持久化機制說明 |
 | `docs/FBX轉GLB壓縮指南.md` | FBX→GLB 批次轉換流程、Draco/Decimate/JPEG 壓縮、前端載入架構 |
 | `docs/大頭照生成指南.md` | Puppeteer + Three.js 離線渲染角色大頭照 |
 | `docs/2D-to-3D-Model-Generation-Guide.md` | TripoSR 模型生成流程 |
@@ -68,3 +113,4 @@
 | `scripts/fbx_to_glb.py` | FBX→GLB 批次轉換（Blender Python） | `blender --background --python scripts/fbx_to_glb.py` |
 | `scripts/convert_models.ps1` | 上述腳本的 PowerShell 包裝器 | `.\scripts\convert_models.ps1` |
 | `scripts/generate_thumbnails.js` | 角色大頭照生成（Puppeteer） | `node scripts/generate_thumbnails.js` |
+| `scripts/update_heroes_sheet.gs` | Google Sheet heroes 表結構更新 | 貼入 Apps Script 執行（或用 POST API） |
