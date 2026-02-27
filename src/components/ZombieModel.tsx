@@ -133,6 +133,11 @@ export function ZombieModel({
   const autoTransitionRef = useRef(false) // 標記 finished-handler 是否已自動過渡到 IDLE
   const { actions, mixer } = useAnimations(animations, scene)
 
+  // 追蹤當前單次動作，用於 useFrame 備援完成偵測
+  const singleRunActionRef = useRef<THREE.AnimationAction | null>(null)
+  const singleRunStateRef = useRef<AnimationState | null>(null)
+  const singleRunDoneCalledRef = useRef(false)
+
   // 首次掛載通知
   useEffect(() => { onReady?.() }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -158,6 +163,10 @@ export function ZombieModel({
     const wasAutoTransition = autoTransitionRef.current
     autoTransitionRef.current = false
     if (wasAutoTransition && prevActionRef.current === newAction) {
+      // 清除 singleRun 追蹤（已自動過渡）
+      singleRunActionRef.current = null
+      singleRunStateRef.current = null
+      singleRunDoneCalledRef.current = false
       return
     }
 
@@ -176,7 +185,6 @@ export function ZombieModel({
       newAction.play()
     } else if (prev && prev !== newAction) {
       // 一般切換：crossFade 平滑過渡
-      // 若前一動作已 clamped（paused），先恢復以讓 crossFadeTo 的權重漸變正常運作
       if (prev.paused || !prev.isRunning()) {
         prev.paused = false
         prev.enabled = true
@@ -195,34 +203,40 @@ export function ZombieModel({
     }
     prevActionRef.current = newAction
 
-    // 單次動作完成事件
+    // 追蹤 singleRun 動作，供 useFrame 備援偵測
+    if (singleRun) {
+      singleRunActionRef.current = newAction
+      singleRunStateRef.current = state
+      singleRunDoneCalledRef.current = false
+    } else {
+      singleRunActionRef.current = null
+      singleRunStateRef.current = null
+      singleRunDoneCalledRef.current = false
+    }
+
+    // 單次動作完成事件（mixer 'finished' 主通道）
     let handler: ((e: { action: THREE.AnimationAction }) => void) | null = null
     if (singleRun && mixer) {
       handler = (e) => {
         if (e.action === newAction) {
-          onActionDoneRef.current?.(state)
+          if (!singleRunDoneCalledRef.current) {
+            singleRunDoneCalledRef.current = true
+            onActionDoneRef.current?.(state)
+          }
 
-          // 自動過渡到待機動畫（HURT / ATTACKING 結束後），
-          // 使用 fadeOut + fadeIn 平滑混合，避免即時跳幀。
-          // fadeOut 只影響權重插值器，不改變 action.weight 本身，
-          // 因此後續 reset() 能正確恢復動作供重複使用。
+          // 自動過渡到待機動畫（HURT / ATTACKING 結束後）
           if (state !== 'DEAD') {
             const idleActionName = `IDLE_${zombieId}`
             const idleAction = actions?.[idleActionName]
             if (idleAction) {
               const TRANS_DUR = 0.3
-
-              // 漸出已結束的動作（保持 paused，僅減少權重）
               newAction.fadeOut(TRANS_DUR)
-
-              // 漸入待機動畫
               idleAction.reset()
               idleAction.setLoop(THREE.LoopRepeat, Infinity)
               idleAction.clampWhenFinished = false
               idleAction.setEffectiveTimeScale(1)
               idleAction.fadeIn(TRANS_DUR)
               idleAction.play()
-
               prevActionRef.current = idleAction
               autoTransitionRef.current = true
             }
@@ -240,6 +254,38 @@ export function ZombieModel({
       }
     }
   }, [state, actions, mixer, isDragging, zombieId])
+
+  // ── useFrame 備援：偵測單次動畫完成（防止 mixer 'finished' 遺漏） ──
+  useFrame(() => {
+    const action = singleRunActionRef.current
+    if (!action || singleRunDoneCalledRef.current) return
+    // 檢查動畫是否已播完（paused by clampWhenFinished 或 time >= duration）
+    const clip = action.getClip()
+    if (clip && action.time >= clip.duration - 0.05) {
+      singleRunDoneCalledRef.current = true
+      const doneState = singleRunStateRef.current
+      if (doneState) {
+        onActionDoneRef.current?.(doneState)
+      }
+      // 自動過渡到 IDLE（與 finished handler 邏輯一致）
+      if (doneState && doneState !== 'DEAD') {
+        const idleActionName = `IDLE_${zombieId}`
+        const idleAction = actions?.[idleActionName]
+        if (idleAction) {
+          const TRANS_DUR = 0.3
+          action.fadeOut(TRANS_DUR)
+          idleAction.reset()
+          idleAction.setLoop(THREE.LoopRepeat, Infinity)
+          idleAction.clampWhenFinished = false
+          idleAction.setEffectiveTimeScale(1)
+          idleAction.fadeIn(TRANS_DUR)
+          idleAction.play()
+          prevActionRef.current = idleAction
+          autoTransitionRef.current = true
+        }
+      }
+    }
+  })
 
   // ── 受擊紅色閃光（color tint + emissive 雙管齊下，確保任何材質都可見）──
   const flashTimerRef = useRef(0)

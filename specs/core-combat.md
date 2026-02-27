@@ -1,9 +1,9 @@
 # 戰鬥系統 Spec
 
-> 版本：v2.0 ｜ 狀態：🟡 草案（v1.0 程式碼同步 + v2.0 新系統設計）
-> 最後更新：2026-02-26
+> 版本：v2.1 ｜ 狀態：🟢 已實作
+> 最後更新：2025-02-26
 > 負責角色：🎯 GAME_DESIGN → 🔧 CODING
-> 原始碼：`src/App.tsx` `src/components/Hero.tsx` `src/components/ZombieModel.tsx`
+> 原始碼：`src/domain/battleEngine.ts`（邏輯）、`src/App.tsx`（3D 演出整合）
 
 ## 概述
 
@@ -11,56 +11,93 @@
 敵方由系統或關卡配置編成。戰鬥為**全自動回合制**，
 角色依速度排序逐一行動，跑到目標面前攻擊後退回原位。
 
-**v2.0 新增**：能量系統（大招機制）、Buff/Debuff 系統、完整傷害公式、被動技能觸發。
+**v2.0**：能量系統（大招機制）、Buff/Debuff 系統、完整傷害公式、被動技能觸發。
+**v2.1**：Domain Engine 完整實作 — 純邏輯引擎 + Command Pattern 3D 演出。
 
 ## 依賴
 
-- `specs/hero-schema.md` — 角色資料結構（HP / ATK / DEF / Speed / CritRate / CritDmg）
-- `specs/skill-system.md` — 主動技能 + 被動技能 + Buff/Debuff 定義
-- `specs/damage-formula.md` — 傷害 / 治療 / 暴擊 / 閃避 / DOT 數值計算
-- `specs/element-system.md` — 屬性剋制倍率
-- `specs/progression.md` — finalStats 結算（等級 / 突破 / 裝備）
-- Google Sheets API — 英雄資料來源
+- `specs/hero-schema.md` → 角色資料結構（HP / ATK / DEF / Speed / CritRate / CritDmg）
+- `specs/skill-system.md` → 主動技能 + 被動技能 + Buff/Debuff 定義
+- `specs/damage-formula.md` → 傷害 / 治療 / 暴擊 / 閃避 / DOT 數值計算
+- `specs/element-system.md` → 屬性剋制倍率
+- `specs/progression.md` → finalStats 結算（等級 / 突破 / 裝備）
+- Google Sheets API → 英雄資料來源
+
+## 實作對照
+
+| 系統 | Spec 區段 | 原始碼 | 狀態 |
+|------|----------|--------|------|
+| 遊戲狀態機 | 1 | `src/App.tsx` useState | ✅ |
+| 陣型系統 | 2 | `src/App.tsx` SLOT_POSITIONS | ✅ |
+| 戰鬥迴圈 | 3 | `src/domain/battleEngine.ts` `runBattle()` | ✅ |
+| 能量系統 | 4 | `src/domain/energySystem.ts` | ✅ |
+| Buff/Debuff | 5 | `src/domain/buffSystem.ts` | ✅ |
+| 被動觸發 | 6 | `src/domain/battleEngine.ts` `triggerPassives()` | ✅ |
+| 目標策略 | 7 | `src/domain/targetStrategy.ts` | ✅ |
+| 傷害計算 | 8 | `src/domain/damageFormula.ts` | ✅ |
+| 3D 演出 | 10 | `src/App.tsx` `onAction` callback | ✅ |
+| Buff 3D 圖標 | 5.3 | — | ⬜ 待做 |
+| 能量條 UI | 4.5 | — | ⬜ 待做 |
+| 大招閃現 | 10.2 | — | ⬜ 待做 |
+| 傷害飄字擴展 | 8.2 | — | ⬜ 待做 |
 
 ---
 
-## 一、遊戲狀態機（不變）
+## 一、遊戲狀態機 
 
 ```
 PRE_BATTLE → FETCHING → IDLE → BATTLE → GAMEOVER
-                                           ↓
+                                           
                                      resetGame → FETCHING（重頭來過）
 ```
 
 | 狀態 | 說明 |
 |------|------|
 | `PRE_BATTLE` | 初始狀態，尚未載入 |
-| `FETCHING` | 從 Google Sheets API 拉取英雄資料 + 預載 GLB 模型/動畫/縮圖 |
+| `FETCHING` | 從 Google Sheets API 拉取英雄資料 + 遊戲配置 + 預載 GLB 模型/動畫/縮圖 |
 | `IDLE` | 資料就緒，玩家可選英雄上陣、調整陣型（拖曳換位） |
 | `BATTLE` | 自動戰鬥進行中（不可操作） |
 | `GAMEOVER` | 戰鬥結束，顯示 VICTORY/DEFEAT，可重啟 |
 
+### 資料載入流程（v2.1 更新）
+
+```
+fetchData() 觸發：
+  1. 並行載入：
+     a. GET heroes API → heroesList（顯示用）
+     b. loadAllGameData() → 並行讀取：
+        - heroes → heroInputsRef（domain 格式 RawHeroInput[]）
+        - skill_templates → skillsRef（Map<skillId, SkillTemplate>）
+        - hero_skills → heroSkillsRef（Map<heroId, HeroSkillConfig>）
+        - element_matrix → loadElementMatrix()（domain 全域矩陣）
+  2. 隨機生成敵方陣型
+  3. 預載所有 GLB 模型 + 縮圖
+  4. 設置 IDLE 狀態
+```
+
+**實作**：`src/App.tsx` `fetchData.current` + `src/services/dataService.ts` `loadAllGameData()`
+
 ---
 
-## 二、陣型系統（不變）
+## 二、陣型系統 
 
 ### 格子佈局（6 格：前排 3 + 後排 3）
 
 ```
                敵方                              我方
      後排(3,4,5)     前排(0,1,2)       前排(0,1,2)     後排(3,4,5)
-       ●  ●  ●         ●  ●  ●          ●  ●  ●         ●  ●  ●
-      
-         -Z ←——————— 中場 ———————→ +Z
+                                                   
+
+         -Z  中場  +Z
 ```
 
 ### 座標
 
 | 欄位 | X 座標 |
 |------|--------|
-| 左 (0) | -2.5 |
-| 中 (1) | 0.0 |
-| 右 (2) | 2.5 |
+| 左 (slot 0/3) | -2.5 |
+| 中 (slot 1/4) | 0.0 |
+| 右 (slot 2/5) | 2.5 |
 
 | 陣營 | 前排 Z | 後排 Z |
 |------|--------|--------|
@@ -74,45 +111,108 @@ PRE_BATTLE → FETCHING → IDLE → BATTLE → GAMEOVER
 
 ---
 
-## 三、戰鬥迴圈（`runBattleLoop`）— v2.0 更新
+## 三、戰鬥迴圈  Domain Engine 架構 
+
+### v2.1 架構：Command Pattern
+
+```
+
+    src/domain/battleEngine.ts       
+    runBattle(players, enemies, cfg) 
+     純邏輯，零 React 依賴          
+   計算傷害、狀態、被動...            
+    產生 BattleAction 指令          
+
+            cfg.onAction(action)
+           
+
+    src/App.tsx onAction callback    
+     消費 BattleAction              
+   播放 3D 動畫                       
+   前進 → 攻擊 → 受傷/死亡 → 後退    
+   同步 HP 到 React state            
+
+```
+
+### BattleAction 型別（11 種指令）
+
+```typescript
+type BattleAction =
+  | { type: 'NORMAL_ATTACK'; attackerUid: string; targetUid: string;
+      result: DamageResult; killed: boolean }
+  | { type: 'SKILL_CAST'; attackerUid: string; skillId: string; skillName: string;
+      targets: Array<{ uid: string; result: DamageResult | HealResult; killed?: boolean }> }
+  | { type: 'DOT_TICK'; targetUid: string; dotType: StatusType; damage: number }
+  | { type: 'BUFF_APPLY'; targetUid: string; effect: StatusEffect }
+  | { type: 'BUFF_EXPIRE'; targetUid: string; effectType: StatusType }
+  | { type: 'DEATH'; targetUid: string }
+  | { type: 'PASSIVE_TRIGGER'; heroUid: string; skillId: string; skillName: string }
+  | { type: 'ENERGY_CHANGE'; heroUid: string; delta: number; newValue: number }
+  | { type: 'TURN_START'; turn: number }
+  | { type: 'TURN_END'; turn: number }
+  | { type: 'BATTLE_END'; winner: 'player' | 'enemy' | 'draw' }
+```
+
+**實作**：`src/domain/types.ts` `BattleAction`
 
 ### 整體流程
 
 ```
-0. 戰鬥初始化：所有角色 energy = 0，觸發「戰鬥開始」被動
-1. 收集雙方存活角色
-2. 按速度排序（DESC），平手看 slot ASC，再平手玩家優先
-3. 每回合開始：
-   a. 結算 DOT（dot_burn / dot_poison / dot_bleed）
-   b. 結算回合型 Buff/Debuff 倒數
-   c. 被動觸發：「每回合開始」類被動
-4. 逐一行動：
-   for (actor of sorted) {
-     a. 跳過已死亡 / 已暈眩 / 已凍結角色
-     b. actor.energy += 50  // 回合能量
-     c. 判斷是否施放大招（energy >= 1000 且有主動技能）
-     d. 若施放大招：
-        i.  選擇技能目標（依技能 targetType）
-        ii. 執行技能演出（前進 → 技能動畫 → 多目標傷害/治療/Buff）
-        iii. energy 歸零
-     e. 若普通攻擊：
-        i.  選擇目標（TARGET_NORMAL 策略）
-        ii. 前進 → 攻擊 → 傷害判定 → 後退
-        iii. 攻擊者 energy += 200
-        iv. 被攻擊者 energy += 150（存活時）
-     f. 被動觸發：「攻擊後」/「命中後」類被動
-     g. 死亡判定：若目標 HP=0 → 攻擊者 energy += 100（擊殺獎勵）
-     h. 間隔 delay(120ms / speed)
-   }
-5. turn++，回到 Step 1
-6. 直到一方全滅 → GAMEOVER
+0. 戰鬥初始化
+   a. SlotHero  BattleHero 轉換（slotToInput  createBattleHero）
+   b. 從 heroSkillsRef + skillsRef 查詢每個英雄的 activeSkill + passives
+   c. energy = 0, passiveUsage = {}
+   d. 觸發所有角色 battle_start 被動
+
+1. 回合迴圈 (turn = 1..50)
+    TURN_START action
+    收集存活角色，按 SPD DESC  slot ASC  玩家優先 排序
+    逐一行動 (for actor of sorted):
+       回合開始能量 +50 → ENERGY_CHANGE action
+       DOT 結算（burn/poison/bleed） DOT_TICK actions
+          DOT 致死 → DEATH action  continue
+       Regen 結算
+       觸發 turn_start 被動
+       控制效果判定（stun/freeze  跳過，fear  跳過）
+       判斷：energy >= 1000 且有 activeSkill 且未被 silence？
+          是  executeSkill() → SKILL_CAST action → consumeEnergy
+          否  executeNormalAttack() → NORMAL_ATTACK action
+       死亡判定 → DEATH action
+    回合結束 buff duration 倒數  BUFF_EXPIRE actions
+    tickShieldDurations 結算
+    觸發 turn_end 被動
+    TURN_END action
+    勝負判定  BATTLE_END action（若一方全滅）
+
+2. 超時（50 回合） BATTLE_END { winner: 'draw' }
 ```
+
+**實作**：`src/domain/battleEngine.ts` `runBattle()`
+
+### SlotHero → BattleHero 轉換
+
+```typescript
+// App.tsx runBattleLoop()：
+for (let i = 0; i < 6; i++) {
+  const p = pSlotsRef.current[i]
+  if (!p) continue
+  const heroId = Number(p.HeroID ?? p.id ?? 0)
+  const input = slotToInput(p, heroId)  // SlotHero → RawHeroInput
+  const { activeSkill, passives } = getHeroSkillSet(heroId, skills, heroSkillsMap)
+  const bh = createBattleHero(input, 'player', i, activeSkill, passives, 1, p._uid)
+  playerBH.push(bh)
+}
+```
+
+`slotToInput()` 從 `SlotHero`（表現層型別）萃取 `RawHeroInput`（domain 型別）。
+`getHeroSkillSet()` 從快取 Map 查出英雄的主動 + 4 個被動技能。
+`createBattleHero()` 產生完整的 `BattleHero`。
 
 ---
 
-## 四、能量系統（v2.0 新增）
+## 四、能量系統 
 
-### 能量值
+### 能量參數
 
 | 屬性 | 值 |
 |------|-----|
@@ -122,389 +222,485 @@ PRE_BATTLE → FETCHING → IDLE → BATTLE → GAMEOVER
 
 ### 能量獲取途徑
 
-| 行為 | 能量 | 說明 |
-|------|------|------|
-| 每回合開始 | +50 | 每個角色在自己行動前 |
-| 發動普攻 | +200 | 攻擊者 |
-| 被攻擊（存活） | +150 | 受擊者 |
-| 擊殺敵人 | +100 | 給予最後一擊者 |
-| 被動加成 | 可變 | 某些被動可加速充能 |
-| Buff: energy_boost | 可變 | 技能效果 |
+| 行為 | 能量 | 常數名 |
+|------|------|--------|
+| 每回合開始 | +50 | `CONFIG.perTurn` |
+| 發動普攻命中 | +200 | `CONFIG.onAttack` |
+| 被攻擊（存活） | +150 | `CONFIG.onBeAttacked` |
+| 擊殺敵人 | +100 | `CONFIG.onKill` |
+| 技能 energy 效果 | 自訂 | `SkillEffect.flatValue` |
 
 ### 大招施放條件
 
 ```typescript
-function shouldCastUltimate(actor: BattleHero): boolean {
-  return actor.energy >= 1000 && actor.activeSkill != null
+// src/domain/energySystem.ts
+export function canCastUltimate(hero: BattleHero): boolean {
+  return (
+    hero.energy >= CONFIG.maxEnergy &&
+    hero.activeSkill != null &&
+    !isSilenced(hero)
+  )
 }
 ```
 
 ### 大招施放流程
 
-1. 確認 `energy >= 1000`
-2. 依技能 `targetType` 選擇目標：
-   - `single_enemy` → TARGET_NORMAL 策略
-   - `all_enemy` → 敵方全體存活
-   - `random_enemy_3` → 隨機 3 個敵人
-   - `front_row` → 敵方前排
-   - `back_row` → 敵方後排
-   - `single_ally` → HP 最低的隊友
-   - `all_ally` → 我方全體
-3. 播放大招演出（特殊鏡頭震動 / 全螢幕技能名稱閃光）
-4. 計算傷害 / 治療 / 施加 Buff/Debuff
-5. `energy = 0`
+1. `canCastUltimate()` === true
+2. 依技能 `targetType` 選擇目標（見 7）
+3. `executeSkill()` → 遍歷技能所有 `SkillEffect`
+4. `consumeEnergy()` → energy 歸零
+5. 產生 `SKILL_CAST` + `ENERGY_CHANGE` actions
 
-### 能量條 UI
+**實作**：`src/domain/energySystem.ts`（所有函式皆為純函式 + 直接 mutation hero.energy）
+
+### 能量條 UI（⬜ 待做）
 
 - 位置：HP 條下方
 - 顏色：金色漸層
 - 充滿動畫：energy >= 1000 時發光脈動
-- 大招圖標：角色頭上出現技能 icon（表示可施放）
 
 ---
 
-## 五、Buff / Debuff 系統（v2.0 新增）
+## 五、Buff / Debuff 系統 
 
 ### 狀態資料結構
 
 ```typescript
+// src/domain/types.ts
 interface StatusEffect {
-  type: StatusType         // 效果類型
-  value: number            // 數值（例如 0.2 = 20%）
-  duration: number         // 剩餘回合數
-  stacks: number           // 當前疊加層數
-  maxStacks: number        // 最大疊加層數
-  sourceHeroId: string     // 施加者 ID
+  type: StatusType
+  value: number          // 效果數值（如 0.2 = 20%）
+  duration: number       // 剩餘回合數（0 = 永久直到戰鬥結束）
+  stacks: number         // 當前疊加層數
+  maxStacks: number      // 最大疊加層數
+  sourceHeroId: string   // 施加者 UID
 }
 
 type StatusType =
-  // Buff（正面效果）
-  | 'atk_up' | 'def_up' | 'speed_up' | 'crit_rate_up'
+  // Buff（正面效果）12 種
+  | 'atk_up' | 'def_up' | 'spd_up' | 'crit_rate_up' | 'crit_dmg_up'
   | 'dmg_reduce' | 'shield' | 'regen' | 'energy_boost'
   | 'dodge_up' | 'reflect' | 'taunt'
-  // Debuff（負面效果）
-  | 'atk_down' | 'def_down' | 'speed_down' | 'crit_rate_down'
+  // Debuff（負面效果）11 種
+  | 'atk_down' | 'def_down' | 'spd_down' | 'crit_rate_down'
   | 'dot_burn' | 'dot_poison' | 'dot_bleed'
   | 'stun' | 'freeze' | 'silence' | 'fear'
-  // 控制
+  // 特殊 2 種
   | 'immunity' | 'cleanse'
 ```
 
-### 回合結算
-
-每回合開始時（角色行動前）：
+### 護盾
 
 ```typescript
-function processStatusEffects(hero: BattleHero): void {
-  for (const status of hero.statusEffects) {
-    // DOT 結算
-    if (['dot_burn', 'dot_poison', 'dot_bleed'].includes(status.type)) {
-      const dotDmg = calculateDot(status.type, status.source, hero)
-      hero.currentHP = Math.max(0, hero.currentHP - dotDmg)
-      showDamagePopup(hero, dotDmg, 'dot')
-    }
-    
-    // regen 結算
-    if (status.type === 'regen') {
-      const heal = Math.floor(hero.finalStats.HP * status.value)
-      hero.currentHP = Math.min(hero.finalStats.HP, hero.currentHP + heal)
-      showDamagePopup(hero, heal, 'heal')
-    }
-    
-    // 回合倒數
-    status.duration--
-  }
-  
-  // 移除到期效果
-  hero.statusEffects = hero.statusEffects.filter(s => s.duration > 0)
+interface Shield {
+  value: number          // 剩餘護盾量
+  duration: number       // 剩餘回合數
+  sourceHeroId: string
 }
 ```
 
-### 疊加規則
+### Buff 分類常數（buffSystem.ts）
+
+```typescript
+const DOT_TYPES: StatusType[] = ['dot_burn', 'dot_poison', 'dot_bleed']
+const CONTROL_TYPES: StatusType[] = ['stun', 'freeze', 'silence', 'fear']
+const BUFF_TYPES: StatusType[] = [
+  'atk_up', 'def_up', 'spd_up', 'crit_rate_up', 'crit_dmg_up',
+  'dmg_reduce', 'shield', 'regen', 'energy_boost',
+  'dodge_up', 'reflect', 'taunt',
+]
+```
+
+### 施加規則
+
+```typescript
+// src/domain/buffSystem.ts
+export function applyStatus(target: BattleHero, effect: Omit<StatusEffect, 'stacks'>): boolean
+```
 
 | 情況 | 處理方式 |
 |------|----------|
-| 同類型 Buff 重複施加 | `stacks++`（不超過 maxStacks），duration 取較長者 |
-| 不同來源的同類型 | 各自獨立計算，效果加算 |
-| 控制效果（stun/freeze） | 不疊加，刷新 duration |
-| immunity 存在時 | 所有 debuff 施加被擋（顯示「免疫」） |
+| `immunity` 存在時施加 debuff | 失敗，回傳 `false` |
+| 控制效果（stun/freeze/silence/fear）重複 | 不疊加 stacks，刷新 duration 取較長 |
+| 其他同類型重複施加 | `stacks++`（ maxStacks），value 加算，duration 取較長 |
+| 全新效果 | push 新 StatusEffect（stacks = 1） |
 
-### 3D 圖標顯示（v2.0 新增）
+### DOT 傷害公式
 
-在角色 3D 模型**頭頂上方**（血條再上方）顯示 Buff/Debuff 圖標：
+| DOT 類型 | 傷害公式 | 與 DEF 關係 |
+|---------|---------|------------|
+| `dot_burn` | 施加者 `ATK × 0.3 × stacks` | 無視 DEF |
+| `dot_poison` | 目標 `maxHP × 0.03 × stacks` | 無視 DEF |
+| `dot_bleed` | 施加者 `ATK × 0.25 × stacks` | 無視 DEF（簡化實作） |
+
+> 注意：spec v2.0 設計 dot_bleed 套用 50% DEF，實作中已簡化為直接計算。
+
+**實作**：`src/domain/buffSystem.ts` `processDotEffects()`
+
+### Buff 對數值的影響（getBuffedStats）
 
 ```typescript
-interface StatusIcon3D {
-  position: [number, number, number]  // 角色頭頂 + offset
-  texture: string                      // 圖標貼圖路徑
-  isDebuff: boolean                    // true=紅框, false=綠框
-  stackCount: number                   // 顯示在右下角的數字
-  duration: number                     // 剩餘回合數（顯示在左下角）
+export function getBuffedStats(hero: BattleHero): FinalStats {
+  const base = { ...hero.finalStats }
+  // 乘算
+  base.ATK = floor(ATK × (1 + atk_up_value - atk_down_value))
+  base.DEF = floor(DEF × (1 + def_up_value - def_down_value))
+  base.SPD = floor(SPD × (1 + spd_up_value - spd_down_value))
+  // 加算
+  base.CritRate = CritRate + crit_rate_up_value×100 - crit_rate_down_value×100
+  // 下限保護
+  base.ATK = max(1, ATK); base.DEF = max(0, DEF); base.SPD = max(1, SPD)
+  base.CritRate = clamp(0, 100, CritRate)
+  return base
 }
 ```
 
-- **Buff**：綠色邊框
-- **Debuff**：紅色邊框
-- **疊加數**：圖標右下角白色數字
-- **排列**：橫向排列，最多顯示 6 個（超出以 `+N` 表示）
-- **大小**：Billboard，螢幕空間約 24×24px
+### 控制效果查詢函式
+
+| 函式 | 判斷 | 效果 |
+|------|------|------|
+| `isControlled(hero)` | stun \| freeze | 跳過整個行動 |
+| `isSilenced(hero)` | silence | 不可施放大招，但可普攻 |
+| `isFeared(hero)` | fear | 跳過行動 |
+| `hasTaunt(hero)` | taunt | 強制作為攻擊目標 |
+
+### 回合結算
+
+```typescript
+// 回合結束時
+tickStatusDurations(hero)     // duration--; duration===0 的永久效果不倒數
+tickShieldDurations(hero)     // shield.duration--; 移除到期或歸零的護盾
+```
+
+### 其他函式
+
+```typescript
+cleanse(target, count)        // 移除 count 個 debuff
+removeStatus(target, type)    // 移除指定類型
+getStatusValue(hero, type)    // 同類型 value×stacks 總和
+hasStatus(hero, type)         // 是否擁有指定效果
+isDebuff(type)                // 判斷是否為 debuff
+absorbDamageByShields(hero, damage) // 護盾吸收，回傳 [actualDmg, absorbed]
+```
 
 ---
 
-## 六、被動技能觸發點（v2.0 新增）
+## 六、被動技能觸發 
 
-被動技能由 `specs/skill-system.md` 定義，戰鬥系統需在以下時機檢查觸發：
+### 觸發時機（13 種）
 
-### 觸發時機
-
-| 觸發點 | 位置 | 範例被動 |
-|--------|------|---------|
-| `battle_start` | 戰鬥開始 | 夜鬼「威壓」敵全體 ATK-10%、無名活屍「茫然」隨機 buff |
-| `turn_start` | 每回合開始 | 腐學者「殘留智識」每 3 回合回血 |
-| `before_attack` | 攻擊前 | 白面鬼「瘋狂表演」隨機傷害倍率 |
-| `on_hit` | 命中目標後 | 屠宰者「殺意」CritRate+15%、口器者「寄生吸取」回血 |
-| `on_kill` | 擊殺目標 | 屠宰者「亡者嗅覺」Speed+2 |
-| `on_be_hit` | 被攻擊後 | 戰厄「壕溝戰術」下次受傷-25%、詭獸「厚皮」受傷-15% |
-| `on_hp_below` | HP 低於閥值 | 異變者「狂暴基因」HP<30% ATK+20%、倖存者「求生本能」HP<50% Speed+3 |
-| `on_fatal` | 即將致死 | 女喪屍「殘存意志」1HP 存活 |
-| `on_dodge` | 閃避成功 | 脫逃者「反擊姿態」閃避後下次攻擊+30% |
-| `on_crit` | 暴擊觸發 | 童魘「弱食本能」暴擊吸血 8% |
+```typescript
+type PassiveTrigger =
+  | 'battle_start'    // 戰鬥開始時（僅一次）
+  | 'turn_start'      // 自身回合開始時
+  | 'turn_end'        // 自身回合結束時
+  | 'on_attack'       // 攻擊前觸發
+  | 'on_kill'         // 擊殺敵人時
+  | 'on_be_attacked'  // 被攻擊時
+  | 'on_take_damage'  // 受傷後
+  | 'on_lethal'       // 受到致命傷害時
+  | 'on_dodge'        // 閃避成功時
+  | 'on_crit'         // 暴擊觸發時
+  | 'hp_below_pct'    // HP 低於 X% 時（首次觸發）
+  | 'every_n_turns'   // 每 N 回合觸發
+  | 'always'          // 永久被動（battle_start 即生效，duration=0）
+```
 
 ### 觸發器架構
 
 ```typescript
-type PassiveTrigger = 
-  | 'battle_start' | 'turn_start' | 'before_attack' 
-  | 'on_hit' | 'on_kill' | 'on_be_hit'
-  | 'on_hp_below' | 'on_fatal' | 'on_dodge' | 'on_crit'
-
-function checkPassives(
-  trigger: PassiveTrigger,
-  actor: BattleHero,
-  context: BattleContext
+function triggerPassives(
+  hero: BattleHero,
+  trigger: string,
+  context: BattleContext,
+  cfg: BattleEngineConfig,
 ): void {
-  for (const passive of actor.activePassives) {
-    if (passive.trigger === trigger && passive.condition(actor, context)) {
-      passive.execute(actor, context)
+  for (const passive of hero.activePassives) {
+    if (passive.passiveTrigger !== trigger) continue
+    // 使用次數限制
+    const usageCount = hero.passiveUsage[usageKey] ?? 0
+    if (trigger === 'on_lethal' && usageCount >= getMaxUsage(passive)) continue
+    // 執行所有效果
+    for (const effect of passive.effects) {
+      executePassiveEffect(hero, effect, context, cfg)
     }
+    hero.passiveUsage[usageKey] = usageCount + 1
+    cfg.onAction({ type: 'PASSIVE_TRIGGER', ... })
   }
 }
 ```
 
+### executePassiveEffect 支援的效果類型
+
+| SkillEffect.type | 行為 |
+|-----------------|------|
+| `buff` / `debuff` | 對自身（buff）或目標（debuff）施加 StatusEffect |
+| `heal` | 自回復（scalingStat × multiplier + flatValue） |
+| `energy` | 自身加能量（flatValue） |
+| `damage` | 被動反擊（對 context.target 計算傷害） |
+| `revive` | 由 `checkLethalPassive()` 特殊處理 |
+| `extra_turn` |  TODO |
+
+### on_lethal 特殊處理
+
+```typescript
+export function checkLethalPassive(hero, incomingDamage, allHeroes): boolean
+// 即將死亡 + 有 on_lethal 被動 + 使用次數未滿
+//  HP = max(1, maxHP × multiplier)  保命成功回傳 true
+```
+
+使用次數限制：
+- 預設 `on_lethal` 每場 1 次
+- 特例：`PAS_1_4` 可觸發 2 次（`getMaxUsage()`）
+
+### hp_below_pct 閾值解析
+
+從被動 `description` 中解析數字：
+- 含 `15%` → threshold 0.15
+- 含 `30%` → threshold 0.30
+- 含 `50%` → threshold 0.50
+- 預設 → 0.30
+
+每個被動只觸發一次（`passiveUsage[skillId + '_hp_below'] = 1`）。
+
+### 星級與被動解鎖
+
+| 星級 | 可用被動數 |
+|------|----------|
+| 1 | 1 |
+| 2 | 2 |
+| 4 | 3 |
+| 6 | 4 |
+
+```typescript
+const passiveSlots = starLevel >= 6 ? 4 : starLevel >= 4 ? 3 : starLevel >= 2 ? 2 : 1
+activePassives = passives.slice(0, passiveSlots)
+```
+
 ---
 
-## 七、目標選擇策略
+## 七、目標選擇策略 
 
-### 現有策略：`TARGET_NORMAL`（不變）
+### selectTargets 路由表
 
-優先順序：
-1. **前排對位欄** → 2. **前排其他欄** → 3. **後排對位欄** → 4. **後排其他欄** → 5. **Fallback**
+| TargetType | 策略 | 說明 |
+|------------|------|------|
+| `single_enemy` | `selectSingleEnemy()` | 嘲諷 > 前排對位 > 近欄 > 後排 |
+| `all_enemies` | filter alive | 敵方全體存活 |
+| `random_enemies_N` | `selectRandomEnemies(N)` | 隨機 N 個（可重複） |
+| `front_row_enemies` | `selectFrontRow()` | slot 0,1,2；全滅 fallback 後排 |
+| `back_row_enemies` | `selectBackRow()` | slot 3,4,5；全滅 fallback 前排 |
+| `single_ally` | `selectLowestHpAlly()` | HP% 最低的存活隊友 |
+| `all_allies` | filter alive | 我方全體存活 |
+| `self` | [attacker] | 自身 |
+| `random_enemies_\d+` | regex 動態解析 | 支援任意 N 值 |
 
-### v2.0 新增策略
+### 普攻目標選擇（selectNormalAttackTarget）
 
-| 策略 | 用途 | 說明 |
-|------|------|------|
-| `TARGET_NORMAL` | 普攻 | 既有：前排對位優先 |
-| `TARGET_ALL_ENEMY` | AOE 大招 | 敵方全體存活角色 |
-| `TARGET_RANDOM(n)` | 隨機 N 體 | 隨機選 N 個敵人（可重複） |
-| `TARGET_FRONT_ROW` | 前排大招 | 敵方前排全體 |
-| `TARGET_BACK_ROW` | 後排大招 | 敵方後排全體（前排無人時打前排） |
-| `TARGET_LOWEST_HP_ALLY` | 單體治療 | HP% 最低的隊友 |
-| `TARGET_ALL_ALLY` | 群體治療 | 我方全體存活角色 |
-| `TARGET_SELF` | 自我 buff | 施術者自身 |
+```
+1. 嘲諷（taunt） → 第一個 taunter
+2. 前排（slot 0,1,2） → pickByColumnProximity(col)
+3. 後排（slot 3,4,5） → pickByColumnProximity(col)
+4. Fallback → 第一個存活敵人
+```
+
+column 透過 `slot % 3` 計算，proximity 為 `|targetCol - attackerCol|`。
+
+**實作**：`src/domain/targetStrategy.ts`
 
 ---
 
-## 八、傷害計算（v2.0 — 替代舊版 ATK 直扣）
+## 八、傷害計算 
 
 完整傷害公式見 `specs/damage-formula.md`。
 
-### 在戰鬥迴圈中的呼叫
+### 引擎中的呼叫
 
 ```typescript
-// 普通攻擊
-const result = calculateDamage(attacker, target, {
-  scalingStat: 'ATK',
-  multiplier: 1.0,
-  targetType: 'single_enemy',
-})
+// 普攻
+const result = calculateDamage(attacker, target)  // multiplier 預設 1.0
 
-// 大招
-const result = calculateDamage(attacker, target, activeSkill.effect)
+// 技能
+const result = calculateDamage(attacker, target, effect)
 
 // 治療
-const healAmount = calculateHeal(healer, target, activeSkill.effect)
+const result = calculateHeal(attacker, target, effect)
 ```
 
-### 傷害飄字延伸（v2.0）
+### 傷害飄字顏色（⬜ 待擴展）
 
-| 類型 | 顏色 | 字號 |
-|------|------|------|
-| 普通傷害 | 白色 | 標準 |
-| 暴擊傷害 | 橙色 + 加大 + 感嘆號 | 1.5× |
-| 治療 | 綠色 + 「+」 | 標準 |
-| 暴擊治療 | 亮綠 + 加大 | 1.5× |
-| DOT 傷害 | 紫色 | 較小 0.8× |
-| MISS | 灰色 | 較小 0.8× |
-| 護盾吸收 | 藍色 | 標準 |
-| 弱點（屬性剋制） | 紅色 + 「弱點」 | 1.3× |
+| DamageResult.damageType | 顏色 | 說明 |
+|------------------------|------|------|
+| `normal` | 白色 | 普通傷害 |
+| `crit` | 橙色 + 加大 | 暴擊 |
+| `miss` | 灰色 | 閃避 |
+| `weakness` | 紅色 | 屬性剋制 |
+| `shield` | 藍色 | 完全被護盾吸收 |
 
 ---
 
-## 九、角色行動狀態機（不變 + v2.0 擴展）
+## 九、角色行動狀態機 
 
 ```
 IDLE → ADVANCING → ATTACKING → RETREATING → IDLE
-                       ↓
+                       
                   目標: HURT → IDLE
                   目標: DEAD → 移除
-
-v2.0 追加：
-IDLE → ADVANCING → CASTING → RETREATING → IDLE    （大招）
-                      ↓
-                 多目標演出（連續 HURT / 治療飄字）
 ```
 
 | ActorState | 說明 | 對應動畫 |
 |------------|------|---------|
-| `IDLE` | 待機 | IDLE（循環） |
-| `ADVANCING` | 跑向目標 | RUN（循環） |
-| `ATTACKING` | 播放攻擊動畫 | ATTACKING（單次） |
-| `CASTING` | 播放大招動畫 | ATTACKING（單次，未來可用專屬動畫） |
-| `HURT` | 受擊反應 | HURT（單次 → 自動回 IDLE） |
-| `RETREATING` | 跑回原位 | RUN（循環） |
-| `DEAD` | 死亡 | DEAD（單次，clamp 最後幀） |
+| `IDLE` | 待機 | idle（循環） |
+| `ADVANCING` | 跑向目標 | run（循環） |
+| `ATTACKING` | 播放攻擊動畫 | attack（單次） |
+| `HURT` | 受擊反應 | hurt（單次 → 回 IDLE） |
+| `RETREATING` | 跑回原位 | run（循環） |
+| `DEAD` | 死亡 | dying（單次，clamp 最後幀） |
+
+> 大招與普攻共用 `ATTACKING` 動畫。CASTING 專屬動畫為擴展點。
 
 ---
 
-## 十、3D 演出流程
+## 十、3D 演出流程 
 
-### 普通攻擊演出（不變）
-
-```
-1. 攻擊者 ADVANCING（lerp 跑向目標前方 2.0 距離）
-2. 攻擊者 ATTACKING（播放攻擊動畫）
-3. delay(180ms) → 目標 HURT + 傷害數字 + 紅色閃光
-4. 等待攻擊動畫完成
-5. 攻擊者 RETREATING（lerp 跑回原位）
-6. 攻擊者到達原位 → IDLE
-```
-
-### 大招演出（v2.0 新增）
+### 普攻演出（onAction: NORMAL_ATTACK）
 
 ```
-1. 攝影機微震 + 螢幕邊緣閃光
-2. 全螢幕技能名稱閃現（0.8 秒）
-3. 根據 targetType：
-   a. 單體：同普攻流程（跑過去 → 攻擊 → 回來）
-   b. AOE：攻擊者原地施法 → 全體目標同時 HURT + 傷害數字
-   c. 治療：攻擊者原地施法 → 隊友同時播綠色治療特效 + 治療數字
-4. 大招結束 → 攻擊者回 IDLE
+1. set moveTargetsRef[uid] = 目標前方 2.0
+2. setActorState(uid, 'ADVANCING') → 等待到達
+3. setActorState(uid, 'ATTACKING') → delay
+4. playHitOrDeath(targetUid, damage, killed, isDodge)
+   - 命中：HURT + 傷害飄字 + 受擊閃光
+   - 擊殺：DEAD
+   - 閃避：MISS 飄字
+5. setActorState(uid, 'RETREATING') → 等待回原位
+6. setActorState(uid, 'IDLE')
 ```
 
-### 受擊閃光（不變）
+### 技能演出（onAction: SKILL_CAST）
+
+```
+1. 前進位置：
+   - 單體目標 → 目標前方
+   - AOE → 中場 [0, 0, 0]
+2. ATTACKING 動畫
+3. 逐目標播放效果
+4. 後退回原位
+```
+
+### 受擊閃光
+
 - 時長：0.28 秒
-- 效果：emissive 紅色 `(2.0, 0, 0)` + color tint 紅 50%
+- 效果：emissive 紅色 (2.0, 0, 0) + color tint 紅 50%
 - 曲線：bell-curve
 
-### 移動機制（不變）
-- `useFrame` 的 `lerp` 逐幀插值
+### 移動機制
+
+- `useFrame` lerp 逐幀插值
 - 前進速率：`Math.min(0.12 × speed, 1)`
 - 到達判定：距離 < 0.25
 
 ---
 
-## 十一、速度控制（不變）
+## 十一、速度控制 
 
 - x1 / x2 / x4 切換
-- 影響：delay 時間 / `mixer.timeScale`
+- `speedRef.current`  `delay(ms / speedRef.current)`
+- 同步影響 `mixer.timeScale`
 
 ---
 
 ## 十二、介面契約
 
-### 型別（v2.0 擴展）
+### BattleHero（domain 層完整角色）
 
 ```typescript
-type GameState = 'PRE_BATTLE' | 'FETCHING' | 'IDLE' | 'BATTLE' | 'GAMEOVER'
-
-type ActorState = 'IDLE' | 'ADVANCING' | 'ATTACKING' | 'CASTING' | 'HURT' | 'RETREATING' | 'DEAD'
-
-type AnimationState = 'IDLE' | 'ATTACKING' | 'HURT' | 'DEAD' | 'RUN'
-
-// 見 hero-schema.md 的 RawHeroData / SlotHero 定義
-
-interface BattleHero extends SlotHero {
-  side: 'player' | 'enemy'
-  slot: number
-  energy: number                    // v2.0: 能量值 0~1000
-  finalStats: FinalStats            // v2.0: 結算後數值
-  statusEffects: StatusEffect[]     // v2.0: 目前身上的 Buff/Debuff
-  activePassives: SkillTemplate[]   // v2.0: 已啟用的被動技能（受星級限制）
-  activeSkill: SkillTemplate | null // v2.0: 大招技能
-  shields: Shield[]                 // v2.0: 護盾列表
+interface BattleHero {
+  uid: string; heroId: number; modelId: string; name: string
+  side: 'player' | 'enemy'; slot: number; element: Element | ''
+  baseStats: FinalStats; finalStats: FinalStats
+  currentHP: number; maxHP: number; energy: number
+  activeSkill: SkillTemplate | null
+  passives: SkillTemplate[]; activePassives: SkillTemplate[]
+  statusEffects: StatusEffect[]; shields: Shield[]
+  passiveUsage: Record<string, number>
+  totalDamageDealt: number; totalHealingDone: number; killCount: number
 }
+```
 
+### RawHeroInput（建立 BattleHero 的輸入）
+
+```typescript
+interface RawHeroInput {
+  heroId: number; modelId: string; name: string; element: string
+  HP: number; ATK: number; DEF: number; SPD: number
+  CritRate: number; CritDmg: number
+}
+```
+
+### BattleEngineConfig
+
+```typescript
+interface BattleEngineConfig {
+  maxTurns: number          // 預設 50
+  onAction: (action: BattleAction) => void | Promise<void>
+}
+```
+
+### BattleContext（被動 / 傷害公式上下文）
+
+```typescript
 interface BattleContext {
-  turn: number
-  attacker: BattleHero
-  target: BattleHero | null
-  targets: BattleHero[]
-  damageDealt: number
-  isKill: boolean
-  isCrit: boolean
-  allAllies: BattleHero[]
-  allEnemies: BattleHero[]
-}
-
-interface DamagePopupData {
-  id: number
-  uid: string
-  value: number
-  type: 'normal' | 'crit' | 'heal' | 'crit_heal' | 'dot' | 'miss' | 'shield' | 'weakness'  // v2.0
+  turn: number; attacker: BattleHero; target: BattleHero | null
+  targets: BattleHero[]; allAllies: BattleHero[]; allEnemies: BattleHero[]
+  damageDealt: number; isKill: boolean; isCrit: boolean; isDodge: boolean
 }
 ```
 
 ---
 
-## 十三、元件架構（v2.0 擴展）
+## 十三、元件架構
 
 ```
 App.tsx
-├── Canvas (R3F)
-│   ├── Arena — 場景
-│   ├── SlotMarker × 12 — 格子標記
-│   ├── Hero × N — 場上英雄
-│   │   ├── ZombieModel — GLB + 骨骼動畫 + 受擊閃光
-│   │   ├── HealthBar3D — 3D 血條
-│   │   ├── EnergyBar3D — 能量條（v2.0）
-│   │   ├── StatusIcons3D — Buff/Debuff 圖標列（v2.0）
-│   │   ├── DamagePopup — 飄字（v2.0 擴展多顏色）
-│   │   └── Billboard Text — 角色名稱
-│   ├── DragPlane
-│   └── ResponsiveCamera
-├── HUD
-├── ThumbnailList
-├── SkillNameFlash — 大招名稱閃現（v2.0）
-├── Battle Result Banner
-├── Speed Button
-└── TransitionOverlay
+ Canvas (R3F)
+    Arena  場景（地面/牆/碎片/雨/煙火/霧）
+    SlotMarker × 12  格子標記
+    Hero × N  場上英雄
+       ZombieModel  GLB + 骨骼動畫 + 受擊閃光
+       HealthBar3D  3D 血條
+       EnergyBar3D ⬜
+       StatusIcons3D ⬜
+       DamagePopup  傷害飄字（待擴展多顏色）
+       Billboard Text  角色名稱
+    DragPlane
+    ResponsiveCamera
+ HUD
+ ThumbnailList
+ SkillNameFlash ⬜
+ Battle Result Banner
+ Speed Button
+ TransitionOverlay
 ```
 
 ---
 
 ## 擴展點
 
-- [ ] **手動操作模式**：玩家回合可手動選技能+目標
-- [ ] **回合數上限**：超時判定機制（例如 30 回合強制結算）
-- [ ] **戰鬥結算畫面**：經驗值、掉落物品、金幣
-- [ ] **多段攻擊演出**：隨機 N 體的逐一演出或同時演出
-- [ ] **友軍 AI**：自動選擇最佳技能目標（治療 → HP 最低隊友、AOE → 敵方密集排）
-- [ ] **戰鬥回放**：記錄 seed + 行動序列，支援重播
+- [ ] 手動操作模式（玩家回合手選技能+目標）
+- [x] ~~回合數上限~~（已實作 maxTurns: 50）
+- [ ] 戰鬥結算畫面（經驗值、掉落、金幣）
+- [ ] 大招鏡頭特效（攝影機震動 + 邊緣閃光）
+- [ ] Buff/Debuff 3D 圖標
+- [ ] 能量條 UI
+- [ ] 傷害飄字多色分類
+- [ ] CASTING 專屬動畫
+- [ ] extra_turn 額外行動
 
 ## 變更歷史
 
 | 版本 | 日期 | 變更內容 |
 |------|------|---------|
-| v1.0 | 2026-02-26 | 從現有程式碼逆向整理 |
-| v2.0 | 2026-02-26 | 新增能量系統、Buff/Debuff 系統（含 3D 圖標）、被動觸發點、大招演出流程、完整傷害公式引用、BattleHero 擴展型別、新增 CASTING 狀態 |
+| v1.0 | 2025-02-25 | 初版：基礎回合制戰鬥 + 3D 演出 |
+| v2.0 | 2025-02-26 | 新增：能量/Buff/被動/傷害設計草案 |
+| v2.1 | 2025-02-26 | **已實作**：Domain Engine、Command Pattern、所有子系統程式碼就位 |

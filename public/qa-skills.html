@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <title>QA 驗證 — 技能顯示</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #1a1a2e; color: #e0e0e0; font-family: 'Microsoft JhengHei', sans-serif; padding: 20px; }
+    h1 { text-align: center; color: #ffd700; margin-bottom: 8px; }
+    .subtitle { text-align: center; color: #aaa; margin-bottom: 20px; font-size: 14px; }
+    .status { text-align: center; padding: 10px; font-size: 16px; }
+    .status.ok { color: #4caf50; }
+    .status.fail { color: #f44336; }
+    .section { margin: 20px 0; }
+    .section h2 { color: #ffd700; border-bottom: 1px solid #333; padding-bottom: 6px; margin-bottom: 12px; }
+    .skill-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(400px, 1fr)); gap: 10px; }
+    .skill-card { display: flex; gap: 12px; background: #16213e; border: 1px solid #333; border-radius: 8px; padding: 12px; }
+    .skill-card.active { border-color: #ff6b35; }
+    .skill-card.passive { border-color: #7b68ee; }
+    .skill-icon { font-size: 28px; min-width: 40px; text-align: center; line-height: 40px; }
+    .skill-body { flex: 1; }
+    .skill-name { font-weight: bold; font-size: 15px; }
+    .skill-badge { display: inline-block; padding: 1px 6px; border-radius: 4px; font-size: 11px; margin-right: 6px; color: #fff; }
+    .skill-badge.active { background: #ff6b35; }
+    .skill-badge.passive { background: #7b68ee; }
+    .skill-desc { color: #bbb; font-size: 13px; margin-top: 4px; }
+    .skill-meta { color: #666; font-size: 11px; margin-top: 4px; }
+    .check-table { width: 100%; border-collapse: collapse; margin-top: 12px; }
+    .check-table th, .check-table td { padding: 8px; border: 1px solid #333; text-align: left; }
+    .check-table th { background: #16213e; color: #ffd700; }
+    .pass { color: #4caf50; font-weight: bold; }
+    .fail { color: #f44336; font-weight: bold; }
+    .hero-section { margin-top: 20px; background: #16213e; border-radius: 8px; padding: 16px; }
+    .hero-section h3 { color: #ffd700; margin-bottom: 10px; }
+  </style>
+</head>
+<body>
+  <h1>🔍 QA 驗證 — 英雄技能顯示</h1>
+  <p class="subtitle">此頁面直接從 Google Sheet API 載入資料，模擬前端渲染結果</p>
+  <div id="status" class="status">⏳ 載入中...</div>
+  <div id="content"></div>
+
+  <script>
+    const POST_URL = 'https://script.google.com/macros/s/AKfycbzy3EHTCyTYjA9j1CvJGvWwDM_RrkCuzNYkMhP7T9DTJ6V6g7Sodrlo4uv3h9yx0HLdsg/exec';
+
+    async function post(body) {
+      const res = await fetch(POST_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain; charset=utf-8' },
+        body: JSON.stringify(body),
+        redirect: 'follow',
+      });
+      return res.json();
+    }
+
+    // icon fallback (same logic as resolveSkillIcon in HeroListPanel.tsx)
+    function resolveIcon(icon, type) {
+      if (!icon || /^[a-z0-9_]+$/i.test(icon)) {
+        return type === 'active' ? '⚔️' : '🔮';
+      }
+      return icon;
+    }
+
+    async function main() {
+      const statusEl = document.getElementById('status');
+      const contentEl = document.getElementById('content');
+      const checks = [];
+
+      try {
+        // Load all three sheets
+        const [skillRes, heroSkillRes, heroRes] = await Promise.all([
+          post({ action: 'readSheet', sheet: 'skill_templates' }),
+          post({ action: 'readSheet', sheet: 'hero_skills' }),
+          post({ action: 'readSheet', sheet: 'heroes' }),
+        ]);
+
+        const skills = skillRes.data || [];
+        const heroSkills = heroSkillRes.data || [];
+        const heroes = heroRes.data || [];
+
+        // ─── Check 1: Data loaded ───
+        checks.push({ item: 'skill_templates 載入', expect: '63 筆', actual: `${skills.length} 筆`, pass: skills.length === 63 });
+        checks.push({ item: 'hero_skills 載入', expect: '≥14 筆', actual: `${heroSkills.length} 筆`, pass: heroSkills.length >= 14 });
+        checks.push({ item: 'heroes 載入', expect: '≥14 筆', actual: `${heroes.length} 筆`, pass: heroes.length >= 14 });
+
+        // ─── Check 2: Chinese names (not English keys) ───
+        const hasEnglishName = skills.filter(s => /^[A-Za-z_ ]+$/.test(s.name || ''));
+        checks.push({ item: '技能名稱全中文', expect: '0 筆英文', actual: `${hasEnglishName.length} 筆英文`, pass: hasEnglishName.length === 0 });
+
+        // ─── Check 3: Icon is emoji, not text key ───
+        const hasTextIcon = skills.filter(s => /^[a-z0-9_]+$/i.test(s.icon || ''));
+        checks.push({ item: 'Icon 是 emoji', expect: '0 筆文字 key', actual: `${hasTextIcon.length} 筆文字 key`, pass: hasTextIcon.length === 0 });
+
+        // ─── Check 4: Chinese descriptions ───
+        const hasEnglishDesc = skills.filter(s => s.description && /^[A-Za-z0-9 %+.,\-×()]+$/.test(s.description));
+        checks.push({ item: '描述含中文', expect: '0 筆純英文', actual: `${hasEnglishDesc.length} 筆純英文`, pass: hasEnglishDesc.length === 0 });
+
+        // ─── Check 5: Garbled text ───
+        const garbled = skills.filter(s =>
+          /[\ufffd]|撠|璉|銋|蝒|賊/.test(s.name + s.description)
+        );
+        checks.push({ item: '無亂碼', expect: '0 筆亂碼', actual: `${garbled.length} 筆亂碼`, pass: garbled.length === 0 });
+
+        // ─── Check 6: Hero 14 exists in hero_skills (exactly once) ───
+        const hero14Entries = heroSkills.filter(h => String(h.heroId) === '14');
+        checks.push({ item: 'Hero 14 在 hero_skills', expect: '恰好 1 筆', actual: `${hero14Entries.length} 筆`, pass: hero14Entries.length === 1 });
+
+        // ─── Check 6b: No duplicate heroIds ───
+        const heroIdCounts = {};
+        heroSkills.forEach(h => { heroIdCounts[h.heroId] = (heroIdCounts[h.heroId] || 0) + 1; });
+        const dupes = Object.entries(heroIdCounts).filter(([, c]) => c > 1);
+        checks.push({ item: 'hero_skills 無重複', expect: '0 筆重複', actual: dupes.length ? dupes.map(([id, c]) => `ID${id}×${c}`).join(', ') : '0 筆重複', pass: dupes.length === 0 });
+
+        // ─── Check 7: SKL_ICE_PRISON exists ───
+        const icePrison = skills.find(s => s.skillId === 'SKL_ICE_PRISON');
+        checks.push({ item: 'SKL_ICE_PRISON 冰獄', expect: '存在', actual: icePrison ? `${icePrison.icon} ${icePrison.name}` : '不存在', pass: !!icePrison });
+
+        // Render check table
+        const allPass = checks.every(c => c.pass);
+        statusEl.className = `status ${allPass ? 'ok' : 'fail'}`;
+        statusEl.innerHTML = allPass ? '✅ 全部檢查通過' : '❌ 有檢查未通過';
+
+        let html = '<div class="section"><h2>📋 自動化檢查</h2><table class="check-table"><tr><th>檢查項目</th><th>期望</th><th>實際</th><th>結果</th></tr>';
+        for (const c of checks) {
+          html += `<tr><td>${c.item}</td><td>${c.expect}</td><td>${c.actual}</td><td class="${c.pass ? 'pass' : 'fail'}">${c.pass ? 'PASS ✓' : 'FAIL ✗'}</td></tr>`;
+        }
+        html += '</table></div>';
+
+        // ─── Render skills (active) ───
+        const activeSkills = skills.filter(s => s.type === 'active');
+        html += '<div class="section"><h2>⚔️ 主動技能 (' + activeSkills.length + ')</h2><div class="skill-grid">';
+        for (const s of activeSkills) {
+          html += `<div class="skill-card active">
+            <div class="skill-icon">${resolveIcon(s.icon, 'active')}</div>
+            <div class="skill-body">
+              <div class="skill-name"><span class="skill-badge active">主動</span>${s.name}</div>
+              <div class="skill-desc">${s.description || '—'}</div>
+              <div class="skill-meta">${s.skillId} | ${s.element || '無屬性'} | ${s.target}</div>
+            </div>
+          </div>`;
+        }
+        html += '</div></div>';
+
+        // ─── Render skills (passive) ───
+        const passiveSkills = skills.filter(s => s.type === 'passive');
+        html += '<div class="section"><h2>🔮 被動技能 (' + passiveSkills.length + ')</h2><div class="skill-grid">';
+        for (const s of passiveSkills) {
+          html += `<div class="skill-card passive">
+            <div class="skill-icon">${resolveIcon(s.icon, 'passive')}</div>
+            <div class="skill-body">
+              <div class="skill-name"><span class="skill-badge passive">被動</span>${s.name}</div>
+              <div class="skill-desc">${s.description || '—'}</div>
+              <div class="skill-meta">${s.skillId} | ${s.passive_trigger}</div>
+            </div>
+          </div>`;
+        }
+        html += '</div></div>';
+
+        // ─── Per-hero skill mapping ───
+        html += '<div class="section"><h2>🧟 各英雄技能對照（模擬 HeroDetail 渲染）</h2>';
+        const skillMap = new Map(skills.map(s => [s.skillId, s]));
+        for (const hs of heroSkills) {
+          const hero = heroes.find(h => String(h.HeroID) === String(hs.heroId));
+          const heroName = hero ? hero.Name : `Hero #${hs.heroId}`;
+          const active = skillMap.get(hs.activeSkillId);
+          const passiveIds = [hs.passive1_skillId, hs.passive2_skillId, hs.passive3_skillId, hs.passive4_skillId].filter(Boolean);
+          const passives = passiveIds.map(id => skillMap.get(id)).filter(Boolean);
+
+          html += `<div class="hero-section"><h3>${heroName}（ID: ${hs.heroId}）</h3>`;
+          if (active) {
+            html += `<div class="skill-card active" style="margin-bottom:8px">
+              <div class="skill-icon">${resolveIcon(active.icon, 'active')}</div>
+              <div class="skill-body">
+                <div class="skill-name"><span class="skill-badge active">主動</span>${active.name}</div>
+                <div class="skill-desc">${active.description || '—'}</div>
+              </div></div>`;
+          } else {
+            html += `<div style="color:#f44336">⚠ 找不到主動技 ${hs.activeSkillId}</div>`;
+          }
+          for (let i = 0; i < passives.length; i++) {
+            const p = passives[i];
+            html += `<div class="skill-card passive" style="margin-bottom:4px">
+              <div class="skill-icon">${resolveIcon(p.icon, 'passive')}</div>
+              <div class="skill-body">
+                <div class="skill-name"><span class="skill-badge passive">被動${i+1}</span>${p.name}</div>
+                <div class="skill-desc">${p.description || '—'}</div>
+              </div></div>`;
+          }
+          html += '</div>';
+        }
+        html += '</div>';
+
+        contentEl.innerHTML = html;
+      } catch (err) {
+        statusEl.className = 'status fail';
+        statusEl.textContent = '❌ 載入失敗: ' + err.message;
+      }
+    }
+
+    main();
+  </script>
+</body>
+</html>

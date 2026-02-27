@@ -1,6 +1,6 @@
 # 關卡系統 Spec
 
-> 版本：v0.1 ｜ 狀態：🟡 草案
+> 版本：v0.2 ｜ 狀態：🟡 草案
 > 最後更新：2026-02-26
 > 負責角色：🎯 GAME_DESIGN → 🔧 CODING
 
@@ -40,7 +40,8 @@
 |------|-----|
 | 每章關卡數 | 8 關 |
 | 初期章節數 | 3 章（共 24 關） |
-| 體力消耗 | 8 / 關 |
+| 體力消耗 | **無**（免費無限挑戰） |
+| 通關效果 | 資源計時器掛載到此關卡（產出量隨進度提升） |
 | 星級評價 | ★★★（全員存活）、★★（≤2 人陣亡）、★（通關即可） |
 | 首通獎勵 | 鑽石 + 金幣 + 經驗值 |
 | 星級獎勵 | 每章累計星數達標 → 額外獎勵（角色碎片/裝備箱） |
@@ -62,7 +63,6 @@ interface StageConfig {
   stage: number
   enemies: StageEnemy[]      // 敵方陣容（1-6 隻）
   recommendedLevel: number
-  staminaCost: number
   rewards: StageReward
   firstClearRewards: StageReward
   dialogue?: StageDialogue[] // 戰前/戰後對話（可選）
@@ -167,7 +167,7 @@ function getTowerReward(floor: number): StageReward {
 
 | 項目 | 值 |
 |------|-----|
-| 體力消耗 | 15 / 次 |
+| 體力消耗 | **無** |
 | 每日次數 | 3 次（可用鑽石買額外次數，每次 50 鑽） |
 | 難度分級 | 初級 / 中級 / 高級（需主線進度解鎖） |
 
@@ -182,7 +182,6 @@ interface DailyDungeon {
 interface DungeonDifficulty {
   tier: 'easy' | 'normal' | 'hard'
   requiredChapter: number    // 解鎖條件（主線章節）
-  staminaCost: number
   enemies: StageEnemy[]
   rewards: StageReward
 }
@@ -263,7 +262,7 @@ interface PvpRecord {
 
 | 項目 | 值 |
 |------|-----|
-| 體力消耗 | 20 |
+| 體力消耗 | **無** |
 | 出現頻率 | 每週固定 2 隻，輪替 |
 | 回合上限 | 30 回合 |
 | 獎勵機制 | 依傷害量段位：S/A/B/C 級 |
@@ -364,3 +363,4 @@ interface BossSkill {
 | 版本 | 日期 | 變更內容 |
 |------|------|---------|
 | v0.1 | 2026-02-26 | 初版：5 種模式（章節/爬塔/每日/PvP/Boss） |
+| v0.2 | 2026-02-26 | 移除體力系統，所有模式免費挑戰；成長限制改由資源計時器控制（見 save-system.md） |

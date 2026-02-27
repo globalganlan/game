@@ -13,6 +13,7 @@
 - `specs/hero-schema.md` — HeroInstance 結構（HP, ATK, DEF, SPD, CritRate, CritDmg）
 - `specs/skill-system.md` — 被動技能星級解鎖
 - `specs/save-system.md` — 存檔結構
+- `specs/inventory.md` — 素材消耗與背包操作（經驗核心/碎片/職業石/強化石等）
 
 ---
 

@@ -9,6 +9,28 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react'
 import type { RawHeroData } from '../types'
+import type { HeroInstance } from '../services/saveService'
+
+/* ── 稀有度配色 ── */
+type RarityLabel = 'SSR' | 'SR' | 'R' | 'N'
+const RARITY_CONFIG: Record<RarityLabel, { color: string; border: string }> = {
+  SSR: { color: '#ffd43b', border: '#ffd43b' },
+  SR:  { color: '#be4bdb', border: '#be4bdb' },
+  R:   { color: '#4dabf7', border: '#4dabf7' },
+  N:   { color: '#888',    border: '#666' },
+}
+function numToRarity(v: unknown): RarityLabel {
+  const n = Number(v)
+  if (n === 4) return 'SSR'
+  if (n === 3) return 'SR'
+  if (n === 2) return 'R'
+  return 'N'
+}
+function initialStars(rarity: RarityLabel): number {
+  if (rarity === 'SSR') return 3
+  if (rarity === 'SR') return 2
+  return 1
+}
 
 /* ────────────────────────────
    TransitionOverlay
@@ -199,6 +221,7 @@ export function Thumbnail3D({ modelId }: Thumbnail3DProps) {
 
 interface ThumbnailListProps {
   heroes: RawHeroData[]
+  heroInstances?: HeroInstance[]
   onThumbClick?: (hero: RawHeroData) => void
   selectedKeys?: string[]
   canAdjust?: boolean
@@ -207,12 +230,17 @@ interface ThumbnailListProps {
 /** 底部英雄選擇欄（可橫向捲動） */
 export function ThumbnailList({
   heroes = [],
+  heroInstances = [],
   onThumbClick,
   selectedKeys = [],
   canAdjust = false,
 }: ThumbnailListProps) {
   const scrollRef = useRef<HTMLDivElement>(null)
   const dragState = useRef({ active: false, startX: 0, scrollStart: 0, moved: false })
+
+  /** heroId → HeroInstance */
+  const instanceMap = useRef(new Map<number, HeroInstance>())
+  instanceMap.current = new Map(heroInstances.map(hi => [Number(hi.heroId), hi]))
 
   // 桌面端：垂直滾輪 → 水平捲動（必須用原生 listener 設 passive:false 才能 preventDefault）
   useEffect(() => {
@@ -285,7 +313,7 @@ export function ThumbnailList({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [heroes, canAdjust, onThumbClick])
 
-  if (heroes.length === 0) return null
+  if (!Array.isArray(heroes) || heroes.length === 0) return null
 
   return (
     <div className={`thumb-bar ${canAdjust ? 'setup-mode' : 'locked-mode'}`}>
@@ -311,14 +339,31 @@ export function ThumbnailList({
           const heroKey = keyRaw != null ? String(keyRaw).trim() : `${modelId}_${i}`
           const isSelected = selectedKeys.includes(heroKey)
 
+          // 稀有度 & 培養資訊
+          const rarity = numToRarity((h as Record<string, unknown>).Rarity)
+          const rcfg = RARITY_CONFIG[rarity]
+          const inst = instanceMap.current.get(Number(h.HeroID ?? h.id ?? 0))
+          const lvl = inst?.level ?? 1
+          const stars = initialStars(rarity)
+
           return (
             <div
               key={heroKey}
               data-thumb-idx={i}
               className={`thumb-card ${canAdjust ? '' : 'disabled'}`}
+              style={{ borderColor: rcfg.border }}
             >
+              <span className="thumb-rarity-badge" style={{ color: rcfg.color }}>{rarity}</span>
               <Thumbnail3D modelId={modelId} />
               <div className="thumb-name">{h.Name || `喪屍 ${i + 1}`}</div>
+              <div className="thumb-stats">
+                <span className="thumb-level">Lv.{lvl}</span>
+                <span className="thumb-stars">
+                  {Array.from({ length: stars }, (_, si) => (
+                    <span key={si} className="star-filled">★</span>
+                  ))}
+                </span>
+              </div>
               {isSelected && (
                 <div className="selected-checkmark">
                   <svg viewBox="0 0 24 24">

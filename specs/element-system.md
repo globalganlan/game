@@ -1,88 +1,186 @@
-# 屬性剋制系統 Spec
+# 屬性系統 Spec
 
-> 版本：v0.1 ｜ 狀態：🟡 草案
-> 最後更新：2026-02-26
+> 版本：v1.0 ｜ 狀態：🟢 已實作
+> 最後更新：2025-02-26
 > 負責角色：🎯 GAME_DESIGN → 🔧 CODING
+> 原始碼：`src/domain/elementSystem.ts`（核心）、`src/services/dataService.ts`（中英對照 + 載入）
 
 ## 概述
 
-定義元素屬性的種類、相剋關係與傷害倍率，影響戰鬥策略的核心系統。
+7 屬性剋制系統。每位英雄和技能可擁有一種屬性，
+攻擊時依屬性剋制矩陣乘算傷害倍率。
+矩陣可從 Google Sheets `element_matrix` 表動態載入，也內建預設 fallback。
 
 ## 依賴
 
-- 無外部依賴（此為底層系統）
+- `specs/damage-formula.md` §1 步驟 4 → 屬性倍率在傷害公式中的套用位置
+- Google Sheets `element_matrix` 表（49 行 = 7×7）
 
-## 介面契約
+---
+
+## 一、7 屬性定義 
 
 ```typescript
-type Element = 'fire' | 'water' | 'wind' | 'thunder' | 'earth' | 'light' | 'dark';
+// src/domain/types.ts
+type Element = 'fire' | 'water' | 'wind' | 'thunder' | 'earth' | 'light' | 'dark'
+```
 
-interface ElementSystem {
-  getMultiplier(attacker: Element, defender: Element): number;
-  getAdvantaged(element: Element): Element;   // 我剋誰
-  getDisadvantaged(element: Element): Element; // 誰剋我
+### 中文 → 英文對照
+
+```typescript
+// src/services/dataService.ts
+const ELEMENT_ZH_TO_EN: Record<string, Element> = {
+  '火': 'fire',
+  '冰': 'water',    // 冰元素 → water
+  '水': 'water',
+  '雷': 'thunder',
+  '闇': 'dark',
+  '暗': 'dark',
+  '光': 'light',
+  '毒': 'wind',     // 毒元素 → wind（遊戲設定）
+  '風': 'wind',
+  '地': 'earth',
+  '土': 'earth',
 }
 ```
 
-## 詳細規格
+> **重要設計決策**：
+> - `冰` = `water`：冰被視為水系的表現形式
+> - `毒` = `wind`：毒被歸類為風系（遊戲世界觀設定）
+> - `闇` / `暗` 皆對應 `dark`（相容兩種寫法）
+> - `地` / `土` 皆對應 `earth`
 
-### 剋制環
-```
-fire → wind → earth → thunder → water → fire
-         （五元素循環剋制）
-
-light ⇔ dark
-    （互相剋制）
-```
-
-### 傷害倍率表
-
-| 關係 | 倍率 |
-|------|------|
-| 剋制（我打弱點） | ×1.3（+30%） |
-| 被剋（我打鋼板） | ×0.7（-30%） |
-| 無關 | ×1.0 |
-| 光⇔暗（互剋） | ×1.3（雙方都吃加成） |
-| 同屬性 | ×0.9（-10%，些微抗性） |
-
-### 完整倍率矩陣
-
-| 攻↓ 守→ | Fire | Water | Wind | Thunder | Earth | Light | Dark |
-|----------|------|-------|------|---------|-------|-------|------|
-| **Fire** | 0.9 | 0.7 | 1.3 | 1.0 | 1.0 | 1.0 | 1.0 |
-| **Water** | 1.3 | 0.9 | 1.0 | 0.7 | 1.0 | 1.0 | 1.0 |
-| **Wind** | 0.7 | 1.0 | 0.9 | 1.0 | 1.3 | 1.0 | 1.0 |
-| **Thunder** | 1.0 | 1.3 | 1.0 | 0.9 | 0.7 | 1.0 | 1.0 |
-| **Earth** | 1.0 | 1.0 | 0.7 | 1.3 | 0.9 | 1.0 | 1.0 |
-| **Light** | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 | 0.9 | 1.3 |
-| **Dark** | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 | 1.3 | 0.9 |
-
-### 程式實作建議
+### 轉換函式
 
 ```typescript
-const ELEMENT_ADVANTAGE: Record<Element, Element> = {
-  fire: 'wind', wind: 'earth', earth: 'thunder',
-  thunder: 'water', water: 'fire',
-  light: 'dark', dark: 'light'
-};
-
-function getElementMultiplier(atk: Element, def: Element): number {
-  if (atk === def) return 0.9;
-  if (ELEMENT_ADVANTAGE[atk] === def) return 1.3;
-  if (ELEMENT_ADVANTAGE[def] === atk) return 0.7;
-  return 1.0;
+// src/services/dataService.ts
+export function toElement(raw: string | undefined | null): Element | '' {
+  if (!raw) return ''
+  const trimmed = raw.trim().toLowerCase()
+  // 已經是英文
+  const validEn: Element[] = ['fire', 'water', 'wind', 'thunder', 'earth', 'light', 'dark']
+  if (validEn.includes(trimmed as Element)) return trimmed as Element
+  // 中文轉換
+  return ELEMENT_ZH_TO_EN[raw.trim()] ?? ''
 }
 ```
+
+---
+
+## 二、剋制矩陣 
+
+### 預設矩陣（硬編碼 fallback）
+
+| 攻 守 | fire | water | wind | thunder | earth | light | dark |
+|---------|------|-------|------|---------|-------|-------|------|
+| **fire** | 0.9 | 0.7 | 1.3 | 1.0 | 1.0 | 1.0 | 1.0 |
+| **water** | 1.3 | 0.9 | 1.0 | 0.7 | 1.0 | 1.0 | 1.0 |
+| **wind** | 0.7 | 1.0 | 0.9 | 1.0 | 1.3 | 1.0 | 1.0 |
+| **thunder** | 1.0 | 1.3 | 1.0 | 0.9 | 0.7 | 1.0 | 1.0 |
+| **earth** | 1.0 | 1.0 | 0.7 | 1.3 | 0.9 | 1.0 | 1.0 |
+| **light** | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 | 0.9 | 1.3 |
+| **dark** | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 | 1.3 | 0.9 |
+
+### 剋制規則
+
+| 倍率 | 意義 | 飄字顯示 |
+|------|------|---------|
+| 1.3 | 剋制（弱點） | 紅色「弱點」 |
+| 1.0 | 中性 | 無特殊 |
+| 0.9 | 同屬減傷 | 無特殊 |
+| 0.7 | 抵抗 | 無特殊（可考慮加「抵抗」標記） |
+
+### 剋制鏈
+
+```
+火 → 風 → 地 → 雷 → 水 → 火    （五行循環）
+光 ↔ 闇                          （互剋）
+```
+
+---
+
+## 三、動態載入 
+
+### Google Sheet: element_matrix
+
+| 欄位 | 型別 | 說明 |
+|------|------|------|
+| attacker | string | 攻擊方屬性（英文） |
+| defender | string | 防守方屬性（英文） |
+| multiplier | number | 倍率 |
+
+共 49 行（7×7 完整矩陣）。
+
+### 載入函式
+
+```typescript
+// src/domain/elementSystem.ts
+export function loadElementMatrix(
+  entries: Array<{ attacker: string; defender: string; multiplier: number }>
+): void {
+  const m: Record<string, Record<string, number>> = {}
+  for (const { attacker, defender, multiplier } of entries) {
+    if (!m[attacker]) m[attacker] = {}
+    m[attacker][defender] = multiplier
+  }
+  matrix = m as ElementMatrix
+}
+```
+
+此函式在 `dataService.ts` `loadElements()` 中被呼叫：
+
+```typescript
+export async function loadElements(): Promise<void> {
+  const rows = await readSheet<RawElementRow>('element_matrix')
+  const entries = rows.map(r => ({
+    attacker: r.attacker as Element,
+    defender: r.defender as Element,
+    multiplier: Number(r.multiplier),
+  }))
+  loadElementMatrix(entries)
+}
+```
+
+---
+
+## 四、查詢 API 
+
+```typescript
+// 取得倍率
+getElementMultiplier(attacker: Element | '', defender: Element | ''): number
+// 無屬性 → 1.0、查不到  1.0
+
+// 是否為弱點（剋制）
+isWeakness(attacker: Element | '', defender: Element | ''): boolean
+// multiplier > 1.0
+
+// 是否為抵抗（被剋）
+isResist(attacker: Element | '', defender: Element | ''): boolean
+// multiplier < 1.0 且 attacker !== defender
+```
+
+---
+
+## 五、在傷害公式中的位置
+
+```
+步驟 4（共 10 步）：
+  DMG = 基礎傷害 × DEF減傷 × 暴擊 × 【屬性倍率】 × 浮動 × Buff修正
+```
+
+---
 
 ## 擴展點
 
-- [ ] **雙屬性角色**：覺醒後獲得第二屬性
-- [ ] **屬性共鳴**：同隊 3 個同屬性角色觸發隊伍 buff
-- [ ] **環境屬性**：特定關卡增強某屬性（如火山關卡 fire +15%）
-- [ ] **無屬性**：BOSS 專用，不受任何剋制
+- [ ] 屬性加傷 buff（如「火屬性傷害 +20%」）
+- [ ] 屬性抗性（如「水屬性抗性 +30%」降低受到的水系傷害）
+- [ ] 雙屬性角色
+- [ ] 飄字顯示「抵抗」標記
+- [ ] 矩陣動態調整 UI（管理後台）
 
 ## 變更歷史
 
 | 版本 | 日期 | 變更內容 |
 |------|------|---------|
-| v0.1 | 2026-02-26 | 初版草案：7 元素循環、倍率矩陣、實作建議 |
+| v0.1 | 2025-02-26 | 草案：基礎 7 屬性設計 |
+| v1.0 | 2025-02-26 | **已實作**：完整矩陣 + Sheets 動態載入 + 中英對照 + 3 個查詢 API |

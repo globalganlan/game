@@ -14,9 +14,13 @@ import type { Vector3Tuple } from 'three'
 export type GameState =
   | 'PRE_BATTLE'
   | 'FETCHING'
+  | 'MAIN_MENU'
   | 'IDLE'
   | 'BATTLE'
   | 'GAMEOVER'
+
+/** 主選單子畫面 */
+export type MenuScreen = 'none' | 'heroes' | 'inventory' | 'gacha' | 'stages' | 'settings' | 'mailbox'
 
 /** 單一角色的即時狀態 */
 export type ActorState =

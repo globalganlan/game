@@ -51,8 +51,8 @@ export function useResponsive(): ResponsiveInfo {
     return {
       device,
       isLandscape,
-      fov: 65,
-      camPos: [0, 14, 12],
+      fov: 58,
+      camPos: [0, 12, 10],
       camTarget: [0, 0, 0],
       textScale,
       dpr,

@@ -10,8 +10,12 @@ import './suppressWarnings'
 
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
+import { runMigrations } from './services/localStorageMigration'
 import './index.css'
 import App from './App'
+
+// localStorage schema 遷移 — 必須在 React 渲染前同步執行
+runMigrations()
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

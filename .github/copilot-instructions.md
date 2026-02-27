@@ -3,6 +3,23 @@
 > 本檔案在每次新對話時自動載入，確保 AI 助手保有專案知識。
 > 詳細知識點請參閱 `docs/Three.js場景與模型整合筆記.md`。
 
+## ❗ 強制規則（每次任務必讀）
+
+1. **使用者只提需求，AI 團隊負責全部實現**（前端/後端/GAS/部署/測試）。絕對不要要求使用者手動操作。
+2. **完成功能後必須執行完整測試**，確認遊戲可正常運行再回報完成：
+   - `npx tsc --noEmit`（零錯誤）
+   - `npx vite build`（編譯成功）
+   - API 端點測試（若有改 GAS）
+   - 確認遊戲流程不會壞：登入 → 載入 → 選英雄 → 戰鬥 → 結果 → 重啟
+   - 有 bug 就修，不能把壞掉的狀態交給使用者
+3. **GAS 修改後自行部署**：改 `gas/程式碼.js` → `clasp push` → `clasp deploy -i <ID>`
+4. **Google Sheets 中文亂碼防護**：每次新增（createSheet）、修改（updateSheet / appendRows）、或讀取（readSheet）Google Sheet 時，必須做以下檢查：
+   - **寫入前**：POST body 必須使用 `[System.Text.Encoding]::UTF8.GetBytes()` 編碼，ContentType 為 `text/plain; charset=utf-8`
+   - **寫入後**：立即用 GET API 讀回資料，抽樣檢查中文欄位是否正確（不可含 `?`、方塊字亂碼如 `撣賊`、`銋`、`璉格` 等）
+   - **發現亂碼**：立即修正 — deleteSheet → createSheet 重建正確資料
+   - **日期自動轉換防護**：含 `X-Y` 格式的欄位（如 stageId "1-1"）必須在 createSheet 時使用 `textColumns` 參數，GAS 會對該欄設 `setNumberFormat('@')` 防止自動轉為日期
+   - **根因**：PowerShell `ConvertTo-Json` 在 Windows Big5 環境下可能產生編碼錯誤，務必用 `UTF8.GetBytes()` 確保 UTF-8
+
 ## 專案概覽
 
 - **名稱**：全球感染 (GlobalGanLan) — 3D 喪屍對戰競技場
@@ -45,6 +62,8 @@
 - `import './App.css'` 漏掉 → 整個 UI 消失
 - async 函數中用 `useRef` 讀即時值，避免閉包陷阱
 - `orientationchange` 事件需 `setTimeout(150ms)` 才能拿到正確尺寸
+- **Google Sheets 寫入後必須驗證中文不是亂碼**（讀回抽查），發現亂碼立即 deleteSheet → createSheet 修復
+- **stageId "1-1" 格式會被 Sheets 自動轉日期** — createSheet 時用 `textColumns:["stageId"]` 參數防護
 
 ## 效能原則
 
@@ -76,13 +95,40 @@
 ```powershell
 $url = "https://script.google.com/macros/s/AKfycbzy3EHTCyTYjA9j1CvJGvWwDM_RrkCuzNYkMhP7T9DTJ6V6g7Sodrlo4uv3h9yx0HLdsg/exec"
 $body = @{ action="updateHeroes"; newColumns=@("NewCol"); data=@(@{HeroID=1; NewCol="value"}) } | ConvertTo-Json -Depth 3
-Invoke-RestMethod -Uri $url -Method Post -ContentType "application/json; charset=utf-8" -Body ([System.Text.Encoding]::UTF8.GetBytes($body))
+Invoke-RestMethod -Uri $url -Method Post -ContentType "text/plain; charset=utf-8" -Body ([System.Text.Encoding]::UTF8.GetBytes($body))
 ```
 
 - 回傳 `{ "success": true, "updated": N }` 表示成功
 - `newColumns` 會自動在 Sheet 建立不存在的欄位
 - `data` 陣列中每個物件以 `HeroID` 為 key 定位行，其餘欄位直接寫入對應欄
 - **當需要更新 Google Sheet 時，直接用 PowerShell POST，不需要請使用者手動操作**
+
+## Apps Script 部署能力（clasp）
+
+**AI 團隊可自行修改 GAS 程式碼並部署，不需要使用者介入。**
+
+- **GAS 原始碼**：`gas/程式碼.js`（完整 doGet + doPost + 所有 handler）
+- **clasp 設定**：`gas/.clasp.json`（scriptId: `1nTjW3rZftAlH3XcbYvg3fP5nrm3TeAkEXFpWDmdcRqbgKEm6HQg7BU5J`）
+- **已登入**：`~/.clasprc.json` 存在，Apps Script API 已啟用
+
+### 部署流程
+
+```powershell
+# 1. 修改 gas/程式碼.js
+# 2. Push + 更新現有部署
+Push-Location d:\GlobalGanLan\gas
+npx @google/clasp push
+npx @google/clasp deploy -i "AKfycbzy3EHTCyTYjA9j1CvJGvWwDM_RrkCuzNYkMhP7T9DTJ6V6g7Sodrlo4uv3h9yx0HLdsg" --description "描述"
+npx @google/clasp deploy -i "AKfycbxXdy3QCvgX7knCCnxfmVY0CMqmUgcG422nVgFDlx5l9CsyldFZ4bwLVHPHxbtXp0LaTw" --description "描述"
+Pop-Location
+```
+
+### 重要原則
+
+- **使用者只負責提需求，AI 團隊負責全部實現（前端、後端、GAS、部署、測試）**
+- 需要新增 GAS API → 直接改 `gas/程式碼.js` 的 doPost switch-case + 加 handler → clasp push + deploy
+- 需要改 Google Sheet 結構 → 用 POST API（createSheet / updateSheet / appendRows）
+- **絕對不要要求使用者手動貼程式碼、手動部署、或手動操作 Google Sheet**
 
 ## AI 團隊調度
 

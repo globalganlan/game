@@ -11,9 +11,9 @@ import { Billboard, Text } from '@react-three/drei'
 import * as THREE from 'three'
 
 import { ZombieModel } from './ZombieModel'
-import { DamagePopup, HealthBar3D } from './SceneWidgets'
+import { DamagePopup, HealthBar3D, EnergyBar3D } from './SceneWidgets'
 import type { SlotHero, ActorState, AnimationState, DamagePopupData } from '../types'
-import type { GameState } from '../types'
+
 import type { Vector3Tuple } from 'three'
 
 /* ────────────────────────────
@@ -24,7 +24,6 @@ interface HeroProps {
   position: Vector3Tuple
   heroData: SlotHero
   isPlayer: boolean
-  gameState: GameState
   actorState?: ActorState
   uid: string
   damagePopups: DamagePopupData[]
@@ -45,6 +44,8 @@ interface HeroProps {
   dragOffsetRef?: React.RefObject<THREE.Vector3>
   isDragActive?: boolean
   canAdjustFormation?: boolean
+  /** 能量比例（0~1），戰鬥中用於顯示 3D 能量條 */
+  energyRatio?: number
 }
 
 /* ────────────────────────────
@@ -73,6 +74,7 @@ export function Hero({
   dragOffsetRef,
   isDragActive,
   canAdjustFormation = false,
+  energyRatio,
 }: HeroProps) {
   const meshRef = useRef<THREE.Group>(null)
   const [basePosition] = useState<Vector3Tuple>(position)
@@ -103,6 +105,8 @@ export function Hero({
   }, [actorState])
 
   // ── 每幀位移邏輯 ──
+
+
   useFrame(() => {
     if (hpDepleted || !meshRef.current) return
 
@@ -226,6 +230,15 @@ export function Hero({
           height={0.12 * textScale}
           color={isPlayer ? '#1aff50' : '#f00'}
         />
+
+        {energyRatio !== undefined && (
+          <EnergyBar3D
+            position={[0, 2.75, 0]}
+            ratio={energyRatio}
+            width={1.6 * textScale}
+            height={0.08 * textScale}
+          />
+        )}
       </group>
     </group>
   )

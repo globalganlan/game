@@ -1,8 +1,12 @@
 /**
- * Arena — 場景環境（地面 + 碎片 + 雨 + 燈光 + 天空）
+ * Arena — 場景環境（地面 + 碎片 + 粒子 + 燈光 + 天空）
  *
- * 五者連動：Ground / Debris / Rain / Sparkles / Fog
- * 修改場景大小時，必須五者一起調整。
+ * 三種場景模式：
+ * - story: 廢土雨夜（棕色地面 + 雨 + 紅色火花 + 暖霧）
+ * - tower: 冰封高塔（藍灰冰面 + 飄雪 + 藍色光點 + 冷霧）
+ * - daily: 熔岩地獄（深紅地面 + 飛灰 + 橙色火花 + 暗紅霧）
+ *
+ * 五者連動：Ground / Debris / Particles / Sparkles / Fog
  */
 
 import { useRef, useMemo } from 'react'
@@ -10,6 +14,147 @@ import { useFrame } from '@react-three/fiber'
 import { Sky, Sparkles } from '@react-three/drei'
 import * as THREE from 'three'
 import type { DebrisItem, DebrisType } from '../types'
+
+export type SceneMode = 'story' | 'tower' | 'daily'
+
+/* ════════════════════════════════════
+   場景配色表
+   ════════════════════════════════════ */
+
+interface SceneTheme {
+  fogColor: string
+  fogNear: number
+  fogFar: number
+  sparkleColor: string
+  sparkleCount: number
+  skyConfig: { sunY: number; rayleigh: number; turbidity: number }
+  hemiArgs: [string, string]
+  hemiIntensity: number
+  ambientIntensity: number
+  pointLights: { pos: [number, number, number]; color: string; intensity: number }[]
+  dirLights: { pos: [number, number, number]; color: string; intensity: number }[]
+  particleType: 'rain' | 'snow' | 'ash'
+  particleColor: string
+  particleOpacity: number
+  groundColorFn: (v: number, brownMix: number) => [number, number, number]
+  wallColors: Record<string, string[]>
+  rubbleColors: Record<string, string[]>
+  groundRoughness: number
+  groundMetalness: number
+}
+
+const THEMES: Record<SceneMode, SceneTheme> = {
+  /* ── 主線：廢土雨夜 ── */
+  story: {
+    fogColor: '#1a0e06', fogNear: 8, fogFar: 35,
+    sparkleColor: '#ff6666', sparkleCount: 80,
+    skyConfig: { sunY: -0.15, rayleigh: 0.2, turbidity: 20 },
+    hemiArgs: ['#ff4400', '#220000'], hemiIntensity: 1.2,
+    ambientIntensity: 2.5,
+    pointLights: [
+      { pos: [15, 10, 10], color: '#ff6633', intensity: 40 },
+      { pos: [-15, 12, -10], color: '#ff2200', intensity: 30 },
+      { pos: [0, 15, 5], color: '#ffffff', intensity: 25 },
+    ],
+    dirLights: [
+      { pos: [5, 25, 15], color: '#ffffff', intensity: 5 },
+      { pos: [-5, 20, 10], color: '#ff8866', intensity: 3 },
+    ],
+    particleType: 'rain', particleColor: '#99aabb', particleOpacity: 0.35,
+    groundColorFn: (v, bm) => [
+      (0.16 + bm * 0.10) * v,
+      (0.11 + bm * 0.06) * v,
+      (0.06 + bm * 0.03) * v,
+    ],
+    wallColors: {
+      slab: ['#8a8078', '#6e6258', '#9c8e80', '#b0a090'],
+      box: ['#5a4030', '#6b4423', '#4a3018'],
+      pillar: ['#707068', '#585850', '#908880'],
+    },
+    rubbleColors: {
+      rock: ['#605848', '#787060', '#504838'],
+      chunk: ['#8b4513', '#a0522d', '#6b3410'],
+      slab: ['#989088', '#807870', '#a8a098'],
+      box: ['#5c4a38', '#4a3828', '#6e5c48'],
+      rebar: ['#b87333', '#c08040', '#8b5a2b', '#d4874a'],
+    },
+    groundRoughness: 0.95, groundMetalness: 0.0,
+  },
+
+  /* ── 爬塔：冰封高塔 ── */
+  tower: {
+    fogColor: '#0c1525', fogNear: 10, fogFar: 38,
+    sparkleColor: '#88ccff', sparkleCount: 100,
+    skyConfig: { sunY: -0.3, rayleigh: 0.6, turbidity: 5 },
+    hemiArgs: ['#4488cc', '#081020'], hemiIntensity: 1.0,
+    ambientIntensity: 2.0,
+    pointLights: [
+      { pos: [12, 12, 8], color: '#6699ff', intensity: 35 },
+      { pos: [-12, 10, -8], color: '#4466cc', intensity: 25 },
+      { pos: [0, 18, 0], color: '#aaccff', intensity: 20 },
+    ],
+    dirLights: [
+      { pos: [6, 25, 12], color: '#ccddff', intensity: 4 },
+      { pos: [-4, 20, 8], color: '#6688bb', intensity: 2.5 },
+    ],
+    particleType: 'snow', particleColor: '#ddeeff', particleOpacity: 0.5,
+    groundColorFn: (v, bm) => [
+      (0.12 + bm * 0.06) * v,
+      (0.15 + bm * 0.08) * v,
+      (0.22 + bm * 0.10) * v,
+    ],
+    wallColors: {
+      slab: ['#8090a0', '#708090', '#90a0b0', '#a0b0c0'],
+      box: ['#506070', '#607080', '#405060'],
+      pillar: ['#9aa8b8', '#7888a0', '#b0c0d0'],
+    },
+    rubbleColors: {
+      rock: ['#607080', '#506070', '#708898'],
+      chunk: ['#5a7088', '#6080a0', '#4a6078'],
+      slab: ['#8898a8', '#7888a0', '#98a8c0'],
+      box: ['#405868', '#506878', '#607088'],
+      rebar: ['#667788', '#778899', '#5a6a7a'],
+    },
+    groundRoughness: 0.7, groundMetalness: 0.15,
+  },
+
+  /* ── 每日副本：熔岩地獄 ── */
+  daily: {
+    fogColor: '#1a0800', fogNear: 7, fogFar: 32,
+    sparkleColor: '#ff4400', sparkleCount: 120,
+    skyConfig: { sunY: -0.05, rayleigh: 0.1, turbidity: 30 },
+    hemiArgs: ['#ff2200', '#100000'], hemiIntensity: 1.5,
+    ambientIntensity: 2.2,
+    pointLights: [
+      { pos: [10, 8, 8], color: '#ff4400', intensity: 50 },
+      { pos: [-10, 10, -6], color: '#ff2200', intensity: 40 },
+      { pos: [0, 12, 0], color: '#ffaa44', intensity: 30 },
+    ],
+    dirLights: [
+      { pos: [4, 22, 14], color: '#ff8844', intensity: 4 },
+      { pos: [-6, 18, 8], color: '#ff4422', intensity: 3 },
+    ],
+    particleType: 'ash', particleColor: '#ff6633', particleOpacity: 0.4,
+    groundColorFn: (v, bm) => [
+      (0.22 + bm * 0.12) * v,
+      (0.06 + bm * 0.03) * v,
+      (0.02 + bm * 0.01) * v,
+    ],
+    wallColors: {
+      slab: ['#3a2018', '#4a2820', '#5a3028', '#302018'],
+      box: ['#2a1008', '#3a1810', '#1a0800'],
+      pillar: ['#484040', '#383030', '#584848'],
+    },
+    rubbleColors: {
+      rock: ['#3a2018', '#4a2820', '#2a1810'],
+      chunk: ['#582010', '#481808', '#681808'],
+      slab: ['#484038', '#383028', '#58483a'],
+      box: ['#3a2818', '#2a1808', '#4a3020'],
+      rebar: ['#604030', '#704838', '#503828'],
+    },
+    groundRoughness: 0.9, groundMetalness: 0.05,
+  },
+}
 
 /* ────────────────────────────
    Debris（單一碎片）
@@ -60,7 +205,6 @@ function Debris({ position, scale, rotation, color = '#222', type = 'box' }: Deb
         pz + nz * disp + (Math.random() - 0.5) * strength * 0.15,
       )
 
-      // 頂點色差 — 加入汙漬斑塊
       const coarse = hash(px * 1.5, py * 1.5, pz * 1.5)
       const fine = hash(px * 8, py * 8, pz * 8)
       const v = 0.45 + coarse * 0.35 + fine * 0.2
@@ -98,38 +242,61 @@ function Debris({ position, scale, rotation, color = '#222', type = 'box' }: Deb
 }
 
 /* ────────────────────────────
-   Rain（LineSegments 雨絲）
+   降落粒子（雨 / 雪 / 飛灰）
    ──────────────────────────── */
 
-interface RainProps {
+interface ParticlesProps {
+  type: 'rain' | 'snow' | 'ash'
   count?: number
   area?: number
   height?: number
   speed?: number
+  color?: string
+  opacity?: number
 }
 
-function Rain({ count = 1200, area = 30, height = 15, speed = 14 }: RainProps) {
-  const meshRef = useRef<THREE.LineSegments>(null)
-  const streakLen = 0.6
-  const windX = 4
-  const windZ = -1.5
+function FallingParticles({
+  type,
+  count = 1200,
+  area = 30,
+  height = 15,
+  speed: baseSpeed = 14,
+  color = '#99aabb',
+  opacity = 0.35,
+}: ParticlesProps) {
+  const meshRef = useRef<THREE.LineSegments | THREE.Points>(null)
+  const isRain = type === 'rain'
+  const isSnow = type === 'snow'
+  // ash = slower, drifting embers
+
+  const speed = isSnow ? baseSpeed * 0.2 : type === 'ash' ? baseSpeed * 0.3 : baseSpeed
+  const streakLen = isRain ? 0.6 : 0
+  const windX = isRain ? 4 : isSnow ? 1.5 : 2
+  const windZ = isRain ? -1.5 : isSnow ? 0.8 : -0.5
 
   const { positions, velocities } = useMemo(() => {
-    const pos = new Float32Array(count * 2 * 3)
+    const ptCount = isRain ? count * 2 : count
+    const pos = new Float32Array(ptCount * 3)
     const vel = new Float32Array(count)
     for (let i = 0; i < count; i++) {
       const x = (Math.random() - 0.5) * area
       const y = Math.random() * height
       const z = (Math.random() - 0.5) * area
-      vel[i] = 0.8 + Math.random() * 0.4
-      const bi = i * 6
-      pos[bi] = x; pos[bi + 1] = y; pos[bi + 2] = z
-      const dx = (windX / speed) * streakLen
-      const dz = (windZ / speed) * streakLen
-      pos[bi + 3] = x + dx; pos[bi + 4] = y - streakLen; pos[bi + 5] = z + dz
+      vel[i] = 0.6 + Math.random() * 0.6
+
+      if (isRain) {
+        const bi = i * 6
+        const dx = (windX / speed) * streakLen
+        const dz = (windZ / speed) * streakLen
+        pos[bi] = x; pos[bi + 1] = y; pos[bi + 2] = z
+        pos[bi + 3] = x + dx; pos[bi + 4] = y - streakLen; pos[bi + 5] = z + dz
+      } else {
+        const bi = i * 3
+        pos[bi] = x; pos[bi + 1] = y; pos[bi + 2] = z
+      }
     }
     return { positions: pos, velocities: vel }
-  }, [count, area, height, speed])
+  }, [count, area, height, speed, isRain, streakLen, windX, windZ])
 
   useFrame((_state, delta) => {
     if (!meshRef.current) return
@@ -137,45 +304,67 @@ function Rain({ count = 1200, area = 30, height = 15, speed = 14 }: RainProps) {
     const dy = speed * delta
     const dx = windX * delta
     const dz = windZ * delta
+
     for (let i = 0; i < count; i++) {
-      const bi = i * 6
-      pos[bi] += dx; pos[bi + 1] -= dy * velocities[i]; pos[bi + 2] += dz
-      pos[bi + 3] += dx; pos[bi + 4] -= dy * velocities[i]; pos[bi + 5] += dz
-      if (pos[bi + 1] < -0.5) {
-        const nx = (Math.random() - 0.5) * area
-        const ny = height + Math.random() * 3
-        const nz = (Math.random() - 0.5) * area
-        const sdx = (windX / speed) * streakLen
-        const sdz = (windZ / speed) * streakLen
-        pos[bi] = nx; pos[bi + 1] = ny; pos[bi + 2] = nz
-        pos[bi + 3] = nx + sdx; pos[bi + 4] = ny - streakLen; pos[bi + 5] = nz + sdz
+      if (isRain) {
+        const bi = i * 6
+        pos[bi] += dx; pos[bi + 1] -= dy * velocities[i]; pos[bi + 2] += dz
+        pos[bi + 3] += dx; pos[bi + 4] -= dy * velocities[i]; pos[bi + 5] += dz
+        if (pos[bi + 1] < -0.5) {
+          const nx = (Math.random() - 0.5) * area
+          const ny = height + Math.random() * 3
+          const nz = (Math.random() - 0.5) * area
+          const sdx = (windX / speed) * streakLen
+          const sdz = (windZ / speed) * streakLen
+          pos[bi] = nx; pos[bi + 1] = ny; pos[bi + 2] = nz
+          pos[bi + 3] = nx + sdx; pos[bi + 4] = ny - streakLen; pos[bi + 5] = nz + sdz
+        }
+      } else {
+        const bi = i * 3
+        // Snow/ash: gentle sway
+        const sway = Math.sin(Date.now() * 0.001 + i) * 0.3
+        pos[bi] += (dx + sway * delta) * velocities[i]
+        pos[bi + 1] -= dy * velocities[i]
+        pos[bi + 2] += dz * velocities[i]
+        if (pos[bi + 1] < -0.5) {
+          pos[bi] = (Math.random() - 0.5) * area
+          pos[bi + 1] = height + Math.random() * 3
+          pos[bi + 2] = (Math.random() - 0.5) * area
+        }
       }
     }
     ;(meshRef.current.geometry.attributes.position as THREE.BufferAttribute).needsUpdate = true
   })
 
-  const material = useMemo(
-    () =>
-      new THREE.LineBasicMaterial({
-        color: '#99aabb',
-        transparent: true,
-        opacity: 0.35,
-        depthWrite: false,
-        blending: THREE.AdditiveBlending,
-      }),
-    [],
-  )
+  if (isRain) {
+    const mat = new THREE.LineBasicMaterial({
+      color, transparent: true, opacity, depthWrite: false, blending: THREE.AdditiveBlending,
+    })
+    return (
+      <lineSegments ref={meshRef as React.RefObject<THREE.LineSegments>} material={mat}>
+        <bufferGeometry>
+          <bufferAttribute attach="attributes-position" args={[positions, 3]} count={count * 2} />
+        </bufferGeometry>
+      </lineSegments>
+    )
+  }
 
+  // Snow / Ash → Points
+  const mat = new THREE.PointsMaterial({
+    color,
+    size: isSnow ? 0.15 : 0.1,
+    transparent: true,
+    opacity,
+    depthWrite: false,
+    blending: type === 'ash' ? THREE.AdditiveBlending : THREE.NormalBlending,
+    sizeAttenuation: true,
+  })
   return (
-    <lineSegments ref={meshRef} material={material}>
+    <points ref={meshRef as React.RefObject<THREE.Points>} material={mat}>
       <bufferGeometry>
-        <bufferAttribute
-          attach="attributes-position"
-          args={[positions, 3]}
-          count={count * 2}
-        />
+        <bufferAttribute attach="attributes-position" args={[positions, 3]} count={count} />
       </bufferGeometry>
-    </lineSegments>
+    </points>
   )
 }
 
@@ -183,55 +372,36 @@ function Rain({ count = 1200, area = 30, height = 15, speed = 14 }: RainProps) {
    碎片佈局產生
    ──────────────────────────── */
 
-function generateDebris(): DebrisItem[] {
+function generateDebris(theme: SceneTheme): DebrisItem[] {
   const items: DebrisItem[] = []
-
   const wallTypes: DebrisType[] = ['slab', 'box', 'pillar']
-  const wallColors: Record<string, string[]> = {
-    slab: ['#8a8078', '#6e6258', '#9c8e80', '#b0a090'],
-    box: ['#5a4030', '#6b4423', '#4a3018'],
-    pillar: ['#707068', '#585850', '#908880'],
-  }
   const rubbleTypes: DebrisType[] = ['rock', 'chunk', 'slab', 'box', 'rebar']
-  const rubbleColors: Record<string, string[]> = {
-    rock: ['#605848', '#787060', '#504838'],
-    chunk: ['#8b4513', '#a0522d', '#6b3410'],
-    slab: ['#989088', '#807870', '#a8a098'],
-    box: ['#5c4a38', '#4a3828', '#6e5c48'],
-    rebar: ['#b87333', '#c08040', '#8b5a2b', '#d4874a'],
-  }
 
   while (items.length < 80) {
     const x = (Math.random() - 0.5) * 35
     const z = (Math.random() - 0.5) * 35
-    // 排除中央戰場
     if (Math.abs(x) < 6 && z > -16 && z < 16) continue
 
     const isWall = items.length < 12
-    const type = isWall
-      ? wallTypes[Math.floor(Math.random() * wallTypes.length)]
-      : rubbleTypes[Math.floor(Math.random() * rubbleTypes.length)]
+    const typePool = isWall ? wallTypes : rubbleTypes
+    const type = typePool[Math.floor(Math.random() * typePool.length)]
 
-    const palette = isWall ? wallColors[type] : rubbleColors[type]
-    const chosenColor = palette[Math.floor(Math.random() * palette.length)]
+    const colorPool = isWall
+      ? (theme.wallColors[type] || ['#888'])
+      : (theme.rubbleColors[type] || ['#555'])
+    const chosenColor = colorPool[Math.floor(Math.random() * colorPool.length)]
 
     let sx: number, sy: number, sz: number
     if (isWall) {
       if (type === 'pillar') {
-        sx = 0.8 + Math.random() * 0.5
-        sy = Math.random() * 5 + 3
-        sz = 0.8 + Math.random() * 0.5
+        sx = 0.8 + Math.random() * 0.5; sy = Math.random() * 5 + 3; sz = 0.8 + Math.random() * 0.5
       } else {
-        sx = Math.random() * 3 + 1
-        sy = Math.random() * 6 + 2
-        sz = 0.3 + Math.random() * 0.5
+        sx = Math.random() * 3 + 1; sy = Math.random() * 6 + 2; sz = 0.3 + Math.random() * 0.5
       }
     } else if (type === 'rebar') {
       sx = 1; sy = Math.random() * 2 + 1; sz = 1
     } else {
-      sx = Math.random() * 1.5 + 0.3
-      sy = 0.15 + Math.random() * 0.6
-      sz = Math.random() * 1.5 + 0.3
+      sx = Math.random() * 1.5 + 0.3; sy = 0.15 + Math.random() * 0.6; sz = Math.random() * 1.5 + 0.3
     }
 
     const baseY = isWall ? sy * 0.5 : (type === 'rock' || type === 'chunk' ? sy * 0.25 : sy * 0.5)
@@ -249,7 +419,6 @@ function generateDebris(): DebrisItem[] {
       type,
     })
   }
-
   return items
 }
 
@@ -257,7 +426,7 @@ function generateDebris(): DebrisItem[] {
    地面幾何產生
    ──────────────────────────── */
 
-function createGroundGeometry(): THREE.PlaneGeometry {
+function createGroundGeometry(theme: SceneTheme): THREE.PlaneGeometry {
   const geo = new THREE.PlaneGeometry(60, 60, 64, 64)
   const pos = geo.attributes.position as THREE.BufferAttribute
   const colors = new Float32Array(pos.count * 3)
@@ -283,9 +452,7 @@ function createGroundGeometry(): THREE.PlaneGeometry {
     const detail = hash2(px * 5, py * 5)
     const v = 0.35 + coarse * 0.25 + fine * 0.12 + detail * 0.05
     const brownMix = hash2(px * 0.3 + 100, py * 0.3 + 100)
-    const r = (0.16 + brownMix * 0.10) * v
-    const g = (0.11 + brownMix * 0.06) * v
-    const b = (0.06 + brownMix * 0.03) * v
+    const [r, g, b] = theme.groundColorFn(v, brownMix)
     const stain = hash2(px * 0.8 + 50, py * 0.8 + 50) < 0.2 ? 0.5 : 1.0
     colors[i * 3] = Math.min(1, r * stain)
     colors[i * 3 + 1] = Math.min(1, g * stain)
@@ -301,27 +468,50 @@ function createGroundGeometry(): THREE.PlaneGeometry {
    Arena（場景主元件）
    ──────────────────────────── */
 
-export function Arena() {
-  const debris = useMemo(generateDebris, [])
-  const groundGeo = useMemo(createGroundGeometry, [])
+interface ArenaProps {
+  sceneMode?: SceneMode
+}
+
+export function Arena({ sceneMode = 'story' }: ArenaProps) {
+  const theme = THEMES[sceneMode]
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const debris = useMemo(() => generateDebris(theme), [sceneMode])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const groundGeo = useMemo(() => createGroundGeometry(theme), [sceneMode])
 
   return (
     <>
       <Sky
         distance={450000}
-        sunPosition={[0, -0.15, 0]}
+        sunPosition={[0, theme.skyConfig.sunY, 0]}
         inclination={0}
         azimuth={1.25}
-        rayleigh={0.2}
-        turbidity={20}
+        rayleigh={theme.skyConfig.rayleigh}
+        turbidity={theme.skyConfig.turbidity}
       />
-      <Sparkles count={80} scale={20} size={1.5} speed={0.4} opacity={0.3} color="#ff6666" />
-      <Rain />
-      <fog attach="fog" args={['#1a0e06', 8, 35]} />
+      <Sparkles
+        count={theme.sparkleCount}
+        scale={20}
+        size={1.5}
+        speed={0.4}
+        opacity={0.3}
+        color={theme.sparkleColor}
+      />
+      <FallingParticles
+        type={theme.particleType}
+        color={theme.particleColor}
+        opacity={theme.particleOpacity}
+      />
+      <fog attach="fog" args={[theme.fogColor, theme.fogNear, theme.fogFar]} />
 
       {/* 地面 */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} geometry={groundGeo} receiveShadow>
-        <meshStandardMaterial vertexColors roughness={0.95} metalness={0.0} flatShading />
+        <meshStandardMaterial
+          vertexColors
+          roughness={theme.groundRoughness}
+          metalness={theme.groundMetalness}
+          flatShading
+        />
       </mesh>
 
       {debris.map((d, i) => (
@@ -329,17 +519,17 @@ export function Arena() {
       ))}
 
       {/* 燈光 */}
-      <ambientLight intensity={2.5} />
-      <hemisphereLight intensity={1.2} args={['#ff4400', '#220000']} />
+      <ambientLight intensity={theme.ambientIntensity} />
+      <hemisphereLight intensity={theme.hemiIntensity} args={theme.hemiArgs} />
 
-      <pointLight position={[15, 10, 10]} intensity={40} color="#ff6633" distance={40} decay={2} castShadow />
-      <pointLight position={[-15, 12, -10]} intensity={30} color="#ff2200" distance={40} decay={2} castShadow />
-      <pointLight position={[0, 15, 5]} intensity={25} color="#ffffff" distance={30} decay={2} castShadow />
+      {theme.pointLights.map((pl, i) => (
+        <pointLight key={`pl${i}`} position={pl.pos} intensity={pl.intensity} color={pl.color} distance={40} decay={2} castShadow />
+      ))}
 
       <directionalLight
-        position={[5, 25, 15]}
-        intensity={5}
-        color="#ffffff"
+        position={theme.dirLights[0]?.pos ?? [5, 25, 15]}
+        intensity={theme.dirLights[0]?.intensity ?? 5}
+        color={theme.dirLights[0]?.color ?? '#ffffff'}
         castShadow
         shadow-mapSize-width={2048}
         shadow-mapSize-height={2048}
@@ -350,14 +540,16 @@ export function Arena() {
         shadow-camera-near={0.5}
         shadow-camera-far={50}
       />
-      <directionalLight
-        position={[-5, 20, 10]}
-        intensity={3}
-        color="#ff8866"
-        castShadow
-        shadow-mapSize-width={1024}
-        shadow-mapSize-height={1024}
-      />
+      {theme.dirLights[1] && (
+        <directionalLight
+          position={theme.dirLights[1].pos}
+          intensity={theme.dirLights[1].intensity}
+          color={theme.dirLights[1].color}
+          castShadow
+          shadow-mapSize-width={1024}
+          shadow-mapSize-height={1024}
+        />
+      )}
     </>
   )
 }

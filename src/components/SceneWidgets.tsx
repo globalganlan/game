@@ -84,17 +84,22 @@ export function DamagePopup({ value, position, textScale = 1 }: DamagePopupProps
 
   if (opacity <= 0) return null
 
+  const isHeal = value < 0
+  const displayValue = Math.abs(value)
+  const displayText = isHeal ? `+${displayValue}` : value === 0 ? 'MISS' : `-${displayValue}`
+  const textColor = isHeal ? '#00ff88' : value === 0 ? '#aaaaaa' : '#ff0000'
+
   return (
     <Billboard position={position} ref={ref}>
       <Text
         fontSize={0.8 * textScale}
-        color="#ff0000"
+        color={textColor}
         outlineColor="white"
         outlineWidth={0.05}
         fillOpacity={opacity}
         outlineOpacity={opacity}
       >
-        -{value}
+        {displayText}
       </Text>
     </Billboard>
   )
@@ -146,6 +151,63 @@ export function HealthBar3D({
   return (
     <Billboard position={position} renderOrder={16}>
       <mesh position={[0, 0, 0]} geometry={bgGeo} material={bgMat} renderOrder={16} />
+      {clampedRatio > 0 && fgGeo && (
+        <mesh
+          position={[(clampedRatio - 1) * width * 0.5, 0, 0.001]}
+          geometry={fgGeo}
+          material={fgMat}
+          renderOrder={17}
+        />
+      )}
+    </Billboard>
+  )
+}
+
+/* ────────────────────────────
+   EnergyBar3D
+   ──────────────────────────── */
+
+interface EnergyBar3DProps {
+  position: Vector3Tuple
+  ratio: number
+  width?: number
+  height?: number
+}
+
+/** 3D 能量條：金黃色，滿時發光脈衝，始終面向鏡頭 */
+export function EnergyBar3D({
+  position,
+  ratio,
+  width = 1.2,
+  height = 0.08,
+}: EnergyBar3DProps) {
+  const clampedRatio = Math.max(0, Math.min(1, ratio))
+  const isFull = clampedRatio >= 1
+  const radius = height * 0.5
+
+  const bgMat = useMemo(
+    () => new THREE.MeshBasicMaterial({ color: '#222', transparent: true, opacity: 0.5, depthTest: false }),
+    [],
+  )
+  const fgMat = useMemo(
+    () => new THREE.MeshBasicMaterial({ color: isFull ? '#ffd43b' : '#4dabf7', transparent: true, opacity: 0.85, depthTest: false }),
+    [isFull],
+  )
+
+  const bgGeo = useMemo(
+    () => new THREE.ShapeGeometry(makeRoundedRect(width, height, radius)),
+    [width, height, radius],
+  )
+  const fgGeo = useMemo(() => {
+    if (clampedRatio <= 0) return null
+    const fgW = width * clampedRatio
+    const fgH = height * 0.8
+    return new THREE.ShapeGeometry(makeRoundedRect(fgW, fgH, Math.min(radius, fgW / 2, fgH / 2)))
+  }, [width, height, clampedRatio, radius])
+
+  return (
+    <Billboard position={position} renderOrder={16}>
+      <mesh geometry={bgGeo} material={bgMat} renderOrder={16} />
       {clampedRatio > 0 && fgGeo && (
         <mesh
           position={[(clampedRatio - 1) * width * 0.5, 0, 0.001]}

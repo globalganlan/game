@@ -1,6 +1,6 @@
 # 存檔系統 Spec
 
-> 版本：v0.1 ｜ 狀態：🟡 草案
+> 版本：v0.2 ｜ 狀態：🟡 草案
 > 最後更新：2026-02-26
 > 負責角色：🎯 GAME_DESIGN → 🔧 CODING
 
@@ -30,8 +30,8 @@
 | `exp` | number | 當前經驗值 |
 | `diamond` | number | 鑽石（premium 貨幣） |
 | `gold` | number | 金幣（一般貨幣） |
-| `stamina` | number | 體力值 |
-| `staminaLastRefill` | string | 上次體力恢復時間（ISO 8601） |
+| `resourceTimerStage` | string | 資源產出器掛載的最高通關關卡 ID（如 `"2-5"`） |
+| `resourceTimerLastCollect` | string | 上次領取資源時間（ISO 8601） |
 | `towerFloor` | number | 爬塔最高樓層 |
 | `storyProgress` | string | 章節進度 JSON `{"chapter":1,"stage":5}` |
 | `formation` | string | 當前陣型 JSON `[heroInstanceId, null, ...]` (6 slots) |
@@ -52,10 +52,12 @@
 
 ### Sheet: `inventory`（玩家道具，一人多行）
 
+> 完整道具系統、裝備實例、商店定義見 `specs/inventory.md`
+
 | 欄位 | 型別 | 說明 |
 |------|------|------|
 | `playerId` | string | 外鍵 |
-| `itemId` | string | 道具 ID |
+| `itemId` | string | 道具 ID（命名規則見 inventory.md §1.2） |
 | `quantity` | number | 數量 |
 
 ---
@@ -82,7 +84,7 @@
 | 英雄升級 | hero_instances 該行 level, exp |
 | 陣型調整 | save_data.formation |
 | 抽卡 | hero_instances + inventory + diamond 扣除 |
-| 每日副本 | stamina 扣除 + 掉落物 |
+| 每日副本 | 掉落物寫入 inventory |
 | 自動存檔 | 每 5 分鐘檢查是否有未同步變更 |
 
 ### 寫入方式
@@ -118,8 +120,8 @@ interface SaveData {
   exp: number
   diamond: number
   gold: number
-  stamina: number
-  staminaLastRefill: string
+  resourceTimerStage: string
+  resourceTimerLastCollect: string
   towerFloor: number
   storyProgress: { chapter: number; stage: number }
   formation: (string | null)[]  // 6 slots, heroInstanceId or null
@@ -159,7 +161,8 @@ const DEFAULT_SAVE: Partial<SaveData> = {
   exp: 0,
   diamond: 500,        // 新手禮包
   gold: 10000,
-  stamina: 120,
+  resourceTimerStage: '1-1',  // 通關 1-1 後啟動
+  resourceTimerLastCollect: new Date().toISOString(),
   towerFloor: 0,
   storyProgress: { chapter: 1, stage: 1 },
   formation: [null, null, null, null, null, null],
@@ -171,23 +174,65 @@ const STARTER_HERO = { heroId: 6, level: 1, exp: 0, ascension: 0 }
 
 ---
 
-## 體力系統
+## 資源產出計時器
+
+> 取代傳統體力系統。玩家**無限制闖關**，成長限制來自資源的時間產出。
+
+### 機制
+
+```
+玩家通關關卡 → 資源計時器掛載到「已通關最高關卡」
+    ↓
+計時器持續累積資源（離線也算）
+    ↓
+玩家進入遊戲 → 按「領取」→ 一次收取累積的金幣 + 經驗素材
+    ↓
+通關更高關卡 → 計時器產出量自動升級
+```
+
+### 產出公式
+
+```typescript
+interface ResourceTimerYield {
+  goldPerHour: number
+  expItemsPerHour: number   // 小型經驗核心 / 小時
+}
+
+/** 根據已通關最高關卡計算每小時產出 */
+function getTimerYield(stageId: string): ResourceTimerYield {
+  const [ch, st] = stageId.split('-').map(Number)  // "2-5" → ch=2, st=5
+  const progress = (ch - 1) * 8 + st               // 線性進度 1~24
+  return {
+    goldPerHour: 100 + progress * 50,               // 150 ~ 1300
+    expItemsPerHour: Math.max(1, Math.floor(progress / 3)),  // 1 ~ 8
+  }
+}
+
+/** 計算可領取的累積資源 */
+function getAccumulatedResources(
+  stageId: string,
+  lastCollect: string,
+  maxHours = 24,           // 最多累積 24 小時（避免無限囤積）
+): { gold: number; expItems: number } {
+  const elapsed = Date.now() - new Date(lastCollect).getTime()
+  const hours = Math.min(maxHours, elapsed / (3600 * 1000))
+  const { goldPerHour, expItemsPerHour } = getTimerYield(stageId)
+  return {
+    gold: Math.floor(goldPerHour * hours),
+    expItems: Math.floor(expItemsPerHour * hours),
+  }
+}
+```
+
+### 參數
 
 | 項目 | 值 |
 |------|-----|
-| 上限 | 120 |
-| 恢復速率 | 1 點 / 5 分鐘 |
-| 章節關卡消耗 | 8 體力 |
-| 爬塔消耗 | 0（免費） |
-| 每日副本消耗 | 15 體力 |
-
-```typescript
-function getCurrentStamina(stamina: number, lastRefill: string, max = 120): number {
-  const elapsed = Date.now() - new Date(lastRefill).getTime()
-  const recovered = Math.floor(elapsed / (5 * 60 * 1000))
-  return Math.min(max, stamina + recovered)
-}
-```
+| 最大累積時間 | 24 小時 |
+| 產出週期 | 持續（離線也計算） |
+| 領取方式 | 主畫面「領取」按鈕，一次全收 |
+| 起始條件 | 通關 1-1 後啟動 |
+| 產出隨進度提升 | 通關越後面的關卡，金幣/經驗產量越高 |
 
 ---
 
@@ -203,3 +248,4 @@ function getCurrentStamina(stamina: number, lastRefill: string, max = 120): numb
 | 版本 | 日期 | 變更內容 |
 |------|------|---------|
 | v0.1 | 2026-02-26 | 初版：Google Sheets 存檔結構 + 讀寫策略 |
+| v0.2 | 2026-02-26 | 移除體力系統，新增「資源產出計時器」取代（resourceTimerStage + resourceTimerLastCollect） |
