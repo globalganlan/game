@@ -16,6 +16,10 @@
     - API 端點測試（若有改 GAS）
     - 確認遊戲流程：登入 → 載入 → 選英雄 → 戰鬥 → 結果 → 重啟
     - 有 bug 就修，不能把壞掉的狀態交給使用者
+  - **任務完成時必須播放提示音通知使用者**：
+    - 指令：`[console]::beep(800,300); Start-Sleep -ms 100; [console]::beep(1000,300); Start-Sleep -ms 100; [console]::beep(1200,400)`
+    - 時機：每次任務全部完成、測試通過、回報結果之前
+    - **絕對不可忘記，這是使用者明確要求的**
   - Google Apps Script（GAS）修改 → 直接改 `gas/程式碼.js` → `clasp push` → `clasp deploy -i <ID>`
   - Google Sheets 資料操作 → 用 POST API（createSheet / updateSheet / appendRows / deleteRows）
   - 前端 / 後端 / 部署 / 測試全部自動化
@@ -105,3 +109,34 @@
   - 修改後必須 `clasp push` + `clasp deploy` 部署 GAS
 - **適用範圍**：能量系統、傷害計算、目標選擇、被動觸發、大招中斷、回合流程等所有戰鬥邏輯
 - **理由**：v2.6 後戰鬥計算已移到 GAS，前端只是動畫播放器。曾因只改前端未改 GAS 導致「能量滿未立即施放大招」的 bug
+
+---
+
+### ADR-007: 貨幣 & 物品 Icon 統一使用 CurrencyIcon / ItemIcon 元件
+
+- **狀態**：✅ 永久生效
+- **日期**：2026-03-01
+- **決定**：
+  - **四種貨幣資源必須使用 `<CurrencyIcon type="..." />` CSS Badge 元件**，禁止用 emoji（💎🪙💰✨）
+  - **其他道具使用 `<ItemIcon itemId="..." />`**，會自動判斷：貨幣→CurrencyIcon、其他→emoji
+  - **任何新增 UI 顯示貨幣/道具的地方，必須使用這兩個元件**
+- **元件位置**：`src/components/CurrencyIcon.tsx`
+- **貨幣 Icon 對照表**：
+
+  | 資源 | type | CSS class | 外觀 |
+  |------|------|-----------|------|
+  | 金幣 | `gold` | `.icon-coin` | 金色圓形 + `G` |
+  | 鑽石 | `diamond` | `.icon-dia` | 藍色菱形 + `D` |
+  | 經驗 | `exp` | `.icon-exp` | 綠色方塊 + `E` |
+  | 星塵 | `stardust` | `.icon-stardust` | 黃色光暈圓形 + `S` |
+
+- **ItemIcon 自動映射**（`CURRENCY_TYPE_MAP`）：
+  - `gold` / `currency_gold` → `<CurrencyIcon type="gold" />`
+  - `diamond` / `currency_diamond` → `<CurrencyIcon type="diamond" />`
+  - `stardust` / `currency_stardust` → `<CurrencyIcon type="stardust" />`
+  - 其他 itemId → `getItemIcon(itemId)` emoji（見 `src/constants/rarity.ts`）
+
+- **CSS 定義位置**：`src/App.css` 第 357~436 行
+- **已統一使用的畫面**：HUD、主選單、商店、關卡選擇、勝利結算、抽卡、背包、信箱、設定（綁定獎勵/PWA 獎勵）
+- **理由**：emoji 在不同平台渲染不一致（Android/iOS/Windows 顯示不同），CSS Badge 保證跨平台統一風格
+- **歷史教訓**：2026-03-01 開發 PWA 安裝獎勵 & 帳號綁定獎勵時，SettingsPanel 中的獎勵預覽文字使用了 💎🪙 emoji 而非 CurrencyIcon 元件，事後才發現不一致並修正

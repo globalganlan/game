@@ -13,6 +13,7 @@
    - API 端點測試（若有改 GAS）
    - 確認遊戲流程不會壞：登入 → 載入 → 選英雄 → 戰鬥 → 結果 → 重啟
    - 有 bug 就修，不能把壞掉的狀態交給使用者
+   - **測試通過後、回報完成前，必須播放提示音**：`[console]::beep(800,300); Start-Sleep -ms 100; [console]::beep(1000,300); Start-Sleep -ms 100; [console]::beep(1200,400)`
 3. **GAS 修改後自行部署**：改 `gas/程式碼.js` → `clasp push` → `clasp deploy -i <ID>`
 4. **Google Sheets 中文亂碼防護**：每次新增（createSheet）、修改（updateSheet / appendRows）、或讀取（readSheet）Google Sheet 時，必須做以下檢查：
    - **寫入前**：POST body 必須使用 `[System.Text.Encoding]::UTF8.GetBytes()` 編碼，ContentType 為 `text/plain; charset=utf-8`
@@ -21,6 +22,15 @@
    - **日期自動轉換防護**：含 `X-Y` 格式的欄位（如 stageId "1-1"）必須在 createSheet 時使用 `textColumns` 參數，GAS 會對該欄設 `setNumberFormat('@')` 防止自動轉為日期
    - **根因**：PowerShell `ConvertTo-Json` 在 Windows Big5 環境下可能產生編碼錯誤，務必用 `UTF8.GetBytes()` 確保 UTF-8
 5. **程式碼改動必須同步更新 Spec**：每次完成使用者任務後，若有改動程式碼，必須將功能變更同步到對應的 `specs/` 文件上（含版本號遞增、變更歷史更新），以確保 spec 始終與實際程式碼一致。不可遺漏任何功能變更未被記錄。
+6. **貨幣 & 物品 Icon 必須使用統一元件**（ADR-007）：
+   - **四種貨幣**必須用 `<CurrencyIcon type="..." />`（來自 `src/components/CurrencyIcon.tsx`）：
+     - 金幣 → `type="gold"`（金色圓形 G）
+     - 鑽石 → `type="diamond"`（藍色菱形 D）
+     - 經驗 → `type="exp"`（綠色方塊 E）
+     - 星塵 → `type="stardust"`（黃色光暈圓形 S）
+   - **其他道具**用 `<ItemIcon itemId="..." />`（自動判斷貨幣→CurrencyIcon、其餘→emoji）
+   - **絕對禁止**在 UI 中硬寫 💎🪙💰✨ 等 emoji 代替貨幣 icon
+   - CSS 定義在 `src/App.css` 第 357~436 行
 
 ## 專案概覽
 

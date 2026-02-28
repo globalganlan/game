@@ -1,7 +1,7 @@
 # 技術架構 Spec
 
-> 版本：v1.5 ｜ 狀態：🟢 定稿（含 Domain Engine + Services 層 + Optimistic Queue + GAS CacheService + Audio Engine + CurrencyIcon 統一 icon）
-> 最後更新：2026-02-28
+> 版本：v1.6 ｜ 狀態：🟢 定稿（含 Domain Engine + Services 層 + Optimistic Queue + GAS CacheService + Audio Engine + CurrencyIcon 統一 icon + PWA）
+> 最後更新：2026-03-01
 > 負責角色：🔧 CODING → 🏗️ ARCHITECT
 
 ## 概述
@@ -497,7 +497,7 @@ POST { "action": "invalidate-cache" }
 快取命中的回應會附加 `_cached: true` 欄位，供偵錯使用。
 - [x] **音效引擎**：Web Audio API 合成 BGM + SFX（`audioService.ts`）
 - [ ] **Shader 特效**：自訂材質效果
-- [ ] **PWA**：離線支援
+- [x] **PWA**：離線支援 + 安裝獎勵（v1.6 已實作）
 - [ ] **多人對戰**：WebSocket / WebRTC
 
 ## 變更歷史
@@ -510,3 +510,4 @@ POST { "action": "invalidate-cache" }
 | v1.3 | 2026-02-28 | 新增 GAS CacheService 快取層：全域配表快取（6h TTL）、resolvePlayerId_ 快取、loadHeroPool_ 快取、分片機制、自動/手動失效、invalidate-cache API |
 | v1.4 | 2026-02-28 | 新增 audioService.ts（Web Audio API 合成 BGM 6 曲目 + SFX 9 種）、ShopPanel.tsx、SettingsPanel.tsx 音效控制 UI、標記音效引擎為已實作 |
 | v1.5 | 2026-02-28 | 新增 `constants/rarity.ts` 共用常數層 + `CurrencyIcon.tsx` 統一貨幣 icon 元件，替代各元件散落的 CSS inline icon 和 emoji |
+| v1.6 | 2026-03-01 | PWA 支援：manifest.json + service worker（Network/Cache First 策略）+ `pwaService.ts`（安裝偵測/平台指引/獎勵領取）+ 帳號綁定獎勵（💎200+🪙5000）+ PWA 安裝獎勵（💎100+🪙3000） |

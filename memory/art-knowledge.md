@@ -157,6 +157,20 @@
 - **決策**：emoji 作為暫時方案，前端 `resolveSkillIcon()` 可辨識並 fallback
 - **後續**：待美術製作正式 icon 後替換 Sheet 資料 + 前端引用路徑
 
+### Case 2：貨幣 icon 寫成 emoji 而非 CurrencyIcon 元件（2026-03-01）
+
+- **背景**：開發 PWA 安裝獎勵 & 帳號綁定獎勵功能
+- **問題**：SettingsPanel 中的獎勵預覽文字直接用 💎🪙 emoji，未使用 `<CurrencyIcon>` 元件
+- **原因**：pwaService.ts 是純 TS 檔回傳 `string[]`，不能直接內嵌 JSX
+- **修正**：將 PWA benefits 文字改由 SettingsPanel 直接渲染 JSX，綁定獎勵行同步改用 CurrencyIcon
+- **規則**（ADR-007）：
+  - 金幣 → `<CurrencyIcon type="gold" />`（金色圓形 G）
+  - 鑽石 → `<CurrencyIcon type="diamond" />`（藍色菱形 D）
+  - 經驗 → `<CurrencyIcon type="exp" />`（綠色方塊 E）
+  - 星塵 → `<CurrencyIcon type="stardust" />`（黃色光暈圓形 S）
+  - 其他道具 → `<ItemIcon itemId="..." />`（自動判斷貨幣 or emoji）
+- **教訓**：任何 UI 顯示貨幣數量的地方，一律用 CurrencyIcon/ItemIcon，**絕對不可硬寫 emoji**
+
 ---
 
 ## 🔁 持續改進

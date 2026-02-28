@@ -17,13 +17,13 @@
   {"skillId":"PAS_2_3","name":"力量爆發","type":"passive","element":"","target":"self","description":"15% 機率造成 150% 傷害","effects":"[{\"type\":\"damage_mult\",\"multiplier\":1.5,\"statusChance\":0.15}]","passive_trigger":"on_attack","icon":"💪"},
   {"skillId":"PAS_2_4","name":"狂化覺醒","type":"passive","element":"","target":"self","description":"HP 低於 15% 時 ATK+50% SPD+30% DEF-30%","effects":"[{\"type\":\"buff\",\"status\":\"atk_up\",\"statusValue\":0.5},{\"type\":\"buff\",\"status\":\"spd_up\",\"statusValue\":0.3},{\"type\":\"debuff\",\"status\":\"def_down\",\"statusValue\":0.3}]","passive_trigger":"hp_below_pct","icon":"🔥"},
 
-  {"skillId":"PAS_3_1","name":"厚皮","type":"passive","element":"","target":"self","description":"受到的所有傷害降低 20%","effects":"[{\"type\":\"buff\",\"status\":\"damage_reduce\",\"statusValue\":0.2}]","passive_trigger":"always","icon":"🪨"},
+  {"skillId":"PAS_3_1","name":"厚皮","type":"passive","element":"","target":"self","description":"受到的所有傷害降低 20%","effects":"[{\"type\":\"buff\",\"status\":\"dmg_reduce\",\"statusValue\":0.2}]","passive_trigger":"always","icon":"🪨"},
   {"skillId":"PAS_3_2","name":"威嚇","type":"passive","element":"","target":"all_enemies","description":"戰鬥開始時全體敵人 ATK -12%（3 回合）","effects":"[{\"type\":\"debuff\",\"status\":\"atk_down\",\"statusValue\":0.12,\"statusDuration\":3}]","passive_trigger":"battle_start","icon":"😈"},
   {"skillId":"PAS_3_3","name":"硬化","type":"passive","element":"","target":"self","description":"每次被攻擊時 DEF +15%，最多疊 4 層","effects":"[{\"type\":\"buff\",\"status\":\"def_up\",\"statusValue\":0.15,\"statusMaxStacks\":4}]","passive_trigger":"on_be_attacked","icon":"🛡️"},
-  {"skillId":"PAS_3_4","name":"鐵壁","type":"passive","element":"","target":"self","description":"HP 低於 50% 時減傷 40%，反彈 15% 傷害","effects":"[{\"type\":\"buff\",\"status\":\"damage_reduce\",\"statusValue\":0.4},{\"type\":\"reflect\",\"multiplier\":0.15}]","passive_trigger":"hp_below_pct","icon":"🏰"},
+  {"skillId":"PAS_3_4","name":"鐵壁","type":"passive","element":"","target":"self","description":"HP 低於 50% 時減傷 40%，反彈 15% 傷害","effects":"[{\"type\":\"buff\",\"status\":\"dmg_reduce\",\"statusValue\":0.4},{\"type\":\"reflect\",\"multiplier\":0.15}]","passive_trigger":"hp_below_pct","icon":"🏰"},
 
   {"skillId":"PAS_4_1","name":"亡者之速","type":"passive","element":"","target":"self","description":"每次攻擊命中後 SPD +3，最多疊 4 層","effects":"[{\"type\":\"buff\",\"status\":\"spd_up\",\"statusValue\":3,\"statusMaxStacks\":4}]","passive_trigger":"on_attack","icon":"💨"},
-  {"skillId":"PAS_4_2","name":"殺意","type":"passive","element":"","target":"self","description":"暴擊率 +20%","effects":"[{\"type\":\"buff\",\"status\":\"crit_up\",\"statusValue\":0.2}]","passive_trigger":"always","icon":"🗡️"},
+  {"skillId":"PAS_4_2","name":"殺意","type":"passive","element":"","target":"self","description":"暴擊率 +20%","effects":"[{\"type\":\"buff\",\"status\":\"crit_rate_up\",\"statusValue\":0.2}]","passive_trigger":"always","icon":"🗡️"},
   {"skillId":"PAS_4_3","name":"狩獵","type":"passive","element":"","target":"self","description":"擊殺敵人時能量 +400","effects":"[{\"type\":\"energy\",\"flatValue\":400}]","passive_trigger":"on_kill","icon":"🎯"},
   {"skillId":"PAS_4_4","name":"處決","type":"passive","element":"","target":"self","description":"目標 HP 低於 40% 時傷害 +80%","effects":"[{\"type\":\"damage_mult\",\"multiplier\":1.8}]","passive_trigger":"on_attack","icon":"☠️"},
 
@@ -62,10 +62,10 @@
   {"skillId":"PAS_11_3","name":"安可","type":"passive","element":"","target":"self","description":"擊殺時獲得額外行動（每輪限一次）","effects":"[{\"type\":\"extra_turn\"}]","passive_trigger":"on_kill","icon":"🌟"},
   {"skillId":"PAS_11_4","name":"謝幕演出","type":"passive","element":"","target":"self","description":"隨機傷害範圍提升為 ×0.8~×2.5","effects":"[{\"type\":\"damage_mult_random\",\"min\":0.8,\"max\":2.5}]","passive_trigger":"on_attack","icon":"🎬"},
 
-  {"skillId":"PAS_12_1","name":"壕溝戰術","type":"passive","element":"","target":"self","description":"受到傷害後，下次受傷 -30%","effects":"[{\"type\":\"buff\",\"status\":\"damage_reduce\",\"statusValue\":0.3,\"statusDuration\":1}]","passive_trigger":"on_take_damage","icon":"🪖"},
+  {"skillId":"PAS_12_1","name":"壕溝戰術","type":"passive","element":"","target":"self","description":"受到傷害後，下次受傷 -30%","effects":"[{\"type\":\"buff\",\"status\":\"dmg_reduce\",\"statusValue\":0.3,\"statusDuration\":1}]","passive_trigger":"on_take_damage","icon":"🪖"},
   {"skillId":"PAS_12_2","name":"嘲諷壁壘","type":"passive","element":"","target":"self","description":"戰鬥開始時嘲諷 3 回合","effects":"[{\"type\":\"buff\",\"status\":\"taunt\",\"statusDuration\":3}]","passive_trigger":"battle_start","icon":"🗿"},
   {"skillId":"PAS_12_3","name":"不屈","type":"passive","element":"","target":"self","description":"每次被攻擊回復 8% 最大 HP","effects":"[{\"type\":\"heal\",\"scalingStat\":\"HP\",\"multiplier\":0.08}]","passive_trigger":"on_be_attacked","icon":"❤️"},
-  {"skillId":"PAS_12_4","name":"要塞化","type":"passive","element":"","target":"self","description":"壕溝戰術升級：減傷 -45%，反彈 20%","effects":"[{\"type\":\"buff\",\"status\":\"damage_reduce\",\"statusValue\":0.45},{\"type\":\"reflect\",\"multiplier\":0.2}]","passive_trigger":"on_take_damage","icon":"🏯"},
+  {"skillId":"PAS_12_4","name":"要塞化","type":"passive","element":"","target":"self","description":"壕溝戰術升級：減傷 -45%，反彈 20%","effects":"[{\"type\":\"buff\",\"status\":\"dmg_reduce\",\"statusValue\":0.45},{\"type\":\"reflect\",\"multiplier\":0.2}]","passive_trigger":"on_take_damage","icon":"🏯"},
 
   {"skillId":"PAS_13_1","name":"巨人踐踏","type":"passive","element":"","target":"self","description":"35% 機率造成額外 60% 傷害","effects":"[{\"type\":\"damage_mult\",\"multiplier\":1.6,\"statusChance\":0.35}]","passive_trigger":"on_attack","icon":"🦶"},
   {"skillId":"PAS_13_2","name":"震暈","type":"passive","element":"","target":"single_enemy","description":"踐踏觸發時 50% 機率暈眩目標 1 回合","effects":"[{\"type\":\"debuff\",\"status\":\"stun\",\"statusChance\":0.5,\"statusDuration\":1}]","passive_trigger":"on_attack","icon":"💫"},

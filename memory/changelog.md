@@ -3,6 +3,108 @@
 > 按時間倒序排列，最新的在最上面。
 
 ---
+### [2026-03-01] 帳號綁定獎勵 + PWA 支援 + 安裝獎勵
+
+- **觸發者**：鼓勵綁定帳號 + 導入 PWA 鼓勵加入主畫面
+- **執行角色**：🔧 CODING + 🎯 GAME_DESIGN
+
+#### 帳號綁定獎勵
+- **GAS `handleBindAccount_`**：首次綁定（`wasBound === false`）自動寄送獎勵信件
+  - 💎200 + 🪙5,000
+  - 二次綁定（改 email）不重複發送
+- **SettingsPanel**：綁定區塊新增獎勵預覽（🎁 綁定獎勵：💎 200 + 🪙 5,000）
+- **綁定成功後自動刷新信箱**
+
+#### PWA 基礎設施
+- **`public/manifest.json`**：name/short_name/icons/start_url/scope/display:standalone/theme_color
+- **`public/sw.js`**：Service Worker（靜態資源 Cache First + 頁面 Network First + 排除 GAS API）
+- **`public/icons/`**：icon-192.png, icon-512.png, apple-touch-icon.png（從 zombie_1 thumbnail 生成）
+- **`index.html`**：manifest link + theme-color + apple-mobile-web-app meta tags
+- **`src/main.tsx`**：SW 註冊
+
+#### PWA 安裝獎勵
+- **`src/services/pwaService.ts`**：新增服務
+  - `detectPlatform()` — Android/iOS/Desktop 偵測
+  - `isStandalone()` — PWA 模式偵測（含 iOS `navigator.standalone`）
+  - `beforeinstallprompt` 事件管理 + `triggerInstall()`
+  - `claimPwaReward()` — 呼叫 GAS API
+  - `getInstallInstructions()` — 平台特定安裝指引
+  - `getPwaBenefits()` — PWA 好處清單
+- **GAS `handleClaimPwaReward_`**：新 action `claim-pwa-reward`
+  - 檢查 `save_data.pwaRewardClaimed` 欄位
+  - 首次：標記 + 寄送 💎100 + 🪙3,000 獎勵信件
+  - 重複呼叫：回傳 `already_claimed`
+- **`save_data` 新增欄位**：`pwaRewardClaimed`（boolean）
+- **App.tsx**：standalone 模式自動偵測 + 自動領取 PWA 獎勵
+
+#### UI 整合
+- **SettingsPanel**「📱 加入主畫面」區塊：
+  - PWA 好處清單（快取/一鍵啟動/穩定性/獎勵）
+  - Android/Desktop：「📲 安裝全球感染」按鈕（觸發原生 prompt）
+  - iOS：Safari 分享→加入主畫面步驟說明
+  - 已安裝：✅ 已安裝為 App
+- **CSS**：`.settings-reward-preview`（漸層金色閃爍）+ `.settings-pwa-*`（好處/步驟）
+
+#### Spec 更新
+- `specs/auth-system.md` v1.2→v1.3（綁定獎勵）
+- `specs/save-system.md` v1.2→v1.3（pwaRewardClaimed 欄位）
+- `specs/tech-architecture.md` v1.5→v1.6（PWA 已實作）
+
+#### 測試結果
+- `npx tsc --noEmit` ✅ 零錯誤
+- `npx vite build` ✅ 編譯成功
+- `npx vitest run` ✅ 594/594 測試通過
+- GAS deploy ✅ POST @70, GET @71
+
+---
+### [2026-03-01] extra_turn 額外行動機制實作 + on_ally_death / on_ally_skill 觸發點
+
+- **觸發者**：技能系統擴展需求
+- **執行角色**：🔧 CODING + 🧪 QA
+- **battleEngine.ts**：
+  1. **`_extraTurnQueue` 佇列** — 新增至 `BattleEngineConfig`（可選內部欄位）
+  2. **`processExtraTurns()` 函式** — 從佇列取出英雄 UID 執行額外行動；每回合每位英雄最多 1 次（防無限連鎖）；跳過 DOT/Regen/turn_start 結算；控制效果仍然生效；安全上限 MAX_EXTRA=10
+  3. **`executePassiveEffect` case `'extra_turn'`** — 推入 `cfg._extraTurnQueue`
+  4. **主迴圈** — 每位角色行動後呼叫 `processExtraTurns()`
+- **新增觸發點**：
+  - `on_ally_death` — 隊友死亡時觸發（普攻和技能擊殺都會觸發）
+  - `on_ally_skill` — 隊友施放主動技能時觸發（施放者自己不觸發）
+- **型別更新**（`types.ts`）：
+  - `PassiveTrigger` 新增 `'on_ally_death'` | `'on_ally_skill'`
+  - `BattleAction` 新增 `{ type: 'EXTRA_TURN'; heroUid: string; reason: string }`
+- **表現層**（`App.tsx`）：`onAction` switch 新增 `case 'EXTRA_TURN'` 處理
+- **測試**：5 項新增（47→594 全通過）
+  - PAS_11_3 安可（on_kill → extra_turn）— 擊殺後再行動一次
+  - extra_turn 每回合最多 1 次（防無限連鎖）
+  - on_ally_death 觸發被動
+  - on_ally_skill 觸發被動
+  - extra_turn 被控制時跳過
+- **適用技能**：PAS_11_3 安可（on_kill → extra_turn）已有 JSON 定義
+- **Spec 更新**：`specs/skill-system.md` v1.2→v1.3
+
+---
+### [2026-03-01] 被動技能系統 6 項 Bug 修復 + 42 項整合測試
+
+- **觸發者**：QA 測試發現被動技能大量失效
+- **執行角色**：🔧 CODING + 🧪 QA
+- **battleEngine.ts 修復**：
+  1. **`always` 被動觸發修復** — 戰鬥開始時 `always` 觸發類型的被動技現在會正確觸發（之前只有 `battle_start` 會觸發）
+  2. **`every_n_turns` 被動觸發修復** — 新增明確的每 N 回合被動觸發邏輯
+  3. **多目標被動修復** — 新增 `resolvePassiveTargets()` 函式，根據被動技的 `target` 欄位（`all_allies`/`all_enemies`/`self`）正確選擇目標。之前所有 buff 只作用於自己，所有 debuff 只作用於單一目標或自己
+  4. **`on_dodge` 反擊目標修復** — 修復閃避反擊的 context.target 指向：反擊應該打攻擊者而非閃避者
+  5. **`dispel_debuff` 處理修復** — 被動效果中新增 `dispel_debuff` 處理（之前只有技能效果中有）
+  6. **`reflect` 效果類型修復** — 被動效果中新增 `reflect` 狀態施加處理
+- **JSON 修正**（`skill_data_zh.json`）：
+  - PAS_3_1 厚皮: `damage_reduce` → `dmg_reduce`
+  - PAS_3_4 鐵壁: `damage_reduce` → `dmg_reduce`
+  - PAS_4_2 殺意: `crit_up` → `crit_rate_up`
+  - PAS_12_1 壕溝戰術: `damage_reduce` → `dmg_reduce`
+  - PAS_12_4 要塞化: `damage_reduce` → `dmg_reduce`
+- **影響範圍**：~15+ 個被動技能從完全無效變為正確運作；所有光環類被動（target: `all_allies`/`all_enemies`）現在能正確影響全隊/全敵
+- **測試**：新增 42 項整合測試（`battleEffectsIntegration.test.ts`），總測試數 589 全通過
+- **Spec 更新**：`specs/skill-system.md` v1.1→v1.2
+
+---
 ### [2026-06-14] 技能與成長系統全面平衡重設計
 
 - **觸發者**：使用者 4 項平衡原則要求

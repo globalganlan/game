@@ -67,7 +67,7 @@ const SHOP_ITEMS: ShopItem[] = [
   },
   // ── 素材商店 ──
   {
-    id: 'mat_class_power', name: '力量職業石 ×1', icon: '�️',
+    id: 'mat_class_power', name: '力量職業石 ×1', icon: '🗡️',
     description: '力量型英雄突破必備',
     price: 10000, currency: 'gold',
     rewards: [{ itemId: 'asc_class_power', quantity: 1 }],
@@ -117,20 +117,13 @@ const SHOP_ITEMS: ShopItem[] = [
     dailyLimit: 0, category: 'equipment',
   },
   {
-    id: 'forge_ore_rare', name: '稀有鍛造礦 ×5', icon: '�',
+    id: 'forge_ore_rare', name: '稀有鍛造礦 ×5', icon: '💠',
     description: '鍛造高級裝備用礦石',
     price: 30, currency: 'diamond',
     rewards: [{ itemId: 'forge_ore_rare', quantity: 5 }],
     dailyLimit: 0, category: 'equipment',
   },
   // ── 特殊商店 ──
-  {
-    id: 'special_stamina', name: '體力回復組合包', icon: '⚡',
-    description: '立即恢復 60 點體力',
-    price: 50, currency: 'diamond',
-    rewards: [{ itemId: 'stamina_potion', quantity: 1 }],
-    dailyLimit: 3, category: 'special',
-  },
   {
     id: 'special_gold_pack', name: '金幣禮包（10,000 金）', icon: '💰',
     description: '快速獲取大量金幣',

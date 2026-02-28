@@ -1,7 +1,7 @@
 # 存檔系統 Spec
 
-> 版本：v1.2 ｜ 狀態：🟢 已實作
-> 最後更新：2026-02-28
+> 版本：v1.3 ｜ 狀態：🟢 已實作
+> 最後更新：2026-03-01
 > 負責角色：🎯 GAME_DESIGN → 🔧 CODING
 
 ## 概述
@@ -47,6 +47,7 @@
 | `stageStars` | string | 每關最高星級 JSON `{"1-1": 3, "1-2": 2}` |
 | `gachaPity` | string | 保底計數 JSON `{"pullsSinceLastSSR":0,"guaranteedFeatured":false}` |
 | `gachaPool` | string | 預生成抽卡池 JSON（200 組 pull results） |
+| `pwaRewardClaimed` | boolean | PWA 安裝獎勵是否已領取（`true` = 已領） |
 | `lastSaved` | string | 最後存檔時間（ISO 8601） |
 
 ### Sheet: `hero_instances`（玩家擁有的英雄，一人多行）

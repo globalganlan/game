@@ -3841,6 +3841,59 @@
   font-weight: 600;
 }
 
+/* ── Bind Reward Preview ── */
+.settings-reward-preview {
+  padding: 10px;
+  text-align: center;
+  background: linear-gradient(135deg, rgba(255,165,0,0.12), rgba(255,215,0,0.12));
+  border: 1px solid rgba(255,165,0,0.3);
+  border-radius: 8px;
+  color: #ffd700;
+  font-size: 0.9rem;
+  font-weight: 600;
+  margin-bottom: 10px;
+  animation: rewardGlow 2s ease-in-out infinite alternate;
+}
+
+@keyframes rewardGlow {
+  from { box-shadow: 0 0 4px rgba(255,165,0,0.2); }
+  to   { box-shadow: 0 0 12px rgba(255,165,0,0.4); }
+}
+
+/* ── PWA Install Section ── */
+.settings-pwa-benefits {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.settings-pwa-benefit {
+  padding: 6px 10px;
+  background: rgba(52,152,219,0.08);
+  border-radius: 6px;
+  color: #ddd;
+  font-size: 0.82rem;
+  line-height: 1.4;
+}
+
+.settings-pwa-benefit:last-child {
+  background: linear-gradient(135deg, rgba(255,165,0,0.12), rgba(255,215,0,0.12));
+  color: #ffd700;
+  font-weight: 600;
+}
+
+.settings-pwa-instructions {
+  margin-bottom: 8px;
+}
+
+.settings-pwa-step {
+  padding: 5px 10px;
+  color: #ccc;
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+
 /* ── Audio Settings ── */
 .settings-audio-row {
   margin-bottom: 10px;

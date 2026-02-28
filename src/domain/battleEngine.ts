@@ -94,17 +94,82 @@ async function processInterruptUltimates(
 }
 
 /* ════════════════════════════════════
+   額外行動（extra_turn）
+   ════════════════════════════════════ */
+
+/**
+ * 處理額外行動佇列。
+ * 被動觸發 extra_turn 時會把 hero UID 推入 cfg._extraTurnQueue，
+ * 此函式從佇列中取出並讓對應英雄再行動一次（普攻 or 大招）。
+ *
+ * 限制：
+ * - 每回合每位英雄最多 1 次額外行動（extraTurnUsed 追蹤）
+ * - 額外行動中的擊殺不再觸發第二次額外行動（防無限連鎖）
+ * - 額外行動跳過 DOT/Regen/turn_start 等回合開始結算
+ */
+async function processExtraTurns(
+  cfg: BattleEngineConfig,
+  extraTurnUsed: Set<string>,
+  players: BattleHero[],
+  enemies: BattleHero[],
+  turn: number,
+  allHeroes: BattleHero[],
+): Promise<void> {
+  const MAX_EXTRA = 10 // 安全上限，防萬一的無限迴圈
+  let processed = 0
+
+  while (cfg._extraTurnQueue && cfg._extraTurnQueue.length > 0 && processed < MAX_EXTRA) {
+    const uid = cfg._extraTurnQueue.shift()!
+    processed++
+
+    // 每回合只允許一次額外行動
+    if (extraTurnUsed.has(uid)) continue
+
+    const hero = allHeroes.find(h => h.uid === uid)
+    if (!hero || hero.currentHP <= 0) continue
+
+    // 標記為已使用（防止額外行動中再次觸發）
+    extraTurnUsed.add(uid)
+
+    const allies = hero.side === 'player' ? players : enemies
+    const foes = hero.side === 'player' ? enemies : players
+
+    // 通知表現層：額外行動開始
+    await cfg.onAction({ type: 'EXTRA_TURN', heroUid: uid, reason: 'extra_turn' })
+
+    // 控制效果仍然生效
+    if (isControlled(hero) || isFeared(hero)) continue
+
+    // 決定行動：大招 or 普攻
+    if (canCastUltimate(hero)) {
+      await executeSkill(hero, hero.activeSkill!, allies, foes, turn, allHeroes, cfg)
+    } else {
+      await executeNormalAttack(hero, allies, foes, turn, allHeroes, cfg)
+    }
+
+    // 中斷大招（額外行動可能觸發能量溢出）
+    const interruptActed = new Set<string>()
+    await processInterruptUltimates(players, enemies, turn, allHeroes, cfg, interruptActed)
+
+    if (players.every(p => p.currentHP <= 0) || enemies.every(e => e.currentHP <= 0)) return
+  }
+}
+
+/* ════════════════════════════════════
    引擎配置
    ════════════════════════════════════ */
 
 export interface BattleEngineConfig {
   maxTurns: number          // 最大回合數（防無限迴圈）
   onAction: (action: BattleAction) => void | Promise<void>  // 行動回調（表現層消費）
+  /** @internal 額外行動佇列（引擎內部使用，外部不需設定） */
+  _extraTurnQueue?: string[]
 }
 
 const DEFAULT_CONFIG: BattleEngineConfig = {
   maxTurns: 50,
   onAction: () => {},
+  _extraTurnQueue: [],
 }
 
 /* ════════════════════════════════════
@@ -124,12 +189,13 @@ export async function runBattle(
   enemies: BattleHero[],
   config: Partial<BattleEngineConfig> = {},
 ): Promise<'player' | 'enemy' | 'draw'> {
-  const cfg = { ...DEFAULT_CONFIG, ...config }
+  const cfg = { ...DEFAULT_CONFIG, ...config, _extraTurnQueue: [] as string[] }
   const allHeroes = [...players, ...enemies]
 
-  // ── 戰鬥開始：觸發 battle_start 被動 ──
+  // ── 戰鬥開始：觸發 battle_start + always 被動 ──
   for (const hero of allHeroes) {
     if (hero.currentHP <= 0) continue
+    triggerPassives(hero, 'always', makeContext(0, hero, allHeroes), cfg)
     triggerPassives(hero, 'battle_start', makeContext(0, hero, allHeroes), cfg)
   }
 
@@ -153,6 +219,7 @@ export async function runBattle(
     })
 
     // ── 每個角色行動 ──
+    const extraTurnUsed = new Set<string>() // 每回合每人最多 1 次額外行動
     for (const actor of actors) {
       if (actor.currentHP <= 0) continue
 
@@ -181,6 +248,18 @@ export async function runBattle(
       // 觸發「每回合開始」被動
       triggerPassives(actor, 'turn_start', makeContext(turn, actor, allHeroes), cfg)
 
+      // 觸發「每 N 回合」被動
+      for (const passive of actor.activePassives) {
+        if (passive.passiveTrigger !== 'every_n_turns') continue
+        const n = passive.description.includes('每 2') || passive.description.includes('每2') ? 2 : 3
+        if (turn % n === 0) {
+          for (const eff of passive.effects) {
+            executePassiveEffect(actor, eff, makeContext(turn, actor, allHeroes), cfg)
+          }
+          cfg.onAction({ type: 'PASSIVE_TRIGGER', heroUid: actor.uid, skillId: passive.skillId, skillName: passive.name })
+        }
+      }
+
       // 控制效果判定
       if (isControlled(actor)) {
         // 被暈眩/凍結，跳過行動
@@ -202,6 +281,10 @@ export async function runBattle(
       // ── 中斷大招：任何角色能量滿了立即施放（含剛行動的自己、被攻擊的對手） ──
       const interruptActed = new Set<string>()
       await processInterruptUltimates(players, enemies, turn, allHeroes, cfg, interruptActed)
+      if (players.every(p => p.currentHP <= 0) || enemies.every(e => e.currentHP <= 0)) break
+
+      // ── 額外行動處理 ──
+      await processExtraTurns(cfg, extraTurnUsed, players, enemies, turn, allHeroes)
       if (players.every(p => p.currentHP <= 0) || enemies.every(e => e.currentHP <= 0)) break
 
       // 清理已死亡角色的行動能力（但保留在陣列中給表現層播放死亡動畫）
@@ -354,9 +437,15 @@ async function executeNormalAttack(
 
     if (killed) {
       triggerPassives(attacker, 'on_kill', makeContext(turn, attacker, allHeroes, target, true), cfg)
+      // 觸發死者隊友的 on_ally_death 被動
+      const deadSideAllies = allHeroes.filter(h => h.side === target.side && h.uid !== target.uid && h.currentHP > 0)
+      for (const ally of deadSideAllies) {
+        triggerPassives(ally, 'on_ally_death', makeContext(turn, ally, allHeroes, target), cfg)
+      }
     }
   } else {
-    triggerPassives(target, 'on_dodge', makeContext(turn, attacker, allHeroes, target), cfg)
+    // on_dodge: 觸發閃避者被動，context.target 設為攻擊者（反擊目標）
+    triggerPassives(target, 'on_dodge', makeContext(turn, target, allHeroes, attacker), cfg)
   }
 
   // HP 低於閾值被動檢查
@@ -422,13 +511,19 @@ async function executeSkill(
               attacker.killCount++
               onKillEnergy(attacker)
               triggerPassives(attacker, 'on_kill', makeContext(turn, attacker, allHeroes, target, true), cfg)
+              // 觸發死者隊友的 on_ally_death 被動
+              const deadSideAllies = allHeroes.filter(h => h.side === target.side && h.uid !== target.uid && h.currentHP > 0)
+              for (const ally of deadSideAllies) {
+                triggerPassives(ally, 'on_ally_death', makeContext(turn, ally, allHeroes, target), cfg)
+              }
             }
 
             if (result.isCrit) {
               triggerPassives(attacker, 'on_crit', makeContext(turn, attacker, allHeroes, target), cfg)
             }
           } else {
-            triggerPassives(target, 'on_dodge', makeContext(turn, attacker, allHeroes, target), cfg)
+            // on_dodge: 觸發閃避者被動，context.target 設為攻擊者（反擊目標）
+            triggerPassives(target, 'on_dodge', makeContext(turn, target, allHeroes, attacker), cfg)
           }
 
           skillResults.push({ uid: target.uid, result, killed })
@@ -507,6 +602,12 @@ async function executeSkill(
     _atkEnergyNew: attacker.energy,
     _tgtEnergyMap: Object.keys(_tgtEnergyMap).length > 0 ? _tgtEnergyMap : undefined,
   })
+
+  // 觸發隊友的 on_ally_skill 被動（施放者自己不觸發）
+  const allySkillAllies = allHeroes.filter(h => h.side === attacker.side && h.uid !== attacker.uid && h.currentHP > 0)
+  for (const ally of allySkillAllies) {
+    triggerPassives(ally, 'on_ally_skill', makeContext(turn, ally, allHeroes, attacker), cfg)
+  }
 
   // HP 低於閾值被動檢查
   for (const target of targets) {
@@ -639,36 +740,67 @@ function executePassiveEffect(
   const chance = effect.statusChance ?? 1.0
   if (Math.random() > chance) return
 
+  // 解析被動目標的 target 欄位，找出對應的 SkillTemplate
+  const ownerPassive = hero.activePassives.find(p => p.effects.includes(effect))
+  const passiveTargetType = ownerPassive?.target ?? 'self'
+
   switch (effect.type) {
     case 'buff':
     case 'debuff': {
       if (!effect.status) return
-      const target = effect.type === 'debuff' && context.target ? context.target : hero
-      applyStatus(target, {
-        type: effect.status,
-        value: effect.statusValue ?? 0,
-        duration: effect.statusDuration ?? 0, // 0 = permanent for passive
-        maxStacks: effect.statusMaxStacks ?? 1,
-        sourceHeroId: hero.uid,
-      })
+      // 根據被動 target 欄位決定施加對象
+      const targets = resolvePassiveTargets(hero, effect.type, passiveTargetType, context)
+      for (const t of targets) {
+        applyStatus(t, {
+          type: effect.status,
+          value: effect.statusValue ?? 0,
+          duration: effect.statusDuration ?? 0, // 0 = permanent for passive
+          maxStacks: effect.statusMaxStacks ?? 1,
+          sourceHeroId: hero.uid,
+        })
+      }
       break
     }
     case 'heal': {
-      const scalingStat = effect.scalingStat ?? 'HP'
-      const base = hero.finalStats[scalingStat] ?? hero.maxHP
-      const healAmt = Math.floor(base * (effect.multiplier ?? 0.1) + (effect.flatValue ?? 0))
-      const actual = Math.min(healAmt, hero.maxHP - hero.currentHP)
-      hero.currentHP += actual
-      hero.totalHealingDone += actual
+      const healTargets = resolvePassiveTargets(hero, 'buff', passiveTargetType, context)
+      for (const ht of healTargets) {
+        if (ht.currentHP <= 0) continue
+        const scalingStat = effect.scalingStat ?? 'HP'
+        const base = ht.finalStats[scalingStat] ?? ht.maxHP
+        const healAmt = Math.floor(base * (effect.multiplier ?? 0.1) + (effect.flatValue ?? 0))
+        const actual = Math.min(healAmt, ht.maxHP - ht.currentHP)
+        ht.currentHP += actual
+        hero.totalHealingDone += actual
+      }
       break
     }
     case 'energy': {
-      addEnergy(hero, effect.flatValue ?? 0)
+      const energyTargets = resolvePassiveTargets(hero, 'buff', passiveTargetType, context)
+      for (const et of energyTargets) {
+        if (et.currentHP <= 0) continue
+        addEnergy(et, effect.flatValue ?? 0)
+      }
+      break
+    }
+    case 'dispel_debuff': {
+      // 被動觸發淨化（如 PAS_7_4）
+      cleanse(hero, 1)
       break
     }
     case 'damage_mult': {
       // on_attack 被動：乘算傷害倍率（多個被動可疊加）
       context.damageMult = (context.damageMult ?? 1.0) * (effect.multiplier ?? 1.0)
+      break
+    }
+    case 'reflect': {
+      // 被動觸發反彈效果（如 PAS_3_4、PAS_12_4）— 施加 reflect status
+      applyStatus(hero, {
+        type: 'reflect',
+        value: effect.multiplier ?? 0.15,
+        duration: 0, // permanent
+        maxStacks: 1,
+        sourceHeroId: hero.uid,
+      })
       break
     }
     case 'damage_mult_random': {
@@ -704,10 +836,35 @@ function executePassiveEffect(
       // Handled by checkLethalPassive
       break
     case 'extra_turn':
-      // TODO: implement extra turn mechanism
+      // 將英雄加入額外行動佇列
+      if (cfg._extraTurnQueue) cfg._extraTurnQueue.push(hero.uid)
       break
     default:
       break
+  }
+}
+
+/**
+ * 根據被動 target 欄位解析實際目標陣列
+ */
+function resolvePassiveTargets(
+  hero: BattleHero,
+  effectType: string,
+  passiveTarget: string,
+  context: BattleContext,
+): BattleHero[] {
+  switch (passiveTarget) {
+    case 'all_allies':
+      return context.allAllies.filter(h => h.side === hero.side && h.currentHP > 0)
+    case 'all_enemies':
+      return context.allEnemies.filter(h => h.side !== hero.side && h.currentHP > 0)
+    case 'self':
+    default:
+      // debuff 類效果：有具體目標則施加到目標，否則自己
+      if (effectType === 'debuff' && context.target && context.target.currentHP > 0) {
+        return [context.target]
+      }
+      return [hero]
   }
 }
 

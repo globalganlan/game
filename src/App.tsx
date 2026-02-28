@@ -44,6 +44,7 @@ import { clearGachaPreload } from './services/gachaPreloadService'
 import { clearLocalPool } from './services/gachaLocalPool'
 import { clearPendingOps } from './services/optimisticQueue'
 import type { MailItem } from './services/mailService'
+import { isStandalone, claimPwaReward } from './services/pwaService'
 /* ── Phase 7: Battle HUD ── */
 import { BattleHUD } from './components/BattleHUD'
 import type { BattleBuffMap, BattleEnergyMap, SkillToast, ElementHint, PassiveHint } from './components/BattleHUD'
@@ -917,6 +918,21 @@ export default function App() {
       .catch(e => console.warn('[early] mail preload failed:', e))
   }, [authHook.auth.isLoggedIn]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // ── PWA: 自動領取安裝獎勵（standalone 模式首次載入時） ──
+  useEffect(() => {
+    if (!isStandalone()) return
+    if (!authHook.auth.isLoggedIn || !authHook.auth.guestToken) return
+    const save = saveHook.playerData?.save
+    if (!save) return
+    // 已領取過就跳過
+    if (save.pwaRewardClaimed === true || save.pwaRewardClaimed === ('true' as unknown as boolean)) return
+    claimPwaReward(authHook.auth.guestToken)
+      .then((res) => {
+        if (res.success) refreshMailData()
+      })
+      .catch(() => { /* silent */ })
+  }, [authHook.auth.isLoggedIn, authHook.auth.guestToken, saveHook.playerData?.save]) // eslint-disable-line react-hooks/exhaustive-deps
+
   // ── Phase 2: showGame → 走 fetchData 匯總（大部分資料已在背景載完）──
   useEffect(() => {
     if (!showGame) return
@@ -1651,6 +1667,10 @@ export default function App() {
           break
         }
 
+        case 'EXTRA_TURN':
+          // 額外行動：表現層目前不需要特殊處理，後續可加特效提示
+          break
+
         case 'BATTLE_END':
           break
       }
@@ -2293,6 +2313,11 @@ export default function App() {
           onLogout={handleFullLogout}
           displayName={authHook.auth.displayName || '倖存者'}
           isBound={authHook.auth.isBound}
+          onRefreshMail={refreshMailData}
+          pwaRewardClaimed={
+            saveHook.playerData?.save.pwaRewardClaimed === true ||
+            saveHook.playerData?.save.pwaRewardClaimed === 'true' as unknown as boolean
+          }
         />
       )}
       {gameState === 'MAIN_MENU' && menuScreen === 'mailbox' && (

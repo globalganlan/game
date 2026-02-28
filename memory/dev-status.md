@@ -1,8 +1,8 @@
 # 開發狀態快照 — Dev Status
 
-> 最後更新：2026-03-01（第二十五次更新 — 被動觸發浮動文字顯示）
+> 最後更新：2026-03-01（第二十八次更新 — 帳號綁定獎勵 + PWA + 安裝獎勵）
 
-## 截至 2026-02-28 的開發狀態
+## 截至 2026-03-01 的開發狀態
 
 ### 已完成
 - [x] 3D 喪屍對戰場景（React 19 + Vite 5 + R3F 9 + Three.js 0.183 + TypeScript 5.9）
@@ -37,8 +37,8 @@
 - [x] **🐛 修復死亡動畫視覺問題** — `playHitOrDeath` killed 分支改 HURT→DEAD 序列（4 路徑全統一）+ GAS turn_end 被動傷害致死時發射 DEATH 事件（POST @64 / GET @65）
 - [x] **🐛 修復 on_attack 被動雙倍傷害** — 新增 `damage_mult` / `damage_mult_random` effect type 取代 `damage`，被動不再獨立計算傷害改為乘算加成；新增 `PASSIVE_DAMAGE` action type；6 個被動技能效果已更新（POST @66 / GET @67）
 - [x] **✨ 被動觸發浮動文字** — 新增 `PassiveHint3D` 元件，被動觸發時在英雄頭頂顯示紫色浮動文字（☕ + 技能名）
-- [x] **🧪 QA 測試完成** — 492 測試全通過（21 test files）
-  - Vitest 1.6.1 單元測試（21 test files / 492 tests）
+- [x] **🧪 QA 測試完成** — 594 測試全通過
+  - Vitest 1.6.1 單元測試（含 battleEffectsIntegration.test.ts 42 項新增）
   - Domain 層：battleEngine、buffSystem、damageFormula、targetStrategy、stageSystem、gachaSystem、progressionSystem、elementSystem、energySystem、boundary
   - Services 層：battleService、saveService、dataService、optimisticQueue
   - 1000 場數值模擬（玩家 ~50% / 敵方 ~50%）
@@ -53,7 +53,7 @@
 | core-combat.md | v2.6 | 🟢 後端戰鬥引擎 + 前端純回放 + 本地 fallback |
 | hero-schema.md | v2.1 | 🟢 4 層型別 + 14 角色完整數值表 |
 | damage-formula.md | v1.0 | 🟢 10 步完整傷害公式 |
-| skill-system.md | v1.0 | 🟢 SkillTemplate + 13 PassiveTrigger |
+| skill-system.md | v1.3 | 🟢 SkillTemplate + 15 PassiveTrigger + extra_turn 機制 + on_ally_death/on_ally_skill |
 | progression.md | v0.3 | 🟢 樂觀佇列 + 自動等級 + EXP bar |
 | tech-architecture.md | v1.5 | 🟢 CurrencyIcon 統一 icon + constants 層 |
 | auth-system.md | v0.1 | 🟡 草案 |
@@ -126,6 +126,37 @@
 - [x] waitForAction/waitForMove timeout defer — document.hidden 時不觸發超時，改為 defer 重排
 - [x] Spec 全面同步 — 7 份 spec 更新至最新版本（core-combat v2.2, save-system v0.3, gacha v1.1, stage-system v0.3, inventory v0.2, progression v0.3, tech-architecture v1.2）
 - [x] copilot-instructions 新增強制規則 #5 — 程式碼改動必須同步更新 Spec
+
+### 2026-03-01 extra_turn 額外行動機制
+- [x] `_extraTurnQueue` + `processExtraTurns()` — 每回合每位英雄最多 1 次額外行動，安全上限 MAX_EXTRA=10
+- [x] `on_ally_death` 觸發點 — 隊友死亡時觸發（普攻/技能擊殺皆觸發）
+- [x] `on_ally_skill` 觸發點 — 隊友施放主動技能時觸發（施放者自己不觸發）
+- [x] `PassiveTrigger` 新增 `'on_ally_death'` | `'on_ally_skill'`
+- [x] `BattleAction` 新增 `EXTRA_TURN` 類型
+- [x] App.tsx `onAction` switch 新增 `case 'EXTRA_TURN'` 處理
+- [x] 5 項新增測試，總計 594 測試全通過
+
+### 2026-03-01 帳號綁定獎勵 + PWA 支援 + PWA 安裝獎勵
+- [x] GAS `handleBindAccount_` — 首次綁定自動寄送 💎200+🪙5000 獎勵信件
+- [x] SettingsPanel 綁定區塊 — 新增獎勵預覽（`.settings-reward-preview` 金色閃爍）
+- [x] PWA `public/manifest.json` — standalone 模式 + 圖示 192/512/180
+- [x] PWA `public/sw.js` — Service Worker（Cache First 靜態/Network First 頁面/排除 GAS API）
+- [x] PWA `index.html` meta tags — manifest + theme-color + apple-mobile-web-app
+- [x] PWA `src/main.tsx` — SW 註冊
+- [x] `src/services/pwaService.ts` — 平台偵測/standalone 偵測/安裝觸發/獎勵領取/操作指引/好處清單
+- [x] GAS `handleClaimPwaReward_` — 新 action `claim-pwa-reward`（save_data.pwaRewardClaimed 防重複）
+- [x] SettingsPanel「📱 加入主畫面」區塊 — PWA 好處/安裝按鈕或平台操作指引/已安裝 badge
+- [x] App.tsx — standalone 模式自動偵測 + 自動領取 PWA 獎勵
+- [x] Spec 更新：auth-system v1.3, save-system v1.3, tech-architecture v1.6
+
+### 2026-03-01 被動技能系統 6 項 Bug 修復
+- [x] `always` 被動觸發修復 — 戰鬥開始時正確觸發永久效果
+- [x] `every_n_turns` 被動觸發修復 — 新增每 N 回合觸發邏輯
+- [x] 多目標被動修復 — 新增 `resolvePassiveTargets()` 正確處理 `all_allies`/`all_enemies`/`self`
+- [x] `on_dodge` 反擊目標修復 — context.target 改為攻擊者
+- [x] `dispel_debuff` / `reflect` 處理修復 — 被動效果中新增處理
+- [x] JSON 修正 5 筆 — `damage_reduce`→`dmg_reduce`、`crit_up`→`crit_rate_up`
+- [x] 新增 42 項整合測試（`battleEffectsIntegration.test.ts`），總計 589 測試全通過
 
 ### 2026-02-28 每日副本中文修復 + 戰鬥回放 + 戰鬥統計（第五批）
 - [x] 每日副本 stageId 中文顯示 — `getDailyDungeonConfig()` + `getDailyDungeonDisplayName()` + 過場幕/toast 中文化

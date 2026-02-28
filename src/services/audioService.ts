@@ -189,9 +189,10 @@ class AudioManager {
       return
     }
 
-    // 若 ctx 是 suspended 狀態（使用者已有互動但還沒 resume），嘗試 resume
+    // ctx 是 suspended 狀態（手勢前就建立過）→ 只暫存，不嘗試 resume（避免瀏覽器警告）
     if (this.ctx.state === 'suspended') {
-      this.ctx.resume()
+      this.currentBgm = track
+      return
     }
 
     const ctx = this.ctx

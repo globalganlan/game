@@ -1,7 +1,7 @@
 # 技能系統 Spec
 
-> 版本：v1.1 ｜ 狀態：🟢 已實作
-> 最後更新：2026-06-14
+> 版本：v1.3 ｜ 狀態：🟢 已實作
+> 最後更新：2026-03-01
 > 負責角色：🎯 GAME_DESIGN → 🔧 CODING
 > 原始碼：`src/domain/types.ts`（型別）、`src/domain/battleEngine.ts`（執行）、`src/services/dataService.ts`（資料載入）
 
@@ -103,7 +103,7 @@ type TargetType =
 | `revive` | ✅ 已實作 | 由 `checkLethalPassive()` 特殊處理 |
 | `dispel_debuff` | ✅ 已實作 | `cleanse(target, 1)` |
 | `reflect` | ✅ 被動中實作 | 施加 reflect buff |
-| `extra_turn` | ⬜ TODO | 額外行動機制 |
+| `extra_turn` | ✅ 已實作 | 額外行動機制（推入 `_extraTurnQueue`，每回合每位英雄最多 1 次） |
 
 ### Buff/Debuff 施加流程
 
@@ -144,18 +144,70 @@ type PassiveTrigger =
   | 'hp_below_pct'    // HP 低於閾值（15%/30%/50%，只觸發一次）
   | 'every_n_turns'   // 每 N 回合
   | 'always'          // 永久效果（duration=0）
+  | 'on_ally_death'   // 隊友死亡時觸發（普攻/技能擊殺皆觸發）
+  | 'on_ally_skill'   // 隊友施放主動技能時觸發（施放者自己不觸發）
 ```
 
 ### 被動效果支援
 
 | effect.type | 被動中的行為 |
 |------------|------------|
-| `buff` | 對自身施加 buff |
-| `debuff` | 對觸發目標（context.target）施加 debuff |
+| `buff` | 依 `resolvePassiveTargets()` 選擇目標施加 buff（支援 `all_allies`/`all_enemies`/`self`） |
+| `debuff` | 依 `resolvePassiveTargets()` 選擇目標施加 debuff（支援 `all_allies`/`all_enemies`/`self`） |
 | `heal` | 自回復（scalingStat × multiplier + flatValue） |
 | `energy` | 自身加能量 |
 | `damage` | 對 context.target 反擊 |
 | `revive` | checkLethalPassive 保命 |
+| `dispel_debuff` | `cleanse(target, 1)` 移除 1 個 debuff |
+| `reflect` | 施加 reflect buff（反彈傷害） |
+| `extra_turn` | 推入 `cfg._extraTurnQueue`，該英雄在本回合結束後再行動一次 |
+
+### 被動觸發修復備註（v1.2）
+
+- **`always` 觸發**：戰鬥開始時與 `battle_start` 一同觸發，正確施加永久效果
+- **`every_n_turns` 觸發**：新增明確的每 N 回合被動觸發邏輯
+- **多目標被動**：新增 `resolvePassiveTargets()` 函式，根據被動技的 `target` 欄位正確選擇目標群
+- **`on_dodge` 反擊**：反擊 context.target 已修正為攻擊者（而非閃避者自身）
+
+### extra_turn 額外行動機制（v1.3 新增）
+
+被動效果 `extra_turn` 會將觸發者推入 `_extraTurnQueue`，該英雄在本回合行動結束後再行動一次。
+
+#### 運作流程
+
+1. 被動觸發（如 `on_kill`）→ `executePassiveEffect` case `'extra_turn'` → 推入 `cfg._extraTurnQueue`
+2. 每位角色行動後呼叫 `processExtraTurns()` → 從佇列取出英雄 UID → 執行額外行動
+3. 額外行動使用普攻（含 `on_attack` 被動觸發），但跳過 DOT/Regen/turn_start 結算
+
+#### 限制與安全機制
+
+| 規則 | 說明 |
+|------|------|
+| 每回合上限 | 每位英雄每回合最多 1 次額外行動（防無限連鎖） |
+| 安全上限 | `MAX_EXTRA = 10`（單回合全域上限） |
+| 控制效果 | 暈眩（`stun`）/ 凍結（`freeze`）/ 恐懼（`fear`）仍然生效，跳過行動 |
+| 跳過結算 | DOT / Regen / `turn_start` 被動不在額外行動中觸發 |
+
+#### BattleAction
+
+```typescript
+{ type: 'EXTRA_TURN'; heroUid: string; reason: string }
+```
+
+表現層 `App.tsx` 的 `onAction` switch 中已新增 `case 'EXTRA_TURN'` 處理。
+
+#### 適用技能
+
+| 技能 ID | 名稱 | 觸發 | 效果 |
+|---------|------|------|------|
+| PAS_11_3 | 安可 | `on_kill` | `extra_turn` — 擊殺後再行動一次 |
+| （未來） | — | `on_ally_death` | `extra_turn` — 隊友死亡多行動一次 |
+| （未來） | — | `on_ally_skill` | `extra_turn` — 隊友施放技能多行動一次 |
+
+### on_ally_death / on_ally_skill 觸發點（v1.3 新增）
+
+- **`on_ally_death`**：當同陣營的隊友死亡時（普攻或技能擊殺均會觸發），存活的隊友會檢查自身被動是否有此觸發點
+- **`on_ally_skill`**：當同陣營的隊友施放主動技能時（施放者自身不觸發），其他隊友會檢查自身被動是否有此觸發點
 
 ---
 
@@ -271,7 +323,7 @@ getHeroSkillSet(heroId, skillsMap, heroSkillsMap)
 ## 擴展點
 
 - [ ] `hitCount` 多段攻擊（每段獨立暴擊 / 閃避）
-- [ ] `extra_turn` 額外行動
+- [x] ~~`extra_turn` 額外行動~~ ✅ v1.3 已實作（`_extraTurnQueue` + `processExtraTurns()`）
 - [ ] `shield` 效果類型（直接產生護盾而非走 buff）
 - [ ] `execute` 斬殺（HP 低於閾值直接擊殺）
 - [ ] `dispel_buff` 驅散正面效果
@@ -312,3 +364,5 @@ getHeroSkillSet(heroId, skillsMap, heroSkillsMap)
 | v0.2 | 2025-02-26 | 草案：新增被動觸發 + 效果模組化設計 |
 | v1.0 | 2025-02-26 | **已實作**：完整型別 + Sheets 資料管線 + 引擎執行邏輯 |
 | v1.1 | 2026-06-14 | **平衡重設計**：主動技倍率依目標數反比（single 350% > all 120%）；被動技依稀有度分層（★4=強力自 buff, ★1=全光環支援）；#6 無名活屍改為全光環專家；#1/#9/#14 新增光環被動 |
+| v1.2 | 2026-03-01 | **被動系統 6 項 Bug 修復**：`always`/`every_n_turns` 觸發修復；新增 `resolvePassiveTargets()` 多目標被動；`on_dodge` 反擊目標修正；被動效果新增 `dispel_debuff`/`reflect` 處理；JSON 修正 5 筆（`damage_reduce`→`dmg_reduce`、`crit_up`→`crit_rate_up`）；~15+ 個被動技能從無效變為正確運作 |
+| v1.3 | 2026-03-01 | **extra_turn 機制實作**：新增 `_extraTurnQueue` + `processExtraTurns()`（每回合每位英雄最多 1 次，安全上限 MAX_EXTRA=10）；新增 `on_ally_death` / `on_ally_skill` 觸發點；`PassiveTrigger` 型別更新；`BattleAction` 新增 `EXTRA_TURN` 類型；App.tsx 表現層處理；5 項新增測試（47→594 全通過） |

@@ -83,6 +83,8 @@ export type PassiveTrigger =
   | 'on_lethal'
   | 'on_dodge'
   | 'on_crit'
+  | 'on_ally_death'
+  | 'on_ally_skill'
   | 'hp_below_pct'
   | 'every_n_turns'
   | 'always'
@@ -254,6 +256,7 @@ export type BattleAction =
   | { type: 'PASSIVE_TRIGGER'; heroUid: string; skillId: string; skillName: string }
   | { type: 'PASSIVE_DAMAGE'; attackerUid: string; targetUid: string; damage: number; killed: boolean }
   | { type: 'ENERGY_CHANGE'; heroUid: string; delta: number; newValue: number }
+  | { type: 'EXTRA_TURN'; heroUid: string; reason: string }
   | { type: 'TURN_START'; turn: number }
   | { type: 'TURN_END'; turn: number }
   | { type: 'BATTLE_END'; winner: 'player' | 'enemy' | 'draw' }

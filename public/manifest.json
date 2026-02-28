@@ -1,0 +1,31 @@
+{
+  "name": "全球感染 - GlobalGanLan",
+  "short_name": "全球感染",
+  "description": "3D 喪屍對戰競技場 — 在末日世界中收集英雄、組建隊伍、征戰殭屍！",
+  "start_url": "/game/",
+  "scope": "/game/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#1a0e06",
+  "theme_color": "#ff6600",
+  "categories": ["games", "entertainment"],
+  "icons": [
+    {
+      "src": "/game/icons/apple-touch-icon.png",
+      "sizes": "180x180",
+      "type": "image/png"
+    },
+    {
+      "src": "/game/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/game/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

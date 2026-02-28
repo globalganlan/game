@@ -1,13 +1,24 @@
 /**
  * SettingsPanel — 設定面板
  *
- * 功能：帳號綁定（email + 密碼）、修改暱稱、登出
+ * 功能：帳號綁定（email + 密碼）+ 綁定獎勵、修改暱稱、PWA 安裝、登出
  */
 
 import { useState, useCallback, useEffect } from 'react'
 import { bindAccount, changeName, changePassword, logout, getAuthState } from '../services/authService'
 import { audioManager } from '../services/audioService'
 import { translateError } from '../utils/errorMessages'
+import { CurrencyIcon } from './CurrencyIcon'
+import {
+  detectPlatform,
+  isStandalone,
+  hasInstallPrompt,
+  triggerInstall,
+  claimPwaReward,
+  getInstallInstructions,
+  onInstallPromptAvailable,
+  onAppInstalled,
+} from '../services/pwaService'
 
 /* ────────────────────────────
    Props
@@ -18,13 +29,17 @@ interface SettingsPanelProps {
   onLogout: () => void
   displayName: string
   isBound: boolean
+  /** 綁定/安裝獎勵領取後刷新信箱 */
+  onRefreshMail?: () => void
+  /** PWA 安裝獎勵是否已領取（from save_data） */
+  pwaRewardClaimed?: boolean
 }
 
 /* ────────────────────────────
    Component
    ──────────────────────────── */
 
-export function SettingsPanel({ onBack, onLogout, displayName, isBound: initialBound }: SettingsPanelProps) {
+export function SettingsPanel({ onBack, onLogout, displayName, isBound: initialBound, onRefreshMail, pwaRewardClaimed: initialPwaClaimed }: SettingsPanelProps) {
   /* ── 音量設定 ── */
   const [audioSettings, setAudioSettings] = useState(audioManager.getSettings())
   useEffect(() => {
@@ -51,6 +66,14 @@ export function SettingsPanel({ onBack, onLogout, displayName, isBound: initialB
   const [pwLoading, setPwLoading] = useState(false)
   const [pwMsg, setPwMsg] = useState<{ ok: boolean; text: string } | null>(null)
 
+  /* ── PWA 安裝 ── */
+  const [pwaInstalled, setPwaInstalled] = useState(() => isStandalone())
+  const [canInstall, setCanInstall] = useState(() => hasInstallPrompt())
+  const [pwaRewardClaimed, setPwaRewardClaimed] = useState(initialPwaClaimed ?? false)
+  const [pwaClaimLoading, setPwaClaimLoading] = useState(false)
+  const [pwaMsg, setPwaMsg] = useState<{ ok: boolean; text: string } | null>(null)
+  const platform = detectPlatform()
+
   const handleBind = useCallback(async () => {
     setBindMsg(null)
     if (!email.includes('@')) { setBindMsg({ ok: false, text: 'Email 格式不正確' }); return }
@@ -61,8 +84,10 @@ export function SettingsPanel({ onBack, onLogout, displayName, isBound: initialB
     try {
       const res = await bindAccount(email, password)
       if (res.success) {
-        setBindMsg({ ok: true, text: '帳號綁定成功！' })
+        setBindMsg({ ok: true, text: '帳號綁定成功！綁定獎勵已寄送至信箱 📬' })
         setIsBound(true)
+        // 綁定成功後刷新信箱（獎勵信件會自動送達）
+        onRefreshMail?.()
       } else {
         setBindMsg({ ok: false, text: translateError(res.error, '綁定失敗') })
       }
@@ -71,7 +96,7 @@ export function SettingsPanel({ onBack, onLogout, displayName, isBound: initialB
     } finally {
       setBindLoading(false)
     }
-  }, [email, password, confirmPw])
+  }, [email, password, confirmPw, onRefreshMail])
 
   const handleChangeName = useCallback(async () => {
     setNameMsg(null)
@@ -121,6 +146,57 @@ export function SettingsPanel({ onBack, onLogout, displayName, isBound: initialB
     logout()
     onLogout()
   }
+
+  /* ── PWA 事件訂閱 ── */
+  useEffect(() => {
+    const unsub1 = onInstallPromptAvailable(() => setCanInstall(true))
+    const unsub2 = onAppInstalled(() => {
+      setPwaInstalled(true)
+      setCanInstall(false)
+      // 自動領取 PWA 獎勵
+      handleClaimPwaReward()
+    })
+    return () => { unsub1(); unsub2() }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  /** 觸發 PWA 安裝 */
+  const handlePwaInstall = useCallback(async () => {
+    const accepted = await triggerInstall()
+    if (accepted) {
+      setPwaInstalled(true)
+      setCanInstall(false)
+      handleClaimPwaReward()
+    } else {
+      setPwaMsg({ ok: false, text: '安裝已取消' })
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  /** 領取 PWA 獎勵 */
+  const handleClaimPwaReward = useCallback(async () => {
+    if (pwaRewardClaimed) return
+    const authState = getAuthState()
+    if (!authState.guestToken) return
+
+    setPwaClaimLoading(true)
+    try {
+      const res = await claimPwaReward(authState.guestToken)
+      if (res.success) {
+        setPwaRewardClaimed(true)
+        setPwaMsg({ ok: true, text: '🎁 安裝獎勵已寄送至信箱！' })
+        onRefreshMail?.()
+      } else if (res.error === 'already_claimed') {
+        setPwaRewardClaimed(true)
+      } else {
+        setPwaMsg({ ok: false, text: '獎勵領取失敗，請稍後再試' })
+      }
+    } catch {
+      setPwaMsg({ ok: false, text: '網路連線失敗' })
+    } finally {
+      setPwaClaimLoading(false)
+    }
+  }, [pwaRewardClaimed, onRefreshMail])
 
   const authState = getAuthState()
 
@@ -237,6 +313,9 @@ export function SettingsPanel({ onBack, onLogout, displayName, isBound: initialB
               <p className="settings-hint">
                 綁定後可在其他裝置用 Email + 密碼登入，保留所有進度。
               </p>
+              <div className="settings-reward-preview">
+                🎁 綁定獎勵：<CurrencyIcon type="diamond" /> 200 + <CurrencyIcon type="gold" /> 5,000
+              </div>
               <div className="settings-form-col">
                 <input
                   className="settings-input"
@@ -323,6 +402,52 @@ export function SettingsPanel({ onBack, onLogout, displayName, isBound: initialB
               )}
             </section>
           )}
+
+          {/* ── PWA 安裝 ── */}
+          <section className="settings-section">
+            <h3 className="settings-section-title">📱 加入主畫面</h3>
+            {pwaInstalled ? (
+              <div className="settings-bound-badge">
+                ✅ 已安裝為 App{pwaRewardClaimed ? '' : '（獎勵領取中...）'}
+              </div>
+            ) : (
+              <>
+                <div className="settings-pwa-benefits">
+                  <div className="settings-pwa-benefit">⚡ 更快的載入速度（資源離線快取）</div>
+                  <div className="settings-pwa-benefit">📱 從主畫面一鍵啟動，如同原生 App</div>
+                  <div className="settings-pwa-benefit">🔒 更穩定的遊戲體驗（不受瀏覽器分頁限制）</div>
+                  <div className="settings-pwa-benefit">🎁 首次安裝可獲得 <CurrencyIcon type="diamond" />100 + <CurrencyIcon type="gold" />3,000 獎勵！</div>
+                </div>
+                {canInstall ? (
+                  <button
+                    className="settings-btn settings-btn-primary"
+                    onClick={handlePwaInstall}
+                  >
+                    📲 安裝全球感染
+                  </button>
+                ) : (
+                  <div className="settings-pwa-instructions">
+                    <p className="settings-hint" style={{ marginBottom: '6px' }}>
+                      {platform === 'ios' ? '📋 iOS 安裝步驟：' :
+                       platform === 'android' ? '📋 Android 安裝步驟：' :
+                       '📋 安裝步驟：'}
+                    </p>
+                    {getInstallInstructions(platform).map((step, i) => (
+                      <div key={i} className="settings-pwa-step">{step}</div>
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
+            {pwaMsg && (
+              <div className={`settings-msg ${pwaMsg.ok ? 'settings-msg-ok' : 'settings-msg-err'}`}>
+                {pwaMsg.text}
+              </div>
+            )}
+            {pwaClaimLoading && (
+              <div className="settings-msg settings-msg-ok">獎勵領取中...</div>
+            )}
+          </section>
 
           {/* ── 登出 ── */}
           <section className="settings-section">

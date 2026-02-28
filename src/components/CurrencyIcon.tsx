@@ -28,6 +28,8 @@ const CURRENCY_TYPE_MAP: Record<string, CurrencyType> = {
   currency_gold: 'gold',
   diamond: 'diamond',
   currency_diamond: 'diamond',
+  exp: 'exp',
+  currency_exp: 'exp',
   stardust: 'stardust',
   currency_stardust: 'stardust',
 }

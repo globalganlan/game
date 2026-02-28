@@ -38,6 +38,7 @@ export interface SaveData {
   stageStars: Record<string, number> // stageId → best star (1-3)
   lastSaved: string
   gachaPity?: { pullsSinceLastSSR: number; guaranteedFeatured: boolean }
+  pwaRewardClaimed?: boolean
 }
 
 export interface HeroInstance {

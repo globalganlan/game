@@ -407,6 +407,10 @@ function doPost(e) {
       case 'send-mail':
         result = handleSendMail_(body);
         break;
+      // ── Reward ──
+      case 'claim-pwa-reward':
+        result = handleClaimPwaReward_(body);
+        break;
       // ── 向下相容 ──
       case 'updateHeroes':
         result = handleUpdateSheet('heroes', 'HeroID', body.newColumns, body.data);
@@ -952,9 +956,31 @@ function handleBindAccount_(params) {
   var emailRow = findRowByColumn_(sheet, 'email', email);
   if (emailRow > 0 && emailRow !== rowNum) return { success: false, error: 'email_taken' };
 
+  // 檢查是否為首次綁定（從未綁定→已綁定）
+  var currentRow = readRow_(sheet, rowNum);
+  var wasBound = currentRow.isBound === true || currentRow.isBound === 'TRUE';
+
   writeCell_(sheet, rowNum, 'email', email);
   writeCell_(sheet, rowNum, 'passwordHash', sha256_(password));
   writeCell_(sheet, rowNum, 'isBound', true);
+
+  // ── 首次綁定獎勵信件 ──
+  if (!wasBound) {
+    try {
+      handleSendMail_({
+        targetPlayerIds: [currentRow.playerId],
+        title: '🔗 帳號綁定獎勵',
+        body: '恭喜完成帳號綁定！您的帳號現在更安全了，可以跨裝置登入保留所有進度。這是您的綁定獎勵！',
+        rewards: [
+          { itemId: 'diamond', quantity: 200 },
+          { itemId: 'gold', quantity: 5000 }
+        ],
+        expiresAt: ''
+      });
+    } catch (e) {
+      Logger.log('Bind reward mail failed for ' + currentRow.playerId + ': ' + e.message);
+    }
+  }
 
   return { success: true, message: '帳號綁定成功' };
 }
@@ -2812,6 +2838,49 @@ function handleSendMail_(params) {
   }
 
   return { success: true, sentCount: rows.length };
+}
+
+/**
+ * 領取 PWA 安裝獎勵（每帳號一次）
+ * POST { action: "claim-pwa-reward", guestToken }
+ */
+function handleClaimPwaReward_(params) {
+  var playerId = resolvePlayerId_(params.guestToken);
+  if (!playerId) return { success: false, error: 'invalid_token' };
+
+  var saveSheet = getSaveSheet_();
+  var saveRow = findRowByColumn_(saveSheet, 'playerId', playerId);
+  if (saveRow === 0) return { success: false, error: 'no_save_data' };
+
+  // 確保欄位存在
+  ensureColumn_(saveSheet, 'pwaRewardClaimed');
+
+  // 檢查是否已領取
+  var claimed = readCell_(saveSheet, saveRow, 'pwaRewardClaimed');
+  if (claimed === true || claimed === 'true' || claimed === 'TRUE') {
+    return { success: false, error: 'already_claimed' };
+  }
+
+  // 標記已領取
+  writeCell_(saveSheet, saveRow, 'pwaRewardClaimed', true);
+
+  // 發送獎勵信件
+  try {
+    handleSendMail_({
+      targetPlayerIds: [playerId],
+      title: '📱 加入主畫面獎勵',
+      body: '感謝將全球感染加入主畫面！享受更快的載入速度與更穩定的遊戲體驗。這是您的安裝獎勵！',
+      rewards: [
+        { itemId: 'diamond', quantity: 100 },
+        { itemId: 'gold', quantity: 3000 }
+      ],
+      expiresAt: ''
+    });
+  } catch (e) {
+    Logger.log('PWA reward mail failed for ' + playerId + ': ' + e.message);
+  }
+
+  return { success: true, message: 'PWA 安裝獎勵已發送' };
 }
 
 /** 發放獎勵到玩家帳號 */
