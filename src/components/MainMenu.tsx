@@ -5,6 +5,7 @@
  * 戰鬥（自由 / 關卡）、英雄管理、背包、召喚、設定
  */
 
+import { useState, useEffect, useCallback } from 'react'
 import type { MenuScreen } from '../types'
 import type { SaveData } from '../services/saveService'
 import { getTimerYield } from '../services/saveService'
@@ -20,8 +21,8 @@ interface MainMenuProps {
   onNavigate: (screen: MenuScreen) => void
   /** 領取計時器資源 */
   onCollectResources?: () => void
-  /** 資源預覽 */
-  resourcePreview?: { gold: number; expItems: number; hoursElapsed: number } | null
+  /** 取得最新資源預覽的函式（每次呼叫即時計算） */
+  getResourcePreview?: () => { gold: number; expItems: number; hoursElapsed: number } | null
   /** 信箱未領取獎勵數量（>0 顯示紅點） */
   mailUnclaimedCount?: number
 }
@@ -36,13 +37,15 @@ interface MenuItem {
   label: string
   sub: string
   color: string
+  /** 解鎖條件：null=永遠開放 */
+  unlock?: { chapter: number; stage: number; hint: string } | null
 }
 
 const MENU_ITEMS: MenuItem[] = [
   { key: 'stages',    icon: '🗺️', label: '關卡',  sub: '主線·爬塔·副本',   color: '#457b9d' },
-  { key: 'heroes',    icon: '🧟', label: '英雄',  sub: '養成·突破·升星',   color: '#2a9d8f' },
-  { key: 'gacha',     icon: '🎰', label: '召喚',  sub: '招募新同伴',       color: '#e9c46a' },
-  { key: 'inventory', icon: '🎒', label: '背包',  sub: '道具·裝備',        color: '#f4a261' },
+  { key: 'heroes',    icon: '🧟', label: '英雄',  sub: '養成·突破·升星',   color: '#2a9d8f', unlock: { chapter: 1, stage: 2, hint: '通關 1-1 後解鎖' } },
+  { key: 'gacha',     icon: '🎰', label: '召喚',  sub: '招募新同伴',       color: '#e9c46a', unlock: { chapter: 1, stage: 3, hint: '通關 1-2 後解鎖' } },
+  { key: 'inventory', icon: '🎒', label: '背包',  sub: '道具·裝備',        color: '#f4a261', unlock: { chapter: 1, stage: 2, hint: '通關 1-1 後解鎖' } },
   { key: 'mailbox',   icon: '📬', label: '信箱',  sub: '信件·獎勵',        color: '#7ec8e3' },
   { key: 'settings',  icon: '⚙️', label: '設定',  sub: '帳號·綁定',        color: '#888' },
 ]
@@ -55,18 +58,50 @@ export function MainMenu({
   saveData,
   onNavigate,
   onCollectResources,
-  resourcePreview,
+  getResourcePreview,
   mailUnclaimedCount = 0,
 }: MainMenuProps) {
+  // 每 30 秒刷新離線獎勵預覽
+  const [resourcePreview, setResourcePreview] = useState(
+    () => getResourcePreview?.() ?? null,
+  )
+  const refreshPreview = useCallback(() => {
+    setResourcePreview(getResourcePreview?.() ?? null)
+  }, [getResourcePreview])
+  useEffect(() => {
+    refreshPreview()
+    const id = setInterval(refreshPreview, 30_000)
+    return () => clearInterval(id)
+  }, [refreshPreview])
   const name = saveData?.displayName || '倖存者'
   const level = saveData?.level ?? 1
   const gold = saveData?.gold ?? 0
   const diamond = saveData?.diamond ?? 0
   const story = saveData?.storyProgress
   const storyText = story ? `${story.chapter}-${story.stage}` : '1-1'
+  const storyProgress = story ?? { chapter: 1, stage: 1 }
+
+  const [lockToast, setLockToast] = useState<string | null>(null)
 
   const handleClick = (item: MenuItem) => {
+    // 檢查解鎖條件
+    if (item.unlock) {
+      const playerProg = (storyProgress.chapter - 1) * 8 + storyProgress.stage
+      const reqProg = (item.unlock.chapter - 1) * 8 + item.unlock.stage
+      if (playerProg < reqProg) {
+        setLockToast(item.unlock.hint)
+        setTimeout(() => setLockToast(null), 2500)
+        return
+      }
+    }
     onNavigate(item.key as MenuScreen)
+  }
+
+  const isItemLocked = (item: MenuItem): boolean => {
+    if (!item.unlock) return false
+    const playerProg = (storyProgress.chapter - 1) * 8 + storyProgress.stage
+    const reqProg = (item.unlock.chapter - 1) * 8 + item.unlock.stage
+    return playerProg < reqProg
   }
 
   return (
@@ -90,56 +125,78 @@ export function MainMenu({
       {(() => {
         const timerStage = saveData?.resourceTimerStage || '1-1'
         const speed = getTimerYield(timerStage)
+        // 尚未通關 1-1 的玩家 → 離線獎勵未解鎖
+        const hasCleared = storyProgress.chapter > 1 || storyProgress.stage > 1
         return (
           <div className="menu-progress-group">
             <div className="menu-progress-header">
               <span className="menu-progress-stage">🗺️ 關卡進度：{storyText}</span>
-              <span className="menu-progress-speed">
-                產速：<i className="icon-coin">G</i>{speed.goldPerHour}/h · <i className="icon-exp">E</i>{speed.expItemsPerHour}/h
-              </span>
-            </div>
-            <div className="menu-progress-hint">通關越多，離線產出速度越快！</div>
-            <div className="menu-timer-row">
-              <div className="menu-timer-info">
-                {resourcePreview && resourcePreview.gold > 0 ? (
-                  <>
-                    <span>⏱️ 待領取：<i className="icon-coin">G</i>{resourcePreview.gold.toLocaleString()} / <i className="icon-exp">E</i>{resourcePreview.expItems}</span>
-                    <span className="menu-timer-hours">({resourcePreview.hoursElapsed}h 累積)</span>
-                  </>
-                ) : (
-                  <span>⏱️ 離線產出累積中...</span>
-                )}
-              </div>
-              {resourcePreview && resourcePreview.gold > 0 ? (
-                <button className="menu-timer-btn" onClick={onCollectResources}>
-                  領取
-                </button>
-              ) : (
-                <span className="menu-timer-idle">累積中...</span>
+              {hasCleared && (
+                <span className="menu-progress-speed">
+                  產速：<i className="icon-coin">G</i>{speed.goldPerHour}/h · <i className="icon-exp">E</i>{speed.expItemsPerHour}/h
+                </span>
               )}
             </div>
+            {hasCleared ? (
+              <>
+                <div className="menu-progress-hint">通關越多，離線產出速度越快！</div>
+                <div className="menu-timer-row">
+                  <div className="menu-timer-info">
+                    {resourcePreview && resourcePreview.gold > 0 ? (
+                      <>
+                        <span>⏱️ 待領取：<i className="icon-coin">G</i>{resourcePreview.gold.toLocaleString()} / <i className="icon-exp">E</i>{resourcePreview.expItems}</span>
+                        <span className="menu-timer-hours">({resourcePreview.hoursElapsed}h 累積)</span>
+                      </>
+                    ) : (
+                      <span>⏱️ 離線產出累積中...</span>
+                    )}
+                  </div>
+                  {resourcePreview && resourcePreview.gold > 0 ? (
+                    <button className="menu-timer-btn" onClick={() => {
+                      onCollectResources?.()
+                      // 領取後立即刷新預覽（lastCollect 已更新，金額歸零）
+                      setTimeout(refreshPreview, 300)
+                    }}>
+                      領取
+                    </button>
+                  ) : (
+                    <span className="menu-timer-idle">累積中...</span>
+                  )}
+                </div>
+              </>
+            ) : (
+              <div className="menu-progress-hint">⚔️ 通關 1-1 後解鎖離線獎勵！</div>
+            )}
           </div>
         )
       })()}
 
       {/* ── 功能按鈕列 ── */}
       <div className="menu-grid">
-        {MENU_ITEMS.map((item) => (
-          <button
-            key={item.key}
-            className="menu-card"
-            style={{ '--card-accent': item.color } as React.CSSProperties}
-            onClick={() => handleClick(item)}
-          >
-            <span className="menu-card-icon">{item.icon}</span>
-            <span className="menu-card-label">{item.label}</span>
-            <span className="menu-card-sub">{item.sub}</span>
-            {item.key === 'mailbox' && mailUnclaimedCount > 0 && (
-              <span className="menu-card-badge">{mailUnclaimedCount > 99 ? '99+' : mailUnclaimedCount}</span>
-            )}
-          </button>
-        ))}
+        {MENU_ITEMS.map((item) => {
+          const locked = isItemLocked(item)
+          return (
+            <button
+              key={item.key}
+              className={`menu-card ${locked ? 'menu-card-locked' : ''}`}
+              style={{ '--card-accent': locked ? '#555' : item.color } as React.CSSProperties}
+              onClick={() => handleClick(item)}
+            >
+              <span className="menu-card-icon">{locked ? '🔒' : item.icon}</span>
+              <span className="menu-card-label">{item.label}</span>
+              <span className="menu-card-sub">{locked ? item.unlock!.hint : item.sub}</span>
+              {item.key === 'mailbox' && !locked && mailUnclaimedCount > 0 && (
+                <span className="menu-card-badge">{mailUnclaimedCount > 99 ? '99+' : mailUnclaimedCount}</span>
+              )}
+            </button>
+          )
+        })}
       </div>
+
+      {/* 鎖定提示 */}
+      {lockToast && (
+        <div className="menu-lock-toast">{lockToast}</div>
+      )}
 
       {/* ── 底部 ── */}
       <div className="menu-footer">

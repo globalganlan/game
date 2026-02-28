@@ -1,7 +1,7 @@
 # 戰鬥系統 Spec
 
-> 版本：v2.1 ｜ 狀態：🟢 已實作
-> 最後更新：2025-02-26
+> 版本：v2.4 ｜ 狀態：🟢 已實作
+> 最後更新：2026-02-28
 > 負責角色：🎯 GAME_DESIGN → 🔧 CODING
 > 原始碼：`src/domain/battleEngine.ts`（邏輯）、`src/App.tsx`（3D 演出整合）
 
@@ -36,8 +36,15 @@
 | 目標策略 | 7 | `src/domain/targetStrategy.ts` | ✅ |
 | 傷害計算 | 8 | `src/domain/damageFormula.ts` | ✅ |
 | 3D 演出 | 10 | `src/App.tsx` `onAction` callback | ✅ |
+| 插入式大招 | 3.1 | `src/domain/battleEngine.ts` `processInterruptUltimates()` | ✅ |
+| 跳過戰鬥 | 11 | `src/App.tsx` `skipBattleRef` | ✅ |
+| 戰鬥回放 | 12 | `src/App.tsx` `battleActionsRef` + `replayBattle()` | ✅ |
+| 戰鬥統計 | 13 | `src/App.tsx` `battleStats` + stats panel UI | ✅ |
+| 戰鬥速度持久化 | 11 | `localStorage.battleSpeed` | ✅ |
+| 技能/屬性 3D 飄字 | 10.3 | `src/components/SceneWidgets.tsx` `SkillToast3D` / `ElementHint3D` | ✅ |
+| waitForAction 防碰撞 | 10.4 | `src/App.tsx` | ✅ |
+| 分頁隱藏補時 | 10.5 | `src/components/ZombieModel.tsx` `visibilitychange` | ✅ |
 | Buff 3D 圖標 | 5.3 | — | ⬜ 待做 |
-| 能量條 UI | 4.5 | — | ⬜ 待做 |
 | 大招閃現 | 10.2 | — | ⬜ 待做 |
 | 傷害飄字擴展 | 8.2 | — | ⬜ 待做 |
 
@@ -600,13 +607,58 @@ IDLE → ADVANCING → ATTACKING → RETREATING → IDLE
 - 前進速率：`Math.min(0.12 × speed, 1)`
 - 到達判定：距離 < 0.25
 
+### 10.3 技能/屬性 3D 飄字
+
+- `SkillToast3D`：技能名稱顯示在攻擊者頭頂（Billboard Text，2.5s 淡出上浮）
+- `ElementHint3D`：屬性剋制/抵抗提示顯示在攻擊者頭頂（Billboard Text）
+- 元件位於 `src/components/SceneWidgets.tsx`
+- toast/hint 資料帶 `attackerUid`，由 `Hero` 元件根據 uid 過濾顯示
+
+### 10.4 waitForAction / waitForMove 防碰撞機制
+
+- **問題**：`random_enemies_N` 可選重複目標 → 同一 uid 同時呼叫 `waitForAction` → 舊 resolve 被覆蓋 → 永遠不 resolve（等 5s timeout）
+- **解法（三層防護）**：
+  1. **SKILL_CAST 合併重複 uid**：`mergedTargets` Map 把同 uid 的 damage 加總、killed OR、isDodge AND，再 `Promise.all` 並行播放
+  2. **waitForAction/waitForMove 碰撞搶佔**：若同一 uid 已有 pending promise，先 resolve 舊的再建新的
+  3. **安全逾時 5 秒**：最後防線，防止動畫回呼完全遺失
+
+### 10.5 分頁隱藏補時（visibilitychange）
+
+- **問題**：瀏覽器切分頁時 `requestAnimationFrame` 停止 → Three.js mixer 不前進 → 動畫回呼不觸發 → 但 `setTimeout` 仍倒數 → 5s 後 timeout 誤報
+- **解法（兩層）**：
+  1. **ZombieModel mixer catch-up**：監聽 `visibilitychange`，切回來時 `mixer.update(deltaSec)`（上限 30s），讓 LoopOnce 動畫自然播完觸發 `finished`
+  2. **timeout 延後重排**：timeout 觸發時若 `document.hidden` 為 true，不 resolve 而是重排 5s 後再檢查
+
+### 10.6 攻擊者反彈致死處理
+
+- **問題**：反彈傷害（`reflectDamage`）可能在攻擊期間殺死攻擊者，但 UI 層只跳過後退、仍設 IDLE → 屍體殘留場上
+- **解法**：NORMAL_ATTACK / SKILL_CAST 的「後退」階段檢查攻擊者 HP，若 ≤ 0 改播 DEAD 動畫、`syncHpToSlot` + `removeSlot`
+
 ---
 
 ## 十一、速度控制 
 
 - x1 / x2 / x4 切換
-- `speedRef.current`  `delay(ms / speedRef.current)`
+- `speedRef.current` → `delay(ms / speedRef.current)`
 - 同步影響 `mixer.timeScale`
+
+### 速度持久化
+
+- 切換速度時存入 `localStorage`（key: `battleSpeed`）
+- 進入戰鬥時讀取 `localStorage.getItem('battleSpeed')`（預設 1）恢復上次速度
+- 有效值限 1 / 2 / 4，不合規則重置為 1
+- 不再同步到 Google Sheet，純前端本地儲存
+
+### 跳過戰鬥
+
+- 戰鬥中右下角顯示「跳過 ⏭」按鈕
+- 點擊後 `skipBattleRef.current = true`：
+  - `delay()` 立即 resolve（所有等待歸零）
+  - `waitForAction()` / `waitForMove()` 立即 resolve
+  - 所有已排隊的 action/move resolve 被即時 flush
+- 引擎 `runBattle()` 正常跑完所有回合（邏輯不變），僅跳過 3D 演出等待
+- 結束後自然進入 GAMEOVER，顯示勝負結果與獎勵
+- 實作：`src/App.tsx` — `skipBattleRef`、btn-skip-battle UI、flush pending resolvers
 
 ---
 
@@ -667,11 +719,12 @@ App.tsx
     Arena  場景（地面/牆/碎片/雨/煙火/霧）
     SlotMarker × 12  格子標記
     Hero × N  場上英雄
-       ZombieModel  GLB + 骨骼動畫 + 受擊閃光
+       ZombieModel  GLB + 骨骼動畫 + 受擊閃光 + visibilitychange 補時
        HealthBar3D  3D 血條
-       EnergyBar3D ⬜
-       StatusIcons3D ⬜
+       EnergyBar3D  3D 能量條
        DamagePopup  傷害飄字（待擴展多顏色）
+       SkillToast3D  技能名稱 3D 飄字
+       ElementHint3D  屬性剋制/抵抗 3D 提示
        Billboard Text  角色名稱
     DragPlane
     ResponsiveCamera
@@ -704,3 +757,6 @@ App.tsx
 | v1.0 | 2025-02-25 | 初版：基礎回合制戰鬥 + 3D 演出 |
 | v2.0 | 2025-02-26 | 新增：能量/Buff/被動/傷害設計草案 |
 | v2.1 | 2025-02-26 | **已實作**：Domain Engine、Command Pattern、所有子系統程式碼就位 |
+| v2.2 | 2026-02-28 | 新增：插入式大招（processInterruptUltimates）、跳過戰鬥、速度持久化、技能/屬性 3D 飄字、waitForAction 碰撞防護（三層：合併 uid + 搶佔 resolve + 5s timeout）、分頁隱藏 mixer 補時（visibilitychange）、攻擊者反彈致死播 DEAD 動畫、非攻擊技能不前進 |
+| v2.3 | 2026-02-28 | 戰鬥速度持久化改用 localStorage（移除 saveService.battleSpeed，不再同步 Google Sheet） |
+| v2.4 | 2026-02-28 | 新增戰鬥回放（紀錄 BattleAction[] → GAMEOVER 點擊「回放」重播 3D 動畫）、戰鬥統計面板（每位英雄輸出/治療/承傷）、DOT_TICK 攜帶 sourceUid、SKILL_CAST reflectDamage 統計+回放修正 |

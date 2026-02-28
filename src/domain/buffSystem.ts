@@ -92,6 +92,7 @@ export function cleanse(target: BattleHero, count: number = 1): StatusType[] {
 export interface DotTickResult {
   type: StatusType
   damage: number
+  sourceUid?: string
 }
 
 /**
@@ -124,7 +125,7 @@ export function processDotEffects(hero: BattleHero, allHeroes: BattleHero[]): Do
 
     if (dmg > 0) {
       hero.currentHP = Math.max(0, hero.currentHP - dmg)
-      results.push({ type: status.type, damage: dmg })
+      results.push({ type: status.type, damage: dmg, sourceUid: status.sourceHeroId })
     }
   }
 

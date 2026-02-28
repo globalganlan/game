@@ -28,6 +28,7 @@ export interface SkillToast {
   heroName: string
   skillName: string
   timestamp: number
+  attackerUid: string
 }
 
 export interface ElementHint {
@@ -35,6 +36,7 @@ export interface ElementHint {
   text: string
   color: string
   timestamp: number
+  attackerUid: string
 }
 
 /* ════════════════════════════════════
@@ -319,11 +321,7 @@ export function BattleHUD({
 
   return (
     <div className="bhud-container">
-      {/* Skill cast toasts (center top) */}
-      <SkillToastBar toasts={skillToasts} />
-
-      {/* Element effectiveness hints (center) */}
-      <ElementHintBar hints={elementHints} />
+      {/* Skill/Element popups now rendered in 3D space via Hero component */}
     </div>
   )
 }

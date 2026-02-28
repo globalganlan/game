@@ -8,6 +8,7 @@
 import { useState, useMemo } from 'react'
 import {
   isModeUnlocked,
+  MODE_UNLOCK,
   getTodayDungeons,
   getTowerFloorConfig,
   type DailyDungeon,
@@ -22,6 +23,8 @@ interface StageSelectProps {
   storyProgress: { chapter: number; stage: number }
   /** 玩家爬塔樓層 */
   towerFloor: number
+  /** 各關卡最佳星級 */
+  stageStars: Record<string, number>
   /** 返回主選單 */
   onBack: () => void
   /** 選擇關卡後進入戰鬥準備 */
@@ -53,10 +56,14 @@ const MODE_TABS: ModeTab[] = [
 
 function StoryStages({
   storyProgress,
+  stageStars,
   onSelect,
+  onLockedClick,
 }: {
   storyProgress: { chapter: number; stage: number }
+  stageStars: Record<string, number>
   onSelect: (stageId: string) => void
+  onLockedClick: (stageId: string) => void
 }) {
   const currentChapter = storyProgress.chapter
   const currentStage = storyProgress.stage
@@ -73,12 +80,14 @@ function StoryStages({
         const cleared = progress < playerProgress
         const current = progress === playerProgress
         const locked = progress > playerProgress
+        const bestStars = stageStars[stageId] || 0
+        const maxStars = cleared && bestStars === 0 ? 3 : bestStars // fallback: cleared前端視為3星
 
-        return { stageId, stage: st, cleared, current, locked }
+        return { stageId, stage: st, cleared, current, locked, bestStars: maxStars }
       })
       return { chapter: ch, stages }
     })
-  }, [currentChapter, currentStage])
+  }, [currentChapter, currentStage, stageStars])
 
   return (
     <div className="stage-story">
@@ -86,19 +95,34 @@ function StoryStages({
         <div key={ch.chapter} className="stage-chapter">
           <h3 className="stage-chapter-title">第 {ch.chapter} 章</h3>
           <div className="stage-list">
-            {ch.stages.map((s) => (
-              <button
-                key={s.stageId}
-                className={`stage-btn ${s.cleared ? 'stage-cleared' : ''} ${s.current ? 'stage-current' : ''} ${s.locked ? 'stage-locked' : ''}`}
-                disabled={s.locked}
-                onClick={() => onSelect(s.stageId)}
-              >
-                <span className="stage-btn-id">{s.stageId}</span>
-                {s.cleared && <span className="stage-btn-stars">⭐⭐⭐</span>}
-                {s.current && <span className="stage-btn-badge">📍</span>}
-                {s.locked && <span className="stage-btn-lock">🔒</span>}
-              </button>
-            ))}
+            {ch.stages.map((s) => {
+              const is3Star = s.bestStars >= 3
+              return (
+                <button
+                  key={s.stageId}
+                  className={`stage-btn ${s.cleared ? 'stage-cleared' : ''} ${s.current ? 'stage-current' : ''} ${s.locked ? 'stage-locked' : ''} ${is3Star ? 'stage-maxed' : ''}`}
+                  disabled={is3Star}
+                  onClick={() => {
+                    if (s.locked) { onLockedClick(s.stageId); return }
+                    onSelect(s.stageId)
+                  }}
+                >
+                  <span className="stage-btn-id">{s.stageId}</span>
+                  {s.cleared && (
+                    <span className="stage-btn-stars">
+                      {[1, 2, 3].map(i => (
+                        <span key={i} className={i <= s.bestStars ? 'star-active' : 'star-empty'}>
+                          {i <= s.bestStars ? '⭐' : '☆'}
+                        </span>
+                      ))}
+                    </span>
+                  )}
+                  {s.current && <span className="stage-btn-badge">📍</span>}
+                  {s.locked && <span className="stage-btn-lock">🔒</span>}
+                  {is3Star && <span className="stage-btn-complete">✅</span>}
+                </button>
+              )
+            })}
           </div>
         </div>
       ))}
@@ -137,23 +161,23 @@ function TowerPanel({
         </div>
         <div className="tower-info-row">
           <span>獎勵金幣</span>
-          <span>金幣 {floorConfig.rewards.gold}</span>
+          <span><i className="icon-coin">G</i> {floorConfig.rewards.gold}</span>
         </div>
         <div className="tower-info-row">
           <span>獎勵經驗</span>
-          <span>📗 {floorConfig.rewards.exp}</span>
+          <span><i className="icon-exp">E</i> {floorConfig.rewards.exp}</span>
         </div>
         {(floorConfig.rewards.diamond ?? 0) > 0 && (
           <div className="tower-info-row">
             <span>獎勵鑽石</span>
-            <span>💎 {floorConfig.rewards.diamond}</span>
+            <span><i className="icon-dia">D</i> {floorConfig.rewards.diamond}</span>
           </div>
         )}
       </div>
 
       <button
         className="tower-challenge-btn"
-        onClick={() => onSelect(`tower-${currentFloor}`)}
+        onClick={() => onSelect(String(currentFloor))}
       >
         ⚔️ 挑戰第 {currentFloor} 層
       </button>
@@ -230,10 +254,23 @@ function DailyPanel({
 export function StageSelect({
   storyProgress,
   towerFloor,
+  stageStars,
   onBack,
   onSelectStage,
 }: StageSelectProps) {
   const [activeMode, setActiveMode] = useState<StageMode>('story')
+  const [lockToast, setLockToast] = useState<string | null>(null)
+
+  /** 點擊未解鎖tab時顯示 toast */
+  const handleTabClick = (tab: ModeTab) => {
+    if (tab.unlockMode && !isModeUnlocked(tab.unlockMode, storyProgress)) {
+      const req = MODE_UNLOCK[tab.unlockMode]
+      setLockToast(`通關 ${req.chapter}-${req.stage} 後解鎖「${tab.label}」玩法`)
+      setTimeout(() => setLockToast(null), 2500)
+      return
+    }
+    setActiveMode(tab.key)
+  }
 
   return (
     <div className="panel-overlay">
@@ -255,8 +292,7 @@ export function StageSelect({
               <button
                 key={tab.key}
                 className={`stage-mode-tab ${activeMode === tab.key ? 'stage-mode-active' : ''} ${!unlocked ? 'stage-mode-locked' : ''}`}
-                disabled={!unlocked}
-                onClick={() => setActiveMode(tab.key)}
+                onClick={() => handleTabClick(tab)}
               >
                 <span>{tab.icon}</span>
                 <span>{tab.label}</span>
@@ -271,7 +307,12 @@ export function StageSelect({
           {activeMode === 'story' && (
             <StoryStages
               storyProgress={storyProgress}
+              stageStars={stageStars}
               onSelect={(id) => onSelectStage('story', id)}
+              onLockedClick={(id) => {
+                setLockToast(`請先通關前一關再挑戰 ${id}`)
+                setTimeout(() => setLockToast(null), 2500)
+              }}
             />
           )}
           {activeMode === 'tower' && (
@@ -287,6 +328,11 @@ export function StageSelect({
             />
           )}
         </div>
+
+        {/* 鎖定提示 */}
+        {lockToast && (
+          <div className="stage-lock-toast">{lockToast}</div>
+        )}
       </div>
     </div>
   )

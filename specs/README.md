@@ -2,7 +2,7 @@
 
 > **本檔案是遊戲所有系統規格的單一入口。每次新對話必須讀取此檔案以取得最新規格狀態。**
 > 
-> 最後更新：2026-02-27
+> 最後更新：2026-03-01
 
 ## 規格架構原則
 
@@ -21,18 +21,18 @@
 | `specs/skill-system.md` | 技能系統（SkillTemplate + SkillEffect + Sheets 資料管線） | v1.0 | 🟢 已實作 |
 | `specs/element-system.md` | 屬性剋制系統（7 屬性矩陣 + 動態載入 + 中英對照） | v1.0 | 🟢 已實作 |
 | `specs/tech-architecture.md` | 技術架構（含 Domain + Services 分層） | v1.1 | 🟢 定稿 |
-| `specs/progression.md` | 養成系統（等級/突破/星級/裝備/套裝） | v0.2 | 🟡 草案 |
-| `specs/auth-system.md` | 帳號系統（訪客 + 綁定帳密） | v0.1 | 🟡 草案 |
-| `specs/save-system.md` | 存檔系統（Google Sheets 存進度 + 資源計時器） | v0.2 | 🟡 草案 |
-| `specs/stage-system.md` | 關卡系統（章節/爬塔/副本/PvP/Boss，無體力限制） | v0.2 | 🟡 草案 |
+| `specs/progression.md` | 養成系統（等級/突破/星級/裝備/套裝） | v1.0 | 🟢 已實作 |
+| `specs/auth-system.md` | 帳號系統（訪客 + 綁定帳密） | v1.0 | 🟢 已實作 |
+| `specs/save-system.md` | 存檔系統（Google Sheets 存進度 + 資源計時器） | v1.0 | 🟢 已實作 |
+| `specs/stage-system.md` | 關卡系統（主線/爬塔/每日副本，PvP/Boss 未實作） | v1.0 | 🟢 已實作 |
 | `specs/gacha.md` | 抽卡系統（本地池架構：伺服器預生成 200 組 → 登入下載 → 0ms 本地抽卡） | v1.0 | 🟢 已實作 |
-| `specs/inventory.md` | 背包與道具系統（8 類道具、裝備實例、商店、容量） | v0.1 | 🟡 草案 |
-| `specs/mailbox.md` | 信箱系統（收信/領獎/刪除/全服廣播） | v0.1 | 🟡 草案 |
+| `specs/inventory.md` | 背包與道具系統（8 類道具、裝備實例、18 個 service 函式） | v1.0 | 🟢 已實作 |
+| `specs/mailbox.md` | 信箱系統（預載/樂觀領取/幂等保護/離線補償） | v1.0 | 🟢 已實作 |
 | `specs/optimistic-queue.md` | 樂觀更新佇列（冪等 + localStorage 備份 + reconcile） | v1.0 | 🟢 已實作 |
 | `specs/local-storage-migration.md` | localStorage Schema 版本遷移（版本化 + 自動 migration + 安全降級） | v1.0 | 🟢 已實作 |
-| `specs/ui-flow.md` | UI 流程與畫面定義 | — | ⚪ 待建立 |
-| `specs/audio.md` | 音頻規格 | — | ⚪ 待建立 |
-| `specs/narrative.md` | 世界觀與劇情架構 | — | ⚪ 待建立 |
+| `specs/ui-flow.md` | UI 流程與畫面定義（GameState/MenuScreen/導航函式/過場幕） | v1.0 | 🟢 已實作 |
+| `specs/audio.md` | 音效與音樂系統（BGM/SFX 規劃） | v0.1 | ⬜ 未實作 |
+| `specs/narrative.md` | 敘事與世界觀（主線章節/角色背景/劇情系統） | v0.1 | ⬜ 未實作 |
 
 > 狀態：🟢 已實作/定稿 ｜ 🟡 草案 ｜ 🔴 衝突待解 ｜ ⚪ 待建立
 
@@ -50,6 +50,14 @@
 | `src/services/dataService.ts` | skill-system §6-7 | Sheets → domain 轉換 |
 | `src/services/sheetApi.ts` | tech-architecture | API 封裝 + 快取 |
 | `src/services/optimisticQueue.ts` | optimistic-queue | 樂觀更新佇列核心 |
+| `src/services/authService.ts` | auth-system | 登入/註冊/綁定帳號 |
+| `src/services/saveService.ts` | save-system | 存檔載入/儲存/資源收集 |
+| `src/services/progressionService.ts` | progression | 養成 API（11 個 Optimistic Queue 操作） |
+| `src/services/inventoryService.ts` | inventory | 背包管理（18 個函式） |
+| `src/services/mailService.ts` | mailbox | 信箱預載/領取/刪除 |
+| `src/domain/progressionSystem.ts` | progression | 養成公式/常數/數值計算 |
+| `src/components/UIOverlay.tsx` | ui-flow | UI 層條件渲染 |
+| `gas/程式碼.js` | auth, save, stage, progression, inventory, mailbox | GAS 全部 handler |
 
 ## Spec 檔案格式規範
 

@@ -118,13 +118,26 @@ function ItemCell({ item, definition, onClick, heroMap }: ItemCellProps & { hero
   const border = RARITY_COLORS[rarity] || '#666'
   const qty = Math.round(item.quantity)
 
+  // 英雄碎片：使用英雄縮圖 + 拼圖角標
+  const fragMatch = item.itemId.match(/^asc_fragment_(\d+)$/)
+  const thumbUrl = fragMatch
+    ? `${import.meta.env.BASE_URL}models/zombie_${fragMatch[1]}/thumbnail.png`
+    : null
+
   return (
     <button
       className="inv-cell"
       style={{ '--cell-border': border } as React.CSSProperties}
       onClick={onClick}
     >
-      <span className="inv-cell-icon">{icon}</span>
+      {thumbUrl ? (
+        <span className="inv-cell-icon inv-cell-thumb-wrap">
+          <img className="inv-cell-thumb" src={thumbUrl} alt={name} />
+          <span className="inv-cell-puzzle">🧩</span>
+        </span>
+      ) : (
+        <span className="inv-cell-icon">{icon}</span>
+      )}
       <span className="inv-cell-name">{name}</span>
       <span className="inv-cell-qty">×{qty}</span>
     </button>
@@ -149,12 +162,25 @@ function ItemDetail({ item, definition, onClose, heroMap }: ItemDetailProps & { 
   const sellPrice = definition?.sellPrice || 0
   const qty = Math.round(item.quantity)
 
+  // 英雄碎片縮圖
+  const fragMatch = item.itemId.match(/^asc_fragment_(\d+)$/)
+  const thumbUrl = fragMatch
+    ? `${import.meta.env.BASE_URL}models/zombie_${fragMatch[1]}/thumbnail.png`
+    : null
+
   return (
     <div className="inv-detail-backdrop" onClick={onClose}>
       <div className="inv-detail-card" onClick={(e) => e.stopPropagation()}>
         <button className="inv-detail-close" onClick={onClose}>✕</button>
         <div className="inv-detail-header">
-          <span className="inv-detail-icon">{definition?.icon || fallback.icon}</span>
+          {thumbUrl ? (
+            <span className="inv-detail-icon inv-cell-thumb-wrap">
+              <img className="inv-cell-thumb" src={thumbUrl} alt={name} style={{ width: 48, height: 48 }} />
+              <span className="inv-cell-puzzle">🧩</span>
+            </span>
+          ) : (
+            <span className="inv-detail-icon">{definition?.icon || fallback.icon}</span>
+          )}
           <div>
             <h3 style={{ color: RARITY_COLORS[rarity] }}>{name}</h3>
             <span className="inv-detail-rarity">{rarity}</span>

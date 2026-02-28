@@ -141,6 +141,24 @@ export function ZombieModel({
   // 首次掛載通知
   useEffect(() => { onReady?.() }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // ── 分頁隱藏補時：切回來時推進 mixer，讓暫停的動畫自然完成 ──
+  useEffect(() => {
+    if (!mixer) return
+    let hiddenAt = 0
+    const onVisChange = () => {
+      if (document.hidden) {
+        hiddenAt = performance.now()
+      } else if (hiddenAt > 0) {
+        const deltaSec = (performance.now() - hiddenAt) / 1000
+        hiddenAt = 0
+        // 補進隱藏期間的時間（上限 30s），讓 LoopOnce 動畫觸發 finished
+        mixer.update(Math.min(deltaSec, 30))
+      }
+    }
+    document.addEventListener('visibilitychange', onVisChange)
+    return () => document.removeEventListener('visibilitychange', onVisChange)
+  }, [mixer])
+
   // ── 動畫狀態切換 ──
   useEffect(() => {
     if (isDragging) return

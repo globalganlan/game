@@ -58,6 +58,8 @@ interface LocalPullResult {
   rarity: GachaRarity;
   isNew: boolean;
   isFeatured: boolean;
+  stardust: number;    // 重複時依稀有度計算（SSR=25, SR=5, R=1, N=0.2），新角色為 0
+  fragments: number;   // 重複時依星級計算英雄碎片數，新角色為 0
 }
 
 interface LocalPullResponse {
@@ -333,3 +335,4 @@ POST { "action": "refill-pool", "guestToken": "..." }
 |------|------|---------|
 | v0.1 | 2026-02-26 | 初版草案：機率表、保底機制、成本、重複處理 |
 | v1.0 | 2026-02-27 | **重大改版**：新增本地池架構（§3-§5），伺服器預生成 200 組 → 前端 0ms 同步抽卡 → 背景同步。新增 GAS `refill-pool` API、前端 `gachaLocalPool.ts`。升級為已實作狀態 🟢 |
+| v1.1 | 2026-02-28 | 新增重複角色獎勵（`stardust` + `fragments` 欄位）、抽卡 UI 顯示「重複」badge + 星塵/碎片數量、重複獎勵透過 `addItemsLocally()` 入帳背包 |

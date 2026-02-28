@@ -11,8 +11,9 @@ import { Billboard, Text } from '@react-three/drei'
 import * as THREE from 'three'
 
 import { ZombieModel } from './ZombieModel'
-import { DamagePopup, HealthBar3D, EnergyBar3D } from './SceneWidgets'
+import { DamagePopup, HealthBar3D, EnergyBar3D, SkillToast3D, ElementHint3D } from './SceneWidgets'
 import type { SlotHero, ActorState, AnimationState, DamagePopupData } from '../types'
+import type { SkillToast, ElementHint } from './BattleHUD'
 
 import type { Vector3Tuple } from 'three'
 
@@ -46,6 +47,10 @@ interface HeroProps {
   canAdjustFormation?: boolean
   /** 能量比例（0~1），戰鬥中用於顯示 3D 能量條 */
   energyRatio?: number
+  /** 技能彈幕（顯示在此英雄頭頂） */
+  skillToasts?: SkillToast[]
+  /** 屬性提示（顯示在此英雄頭頂） */
+  elementHints?: ElementHint[]
 }
 
 /* ────────────────────────────
@@ -75,6 +80,8 @@ export function Hero({
   isDragActive,
   canAdjustFormation = false,
   energyRatio,
+  skillToasts = [],
+  elementHints = [],
 }: HeroProps) {
   const meshRef = useRef<THREE.Group>(null)
   const [basePosition] = useState<Vector3Tuple>(position)
@@ -215,6 +222,16 @@ export function Hero({
 
         {damagePopups.map((pop) => (
           <DamagePopup key={pop.id} value={pop.value} position={[0, 2.5, 0]} textScale={textScale} />
+        ))}
+
+        {/* 技能名稱浮動標示 */}
+        {skillToasts.map((t) => (
+          <SkillToast3D key={t.id} heroName={t.heroName} skillName={t.skillName} position={[0, 4.2, 0]} textScale={textScale} />
+        ))}
+
+        {/* 屬性克制/抵抗浮動標示 */}
+        {elementHints.map((h) => (
+          <ElementHint3D key={h.id} text={h.text} color={h.color} position={[0, 3.8, 0]} textScale={textScale} />
         ))}
 
         <Billboard position={[0, 3.5, 0]} renderOrder={15}>

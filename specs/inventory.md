@@ -1,7 +1,7 @@
 # 背包與道具系統 Spec
 
-> 版本：v0.1 ｜ 狀態：🟡 草案
-> 最後更新：2026-02-27
+> 版本：v1.0 ｜ 狀態：🟢 已實作（部分 UI 操作待開發）
+> 最後更新：2026-03-01
 > 負責角色：🎯 GAME_DESIGN → 🔧 CODING
 
 ## 概述
@@ -11,11 +11,21 @@
 
 ## 依賴
 
-- `specs/save-system.md` — `inventory` Sheet 結構、`/load-save` API
-- `specs/progression.md` — 消耗素材定義（經驗核心/碎片/職業石/強化石/重洗石/鍛造圖紙）
+- `specs/save-system.md` — `save_data.equipmentCapacity` 欄位
+- `specs/progression.md` — 消耗素材定義（經驗核心/碎片/職業石/強化石等）
 - `specs/gacha.md` — 星塵貨幣、抽卡產出
 - `specs/stage-system.md` — 關卡掉落物
 - `specs/hero-schema.md` — 英雄 HeroID 對應碎片
+
+## 實作對照
+
+| 原始碼 | 說明 |
+|--------|------|
+| `src/services/inventoryService.ts` | Service 層 — 18 個匯出函式 |
+| `src/components/InventoryPanel.tsx` | UI — 6 分頁背包 + ItemDetail 彈窗 |
+| `src/domain/progressionSystem.ts` | EquipmentInstance / EquipmentSlot / SubStat 型別定義 |
+| `src/services/saveService.ts` | InventoryItem 型別定義 |
+| `gas/程式碼.js` | GAS Handler — 10 個 inventory 端點 |
 
 ---
 
@@ -132,8 +142,6 @@
 | `itemId` | string | 道具 ID（見命名規則） |
 | `quantity` | number | 數量（≥ 0，0 不刪行、下次增加時直接更新） |
 
-> 裝備是獨立物件（有屬性/強化等級），不存 inventory，存 `equipment_instances`。
-
 ### 3.2 Sheet: `equipment_instances`（玩家裝備實例，一件一行）
 
 | 欄位 | 型別 | 說明 |
@@ -171,14 +179,14 @@
 ## 四、前端資料結構
 
 ```typescript
-/** 可堆疊道具（素材/貨幣/寶箱） */
-interface InventoryItem {
+/** 可堆疊道具（定義於 saveService.ts） */
+export interface InventoryItem {
   itemId: string
   quantity: number
 }
 
 /** 道具定義（從 item_definitions Sheet 載入） */
-interface ItemDefinition {
+export interface ItemDefinition {
   itemId: string
   name: string
   category: ItemCategory
@@ -190,7 +198,7 @@ interface ItemDefinition {
   sellPrice: number
 }
 
-type ItemCategory =
+export type ItemCategory =
   | 'exp_material'
   | 'ascension_material'
   | 'equipment_material'
@@ -200,13 +208,13 @@ type ItemCategory =
   | 'chest'
   | 'currency'
 
-/** 裝備實例（從 equipment_instances Sheet 載入） */
-interface EquipmentInstance {
+/** 裝備實例（定義於 domain/progressionSystem.ts） */
+export interface EquipmentInstance {
   equipId: string
   templateId: string
   setId: string
   slot: EquipmentSlot
-  rarity: 'N' | 'R' | 'SR' | 'SSR'
+  rarity: Rarity
   mainStat: string
   mainStatValue: number
   enhanceLevel: number
@@ -216,73 +224,27 @@ interface EquipmentInstance {
   obtainedAt: string
 }
 
-type EquipmentSlot = 'weapon' | 'armor' | 'ring' | 'boots'
+export type EquipmentSlot = 'weapon' | 'armor' | 'ring' | 'boots'
+export type Rarity = 'N' | 'R' | 'SR' | 'SSR'
 
-interface SubStat {
-  stat: string             // 'ATK' | 'HP' | 'DEF' | 'SPD' | 'CritRate' | 'CritDmg'
+export interface SubStat {
+  stat: string
   value: number
-  isPercent: boolean       // true = 百分比加成, false = 固定值
+  isPercent: boolean
 }
 
-/** 完整背包狀態 */
-interface PlayerInventory {
-  items: InventoryItem[]           // 可堆疊道具
-  equipment: EquipmentInstance[]   // 裝備實例
+/** 背包完整狀態（inventoryService 管理） */
+export interface InventoryState {
+  items: InventoryItem[]
+  equipment: EquipmentInstance[]
+  equipmentCapacity: number
+  definitions: Map<string, ItemDefinition>
 }
 ```
 
 ---
 
-## 五、背包 UI 設計
-
-### 5.1 分頁結構
-
-```
-┌─────────────────────────────────────┐
-│  背包                    💰12,500   │
-│                          💎 850     │
-├────┬────┬────┬────┬────┬───────────┤
-│ 全部│素材│裝備│寶箱│貨幣│ 排序 ▼     │
-├────┴────┴────┴────┴────┴───────────┤
-│ ┌──┐ ┌──┐ ┌──┐ ┌──┐ ┌──┐ ┌──┐    │
-│ │🔴│ │🟢│ │🔵│ │🟡│ │⬜│ │⬜│    │
-│ │x5│ │x3│ │x1│ │x8│ │  │ │  │    │
-│ └──┘ └──┘ └──┘ └──┘ └──┘ └──┘    │
-│ ┌──┐ ┌──┐ ┌──┐ ┌──┐             │
-│ │⚔️│ │🛡️│ │💍│ │👟│              │
-│ │+5│ │+0│ │+3│ │+0│              │
-│ └──┘ └──┘ └──┘ └──┘              │
-│                                    │
-│ ──── 選中道具詳情 ────              │
-│ 小型經驗核心 (x5)                   │
-│ 提供 100 EXP 的升級素材            │
-│ [使用] [出售]                      │
-└─────────────────────────────────────┘
-```
-
-### 5.2 排序選項
-
-| 排序方式 | 說明 |
-|---------|------|
-| 取得時間 | 最新在前（預設） |
-| 稀有度 | SSR → SR → R → N |
-| 類別 | 按 category 分組 |
-| 數量 | 多到少 |
-
-### 5.3 道具操作
-
-| 操作 | 條件 | 說明 |
-|------|------|------|
-| **使用** | useAction 非空 | 寶箱→開啟、經驗核心→選英雄升級 |
-| **出售** | sellPrice > 0 | 轉換為金幣 |
-| **詳情** | 裝備類 | 查看主/副屬性、強化等級、套裝效果 |
-| **鎖定** | 裝備類 | 標記為鎖定，防止誤拆解 |
-| **批量出售** | 長按進入多選模式 | 一次賣多個 |
-| **批量使用** | 素材類可批量 | 如一次用 10 個經驗核心 |
-
----
-
-## 六、背包容量
+## 五、背包容量
 
 | 項目 | 上限 | 說明 |
 |------|------|------|
@@ -292,66 +254,143 @@ interface PlayerInventory {
 
 ```typescript
 const EQUIPMENT_SLOT_BASE = 200
-const EQUIPMENT_SLOT_EXPAND = 50    // 每次擴容 +50
-const EQUIPMENT_SLOT_COST = 100     // 每次擴容 100 鑽石
-const EQUIPMENT_SLOT_MAX = 500      // 最大容量
+const EQUIPMENT_SLOT_EXPAND = 50
+const EQUIPMENT_SLOT_COST = 100     // 鑽石
+const EQUIPMENT_SLOT_MAX = 500
 ```
 
 ---
 
-## 七、API 端點
+## 六、背包載入流程
 
-| 端點 | 方法 | 參數 | 回傳 | 說明 |
-|------|------|------|------|------|
-| `/load-inventory` | POST | `{ guestToken }` | `{ items, equipment }` | 載入完整背包 |
-| `/add-items` | POST | `{ guestToken, items: [{itemId, quantity}] }` | `{ success, inventory }` | 批量增加道具 |
-| `/remove-items` | POST | `{ guestToken, items: [{itemId, quantity}] }` | `{ success, inventory }` | 批量消耗道具（有不足則整筆失敗） |
-| `/use-item` | POST | `{ guestToken, itemId, quantity, targetId? }` | `{ success, result }` | 使用道具（寶箱開啟/經驗核心升級） |
-| `/sell-items` | POST | `{ guestToken, items: [{itemId, quantity}] }` | `{ success, goldGained }` | 出售道具換金幣 |
-| `/add-equipment` | POST | `{ guestToken, templateId, setId, ... }` | `{ equipId }` | 新增裝備實例（掉落/鍛造） |
-| `/remove-equipment` | POST | `{ guestToken, equipId }` | `{ success, materials }` | 拆解裝備（返回素材） |
-| `/equip-item` | POST | `{ guestToken, equipId, heroInstanceId }` | `{ success }` | 裝備到英雄身上 |
-| `/unequip-item` | POST | `{ guestToken, equipId }` | `{ success }` | 卸下裝備放回背包 |
-| `/lock-equipment` | POST | `{ guestToken, equipId, locked }` | `{ success }` | 鎖定/解鎖裝備 |
-| `/expand-inventory` | POST | `{ guestToken }` | `{ success, newCapacity }` | 擴容（扣鑽石） |
+```
+InventoryPanel mount
+  ├─ getInventoryState() === null ?
+  │   └─ YES → loadInventory()
+  │             ├─ loadItemDefinitions()    ← GAS API (有記憶體快取)
+  │             ├─ GAS API: load-inventory  ← 取得 items + equipment + equipmentCapacity
+  │             ├─ 解析 equipment.subStats (JSON string → object)
+  │             ├─ localStorage 合併：若 local 數量 > server 則取 local（樂觀寫入尚未同步）
+  │             └─ 組成 InventoryState → 存 localStorage → 通知監聽者
+  └─ NO  → 使用快取的 InventoryState
+```
 
----
-
-## 八、道具獲取來源總覽
-
-| 來源 | 可獲得道具 |
-|------|-----------|
-| **主線關卡** | 金幣、經驗核心（小/中）、裝備（N~SR）、鍛造礦 |
-| **資源計時器** | 金幣、小型經驗核心 |
-| **無盡爬塔** | 鑽石（每10層）、大型經驗核心、裝備寶箱 |
-| **每日副本** | 職業石（力量/敏捷/防禦）、強化石、經驗核心 |
-| **PvP 競技場** | 競技幣（每日排名獎勵）→ 商店兌換碎片/道具 |
-| **Boss 戰** | Boss 幣、鍛造圖紙、大型強化石、裝備（SR~SSR） |
-| **抽卡（重複）** | 星塵 |
-| **商店購買** | 鑽石 → 素材寶箱 / 體力等 |
-| **活動** | 限定道具、限定裝備 |
+> **與 save 系統分離**：背包不在 `load-save` 中載入，由 `inventoryService` 獨立管理。
 
 ---
 
-## 九、商店系統（附屬於背包）
+## 七、Service 層（inventoryService）
 
-### 9.1 商店分類
+### 18 個匯出函式
 
-| 商店 | 貨幣 | 商品 | 說明 |
-|------|------|------|------|
-| 雜貨商店 | 金幣 | 小/中型強化石、重洗石、經驗核心 | 每日刷新 6 個 |
-| 競技商店 | 競技幣 | 指定英雄碎片（輪替）、鍛造礦 | 每週刷新 |
-| 星塵商店 | 星塵 | 指定英雄碎片（永久） | 不刷新 |
-| Boss 商店 | Boss 幣 | 鍛造圖紙、大型強化石、稀有鍛造礦 | 每週刷新 |
-| 鑽石商店 | 鑽石 | 素材寶箱、背包擴容、外觀（未來） | 常駐 |
+| # | 函式 | 說明 | API/Queue |
+|---|------|------|-----------|
+| 1 | `loadItemDefinitions(): Promise<Map<string, ItemDefinition>>` | 從 GAS 載入道具定義（有記憶體快取） | API `load-item-definitions` |
+| 2 | `getItemDefinition(itemId): ItemDefinition \| undefined` | 從快取取得單個道具定義 | 純前端 |
+| 3 | `loadInventory(): Promise<InventoryState>` | 載入完整背包，合併 localStorage | API `load-inventory` |
+| 4 | `addItems(items): Promise<boolean>` | 批量增加道具 | API `add-items` |
+| 5 | `removeItems(items): Promise<boolean>` | 批量消耗道具（不足則整筆失敗） | API `remove-items` |
+| 6 | `sellItems(items): Promise<number>` | 出售道具換金幣 | API `sell-items` |
+| 7 | `useItem(itemId, quantity, targetId?): Promise<{success, result?}>` | 使用道具（寶箱/經驗核心） | Optimistic Queue |
+| 8 | `equipItem(equipId, heroInstanceId): Promise<boolean>` | 裝備到英雄（同 slot 自動卸下舊裝） | Optimistic Queue |
+| 9 | `unequipItem(equipId): Promise<boolean>` | 卸下裝備 | Optimistic Queue |
+| 10 | `lockEquipment(equipId, locked): Promise<boolean>` | 鎖定/解鎖裝備 | Optimistic Queue |
+| 11 | `expandInventory(): Promise<number>` | 擴容 +50（扣 100 鑽石） | Optimistic Queue |
+| 12 | `getItemQuantity(itemId): number` | 查詢某道具數量 | 純前端 |
+| 13 | `getHeroEquipment(heroInstanceId): EquipmentInstance[]` | 取得某英雄已裝備列表 | 純前端 |
+| 14 | `getUnequippedEquipment(): EquipmentInstance[]` | 取得所有未裝備的裝備 | 純前端 |
+| 15 | `filterItemsByCategory(category \| 'all'): InventoryItem[]` | 依分類篩選（'all' 回傳 qty>0） | 純前端 |
+| 16 | `onInventoryChange(fn): () => void` | 訂閱背包變化，回傳 unsubscribe | 純前端 |
+| 17 | `getInventoryState(): InventoryState \| null` | 取得當前記憶體中的背包狀態 | 純前端 |
+| 18 | `addItemsLocally(items): void` | **不呼叫 API**，純前端樂觀新增（戰鬥掉落/抽卡碎片/信件獎勵） | 純前端 |
 
-### 9.2 商店 API
+### addItemsLocally 細節
 
-| 端點 | 方法 | 說明 |
-|------|------|------|
-| `/get-shop` | POST | 取得商店列表（含已購買狀態） |
-| `/buy-shop-item` | POST | 購買（扣貨幣 + 發道具） |
-| `/refresh-shop` | POST | 手動刷新雜貨商店（50 鑽石） |
+```typescript
+function addItemsLocally(items: { itemId: string; quantity: number }[]): void
+```
+
+- 直接修改記憶體中的 `inventoryState.items`
+- 若 `inventoryState` 為 `null`，自動建立最小狀態 `{ items: [], equipment: [], equipmentCapacity: 200, definitions: new Map() }`
+- **不呼叫 API**，資料由 GAS 端在 `completeStage` / `gachaPull` 等 handler 中寫入 Sheet
+- 用途 1：戰鬥勝利後的掉落物即時入帳
+- 用途 2：抽卡重複英雄的碎片入帳
+- 用途 3：信件獎勵領取（MailboxPanel `onRewardsClaimed`）
+
+---
+
+## 八、GAS 端點
+
+### 已實作的 10 個 handler
+
+| action | handler | 說明 |
+|--------|---------|------|
+| `load-item-definitions` | `handleLoadItemDefinitions_()` | 從 `item_definitions` Sheet 載入（有 CacheService 快取） |
+| `load-inventory` | `handleLoadInventory_(params)` | 讀 `inventory` + `equipment_instances` + `save_data.equipmentCapacity` |
+| `add-items` | `handleAddItems_(params)` | 批量 `upsertItem_()` 增加 |
+| `remove-items` | `handleRemoveItems_(params)` | 先全量檢查夠不夠，再批量扣除 |
+| `sell-items` | `handleSellItems_(params)` | 扣道具 + 查 sellPrice + 加金幣到 `save_data.gold` |
+| `use-item` | `handleUseItem_(params)` | 扣道具，回傳 `{ used, quantity }`（簡化版） |
+| `equip-item` | `handleEquipItem_(params)` | 設定 `equippedBy`，**同英雄同 slot 舊裝備自動卸下** |
+| `unequip-item` | `handleUnequipItem_(params)` | 清空 `equippedBy` |
+| `lock-equipment` | `handleLockEquipment_(params)` | 設定 `locked` |
+| `expand-inventory` | `handleExpandInventory_(params)` | +50 容量、扣 100 鑽石、上限 500 |
+
+### ⚠️ 未實作的端點
+
+| 設計中 | 說明 |
+|--------|------|
+| `add-equipment` | 新增裝備實例 — 目前由鍛造/掉落/抽卡等 handler 內部建立 |
+| `remove-equipment` | 拆解裝備 — 由 `dismantle-equipment`（progressionService）處理 |
+| 商店系列 | `get-shop` / `buy-shop-item` / `refresh-shop` — 完全未實作 |
+
+---
+
+## 九、InventoryPanel UI
+
+### Props
+
+```typescript
+interface InventoryPanelProps {
+  onBack: () => void
+  heroesList?: RawHeroData[]   // 用於英雄碎片名稱解析
+}
+```
+
+### 分頁（6 個）
+
+| key | icon | label |
+|-----|------|-------|
+| `all` | 📦 | 全部 |
+| `exp_material` | 📗 | 經驗 |
+| `ascension_material` | 🔥 | 突破 |
+| `equipment_material` | 🔧 | 裝備素材 |
+| `equipment` | 🗡️ | 裝備 |
+| `chest` | 🎁 | 寶箱 |
+
+> ⚠️ **缺少的分頁**：`forge_material`（鍛造素材）、`general_material`（通用素材）、`currency`（貨幣代幣）尚無對應 Tab。
+
+### 已實作的功能
+
+| 功能 | 說明 |
+|------|------|
+| 容量顯示 | Header 顯示 `{equipment.length}/{equipmentCapacity} 裝備` |
+| 點擊查看 | 點擊道具 → ItemDetail 彈窗（名稱、稀有度、描述、數量、出售價格） |
+| 英雄碎片辨識 | `asc_fragment_{heroId}` 自動顯示英雄縮圖 + 🧩 角標 |
+
+### ⚠️ 未實作的 UI 操作
+
+| 操作 | Spec 設計 | 狀態 |
+|------|-----------|------|
+| 使用按鈕 | 寶箱開啟 / 經驗核心升級 | ❌ 未實作 |
+| 出售按鈕 | 道具換金幣 | ❌ 未實作（僅顯示價格） |
+| 鎖定按鈕 | 裝備鎖定 | ❌ 未實作 |
+| 排序功能 | 時間/稀有度/類別/數量 | ❌ 未實作 |
+| 批量出售 | 長按多選 | ❌ 未實作 |
+| 批量使用 | 素材批量使用 | ❌ 未實作 |
+| 裝備詳情 | 顯示主/副屬性/套裝 | ❌ 未實作（共用一般 ItemDetail） |
+| 擴容入口 | 背包擴容按鈕 | ❌ 未實作（僅顯示容量） |
+| 金幣/鑽石 | Header 顯示 | ❌ 未傳入 Props |
 
 ---
 
@@ -360,63 +399,58 @@ const EQUIPMENT_SLOT_MAX = 500      // 最大容量
 ### 10.1 養成系統 (`progression.md`)
 
 ```
-升級英雄：
-  inventory 扣除 exp_core_* → hero_instances.level 提升
-
-突破英雄：
-  inventory 扣除 asc_fragment_{heroId} + asc_class_* + gold
-  → hero_instances.ascension 提升
-
-升星英雄：
-  inventory 扣除 asc_fragment_{heroId}
-  → hero_instances.stars 提升
-
-裝備強化：
-  inventory 扣除 eqm_enhance_* + gold
-  → equipment_instances.enhanceLevel 提升
-
-裝備重洗：
-  inventory 扣除 eqm_reroll
-  → equipment_instances.subStats 重新隨機
-
-鍛造裝備：
-  inventory 扣除 forge_blueprint_* + forge_ore_* + gold
-  → equipment_instances 新增一行
-
-拆解裝備：
-  equipment_instances 刪行
-  → inventory 增加 eqm_enhance_* + gold
+升級英雄：inventory 扣除 exp_core_* → hero.level 提升
+突破英雄：inventory 扣除 asc_fragment + asc_class_* + gold → hero.ascension 提升
+升星英雄：inventory 扣除 asc_fragment → hero.stars 提升
+裝備強化：inventory 扣除 eqm_enhance_* + gold → equipment.enhanceLevel 提升
+裝備重洗：inventory 扣除 eqm_reroll → equipment.subStats 重隨機
+鍛造裝備：inventory 扣除 forge_blueprint_* + forge_ore_* + gold → equipment_instances 新增
+拆解裝備：equipment_instances 刪行 → inventory 增加 eqm_enhance_* + gold
 ```
 
 ### 10.2 關卡系統 (`stage-system.md`)
 
 ```
-通關結算：
-  → inventory 增加掉落物（經驗核心/裝備/鍛造礦…）
-  → 首通獎勵：diam + gold + 可能的裝備
-
-每日副本結算：
-  → inventory 增加職業石/強化石
-
-Boss 結算：
-  → inventory 增加 Boss 幣 + 鍛造圖紙 + 裝備
+通關結算 → addItemsLocally() 入帳掉落物 → GAS handler 同步寫入 Sheet
+每日副本 → addItemsLocally() 入帳職業石/強化石
 ```
 
 ### 10.3 抽卡系統 (`gacha.md`)
 
 ```
-抽到新英雄：
-  → hero_instances 新增
-
-抽到重複英雄：
-  → inventory 增加 currency_stardust（SSR=25, SR=5, R=1, N=0.2）
-  → inventory 增加 asc_fragment_{heroId}（見 progression.md §3 碎片來源）
+抽到重複英雄 → addItemsLocally() 入帳碎片 + 星塵
 ```
+
+### 10.4 信件系統 (`mailbox.md`)
+
+```
+領取信件獎勵 → 非貨幣獎勵走 addItemsLocally() 入帳
+```
+
+---
+
+## 十一、商店系統（設計中 ⚠️ 未實作）
+
+### 商店分類（規劃）
+
+| 商店 | 貨幣 | 商品 | 刷新 |
+|------|------|------|------|
+| 雜貨商店 | 金幣 | 小/中型強化石、重洗石、經驗核心 | 每日 6 個 |
+| 競技商店 | 競技幣 | 指定英雄碎片（輪替）、鍛造礦 | 每週 |
+| 星塵商店 | 星塵 | 指定英雄碎片（永久） | 不刷新 |
+| Boss 商店 | Boss 幣 | 鍛造圖紙、大型強化石、稀有鍛造礦 | 每週 |
+| 鑽石商店 | 鑽石 | 素材寶箱、背包擴容 | 常駐 |
 
 ---
 
 ## 擴展點
 
+- [ ] **UI 操作按鈕**：使用/出售/鎖定/批量操作
+- [ ] **排序功能**：時間/稀有度/類別/數量 排序
+- [ ] **商店系統**：5 種商店 + 3 個 API
+- [ ] **缺少的分頁**：forge_material / general_material / currency Tab
+- [ ] **裝備詳情面板**：獨立於一般道具的裝備資訊（主副屬性/套裝/強化等級）
+- [ ] **金幣/鑽石 Header 顯示**
 - [ ] **道具合成**：低級素材合成高級（如 3×小型強化石 → 1×中型強化石）
 - [ ] **禮物系統**：玩家之間贈送道具
 - [ ] **公會倉庫**：公會共享道具池
@@ -430,4 +464,6 @@ Boss 結算：
 
 | 版本 | 日期 | 變更內容 |
 |------|------|---------|
-| v0.1 | 2026-02-27 | 初版：道具分類（8 類）、ID 命名規則、item_definitions + inventory + equipment_instances 三表結構、背包 UI、容量機制、11 個 API 端點、商店系統、與養成/關卡/抽卡的交互定義 |
+| v0.1 | 2026-02-27 | 初版：道具分類（8 類）、ID 命名規則、三表結構、背包 UI、容量機制、11 個 API 端點、商店系統、與養成/關卡/抽卡的交互定義 |
+| v0.2 | 2026-02-28 | 全面採用 Optimistic Queue（equip/unequip/lock/expand/useItem）、localStorage 快取、local/server 合併策略、新增 `addItemsLocally()`、英雄碎片縮圖 |
+| v1.0 | 2026-03-01 | 全面同步實作：修正 InventoryState 型別（含 equipmentCapacity/definitions）、補齊 18 個 Service 匯出函式簽名、10 個 GAS handler、UI 6 分頁對照（缺 forge/general/currency）、未實作操作完整列表、addItemsLocally 用途場景（戰鬥/抽卡/信件）、背包獨立載入流程、裝備同 slot 自動卸下行為、商店系統標示為未實作 |

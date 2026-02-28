@@ -1,7 +1,7 @@
 # 存檔系統 Spec
 
-> 版本：v0.2 ｜ 狀態：🟡 草案
-> 最後更新：2026-02-26
+> 版本：v1.0 ｜ 狀態：🟢 已實作
+> 最後更新：2026-03-01
 > 負責角色：🎯 GAME_DESIGN → 🔧 CODING
 
 ## 概述
@@ -11,10 +11,19 @@
 
 ## 依賴
 
-- `specs/auth-system.md` — playerId / guestToken
+- `specs/auth-system.md` — playerId / guestToken / resolvePlayerId_
 - `specs/hero-schema.md` — 英雄資料結構
 - `specs/stage-system.md` — 關卡進度結構
 - `specs/progression.md` — 養成結構
+- `specs/gacha.md` — 抽卡池預生成
+
+## 實作對照
+
+| 原始碼 | 說明 |
+|--------|------|
+| `src/services/saveService.ts` | 核心服務 — loadSave / enqueueSave / collectResources / saveFormation |
+| `src/hooks/useSave.ts` | React Hook — 封裝 saveService |
+| `gas/程式碼.js` | GAS Handler — `handleLoadSave_ / handleInitSave_ / handleSaveProgress_ / handleSaveFormation_ / handleCollectResources_` |
 
 ---
 
@@ -30,11 +39,14 @@
 | `exp` | number | 當前經驗值 |
 | `diamond` | number | 鑽石（premium 貨幣） |
 | `gold` | number | 金幣（一般貨幣） |
-| `resourceTimerStage` | string | 資源產出器掛載的最高通關關卡 ID（如 `"2-5"`） |
+| `resourceTimerStage` | string | 資源產出器掛載的最高通關關卡 ID（如 `"2-5"`，純文字格式 `@` 防 Sheets 日期轉換） |
 | `resourceTimerLastCollect` | string | 上次領取資源時間（ISO 8601） |
 | `towerFloor` | number | 爬塔最高樓層 |
 | `storyProgress` | string | 章節進度 JSON `{"chapter":1,"stage":5}` |
 | `formation` | string | 當前陣型 JSON `[heroInstanceId, null, ...]` (6 slots) |
+| `stageStars` | string | 每關最高星級 JSON `{"1-1": 3, "1-2": 2}` |
+| `gachaPity` | string | 保底計數 JSON `{"pullsSinceLastSSR":0,"guaranteedFeatured":false}` |
+| `gachaPool` | string | 預生成抽卡池 JSON（200 組 pull results） |
 | `lastSaved` | string | 最後存檔時間（ISO 8601） |
 
 ### Sheet: `hero_instances`（玩家擁有的英雄，一人多行）
@@ -47,7 +59,7 @@
 | `level` | number | 英雄等級 |
 | `exp` | number | 當前經驗值 |
 | `ascension` | number | 突破階段 (0-6) |
-| `equippedItems` | string | 裝備 JSON `{"weapon":"item_01",...}` |
+| `equippedItems` | string | 裝備 JSON `{"weapon":"equipId",...}` |
 | `obtainedAt` | string | 獲得時間 |
 
 ### Sheet: `inventory`（玩家道具，一人多行）
@@ -64,13 +76,54 @@
 
 ## API 端點
 
-| 端點 | 方法 | 參數 | 回傳 | 說明 |
-|------|------|------|------|------|
-| `/load-save` | POST | `{ guestToken }` | `{ saveData, heroes, inventory }` | 拉取完整存檔 |
-| `/save-progress` | POST | `{ guestToken, changes }` | `{ success, lastSaved }` | 增量寫入變更 |
-| `/save-formation` | POST | `{ guestToken, formation }` | `{ success }` | 儲存陣型 |
-| `/add-hero` | POST | `{ guestToken, heroId }` | `{ instanceId }` | 新增英雄（抽卡/獎勵） |
-| `/upgrade-hero` | POST | `{ guestToken, instanceId, newLevel, newExp }` | `{ success }` | 升級英雄 |
+| action | 參數 | 回傳 | GAS Handler |
+|--------|------|------|-------------|
+| `load-save` | `{ guestToken }` | `{ saveData, heroes, isNew, gachaPool, ownedHeroIds }` | `handleLoadSave_` |
+| `init-save` | `{ guestToken }` | `{ success, alreadyExists, starterHeroInstanceId }` | `handleInitSave_` |
+| `save-progress` | `{ guestToken, changes }` | `{ success, lastSaved }` | `handleSaveProgress_` |
+| `save-formation` | `{ guestToken, formation }` | `{ success }` | `handleSaveFormation_` |
+| `collect-resources` | `{ guestToken, opId? }` | `{ success, gold, expItems, newGoldTotal }` | `handleCollectResources_` |
+
+### save-progress 白名單欄位
+
+`['displayName', 'level', 'exp', 'diamond', 'gold', 'resourceTimerStage', 'resourceTimerLastCollect', 'towerFloor', 'storyProgress', 'formation']`
+
+> `storyProgress` / `formation` 若非 string 會自動 `JSON.stringify()`。
+
+---
+
+## 載入流程（loadSave）
+
+```
+POST load-save { guestToken }
+    ↓
+handleLoadSave_:
+  1. resolvePlayerId_(guestToken) → playerId
+  2. 查 save_data 表 → 找不到 → { isNew: true }
+  3. 解析 JSON 欄位（storyProgress / formation / gachaPity）
+  4. readHeroInstances_(playerId) → 解析 equippedItems JSON
+  5. ensureGachaPool_(playerId) → 確保池 >= 200 組
+  6. 收集 ownedHeroIds（去重）
+  7. 回傳完整資料
+    ↓
+前端 saveService.loadSave():
+  1. 若 isNew → POST init-save → POST load-save（二次載入）
+  2. sanitizeSaveData() — 防禦性解析雙重序列化 JSON
+  3. initLocalPool() — 初始化本地抽卡池
+  4. 存入 currentData → 寫 localStorage → notify()
+  5. 背景 reconcilePendingOps()（補償上次未完成操作）
+  6. 失敗時 fallback 讀 localStorage 快取
+```
+
+### sanitizeSaveData 防護
+
+| 欄位 | 防護 |
+|------|------|
+| `storyProgress` | 字串 → JSON.parse → 非物件重置為 `{chapter:1, stage:1}` |
+| `towerFloor` | < 1 → 1 |
+| `formation` | 字串 → JSON.parse → 非陣列重置為 6 個 null |
+| `stageStars` | 字串 → JSON.parse → 非物件重置為 `{}` |
+| `gachaPity` | 字串 → JSON.parse → 預設 `{pullsSinceLastSSR:0, guaranteedFeatured:false}` |
 
 ---
 
@@ -80,37 +133,68 @@
 
 | 觸發點 | 寫入內容 |
 |--------|---------|
-| 過關 | storyProgress / towerFloor + 獎勵（gold, exp, items） |
+| 過關 | storyProgress / towerFloor / stageStars + 獎勵（gold, exp, items） |
 | 英雄升級 | hero_instances 該行 level, exp |
-| 陣型調整 | save_data.formation |
+| 陣型調整 | save_data.formation（戰鬥開始時存檔，非即時） |
 | 抽卡 | hero_instances + inventory + diamond 扣除 |
 | 每日副本 | 掉落物寫入 inventory |
-| 自動存檔 | 每 5 分鐘檢查是否有未同步變更 |
 
-### 寫入方式
+### 寫入方式（Optimistic Queue）
 
 ```
 前端狀態變更
     ↓
-更新本地 state（即時反映 UI）
+更新本地 state + localStorage（即時反映 UI）
     ↓
-加入寫入佇列（debounce 2 秒）
+enqueueSave(changes):
+  1. 合併到 pendingChanges 物件
+  2. 即時更新 currentData.save + 寫 localStorage + notify()
+  3. 清除舊 debounce timer
+  4. 設定 2 秒後 flushChanges()
     ↓
-批次呼叫 /save-progress（合併多次變更為一次 API call）
+flushChanges():
+  1. 複製 pendingChanges → 清空原物件
+  2. POST save-progress { guestToken, changes }
+  3. 成功 → 更新 lastSaved
+  4. 失敗 → 合併回 pendingChanges + scheduleRetry()
     ↓
-成功 → 清佇列
-失敗 → 重試 3 次 → Toast 提示「存檔失敗，請檢查網路」
+scheduleRetry(): 指數退避 3000ms × retryCount，最多 3 次
 ```
+
+> **全面採用 Optimistic Queue**：`inventoryService`（5 個操作）、`progressionService`（8 個操作）、`mailService`（2 個操作）、`saveService`（`saveFormation` / `collectResources`）全部改用 `fireOptimistic` / `fireOptimisticAsync`。
 
 ### 本地快取
 
-- 存檔副本同步複寫到 `localStorage`
-- 離線時可繼續遊玩，重新上線後同步
-- 衝突解決：**伺服器端 lastSaved 較新者優先**，但本地有未同步變更時提示使用者選擇
+- localStorage key: `globalganlan_save_cache`
+- 存檔副本同步複寫到 localStorage
+- 離線時可讀取快取繼續遊玩
+- 重新上線後 `reconcilePendingOps()` 補償
 
 ---
 
-## 前端狀態
+## 陣型存讀
+
+### 還原流程
+
+```
+登入完成 → fetchData → 讀取 save.formation
+    ↓
+對照 ownedHeroIds 驗證（不再擁有的英雄跳過）
+    ↓
+對照 heroesList 取得完整資料（name/HP/modelId...）
+    ↓
+updatePlayerSlots() 還原上次陣型
+```
+
+### 保存時機
+
+- **戰鬥開始時**才呼叫 `saveFormation()`（在 `runBattleLoop` 中，非 replay 模式）
+- 不再使用 `useEffect` 監聽 `playerSlots` 變化自動存
+- `saveFormation()` 為同步函式：寫 localStorage + `fireOptimistic('save-formation', { formation })`
+
+---
+
+## 前端介面
 
 ```typescript
 interface SaveData {
@@ -124,8 +208,10 @@ interface SaveData {
   resourceTimerLastCollect: string
   towerFloor: number
   storyProgress: { chapter: number; stage: number }
-  formation: (string | null)[]  // 6 slots, heroInstanceId or null
+  formation: (string | null)[]       // 6 slots, heroInstanceId or null
+  stageStars: Record<string, number> // stageId → best star (1-3)
   lastSaved: string
+  gachaPity?: { pullsSinceLastSSR: number; guaranteedFeatured: boolean }
 }
 
 interface HeroInstance {
@@ -147,29 +233,49 @@ interface PlayerData {
   save: SaveData
   heroes: HeroInstance[]
   inventory: InventoryItem[]
-  isDirty: boolean          // 有未同步變更
+  isDirty: boolean           // 有未同步變更
 }
 ```
+
+### 導出函式
+
+| 函式 | 簽名 | 說明 |
+|------|------|------|
+| `loadSave` | `() => Promise<PlayerData>` | 完整載入存檔（含 fallback） |
+| `getSaveState` | `() => PlayerData \| null` | 同步讀取（避免閉包延遲） |
+| `updateProgress` | `(changes: Partial<SaveData>) => void` | 增量更新（走 debounce） |
+| `updateStoryProgress` | `(chapter, stage) => void` | 更新章節進度 |
+| `updateStageStars` | `(stageId, stars) => void` | 只升不降更新星級 |
+| `saveFormation` | `(formation) => boolean` | 同步存陣型（Optimistic） |
+| `collectResources` | `() => Promise<AccumulatedResources \| null>` | 領取離線產出（幂等保護） |
+| `addHero` | `(heroId) => Promise<HeroInstance \| null>` | 新增英雄 |
+| `addHeroesLocally` | `(heroIds) => void` | 本地樂觀新增英雄 |
+| `flushPendingChanges` | `() => Promise<void>` | 強制送出待同步變更 |
+| `onSaveChange` | `(fn) => () => void` | 訂閱存檔變化 |
+| `clearLocalSaveCache` | `() => void` | 清除 localStorage 快取 |
 
 ---
 
 ## 新玩家初始存檔
 
 ```typescript
-const DEFAULT_SAVE: Partial<SaveData> = {
+// GAS handleInitSave_ 寫入的初始值
+const INITIAL_SAVE = {
+  displayName: '倖存者#0001',        // '倖存者#' + playerId.replace('P','')
   level: 1,
   exp: 0,
-  diamond: 500,        // 新手禮包
+  diamond: 500,                       // 新手禮包
   gold: 10000,
-  resourceTimerStage: '1-1',  // 通關 1-1 後啟動
-  resourceTimerLastCollect: new Date().toISOString(),
+  resourceTimerStage: '1-1',          // 通關 1-1 後啟動
+  resourceTimerLastCollect: now,       // ISO 8601
   towerFloor: 0,
-  storyProgress: { chapter: 1, stage: 1 },
-  formation: [null, null, null, null, null, null],
+  storyProgress: '{"chapter":1,"stage":1}',
+  formation: '[null,null,null,null,null,null]',
+  lastSaved: now,
 }
 
 // 初始英雄：贈送「無名活屍」（HeroID=6, ★1, 均衡型）
-const STARTER_HERO = { heroId: 6, level: 1, exp: 0, ascension: 0 }
+// instanceId = playerId + '_6_' + Date.now()
 ```
 
 ---
@@ -190,17 +296,14 @@ const STARTER_HERO = { heroId: 6, level: 1, exp: 0, ascension: 0 }
 通關更高關卡 → 計時器產出量自動升級
 ```
 
-### 產出公式
+### 產出公式（前端 = GAS 相同）
 
 ```typescript
-interface ResourceTimerYield {
-  goldPerHour: number
-  expItemsPerHour: number   // 小型經驗核心 / 小時
-}
+interface ResourceTimerYield { goldPerHour: number; expItemsPerHour: number }
+interface AccumulatedResources { gold: number; expItems: number; hoursElapsed: number }
 
-/** 根據已通關最高關卡計算每小時產出 */
 function getTimerYield(stageId: string): ResourceTimerYield {
-  const [ch, st] = stageId.split('-').map(Number)  // "2-5" → ch=2, st=5
+  const [ch, st] = stageId.split('-').map(Number)
   const progress = (ch - 1) * 8 + st               // 線性進度 1~24
   return {
     goldPerHour: 100 + progress * 50,               // 150 ~ 1300
@@ -208,20 +311,37 @@ function getTimerYield(stageId: string): ResourceTimerYield {
   }
 }
 
-/** 計算可領取的累積資源 */
-function getAccumulatedResources(
-  stageId: string,
-  lastCollect: string,
-  maxHours = 24,           // 最多累積 24 小時（避免無限囤積）
-): { gold: number; expItems: number } {
+function getAccumulatedResources(stageId, lastCollect, maxHours = 24) {
   const elapsed = Date.now() - new Date(lastCollect).getTime()
-  const hours = Math.min(maxHours, elapsed / (3600 * 1000))
+  const hours = Math.min(maxHours, elapsed / 3_600_000)
   const { goldPerHour, expItemsPerHour } = getTimerYield(stageId)
   return {
     gold: Math.floor(goldPerHour * hours),
     expItems: Math.floor(expItemsPerHour * hours),
+    hoursElapsed: hours,
   }
 }
+```
+
+### collectResources 流程
+
+```
+前端 collectResources():
+  1. storyProgress.chapter===1 && stage===1 → 未解鎖，return null
+  2. 本地計算 getAccumulatedResources()
+  3. gold<=0 && expItems<=0 → return null
+  4. 樂觀更新 currentData.save.gold + resourceTimerLastCollect=now
+  5. fireOptimistic('collect-resources', {})  ← 幂等保護 opId
+  6. 伺服器 callback 校正 newGoldTotal（若不一致）
+  7. 回傳本地計算結果
+
+GAS handleCollectResources_:（包在 executeWithIdempotency_ 中）
+  1. 驗證 token → playerId
+  2. 讀 resourceTimerStage / resourceTimerLastCollect
+  3. 計算相同公式 → goldGain / expItemsGain
+  4. writeCell_(gold: currentGold + goldGain)
+  5. 更新 resourceTimerLastCollect + lastSaved
+  6. 回傳 { gold, expItems, newGoldTotal, hoursElapsed }
 ```
 
 ### 參數
@@ -249,3 +369,6 @@ function getAccumulatedResources(
 |------|------|---------|
 | v0.1 | 2026-02-26 | 初版：Google Sheets 存檔結構 + 讀寫策略 |
 | v0.2 | 2026-02-26 | 移除體力系統，新增「資源產出計時器」取代（resourceTimerStage + resourceTimerLastCollect） |
+| v0.3 | 2026-02-28 | 新增 `stageStars` / `battleSpeed` 欄位、陣型自動存讀、sanitization 防護、`saveFormation` 改 sync + Optimistic、全面採用 Optimistic Queue、`getSaveState()` 新 API |
+| v0.4 | 2026-02-28 | 移除 `battleSpeed` 欄位（改存 localStorage，不再同步到 Google Sheet）、GAS 新增 `delete-column` handler |
+| v1.0 | 2026-03-01 | 全面同步實作：新增 gachaPity/gachaPool 欄位至 Sheet 結構、補齊 loadSave 完整流程（含 isNew/initSave/sanitize/reconcile/fallback）、enqueueSave debounce 2s + retry 3x 機制、collectResources 幂等保護 + 樂觀更新、陣型改為戰鬥開始時才保存、完整列出所有導出函式簽名、init-save 初始值詳列 |

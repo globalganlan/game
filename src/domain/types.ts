@@ -243,7 +243,7 @@ export type BattleAction =
       targets: Array<{ uid: string; result: DamageResult | HealResult; killed?: boolean }>;
       /** 攻擊者能量快照（消耗後，通常為 0） */ _atkEnergyNew?: number;
       /** 各受擊目標能量快照 uid→newValue */ _tgtEnergyMap?: Record<string, number> }
-  | { type: 'DOT_TICK'; targetUid: string; dotType: StatusType; damage: number }
+  | { type: 'DOT_TICK'; targetUid: string; dotType: StatusType; damage: number; sourceUid?: string }
   | { type: 'BUFF_APPLY'; targetUid: string; effect: StatusEffect }
   | { type: 'BUFF_EXPIRE'; targetUid: string; effectType: StatusType }
   | { type: 'DEATH'; targetUid: string }

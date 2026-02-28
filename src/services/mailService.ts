@@ -137,15 +137,16 @@ export async function claimAllMail(): Promise<{
   return { success: true, claimedCount: 0, totalRewards: [] }
 }
 
-/** 刪除信件 */
+/** 刪除信件（樂觀佇列 — 背景同步 + localStorage 備份） */
 export async function deleteMail(mailId: string): Promise<{ success: boolean; error?: string }> {
-  const res = await callApi('delete-mail', { mailId })
+  const { serverResult } = fireOptimisticAsync<{ error?: string }>('delete-mail', { mailId })
+  const res = await serverResult
   return { success: res.success, error: res.error }
 }
 
-/** 刪除所有已讀（已領取/無獎勵）信件 */
+/** 刪除所有已讀（已領取/無獎勵）信件 — 樂觀佇列保護 */
 export async function deleteAllRead(): Promise<{ success: boolean; deletedCount: number }> {
-  const res = await callApi<{ deletedCount: number }>('delete-all-read')
-  if (!res.success) throw new Error(res.error || 'delete-all failed')
-  return { success: true, deletedCount: res.deletedCount || 0 }
+  const { serverResult } = fireOptimisticAsync<{ deletedCount: number }>('delete-all-read', {})
+  const res = await serverResult
+  return { success: res.success, deletedCount: res.deletedCount || 0 }
 }

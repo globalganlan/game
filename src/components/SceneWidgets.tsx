@@ -1,5 +1,5 @@
 /**
- * 小型 3D 元件 — DamagePopup / HealthBar3D / SlotMarker / ResponsiveCamera
+ * 小型 3D 元件 — DamagePopup / HealthBar3D / SlotMarker / ResponsiveCamera / SkillToast3D / ElementHint3D
  *
  * 這些元件都在 R3F Canvas 內使用。
  */
@@ -185,6 +185,10 @@ export function EnergyBar3D({
   const isFull = clampedRatio >= 1
   const radius = height * 0.5
 
+  const groupRef = useRef<THREE.Group>(null)
+  const fgRef = useRef<THREE.Mesh>(null)
+  const glowRef = useRef<THREE.Mesh>(null)
+
   const bgMat = useMemo(
     () => new THREE.MeshBasicMaterial({ color: '#222', transparent: true, opacity: 0.5, depthTest: false }),
     [],
@@ -192,6 +196,10 @@ export function EnergyBar3D({
   const fgMat = useMemo(
     () => new THREE.MeshBasicMaterial({ color: isFull ? '#ffd43b' : '#4dabf7', transparent: true, opacity: 0.85, depthTest: false }),
     [isFull],
+  )
+  const glowMat = useMemo(
+    () => new THREE.MeshBasicMaterial({ color: '#ffd43b', transparent: true, opacity: 0, depthTest: false }),
+    [],
   )
 
   const bgGeo = useMemo(
@@ -204,12 +212,35 @@ export function EnergyBar3D({
     const fgH = height * 0.8
     return new THREE.ShapeGeometry(makeRoundedRect(fgW, fgH, Math.min(radius, fgW / 2, fgH / 2)))
   }, [width, height, clampedRatio, radius])
+  const glowGeo = useMemo(
+    () => new THREE.ShapeGeometry(makeRoundedRect(width * 1.15, height * 2.2, radius * 2)),
+    [width, height, radius],
+  )
+
+  // 滿時脈衝動畫
+  useFrame((state) => {
+    if (!isFull) {
+      if (glowRef.current) glowMat.opacity = 0
+      if (fgRef.current) fgRef.current.scale.set(1, 1, 1)
+      return
+    }
+    const t = state.clock.getElapsedTime()
+    const pulse = 0.35 + Math.sin(t * 4) * 0.25 // 0.1 ~ 0.6
+    glowMat.opacity = pulse
+    if (fgRef.current) {
+      const s = 1 + Math.sin(t * 4) * 0.06
+      fgRef.current.scale.set(s, s, 1)
+    }
+  })
 
   return (
     <Billboard position={position} renderOrder={16}>
+      {/* 滿時發光光暈 */}
+      {isFull && <mesh ref={glowRef} geometry={glowGeo} material={glowMat} renderOrder={15} />}
       <mesh geometry={bgGeo} material={bgMat} renderOrder={16} />
       {clampedRatio > 0 && fgGeo && (
         <mesh
+          ref={fgRef}
           position={[(clampedRatio - 1) * width * 0.5, 0, 0.001]}
           geometry={fgGeo}
           material={fgMat}
@@ -258,5 +289,126 @@ export function SlotMarker({ position, selected = false, color = '#ffffff' }: Sl
         depthTest
       />
     </mesh>
+  )
+}
+
+/* ────────────────────────────
+   SkillToast3D — 大招名稱浮動標示
+   ──────────────────────────── */
+
+interface SkillToast3DProps {
+  heroName: string
+  skillName: string
+  position: Vector3Tuple
+  textScale?: number
+}
+
+/** 攻擊者頭頂顯示技能名稱（自動上浮淡出，金色光暈背景） */
+export function SkillToast3D({ heroName, skillName, position, textScale = 1 }: SkillToast3DProps) {
+  const ref = useRef<THREE.Group>(null)
+  const [opacity, setOpacity] = useState(1)
+  const elapsed = useRef(0)
+
+  useFrame((_state, delta) => {
+    if (ref.current) {
+      elapsed.current += delta
+      ref.current.position.y += delta * 0.12
+      // 前 0.8 秒保持完全不透明，之後才淡出
+      if (elapsed.current > 0.8) {
+        setOpacity((prev) => Math.max(0, prev - delta * 0.5))
+      }
+      // 開頭彈入動畫：前 0.15 秒放大到 1.15x 再縮回
+      const t = elapsed.current
+      const scale = t < 0.08 ? 1 + t / 0.08 * 0.15 : t < 0.2 ? 1.15 - (t - 0.08) / 0.12 * 0.15 : 1
+      ref.current.scale.set(scale, scale, scale)
+    }
+  })
+
+  if (opacity <= 0) return null
+
+  const bgW = Math.max(skillName.length, heroName.length) * 0.38 * textScale + 0.6
+  const bgH = 1.1 * textScale
+
+  return (
+    <Billboard position={position} ref={ref} renderOrder={30}>
+      {/* 光暈背景 */}
+      <mesh position={[0, 0.25 * textScale, -0.01]} renderOrder={30}>
+        <planeGeometry args={[bgW, bgH]} />
+        <meshBasicMaterial
+          color="#ffa500"
+          transparent
+          opacity={opacity * 0.3}
+          depthTest={false}
+        />
+      </mesh>
+      {/* 英雄名 */}
+      <Text
+        fontSize={0.32 * textScale}
+        color="#ffd866"
+        outlineColor="#000"
+        outlineWidth={0.05}
+        fillOpacity={opacity}
+        outlineOpacity={opacity}
+        anchorY="bottom"
+        renderOrder={31}
+      >
+        {heroName}
+      </Text>
+      {/* 技能名（更大更亮） */}
+      <Text
+        fontSize={0.55 * textScale}
+        color="#fff"
+        outlineColor="#ff6600"
+        outlineWidth={0.06}
+        fillOpacity={opacity}
+        outlineOpacity={opacity}
+        position={[0, 0.5 * textScale, 0]}
+        anchorY="bottom"
+        renderOrder={31}
+      >
+        {skillName}
+      </Text>
+    </Billboard>
+  )
+}
+
+/* ────────────────────────────
+   ElementHint3D — 屬性提示浮動標示
+   ──────────────────────────── */
+
+interface ElementHint3DProps {
+  text: string
+  color: string
+  position: Vector3Tuple
+  textScale?: number
+}
+
+/** 攻擊者頭頂顯示屬性克制/抵抗（自動上浮淡出） */
+export function ElementHint3D({ text, color, position, textScale = 1 }: ElementHint3DProps) {
+  const ref = useRef<THREE.Group>(null)
+  const [opacity, setOpacity] = useState(1)
+
+  useFrame((_state, delta) => {
+    if (ref.current) {
+      ref.current.position.y += delta * 0.15
+      setOpacity((prev) => Math.max(0, prev - delta * 0.55))
+    }
+  })
+
+  if (opacity <= 0) return null
+
+  return (
+    <Billboard position={position} ref={ref}>
+      <Text
+        fontSize={0.45 * textScale}
+        color={color}
+        outlineColor="#000"
+        outlineWidth={0.04}
+        fillOpacity={opacity}
+        outlineOpacity={opacity}
+      >
+        {text}
+      </Text>
+    </Billboard>
   )
 }

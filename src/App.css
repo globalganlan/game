@@ -103,6 +103,35 @@
   text-shadow: 0 1px 3px rgba(0,0,0,0.7);
 }
 
+/* ── EXP Bar ── */
+.hud-exp-wrap {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.hud-exp-bar {
+  width: 60px;
+  height: 6px;
+  background: rgba(0,0,0,0.5);
+  border-radius: 3px;
+  overflow: hidden;
+  border: 1px solid rgba(255,255,255,0.15);
+}
+
+.hud-exp-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #7df9ff, #38bdf8);
+  border-radius: 3px;
+  transition: width 0.4s ease;
+}
+
+.hud-exp-text {
+  color: #aadcf0;
+  font-size: 0.55rem;
+  white-space: nowrap;
+}
+
 /* ── Battle Result Banner ── */
 
 .battle-result-banner {
@@ -206,6 +235,17 @@
   letter-spacing: 1px;
 }
 
+.reward-floor-clear {
+  font-size: clamp(0.7rem, 1.8vw, 0.9rem);
+  color: #7df9ff;
+  background: rgba(125, 249, 255, 0.08);
+  padding: 4px 14px;
+  border-radius: 10px;
+  border: 1px solid rgba(125, 249, 255, 0.2);
+  letter-spacing: 1px;
+  font-weight: bold;
+}
+
 .reward-items-list {
   display: flex;
   flex-direction: column;
@@ -275,8 +315,8 @@
 
 /* ── Next Stage Button ── */
 .btn-next-stage {
-  padding: clamp(8px, 1.5vh, 15px) clamp(20px, 5vw, 40px);
-  font-size: clamp(0.85rem, 2.2vw, 1.1rem);
+  padding: clamp(6px, 1vh, 10px) clamp(14px, 3vw, 24px);
+  font-size: clamp(0.75rem, 1.8vw, 0.9rem);
   cursor: pointer;
   background: linear-gradient(135deg, #d4a743, #e76f51);
   color: #000;
@@ -389,8 +429,8 @@
 }
 
 .btn-reset {
-  padding: clamp(8px, 1.5vh, 15px) clamp(20px, 5vw, 40px);
-  font-size: clamp(0.85rem, 2.2vw, 1.1rem);
+  padding: clamp(6px, 1vh, 10px) clamp(14px, 3vw, 24px);
+  font-size: clamp(0.75rem, 1.8vw, 0.9rem);
   cursor: pointer;
   background: white;
   color: black;
@@ -414,46 +454,225 @@
 
 .btn-bottom-center {
   position: absolute;
-  bottom: max(clamp(20px, 5vh, 60px), env(safe-area-inset-bottom, 0px));
+  bottom: max(clamp(12px, 3vh, 30px), env(safe-area-inset-bottom, 0px));
   width: 100%;
   display: flex;
   justify-content: center;
-  gap: 12px;
+  gap: 8px;
   z-index: 10;
+  flex-wrap: wrap;
+  padding: 0 12px;
 }
 
 .btn-back-lobby {
-  padding: clamp(8px, 1.5vh, 15px) clamp(20px, 5vw, 40px);
-  font-size: clamp(0.85rem, 2.2vw, 1.1rem);
+  padding: clamp(6px, 1vh, 10px) clamp(14px, 3vw, 24px);
+  font-size: clamp(0.75rem, 1.8vw, 0.9rem);
   cursor: pointer;
   background: rgba(60,60,60,0.9);
-  color: #ddd;
-  border: 1px solid #888;
+  color: #eee;
+  border: 1px solid #999;
   font-weight: bold;
-  border-radius: 4px;
+  border-radius: 8px;
   touch-action: manipulation;
+  transition: transform 0.1s;
 }
+.btn-back-lobby:active { transform: scale(0.95); }
+
+/* ── 回放 & 戰鬥資訊按鈕 ── */
+.btn-replay {
+  padding: clamp(6px, 1vh, 10px) clamp(14px, 3vw, 24px);
+  font-size: clamp(0.75rem, 1.8vw, 0.9rem);
+  cursor: pointer;
+  background: rgba(40, 80, 120, 0.9);
+  color: #8cf;
+  border: 1px solid #6af;
+  font-weight: bold;
+  border-radius: 8px;
+  touch-action: manipulation;
+  transition: transform 0.1s;
+}
+.btn-replay:active { transform: scale(0.95); }
+
+.btn-stats {
+  padding: clamp(6px, 1vh, 10px) clamp(14px, 3vw, 24px);
+  font-size: clamp(0.75rem, 1.8vw, 0.9rem);
+  cursor: pointer;
+  background: rgba(100, 60, 20, 0.9);
+  color: #fc8;
+  border: 1px solid #da5;
+  font-weight: bold;
+  border-radius: 8px;
+  touch-action: manipulation;
+  transition: transform 0.1s;
+}
+.btn-stats:active { transform: scale(0.95); }
+
+/* ── 戰鬥統計面板 ── */
+.battle-stats-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  z-index: 200;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.battle-stats-panel {
+  background: linear-gradient(160deg, #1a1a2e 0%, #16213e 100%);
+  border: 1px solid #444;
+  border-radius: 12px;
+  padding: clamp(12px, 2vw, 24px);
+  width: min(90vw, 480px);
+  max-height: 80vh;
+  overflow-y: auto;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+}
+
+.battle-stats-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  color: #fff;
+  font-size: clamp(1rem, 3vw, 1.3rem);
+  font-weight: bold;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #555;
+}
+
+.battle-stats-close {
+  background: none;
+  border: none;
+  color: #aaa;
+  font-size: 1.3rem;
+  cursor: pointer;
+  padding: 4px 8px;
+}
+.battle-stats-close:hover { color: #fff; }
+
+.battle-stats-section {
+  margin-bottom: 16px;
+}
+
+.battle-stats-section-title {
+  color: #ccc;
+  font-size: clamp(0.85rem, 2vw, 1rem);
+  font-weight: bold;
+  margin-bottom: 6px;
+}
+
+.battle-stats-row {
+  padding: 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+.battle-stats-row.enemy .bs-hero-name { color: #f99; }
+
+.bs-hero-name {
+  color: #eee;
+  font-size: clamp(0.78rem, 1.8vw, 0.9rem);
+  font-weight: bold;
+  margin-bottom: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.bs-bar-group {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.bs-bar-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 16px;
+}
+
+.bs-bar-label {
+  width: 28px;
+  font-size: clamp(0.6rem, 1.4vw, 0.72rem);
+  color: #999;
+  flex-shrink: 0;
+  text-align: right;
+}
+.bs-bar-label.damage { color: #ff8888; }
+.bs-bar-label.heal { color: #6fd67a; }
+.bs-bar-label.taken { color: #fcc419; }
+
+.bs-bar-track {
+  flex: 1;
+  height: 10px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 5px;
+  overflow: hidden;
+}
+
+.bs-bar-fill {
+  height: 100%;
+  border-radius: 5px;
+  transition: width 0.6s ease;
+  min-width: 2px;
+}
+.bs-bar-fill.damage { background: linear-gradient(90deg, #e03131, #ff6b6b); }
+.bs-bar-fill.heal { background: linear-gradient(90deg, #2b8a3e, #51cf66); }
+.bs-bar-fill.taken { background: linear-gradient(90deg, #e67700, #fcc419); }
+
+.bs-bar-value {
+  width: 52px;
+  font-size: clamp(0.6rem, 1.4vw, 0.72rem);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  flex-shrink: 0;
+  color: #bbb;
+}
+.bs-bar-value.damage { color: #ff6b6b; }
+.bs-bar-value.heal { color: #51cf66; }
+.bs-bar-value.taken { color: #fcc419; }
 
 .btn-speed-wrap {
   position: absolute;
   bottom: max(clamp(10px, 2vh, 20px), env(safe-area-inset-bottom, 0px));
   right: max(clamp(10px, 3vw, 30px), env(safe-area-inset-right, 0px));
   z-index: 30;
+  display: flex;
+  flex-direction: row;
+  gap: 8px;
+  align-items: center;
 }
+
+.btn-skip-battle {
+  padding: clamp(6px, 1vh, 8px) clamp(12px, 2vw, 18px);
+  font-size: clamp(0.8rem, 1.8vw, 1rem);
+  cursor: pointer;
+  background: rgba(100, 30, 30, 0.85);
+  color: #ffcc00;
+  border: 1px solid #cc8800;
+  border-radius: 4px;
+  font-weight: bold;
+  touch-action: manipulation;
+  transition: transform 0.1s, background 0.2s;
+}
+.btn-skip-battle:hover { background: rgba(140, 40, 40, 0.9); }
+.btn-skip-battle:active { transform: scale(0.95); }
 
 /* ── Transition Overlay ── */
 
 .transition-text {
   color: #cc1111;
-  font-size: clamp(1rem, 3.5vw, 1.8rem);
+  font-size: clamp(0.8rem, 2.5vw, 1.2rem);
   font-weight: bold;
-  letter-spacing: clamp(3px, 1vw, 8px);
+  letter-spacing: clamp(2px, 0.6vw, 5px);
   font-family: monospace;
   animation: textFlicker 2s ease-in-out infinite;
   text-shadow: 0 0 30px rgba(255,0,0,0.6), 0 0 60px rgba(255,0,0,0.3);
   z-index: 1;
   text-align: center;
   padding: 0 20px;
+  max-width: 90vw;
+  word-break: keep-all;
 }
 
 /* ── Landscape Block Overlay ── */
@@ -574,13 +793,13 @@
 }
 
 .btn-back-menu {
-  padding: clamp(6px, 1.2vh, 12px) clamp(14px, 3vw, 24px);
-  font-size: clamp(0.75rem, 2vw, 1rem);
+  padding: clamp(8px, 1.5vh, 16px) clamp(18px, 4vw, 32px);
+  font-size: clamp(0.85rem, 2.2vw, 1.1rem);
   cursor: pointer;
-  background: rgba(50,50,50,0.85);
-  color: #ccc;
-  border: 1px solid #666;
-  border-radius: 4px;
+  background: rgba(50,50,50,0.9);
+  color: #eee;
+  border: 1px solid #888;
+  border-radius: 8px;
   font-weight: 700;
   touch-action: manipulation;
   transition: transform 0.1s;
@@ -1187,6 +1406,44 @@
 .menu-card-label { color: #eee; font-size: 1rem; font-weight: bold; }
 .menu-card-sub { color: #aaa; font-size: 0.7rem; }
 
+/* Locked menu card */
+.menu-card-locked {
+  opacity: 0.45;
+  filter: grayscale(0.8);
+  cursor: not-allowed;
+}
+.menu-card-locked:hover {
+  transform: none;
+  border-color: rgba(255,255,255,0.08);
+}
+.menu-card-locked .menu-card-sub {
+  color: #e9c46a;
+  font-size: 0.65rem;
+}
+
+/* Lock toast */
+.menu-lock-toast {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(20, 18, 30, 0.95);
+  border: 1px solid rgba(233, 196, 106, 0.4);
+  color: #e9c46a;
+  padding: 12px 28px;
+  border-radius: 12px;
+  font-size: 0.9rem;
+  font-weight: bold;
+  z-index: 200;
+  pointer-events: none;
+  animation: lockToastIn 0.3s ease-out;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+}
+@keyframes lockToastIn {
+  from { opacity: 0; transform: translate(-50%, -50%) scale(0.85); }
+  to   { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+}
+
 /* Red badge (e.g. mailbox unclaimed count) */
 .menu-card-badge {
   position: absolute;
@@ -1263,16 +1520,19 @@
 }
 
 .panel-back-btn {
-  background: rgba(255,255,255,0.06);
-  border: 1px solid rgba(255,255,255,0.2);
-  color: #ddd;
-  padding: 4px 10px;
-  border-radius: 6px;
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.25);
+  color: #eee;
+  padding: 8px 18px;
+  border-radius: 8px;
   cursor: pointer;
-  font-size: 0.85rem;
+  font-size: 1rem;
+  font-weight: 700;
+  transition: background 0.15s, transform 0.1s;
 }
 
-.panel-back-btn:hover { background: rgba(255,255,255,0.08); }
+.panel-back-btn:hover { background: rgba(255,255,255,0.14); }
+.panel-back-btn:active { transform: scale(0.95); }
 
 .panel-title {
   color: #eee;
@@ -1466,15 +1726,21 @@
   position: absolute;
   top: 10px;
   right: 12px;
-  background: none;
-  border: none;
-  color: #aaa;
-  font-size: 1.3rem;
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.2);
+  color: #ccc;
+  font-size: 1.6rem;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
   cursor: pointer;
   z-index: 5;
-  transition: color 0.15s;
+  transition: color 0.15s, background 0.15s;
 }
-.hd2-close:hover { color: #fff; }
+.hd2-close:hover { color: #fff; background: rgba(255,255,255,0.15); }
 
 /* ── Top: Model + Identity ── */
 .hd2-top {
@@ -1839,6 +2105,28 @@
 .inv-cell:hover { background: rgba(255,255,255,0.13); }
 
 .inv-cell-icon { font-size: 1rem; line-height: 1; }
+
+/* 英雄碎片縮圖 */
+.inv-cell-thumb-wrap {
+  position: relative;
+  display: inline-block;
+  width: 40px;
+  height: 40px;
+}
+.inv-cell-thumb {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 4px;
+}
+.inv-cell-puzzle {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  font-size: 0.7rem;
+  line-height: 1;
+  filter: drop-shadow(0 0 2px rgba(0,0,0,0.7));
+}
 .inv-cell-name {
   color: #ddd;
   font-size: 0.6rem;
@@ -1878,9 +2166,15 @@
 .inv-detail-close {
   position: absolute;
   top: 10px; right: 12px;
-  background: none; border: none;
-  color: #aaa; font-size: 1.2rem; cursor: pointer;
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.2);
+  color: #ccc; font-size: 1.5rem;
+  width: 34px; height: 34px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 50%; cursor: pointer;
+  transition: color 0.15s, background 0.15s;
 }
+.inv-detail-close:hover { color: #fff; background: rgba(255,255,255,0.15); }
 
 .inv-detail-header {
   display: flex;
@@ -2126,16 +2420,43 @@
 .gacha-result-name { color: #ddd; font-size: 0.7rem; }
 .gacha-result-rarity { font-size: 0.6rem; font-weight: bold; }
 
+.gacha-dupe-badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  background: #6c757d;
+  color: #fff;
+  font-size: 0.5rem;
+  padding: 1px 3px;
+  border-radius: 4px;
+  font-weight: bold;
+}
+
+.gacha-dupe-reward {
+  display: flex;
+  gap: 4px;
+  font-size: 0.55rem;
+  color: #ccc;
+}
+
+.gacha-dupe-reward span {
+  display: flex;
+  align-items: center;
+  gap: 1px;
+}
+
 .gacha-results-close {
   background: linear-gradient(135deg, #2a9d8f, #264653);
   border: none;
   color: #eee;
-  padding: 10px 32px;
-  border-radius: 8px;
+  padding: 14px 40px;
+  border-radius: 10px;
   cursor: pointer;
-  font-size: 0.9rem;
+  font-size: 1.05rem;
   font-weight: bold;
+  transition: transform 0.1s;
 }
+.gacha-results-close:active { transform: scale(0.95); }
 
 /* Gacha Loading Overlay */
 .gacha-loading-overlay {
@@ -2210,8 +2531,28 @@
   color: #457b9d;
 }
 
-.stage-mode-locked { opacity: 0.55; cursor: not-allowed; }
+.stage-mode-locked { opacity: 0.55; cursor: not-allowed; filter: grayscale(0.6); }
 .stage-mode-lock { font-size: 0.6rem; }
+
+/* Stage lock toast (same style as menu lock toast) */
+.stage-lock-toast {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(20, 18, 30, 0.95);
+  border: 1px solid rgba(233, 196, 106, 0.4);
+  color: #e9c46a;
+  padding: 12px 28px;
+  border-radius: 12px;
+  font-size: 0.9rem;
+  font-weight: bold;
+  z-index: 200;
+  pointer-events: none;
+  animation: lockToastIn 0.3s ease-out;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+  white-space: nowrap;
+}
 
 .stage-content {
   flex: 1;
@@ -2268,10 +2609,19 @@
   cursor: not-allowed;
 }
 
+.stage-maxed {
+  opacity: 0.45;
+  cursor: not-allowed;
+  border-color: rgba(42,157,143,0.15);
+  background: rgba(42,157,143,0.03);
+}
+
 .stage-btn-id { font-weight: bold; }
-.stage-btn-stars { font-size: 0.55rem; }
+.stage-btn-stars { font-size: 0.55rem; display: flex; gap: 1px; }
+.stage-btn-stars .star-empty { opacity: 0.3; filter: grayscale(1); }
 .stage-btn-badge { font-size: 0.7rem; }
 .stage-btn-lock { font-size: 0.7rem; }
+.stage-btn-complete { font-size: 0.6rem; }
 
 /* Tower */
 .stage-tower {
@@ -2938,15 +3288,19 @@
 
 .mail-detail-back {
   align-self: flex-start;
-  background: none;
-  border: none;
-  color: rgba(255,255,255,0.5);
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.2);
+  color: #eee;
   cursor: pointer;
-  font-size: 0.82rem;
-  padding: 0;
+  font-size: 0.95rem;
+  font-weight: 700;
+  padding: 8px 16px;
+  border-radius: 8px;
+  transition: background 0.15s;
 }
 .mail-detail-back:hover {
   color: #fff;
+  background: rgba(255,255,255,0.14);
 }
 
 .mail-detail-title {

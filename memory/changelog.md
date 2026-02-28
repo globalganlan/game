@@ -3,6 +3,212 @@
 > 按時間倒序排列，最新的在最上面。
 
 ---
+### [2026-02-28] 建立 UI 流程 Spec（ui-flow.md v1.0）
+
+- **觸發者**：使用者要求建立 UI flow spec
+- **執行角色**：📋 SPEC_MAINTAINER
+- **主要變更**：
+  - 新增 `specs/ui-flow.md` v1.0 — 完整記錄 GameState（6 值）、MenuScreen（7 值）、所有導航函式、TransitionOverlay 過場幕機制、元件規格、載入流程（Phase 0/1/2）、戰鬥完整流程
+  - 更新 `specs/README.md` — ui-flow 狀態改為 🟢 已實作
+
+---
+### [2026-02-28] GAS CacheService 快取層
+
+- **觸發者**：使用者詢問 GAS 快取功能
+- **執行角色**：🔧 CODING + 📋 SPEC_MAINTAINER
+- **主要變更**：
+
+  **GAS 伺服端快取**
+  - `gas/程式碼.js` — 新增 CacheService 快取層（`cacheGet_` / `cacheSet_` / `cacheRemove_`）
+  - 支援自動分片（單 key 超過 90KB 時自動拆成 chunk）
+  - **全域配表快取**：heroes, skill_templates, hero_skills, element_matrix, item_definitions — TTL 6h
+  - **衍生結果快取**：`loadHeroPool_()` — TTL 6h
+  - **用戶映射快取**：`resolvePlayerId_(guestToken)` — TTL 6h
+  - **道具定義快取**：`handleLoadItemDefinitions_()` — TTL 6h
+  - 所有寫入 handler 自動清除對應 sheet 快取（`invalidateSheetCache_`）
+  - 新增 `invalidate-cache` POST action 供手動清除全部快取
+  - 快取命中時回應附加 `_cached: true` 欄位
+
+  **Spec 更新**
+  - `specs/tech-architecture.md` v1.2 → v1.3 — 新增「GAS CacheService 快取層」章節
+
+---
+### [2026-02-28] 每日副本中文修復 + 戰鬥回放 + 戰鬥統計
+
+- **觸發者**：使用者要求修復每日副本 key 缺中文、新增回放與統計
+- **執行角色**：🔧 CODING + 📋 SPEC_MAINTAINER
+- **主要變更**：
+
+  **任務 1：每日副本中文修復**
+  - `src/domain/stageSystem.ts` — 新增 `getDailyDungeonConfig()`、`getDailyDungeonDisplayName()` 輔助函式
+  - `src/App.tsx` — `handleStageSelect` 對 daily 模式顯示中文名（如「力量試煉 - 簡單」）
+  - `src/App.tsx` — `buildEnemySlotsFromStage` 對 daily 模式改用 `getDailyDungeonConfig()` 取得敵方設定
+  - `src/App.tsx` — 勝利獎勵結算 daily 分支改用 `getDailyDungeonConfig()` 取得副本獎勵
+
+  **任務 2：戰鬥統計面板**
+  - `src/App.tsx` — 新增 `battleStats` state + `showBattleStats` 控制，從 BattleAction[] 計算每位英雄輸出/治療/承傷
+  - `src/App.tsx` — GAMEOVER 新增「戰鬥資訊 📊」按鈕 → 彈出統計面板（敵我分區、按輸出排序）
+  - `src/App.css` — 新增 `.battle-stats-*` 系列樣式
+
+  **任務 3：戰鬥回放**
+  - `src/App.tsx` — 新增 `battleActionsRef` 紀錄所有 BattleAction
+  - `src/App.tsx` — `runBattleLoop(replayActions?)` 支援回放模式：手動更新 BattleHero HP → 呼叫 onAction 重現 3D 動畫
+  - `src/App.tsx` — 新增 `replayBattle()` 函式：過場幕 → 恢復戰前陣容 → 重建敵方 → 執行回放
+  - `src/App.tsx` — GAMEOVER 新增「回放 ⏪」按鈕
+  - `src/App.css` — 新增 `.btn-replay`、`.btn-stats` 樣式
+  - 回放模式不發放獎勵、不推進進度
+
+  **QA 修復**
+  - `src/domain/buffSystem.ts` — `DotTickResult` 新增 `sourceUid` 欄位
+  - `src/domain/types.ts` — `DOT_TICK` action 新增 `sourceUid?` 欄位
+  - `src/domain/battleEngine.ts` — 發送 DOT_TICK 時攜帶 `sourceUid`
+  - `src/App.tsx` — 統計計算 DOT 傷害歸屬施放者 `damageDealt`
+  - `src/App.tsx` — 統計計算 SKILL_CAST `reflectDamage`
+  - `src/App.tsx` — 回放 HP 更新 SKILL_CAST `reflectDamage` 對攻擊者扣血
+
+- **Spec 更新**：`stage-system.md` v0.2→v0.4、`core-combat.md` v2.3→v2.4
+
+---
+### [2026-02-28] battleSpeed 改用 localStorage + 英雄列表已獲得數量修正
+
+- **觸發者**：使用者要求戰鬥倍速不再存 Google Sheet
+- **執行角色**：🔧 CODING + 📋 SPEC_MAINTAINER
+- **主要變更**：
+
+  **任務 1：戰鬥倍速改存 localStorage**
+  - `src/App.tsx` — 切換速度改用 `localStorage.setItem('battleSpeed', nv)`；進入戰鬥讀 `localStorage.getItem('battleSpeed')`
+  - `src/services/saveService.ts` — 移除 `SaveData.battleSpeed` 欄位 + sanitization + `updateProgress` 可更新欄位
+  - `src/hooks/useSave.ts` — 移除 `battleSpeed` 型別
+  - `gas/程式碼.js` — 新增 `delete-column` handler（通用），部署 POST @50
+  - Google Sheet save_data 表實際已無 battleSpeed 欄，無需刪除
+
+  **任務 2：英雄列表已獲得數量修正**
+  - `src/components/HeroListPanel.tsx` — 「已獲得」數量改用 `new Set(heroInstances.map(h => h.heroId)).size`（去重後的唯一英雄數），不再顯示包含重複實例的原始陣列長度
+
+- **Spec 更新**：
+  - `specs/save-system.md` v0.3→v0.4 — 移除 battleSpeed 相關欄位/sanitization/API
+  - `specs/core-combat.md` v2.2→v2.3 — 速度持久化改用 localStorage
+- **驗證**：`tsc --noEmit` 零錯誤 | `vite build` 成功
+
+---
+### [2026-02-28] 瀏覽器分頁切換動畫修復 + Spec 全面同步
+
+- **觸發者**：使用者回報切換分頁導致動畫 timeout warning
+- **執行角色**：🔧 CODING + 📋 SPEC_MAINTAINER
+- **主要變更**：
+
+  **Bug：瀏覽器分頁切換導致動畫 5 秒 timeout 誤觸發**
+  - 根因：瀏覽器隱藏分頁時 `requestAnimationFrame` 停止 → Three.js mixer 不推進 → 動畫 finished 回呼不觸發 → 但 `setTimeout` 持續計時 → 5 秒超時誤判
+  - `src/components/ZombieModel.tsx` — 新增 `visibilitychange` useEffect：切回分頁時 `mixer.update(Math.min(deltaSec, 30))` 補上暫停時間，讓 LoopOnce 動畫自然 finish
+  - `src/App.tsx` — `waitForAction` / `waitForMove` timeout callback 新增 `document.hidden` 判斷：隱藏時不觸發超時，改為 defer 重排 5 秒
+
+  **Spec 全面同步（7 份文件）**
+  - `specs/core-combat.md` v2.1→v2.2 — 新增 §10.3~§10.6（SkillToast3D/ElementHint3D、waitForAction collision protection、visibilitychange mixer catch-up、attacker reflect-death）+ battleSpeed 持久化 + 元件樹更新
+  - `specs/save-system.md` v0.2→v0.3 — 新增 stageStars/battleSpeed 欄位、陣型自動存讀、sanitization、Optimistic Queue、getSaveState() API
+  - `specs/gacha.md` v1.0→v1.1 — LocalPullResult 新增 stardust/fragments
+  - `specs/stage-system.md` v0.2→v0.3 — 三星鎖定、模式解鎖 toast、過場遮幕、爬塔勝利顯示
+  - `specs/inventory.md` v0.1→v0.2 — Optimistic Queue + localStorage cache + hero fragment thumbnail
+  - `specs/progression.md` v0.2→v0.3 — Optimistic Queue + 自動等級算 + EXP bar
+  - `specs/tech-architecture.md` v1.1→v1.2 — 三階段 loading + Optimistic Queue 表 + visibilitychange + heroesListRef
+
+  **流程規則**
+  - `.github/copilot-instructions.md` — 強制規則新增 #5「程式碼改動必須同步更新 Spec」
+
+- **驗證**：`tsc --noEmit` 零錯誤 | `vite build` 成功
+
+---
+### [2026-02-28] 戰鬥卡死修復（童魘重複 uid + waitFor collision + 反彈致死）
+
+- **觸發者**：使用者回報童魘場次戰鬥永遠無法結束
+- **執行角色**：🔧 CODING + 🧪 QA
+- **主要變更**：
+  - SKILL_CAST handler merged targets 去重（同 uid 多次出現導致卡死）
+  - waitForAction / waitForMove 三層防護（resolve old → create new → deferred timeout）
+  - 攻擊者反彈致死處理：reflect-death 後不再執行後續 action
+
+- **驗證**：`tsc --noEmit` 零錯誤 | `vite build` 成功
+
+---
+### [2026-02-28] 7 項 Bug 修復 + 新功能（陣型/toast/HUD/AOE/背包/跳過/技能動畫）
+
+- **觸發者**：使用者回報 7 項問題
+- **執行角色**：🔧 CODING + 🧪 QA
+- **主要變更**：
+
+  **Bug 1：陣型還原失敗**
+  - 根因：`fetchData` 閉包讀取 `saveHook.playerData`（React state），Phase 1 的 `doLoadSave` 雖完成但 state 尚未更新
+  - 修復：改用 `getSaveState()` 直接從 service 層讀取，避免 React state 閉包延遲
+
+  **Bug 2：關卡模式鎖定無 toast**
+  - 根因：StageSelect 的 mode tab 用 `disabled` 屬性，阻止了 click 事件
+  - 修復：移除 `disabled`，改用 `handleTabClick` 內判斷，鎖定時 `setLockToast()` 顯示解鎖條件
+  - 同時修復 MainMenu toast `position: fixed` → `position: absolute`（避免 stacking context 吞掉）
+
+  **功能 3：戰鬥準備隱藏 HUD 資源**
+  - HUD 資源列只在 `gameState === 'MAIN_MENU'` 時顯示（IDLE/BATTLE/GAMEOVER 均隱藏）
+
+  **功能 4：多目標受擊同時播放**
+  - SKILL_CAST handler 中 `for...of await` 改為 `Promise.all(hitPromises)`，AOE 技能所有目標同時彈出受擊動畫
+
+  **Bug 5：戰鬥掉落物未進背包**
+  - 根因：`addItemsLocally()` 在 `inventoryState` 為 null 時直接 return（玩家未開過背包）
+  - 修復：null 時自動建立最小 inventoryState（從 localStorage 讀取 + 空 equipment），確保掉落物寫入
+
+  **功能 6：跳過戰鬥按鈕**
+  - 新增 `skipBattleRef`：跳過時 `delay()` / `waitForAction()` / `waitForMove()` 全部立即 resolve
+  - 點擊「跳過 ⏭」按鈕 → flush 所有 pending resolvers → 引擎跑完後直接顯示戰果
+  - 已寫入 `specs/core-combat.md` 第十一節
+
+  **功能 7：非攻擊技能不前進**
+  - SKILL_CAST handler 新增 `hasDamageTargets` 判斷：治療/buff 技能施法者原地播放攻擊動畫，不前進也不後退
+
+- **驗證**：`tsc --noEmit` 零錯誤 | `vite build` 成功 | `get_errors` 全部 0
+
+---
+### [2026-02-28] 8 項 UI/UX 改善（陣型記憶 / 三星鎖定 / 圖標統一 / 過場 / 爬塔 / 鎖定模式 / 按鈕放大）
+
+- **觸發者**：使用者提出 8 項改善需求
+- **執行角色**：🔧 CODING + 🎨 UI_DESIGN + 🧪 QA
+- **主要變更**：
+
+  **任務 1：陣型自動存讀**
+  - `src/App.tsx` — 新增 `formationRestoredRef`；`fetchData` 中從 save.formation 還原 playerSlots；新增 auto-save useEffect 監聽 playerSlots 變化，於 IDLE/MAIN_MENU 時自動呼叫 `doSaveFormation`
+  - 不阻塞 loading 動畫，於 Phase 2 fetchData 末尾靜默還原
+
+  **任務 2：敵方終結技名稱提示**
+  - 調查確認已正常運作（battleEngine 的 SKILL_CAST 對敵我雙方都會觸發、App.tsx onAction 會分發到敵方 Hero 元件的 SkillToast3D），**無需修改**
+
+  **任務 3：三星通關關卡不可再挑戰**
+  - `src/services/saveService.ts` — `SaveData` 新增 `stageStars: Record<string, number>`；`sanitizeSaveData` 防禦性 JSON.parse；新增 `updateStageStars(stageId, stars)` 保存最佳星數 + 樂觀同步
+  - `src/hooks/useSave.ts` — 新增 `doUpdateStageStars` callback
+  - `src/App.tsx` — 勝利流程中呼叫 `doUpdateStageStars`；傳 `stageStars` prop 給 StageSelect
+  - `src/components/StageSelect.tsx` — 接收 `stageStars` prop；顯示 1~3 星圖示（active/empty）；3 星關卡加上 `stage-maxed` class（半透明 + 禁止點擊 + ✅ 徽章）
+  - `src/App.css` — 新增 `.stage-maxed`、`.stage-btn-stars`、`.star-active`、`.star-empty` 樣式
+
+  **任務 4：統一金幣/鑽石/經驗圖標**
+  - `src/App.css` — 新增 `.icon-coin`（金色漸層圓形 "G"）、`.icon-dia`（青色旋轉方塊 "D"）、`.icon-exp`（綠色圓角方塊 "E"）三個 CSS icon class
+  - `src/components/GachaScreen.tsx` — 4 處 💎 emoji 替換為 `<i className="icon-dia">D</i>`
+  - `src/components/StageSelect.tsx` — 爬塔獎勵 📗/💎 emoji 替換為 CSS icon class
+  - `src/App.tsx` — 勝利獎勵的 ⚡ emoji 替換為 `<i className="icon-exp">E</i>`
+
+  **任務 5：切換關卡過場遮幕**
+  - `src/App.tsx` — `handleStageSelect` 加入 curtain 動畫：顯示過場幕 → 400ms 等待 → 切換敵方陣營/狀態 → closeCurtain
+
+  **任務 6：爬塔勝利結算 + 預設 1F**
+  - `src/App.tsx` — 勝利面板：爬塔模式顯示 `🗼 第 N 層通關！` 取代星數
+  - `src/services/saveService.ts` — `sanitizeSaveData` towerFloor 預設值修正為 1（原本 0/undefined 會 fallback）
+  - `src/components/StageSelect.tsx` — 修正 tower stageId bug：`tower-${currentFloor}` 改為 `String(currentFloor)`
+
+  **任務 7：未解鎖玩法鎖定樣式 + 提示**
+  - `src/components/MainMenu.tsx` — MenuItem 新增 `unlock?: { chapter, stage, hint }` 屬性；英雄（1-2）/抽卡（1-3）/背包（1-2）設定解鎖條件；`isItemLocked()` 比對玩家進度；鎖定卡片顯示 🔒 + 灰階半透明；點擊鎖定卡彈出 toast 顯示解鎖條件（2.5s 後消失）
+  - `src/App.css` — 新增 `.menu-card-locked`（opacity 0.45 + grayscale 0.8）、`.menu-lock-toast`（置中浮層 + 金色邊框 + 動畫）
+
+  **任務 8：放大返回/關閉按鈕**
+  - `src/App.css` — 7 個按鈕類別大幅放大：`.panel-back-btn`、`.hd2-close`、`.inv-detail-close`、`.gacha-results-close`、`.btn-back-lobby`、`.btn-back-menu`、`.mail-detail-back`（padding/font-size/border-radius 全面增大 + hover/active 回饋）
+
+- **驗證**：`tsc --noEmit` 零錯誤 | `vite build` 成功 | `get_errors` 全部 0
+
+---
 ### [2026-02-28] 抽卡保底深層修正 + 500 抽壓力測試通過
 
 - **觸發者**：10,000 抽壓力測試發現保底仍偶爾超過 90（8,710 抽中 7 次溢出）

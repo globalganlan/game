@@ -1,20 +1,60 @@
 # 關卡系統 Spec
 
-> 版本：v0.2 ｜ 狀態：🟡 草案
-> 最後更新：2026-02-26
+> 版本：v1.0 ｜ 狀態：🟢 已實作
+> 最後更新：2026-03-01
 > 負責角色：🎯 GAME_DESIGN → 🔧 CODING
 
 ## 概述
 
-五種關卡模式：**主線章節**（劇情推進）、**無盡爬塔**（挑戰極限）、**每日副本**（素材農場）、**PvP 競技場**（玩家對戰）、**Boss 戰**（高難度單體）。
+三種已實作關卡模式：**主線章節**（劇情推進）、**無盡爬塔**（挑戰極限）、**每日副本**（素材農場）。
+PvP 競技場和 Boss 戰定義了解鎖條件但**尚未實作**。
 所有模式共用 `core-combat.md` 戰鬥引擎，差異在於敵方配置、勝負條件、獎勵。
+敵方配置全部由**前端 seeded PRNG** 確定性生成，無需 GAS 端提供關卡配置。
 
 ## 依賴
 
 - `specs/core-combat.md` — 戰鬥引擎
-- `specs/hero-schema.md` — 英雄數值
-- `specs/save-system.md` — 進度儲存
+- `specs/hero-schema.md` — 英雄數值（ZOMBIE_IDS [1-14]）
+- `specs/save-system.md` — 進度儲存（storyProgress / towerFloor / stageStars）
 - `specs/auth-system.md` — 玩家身份
+
+## 實作對照
+
+| 原始碼 | 說明 |
+|--------|------|
+| `src/domain/stageSystem.ts` | 核心邏輯 — 配置生成 / PRNG / 星級計算 / 副本定義 / 掉落擲骰 |
+| `src/components/StageSelect.tsx` | 關卡選擇 UI — 3 個分頁（主線/爬塔/每日） |
+| `src/App.tsx` | 遊戲流程整合 — handleStageSelect / buildEnemySlots / 勝利結算 / goNextStage |
+| `gas/程式碼.js` | GAS Handler — `handleCompleteStage_ / handleCompleteTower_ / handleCompleteDaily_` |
+
+---
+
+## 核心常數
+
+```typescript
+const MAX_CHAPTER = 3
+const STAGES_PER_CHAPTER = 8
+const ZOMBIE_IDS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]
+```
+
+## Seeded PRNG
+
+所有敵方組合使用確定性偽隨機生成（Linear Congruential Generator）：
+
+```typescript
+function seededRandom(seed: number): () => number {
+  let s = seed
+  return () => {
+    s = (s * 1103515245 + 12345) & 0x7fffffff
+    return s / 0x7fffffff
+  }
+}
+```
+
+| 模式 | Seed 公式 |
+|------|----------|
+| 主線 | `chapter * 1000 + stage` |
+| 爬塔 | `floor * 7919`（7919 為質數） |
 
 ---
 
@@ -23,78 +63,66 @@
 ### 結構
 
 ```
-章節 1（廢墟之城）
-├── 1-1  教學關（固定敵人, 引導操作）
-├── 1-2
-├── ...
-├── 1-8  章節 Boss
-└── 1-8 通關 → 解鎖章節 2
+章節 1（共 8 關）
+├── 1-1 ~ 1-7  一般關
+└── 1-8        章節 Boss 關（首通獎勵含 20 鑽石）
 
-章節 2（暗夜森林）
-├── 2-1
-├── ...
-└── 2-8  章節 Boss
+章節 2（通關 1-8 後解鎖）
+└── 2-1 ~ 2-8
+
+章節 3（通關 2-8 後解鎖）
+└── 3-1 ~ 3-8
 ```
 
 | 項目 | 值 |
 |------|-----|
 | 每章關卡數 | 8 關 |
-| 初期章節數 | 3 章（共 24 關） |
+| 章節數 | 3 章（共 24 關） |
 | 體力消耗 | **無**（免費無限挑戰） |
-| 通關效果 | 資源計時器掛載到此關卡（產出量隨進度提升） |
+| stageId 格式 | `"{chapter}-{stage}"`（如 `"2-5"`） |
 | 星級評價 | ★★★（全員存活）、★★（≤2 人陣亡）、★（通關即可） |
-| 首通獎勵 | 鑽石 + 金幣 + 經驗值 |
-| 星級獎勵 | 每章累計星數達標 → 額外獎勵（角色碎片/裝備箱） |
+| 三星鎖定 | 已獲 3 星的關卡顯示 ✅ 並禁止再挑戰（`stage-maxed` class） |
+| 星級記錄 | `save_data.stageStars` JSON，`updateStageStars()` 只升不降 |
+| 首通效果 | 推進 storyProgress + 更新 resourceTimerStage + 首通獎勵 |
 
-### 難度曲線
-
-| 章節 | 推薦等級 | 敵數 | 敵 HP 倍率 | 敵 ATK 倍率 |
-|------|---------|------|-----------|------------|
-| 1 | 1-10 | 3-6 | ×1.0 | ×1.0 |
-| 2 | 10-20 | 4-6 | ×1.5 | ×1.3 |
-| 3 | 20-30 | 5-6 | ×2.2 | ×1.7 |
-
-### 敵方配置
+### 敵方配置公式（getStoryStageConfig）
 
 ```typescript
-interface StageConfig {
-  stageId: string            // "1-1", "1-2", ...
-  chapter: number
-  stage: number
-  enemies: StageEnemy[]      // 敵方陣容（1-6 隻）
-  recommendedLevel: number
-  rewards: StageReward
-  firstClearRewards: StageReward
-  dialogue?: StageDialogue[] // 戰前/戰後對話（可選）
-}
+linearIndex = (chapter - 1) * 8 + stage  // 1~24
+seed = chapter * 1000 + stage
 
-interface StageEnemy {
-  heroId: number             // 使用哪個 zombie 模型 + 數值
-  slot: number               // 格子位置 (0-5)
-  levelMultiplier: number    // 數值倍率（基於原始數值）
-  hpMultiplier: number
-  atkMultiplier: number
-  speedMultiplier: number
-}
+// 敵人數量
+minCount = min(2 + floor(linearIndex / 4), 6)
+maxCount = min(minCount + 2, 6)
+enemyCount = minCount + floor(rng() * (maxCount - minCount + 1))
 
-interface StageReward {
-  exp: number
-  gold: number
-  diamond?: number
-  items?: { itemId: string; quantity: number; dropRate: number }[]
-}
+// 倍率
+hpMult    = 1.0 + (linearIndex - 1) * 0.12
+atkMult   = 1.0 + (linearIndex - 1) * 0.08
+speedMult = 1.0 + (linearIndex - 1) * 0.015
 
-interface StageDialogue {
-  timing: 'before' | 'after'
-  lines: { speaker: string; text: string }[]
-}
+// 敵人 heroId 從 ZOMBIE_IDS [1-14] 隨機選取
+recommendedLevel = min(1 + (linearIndex - 1) * 2, 60)
 ```
 
-### 資料儲存
+### 獎勵公式
 
-- Sheet: `stage_configs`（所有關卡配置，由開發者維護）
-- 進度儲存在 `save_data.storyProgress = { chapter, stage }`
-- 星級記錄在 `save_data` 額外欄位 `stageStars` JSON：`{"1-1": 3, "1-2": 2, ...}`
+| 類型 | exp | gold | diamond | items |
+|------|-----|------|---------|-------|
+| **普通** | `30 + linearIndex × 15` | `50 + linearIndex × 30` | 章底關(stage=8): 20, 其餘: 0 | `linearIndex % 3 === 0` → `exp_core_s ×1` (60%) |
+| **首通** | `60 + linearIndex × 20` | `100 + linearIndex × 50` | 30 | `exp_core_s ×2` (100%) |
+
+### 星級判定（calculateStarRating）
+
+```typescript
+survivingHeroes >= totalHeroes            → ⭐⭐⭐ (3)
+totalHeroes - survivingHeroes <= 2        → ⭐⭐   (2)
+otherwise                                 → ⭐     (1)
+```
+
+### 下一關（getNextStageId）
+
+`stage + 1`，若 `> 8` → `chapter + 1, stage = 1`。若 `chapter > MAX_CHAPTER` → 回傳 `null`（全通關）。
 
 ---
 
@@ -104,263 +132,206 @@ interface StageDialogue {
 
 ```
 第 1 層 → 第 2 層 → ... → 第 N 層（無上限）
-    每層固定敵方配置，難度逐層遞增
-    每 10 層一個 Boss 層（獎勵加倍）
+    每層 seeded PRNG 生成固定敵方配置
+    每 10 層一個 Boss 層（單體高數值 + 獎勵加倍）
     打不過 = 停在該層，下次再挑戰
 ```
 
 | 項目 | 值 |
 |------|-----|
-| 體力消耗 | **0**（免費無限挑戰） |
+| 體力消耗 | **0** |
+| stageId 格式 | `"{floor}"`（純數字，如 `"15"`） |
 | 重置週期 | 不重置，永久進度 |
-| 獎勵 | 首次通過每層：金幣 + 經驗，每 10 層：鑽石 + 道具 |
-| 排行榜 | 依最高樓層排名 |
+| 存檔欄位 | `save_data.towerFloor` |
 
-### 難度公式
-
-```typescript
-function getTowerEnemies(floor: number): StageEnemy[] {
-  const enemyCount = Math.min(6, 3 + Math.floor(floor / 5))
-  const hpMult = 1.0 + floor * 0.15
-  const atkMult = 1.0 + floor * 0.10
-  const spdMult = 1.0 + floor * 0.02
-
-  // 每 10 層 Boss：單體高數值
-  if (floor % 10 === 0) {
-    return [{ heroId: randomBoss(), slot: 1, levelMultiplier: 1,
-              hpMultiplier: hpMult * 3, atkMultiplier: atkMult * 2,
-              speedMultiplier: spdMult }]
-  }
-
-  // 一般層：隨機組合
-  return randomEnemyFormation(enemyCount, hpMult, atkMult, spdMult)
-}
-```
-
-### 獎勵公式
+### 敵方配置公式（getTowerFloorConfig）
 
 ```typescript
-function getTowerReward(floor: number): StageReward {
-  return {
-    exp: 50 + floor * 10,
-    gold: 100 + floor * 20,
-    diamond: floor % 10 === 0 ? 50 : 0,
-    items: floor % 10 === 0
-      ? [{ itemId: 'equipment_box', quantity: 1, dropRate: 1.0 }]
-      : []
-  }
-}
+seed = floor * 7919
+hpMult    = 1.0 + floor * 0.15
+atkMult   = 1.0 + floor * 0.10
+speedMult = 1.0 + floor * 0.02
+
+// Boss 層（floor % 10 === 0）
+enemies = [{ heroId: random, slot: 1, hp: hpMult×3, atk: atkMult×2, speed: speedMult }]
+
+// 普通層
+enemyCount = min(6, 3 + floor(floor / 5))
+enemies = randomFormation(enemyCount, hpMult, atkMult, speedMult)
 ```
+
+### 獎勵公式（getTowerReward）
+
+| 條件 | exp | gold | diamond | items |
+|------|-----|------|---------|-------|
+| Boss 層 (floor%10=0) | `50 + floor×10` | `100 + floor×20` | 50 | `chest_equipment ×1` (100%) |
+| 每5層 (floor%5=0) | `50 + floor×10` | `100 + floor×20` | 0 | `exp_core_m ×1` (50%) |
+| 其他 | `50 + floor×10` | `100 + floor×20` | 0 | 無 |
+
+### 連續挑戰（goNextStage — tower）
+
+勝利後可點「下一層」，恢復戰前 HP（`preBattlePlayerSlotsRef`），不回大廳。
 
 ---
 
 ## 三、每日副本
 
-### 種類（輪替制）
+### 三種副本定義
 
-| 星期 | 副本 | 掉落 |
-|------|------|------|
-| 一、四 | 力量試煉 | 力量型升級素材 |
-| 二、五 | 敏捷試煉 | 敏捷型升級素材 |
-| 三、六 | 防禦試煉 | 坦克型升級素材 |
-| 日 | 全開放 | 隨機素材 |
+| dungeonId | 名稱 | 開放日 | 掉落主題 |
+|-----------|------|--------|---------|
+| `power_trial` | 力量試煉 | 週一(1)、週四(4) | 力量職業石 + 強化石 |
+| `agility_trial` | 敏捷試煉 | 週二(2)、週五(5) | 敏捷職業石 + 強化石 |
+| `defense_trial` | 防禦試煉 | 週三(3)、週六(6) | 防禦職業石 + 強化石 |
+
+**週日(0)**：三個副本全部開放。
 
 | 項目 | 值 |
 |------|-----|
-| 體力消耗 | **無** |
-| 每日次數 | 3 次（可用鑽石買額外次數，每次 50 鑽） |
-| 難度分級 | 初級 / 中級 / 高級（需主線進度解鎖） |
+| stageId 格式 | `"{dungeonId}_{tier}"`（如 `"power_trial_easy"`） |
+| 難度分級 | `easy` / `normal` / `hard` |
+| 解鎖條件 | Easy: Ch.1、Normal: Ch.2、Hard: Ch.3 |
 
-```typescript
-interface DailyDungeon {
-  dungeonId: string          // "power_trial", "agility_trial", "defense_trial"
-  name: string
-  availableDays: number[]    // [1,4] = 一、四
-  difficulties: DungeonDifficulty[]
-}
+### 難度配置（以力量試煉為例）
 
-interface DungeonDifficulty {
-  tier: 'easy' | 'normal' | 'hard'
-  requiredChapter: number    // 解鎖條件（主線章節）
-  enemies: StageEnemy[]
-  rewards: StageReward
-}
-```
+| 難度 | 敵人數 | HP/ATK/SPD 倍率 | 敵方 heroIds |
+|------|--------|-----------------|-------------|
+| easy | 3 | 1.0 / 1.0 / 1.0 | [2, 8, 13] |
+| normal | 4 | 1.5 / 1.3 / 1.1 | [2, 8, 13, 2] |
+| hard | 5 | 2.5 / 2.0 / 1.2 | [2, 8, 13, 2, 8] |
+
+### 獎勵（以力量試煉為例）
+
+| 難度 | exp | gold | 專屬掉落 |
+|------|-----|------|---------|
+| easy | 100 | 500 | `asc_class_power ×2`, `eqm_enhance_s ×3` |
+| normal | 200 | 1000 | `asc_class_power ×4`, `eqm_enhance_m ×2`, `exp_core_m ×1` (50%) |
+| hard | 400 | 2000 | `asc_class_power ×8`, `eqm_enhance_l ×1`, `exp_core_l ×1` (30%) |
+
+> Daily 模式勝利後無「下一關」按鈕。
 
 ---
 
-## 四、PvP 競技場
+## 四、PvP 競技場（⚠️ 未實作）
 
-### 機制（異步 PvP）
-
-```
-不是即時對戰 — 打的是別人設定的「防守陣容」
-    ↓
-從排行榜選對手 → 用自己的攻擊隊 vs 對方防守隊
-    ↓
-戰鬥用同一套 core-combat 引擎（全自動）
-    ↓
-贏 → 排名交換（或獲得積分）
-輸 → 排名不變
-```
-
-| 項目 | 值 |
-|------|-----|
-| 體力消耗 | **0** |
-| 每日挑戰次數 | 5 次（VIP 可增加） |
-| 排名重置 | 每週一重算 |
-| 獎勵 | 每日依排名發放鑽石 + 競技幣 |
-| 對手匹配 | 排名 ±50 名內隨機 3 人 |
-
-### 資料結構
-
-```typescript
-interface PvpDefense {
-  playerId: string
-  formation: (string | null)[]  // 6 slots, heroInstanceId
-  // 伺服器端展開為完整英雄數值快照
-}
-
-interface PvpRecord {
-  playerId: string
-  rank: number
-  score: number
-  defenseFormation: (string | null)[]
-  wins: number
-  losses: number
-  lastUpdated: string
-}
-```
-
-### Google Sheet「pvp_rankings」
-
-| 欄位 | 型別 | 說明 |
-|------|------|------|
-| `playerId` | string | 主鍵 |
-| `rank` | number | 當前排名 |
-| `score` | number | 積分 |
-| `defenseFormation` | string | 防守陣容 JSON |
-| `defenseSnapshot` | string | 防守英雄數值快照 JSON（避免即時查表） |
-| `wins` | number | 本週勝場 |
-| `losses` | number | 本週敗場 |
+已定義解鎖條件（通過 2-1），但前端/後端均未實作。
 
 ---
 
-## 五、Boss 戰
+## 五、Boss 戰（⚠️ 未實作）
 
-### 機制
-
-```
-獨立高難 Boss → 巨量 HP + 特殊技能
-    ↓
-玩家 6 人陣容 vs 1-2 隻 Boss
-    ↓
-有回合數上限（30 回合），打不死 = 失敗
-    ↓
-依據造成傷害量給獎勵（不必打死也有獎勵）
-```
-
-| 項目 | 值 |
-|------|-----|
-| 體力消耗 | **無** |
-| 出現頻率 | 每週固定 2 隻，輪替 |
-| 回合上限 | 30 回合 |
-| 獎勵機制 | 依傷害量段位：S/A/B/C 級 |
-
-```typescript
-interface BossConfig {
-  bossId: string
-  name: string
-  heroId: number             // 模型
-  hp: number                 // 超高（數萬）
-  atk: number
-  speed: number
-  skills: BossSkill[]        // Boss 專屬技能
-  turnLimit: number          // 30
-  damageThresholds: {        // 傷害量段位
-    S: number                // >= 此值 = S 級
-    A: number
-    B: number
-    C: number                // 任何傷害 = C 級
-  }
-}
-
-interface BossSkill {
-  name: string
-  type: 'aoe' | 'single' | 'buff' | 'debuff'
-  triggerCondition: 'every_N_turns' | 'hp_below'
-  triggerValue: number       // 每 N 回合 or HP% 閾值
-  effect: string             // 效果描述
-}
-```
+已定義解鎖條件（通過 2-8），但前端/後端均未實作。
 
 ---
 
 ## 模式解鎖條件
 
-| 模式 | 解鎖條件 |
+```typescript
+const MODE_UNLOCK = {
+  tower: { chapter: 1, stage: 4 },   // 通關 1-4
+  daily: { chapter: 1, stage: 8 },   // 通關 1-8
+  pvp:   { chapter: 2, stage: 1 },   // 通關 2-1（未實作）
+  boss:  { chapter: 2, stage: 8 },   // 通關 2-8（未實作）
+}
+
+function isModeUnlocked(mode, storyProgress): boolean {
+  const playerProgress = (storyProgress.chapter - 1) * 8 + storyProgress.stage
+  const reqProgress = (req.chapter - 1) * 8 + req.stage
+  return playerProgress >= reqProgress
+}
+```
+
+鎖定的模式 Tab 點擊時顯示 Toast 提示解鎖條件。
+
+### MainMenu 功能解鎖
+
+| 按鈕 | 解鎖條件 |
 |------|---------|
-| 主線章節 | 預設開放（第 1 章） |
-| 無盡爬塔 | 通過 1-4 |
-| 每日副本 | 通過 1-8（第 1 章全通） |
-| PvP 競技場 | 通過 2-1（進入第 2 章） |
-| Boss 戰 | 通過 2-8（第 2 章全通） |
+| 🗺️ 關卡 | 無 |
+| 🧟 英雄 | 通關 1-1 |
+| 🎰 召喚 | 通關 1-2 |
+| 🎒 背包 | 通關 1-1 |
+| 📬 信箱 | 無 |
+| ⚙️ 設定 | 無 |
 
 ---
 
-## 主選單結構
+## 選關過場流程
 
 ```
-┌──────────────────────┐
-│      全球感染         │
-│                      │
-│  ┌──────┐ ┌──────┐  │
-│  │ 主線  │ │ 爬塔  │  │
-│  │ 章節  │ │ 🔒    │  │
-│  └──────┘ └──────┘  │
-│  ┌──────┐ ┌──────┐  │
-│  │ 每日  │ │ PvP  │  │
-│  │ 🔒   │ │ 🔒    │  │
-│  └──────┘ └──────┘  │
-│     ┌──────┐         │
-│     │ Boss │         │
-│     │ 🔒   │         │
-│     └──────┘         │
-│                      │
-│  [英雄] [背包] [設定] │
-└──────────────────────┘
+handleStageSelect(mode, stageId):
+  1. setCurtainVisible(true) — 拉起過場幕
+  2. 設定顯示文字（tower: "第 X 層" / daily: 中文名 / story: "關卡 X-Y"）
+  3. await waitFrames(2) — 等幕不透明
+  4. setStageMode(mode), setStageId(sid)
+  5. buildEnemySlotsFromStage(mode, sid, heroesList) — 生成敵方
+  6. restoreFormationFromSave() — 恢復玩家陣型
+  7. setGameState('IDLE'), 收幕
 ```
+
+### 勝利結算行為差異
+
+| 模式 | 星級 | 顯示 | 操作按鈕 |
+|------|------|------|---------|
+| 主線 | ✅ 計算並記錄 | 星級評價 + 首通 Badge + 獎勵 + 資源速度 | 返回大廳 / 下一關 |
+| 爬塔 | ❌ 不計算 | 「🗼 第 N 層通關！」+ 獎勵 | 返回大廳 / 下一層 |
+| 副本 | ❌ 不計算 | 獎勵 | 返回大廳 |
+
+- 勝利時不顯示「再戰一次」（僅敗北時顯示）
+
+### 掉落物機制
+
+```typescript
+rollDrops(items: StageDropItem[]): InventoryItem[]   // 按 dropRate 機率擲骰
+mergeDrops(items: InventoryItem[]): InventoryItem[]   // 合併同 itemId
+```
+
+掉落物透過 `addItemsLocally()` 樂觀寫入本地背包。
 
 ---
 
-## API 端點
+## GAS 後端結算 Handler
 
-| 端點 | 說明 |
-|------|------|
-| `/get-stage-config` | 取得關卡敵方配置 |
-| `/complete-stage` | 通關結算（驗證 + 發獎勵 + 存進度） |
-| `/get-tower-floor` | 取得爬塔當前樓層敵方 |
-| `/complete-tower` | 爬塔通關結算 |
-| `/get-daily-dungeon` | 取得今日副本配置 |
-| `/complete-daily` | 副本結算 |
-| `/get-pvp-opponents` | 取得 3 個對手 |
-| `/pvp-battle-result` | PvP 結果上報 |
-| `/get-boss-config` | 取得本週 Boss 配置 |
-| `/boss-battle-result` | Boss 戰結果上報 |
+### handleCompleteStage_
+
+| 參數 | `{ guestToken, stageId, starsEarned }` |
+|------|-------|
+| 首通判定 | `stageStars[stageId]` 無值 = 首通 |
+| 獎勵公式 | `gold: 100 + ch×50 + st×20`, `exp: 50 + ch×30 + st×10` |
+| 首通加碼 | `gold: +200`, `exp: +100`, `diamond: +30` |
+
+### handleCompleteTower_
+
+| 參數 | `{ guestToken, floor }` |
+|------|-------|
+| 驗證 | `floor === currentFloor + 1` |
+| 獎勵公式 | `gold: 100 + floor×20`, `exp: 50 + floor×10`，Boss 層 `diamond: 50` |
+
+### handleCompleteDaily_
+
+| 參數 | `{ guestToken, dungeonId, tier }` |
+|------|-------|
+| 獎勵 | 硬編碼：easy(500g/100e), normal(1000g/200e), hard(2000g/400e) |
+
+> 注意：前端獎勵公式與 GAS 公式**不完全一致**（前端更細緻），最終以 GAS 回傳為準。
 
 ---
 
 ## 擴展點
 
-- [ ] **困難模式**：主線章節 Hard 難度，不同獎勵
-- [ ] **公會副本**：多人協力打 Boss
-- [ ] **賽季系統**：PvP 賽季獎勵
+- [ ] **PvP 競技場**：異步 PvP（防守陣容 + 排行榜）
+- [ ] **Boss 戰**：高難度單體，30 回合限制，傷害段位獎勵
+- [ ] **困難模式**：主線 Hard 難度
+- [ ] **掃蕩功能**：已三星通關的關卡跳過戰鬥直接領獎
 - [ ] **活動關卡**：限時活動副本
-- [ ] **掃蕩功能**：已三星通關的關卡可跳過戰鬥直接領獎
+- [ ] **Stage 對話系統**：戰前/戰後劇情對話
 
 ## 變更歷史
 
 | 版本 | 日期 | 變更內容 |
 |------|------|---------|
 | v0.1 | 2026-02-26 | 初版：5 種模式（章節/爬塔/每日/PvP/Boss） |
-| v0.2 | 2026-02-26 | 移除體力系統，所有模式免費挑戰；成長限制改由資源計時器控制（見 save-system.md） |
+| v0.2 | 2026-02-26 | 移除體力系統，所有模式免費挑戰 |
+| v0.3 | 2026-02-28 | 新增三星鎖定、關卡鎖定 toast、模式解鎖 toast、選關過場遮幕 |
+| v0.4 | 2026-02-28 | 每日副本 stageId 中文名、副本專用 config、副本獎勵 |
+| v1.0 | 2026-03-01 | 全面同步實作：補齊 stageSystem.ts 所有公式（seeded PRNG / 敵方配置 / 獎勵 / 星級 / 掉落 / 解鎖條件）、3 副本完整數據表、GAS 3 個結算 Handler、標記 PvP + Boss 為未實作、前端勝利結算完整流程、goNextStage 機制 |

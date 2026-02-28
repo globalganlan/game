@@ -82,6 +82,138 @@
  *   → 等同 updateSheet + sheet=heroes + keyColumn=HeroID
  */
 
+// ═══════════════════════════════════════════════════════
+// CacheService 快取層
+// ═══════════════════════════════════════════════════════
+//
+// GAS CacheService 限制：
+//   - 每個 key-value 最大 100 KB
+//   - ScriptCache 全使用者共用（適合全域配表）
+//   - 最長 TTL = 21600 秒（6 小時）
+//
+// 快取策略分 3 級：
+//   A. 全域配表（heroes, skill_templates, hero_skills, element_matrix,
+//      item_definitions）— 所有玩家相同、極少變動 → TTL 6h
+//   B. 共用運算結果（loadHeroPool_）— 衍生自 heroes 表 → TTL 6h
+//   C. 每用戶映射（resolvePlayerId_）— token→playerId → TTL 6h
+//
+// 寫入操作會自動清除相關快取 key，確保下次讀取拿到最新值。
+
+var CACHE_TTL_CONFIG_ = 21600;   // 6 小時（全域配表）
+var CACHE_TTL_PLAYER_ = 21600;   // 6 小時（token→playerId，不會變）
+
+// 可快取的全域配表白名單
+var CACHEABLE_SHEETS_ = ['heroes', 'skill_templates', 'hero_skills', 'element_matrix', 'item_definitions'];
+
+/**
+ * 從 ScriptCache 取值，若命中直接回傳 parsed JSON。
+ * 支援大資料分片：超過 90KB 時自動切成 chunk:key:0, chunk:key:1, …
+ * @param {string} key
+ * @returns {*|null} parsed value or null if miss
+ */
+function cacheGet_(key) {
+  try {
+    var c = CacheService.getScriptCache();
+    var meta = c.get('meta:' + key);
+    if (meta) {
+      // 分片模式
+      var chunks = Number(meta);
+      var parts = [];
+      for (var i = 0; i < chunks; i++) {
+        var part = c.get('chunk:' + key + ':' + i);
+        if (part === null) return null;  // 任一 chunk miss → 快取失效
+        parts.push(part);
+      }
+      return JSON.parse(parts.join(''));
+    }
+    var raw = c.get(key);
+    if (raw === null) return null;
+    return JSON.parse(raw);
+  } catch (e) {
+    return null;  // 解析失敗當作 miss
+  }
+}
+
+/**
+ * 寫入 ScriptCache。若 JSON 字串 > 90KB 則自動分片。
+ * @param {string} key
+ * @param {*} value     — 會被 JSON.stringify
+ * @param {number} ttl  — 秒（max 21600）
+ */
+function cacheSet_(key, value, ttl) {
+  try {
+    var c = CacheService.getScriptCache();
+    var json = JSON.stringify(value);
+    var CHUNK_SIZE = 90000; // 90 KB 上限留點餘裕
+    if (json.length <= CHUNK_SIZE) {
+      // 確保清掉舊分片 meta（如果之前是分片存的）
+      c.remove('meta:' + key);
+      c.put(key, json, ttl);
+    } else {
+      // 分片寫入
+      var chunks = Math.ceil(json.length / CHUNK_SIZE);
+      var pairs = {};
+      for (var i = 0; i < chunks; i++) {
+        pairs['chunk:' + key + ':' + i] = json.substring(i * CHUNK_SIZE, (i + 1) * CHUNK_SIZE);
+      }
+      c.putAll(pairs, ttl);
+      c.put('meta:' + key, String(chunks), ttl);
+      c.remove(key); // 清掉可能的舊非分片值
+    }
+  } catch (e) {
+    // 快取寫入失敗不影響主流程
+  }
+}
+
+/**
+ * 刪除快取 key（含分片清理）
+ * @param {string} key
+ */
+function cacheRemove_(key) {
+  try {
+    var c = CacheService.getScriptCache();
+    var meta = c.get('meta:' + key);
+    if (meta) {
+      var chunks = Number(meta);
+      var keys = ['meta:' + key];
+      for (var i = 0; i < chunks; i++) keys.push('chunk:' + key + ':' + i);
+      c.removeAll(keys);
+    }
+    c.remove(key);
+  } catch (e) { /* ignore */ }
+}
+
+/**
+ * 清除某張表相關的所有快取
+ * @param {string} sheetName
+ */
+function invalidateSheetCache_(sheetName) {
+  cacheRemove_('sheet:' + sheetName);
+  // heroes 表額外清 loadHeroPool_ 快取
+  if (sheetName === 'heroes') {
+    cacheRemove_('heroPool');
+  }
+  // item_definitions 表額外清 itemDefs 快取
+  if (sheetName === 'item_definitions') {
+    cacheRemove_('itemDefs');
+  }
+}
+
+/**
+ * 清除所有已知快取 key（管理員用）
+ */
+function invalidateAllCache_() {
+  var keys = ['heroPool', 'itemDefs'];
+  for (var i = 0; i < CACHEABLE_SHEETS_.length; i++) {
+    keys.push('sheet:' + CACHEABLE_SHEETS_[i]);
+  }
+  // 也嘗試清除所有可能的 player token 快取
+  // （無法列舉全部，但手動全清時效果等同 TTL 到期）
+  for (var j = 0; j < keys.length; j++) {
+    cacheRemove_(keys[j]);
+  }
+}
+
 // ─── GET ────────────────────────────────────────────────
 function doGet(e) {
   var params = e ? e.parameter : {};
@@ -286,6 +418,14 @@ function doPost(e) {
       case 'check-op':
         result = handleCheckOp_(body);
         break;
+      case 'delete-column':
+        result = handleDeleteColumn_(body.sheet, body.column);
+        break;
+      // ── Cache ──
+      case 'invalidate-cache':
+        invalidateAllCache_();
+        result = { success: true, message: 'All cache invalidated' };
+        break;
       default:
         result = { error: 'Unknown action: ' + action };
     }
@@ -312,9 +452,19 @@ function handleListSheets() {
   return { sheets: sheets };
 }
 
-/** 讀取指定工作表（新格式） */
+/** 讀取指定工作表（新格式，含快取） */
 function handleReadSheet(sheetName) {
   if (!sheetName) throw new Error('Missing required parameter: sheet');
+
+  // 全域配表走快取
+  if (CACHEABLE_SHEETS_.indexOf(sheetName) !== -1) {
+    var cached = cacheGet_('sheet:' + sheetName);
+    if (cached) {
+      cached._cached = true;  // 標記來源
+      return cached;
+    }
+  }
+
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getSheetByName(sheetName);
   if (!sheet) throw new Error('Sheet not found: ' + sheetName);
@@ -341,11 +491,24 @@ function handleReadSheet(sheetName) {
     return obj;
   });
 
-  return { sheet: sheetName, headers: headers, data: data, count: data.length };
+  var result = { sheet: sheetName, headers: headers, data: data, count: data.length };
+
+  // 全域配表寫入快取
+  if (CACHEABLE_SHEETS_.indexOf(sheetName) !== -1) {
+    cacheSet_('sheet:' + sheetName, result, CACHE_TTL_CONFIG_);
+  }
+
+  return result;
 }
 
-/** 向下相容舊 GET（讀 heroes） */
+/** 向下相容舊 GET（讀 heroes，含快取） */
 function handleReadSheetLegacy() {
+  // 嘗試從 heroes 的快取中取
+  var cached = cacheGet_('sheet:heroes');
+  if (cached && cached.data) {
+    return { value: cached.data, Count: cached.data.length, _cached: true };
+  }
+
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getSheetByName('heroes') || ss.getSheets()[0];
   var lastRow = sheet.getLastRow();
@@ -360,6 +523,10 @@ function handleReadSheetLegacy() {
     headers.forEach(function(h, i) { obj[h] = row[i]; });
     return obj;
   });
+
+  // 同時填充 readSheet 格式的快取（供後續 readSheet('heroes') 使用）
+  cacheSet_('sheet:heroes', { sheet: 'heroes', headers: headers, data: result, count: result.length }, CACHE_TTL_CONFIG_);
+
   return { value: result, Count: result.length };
 }
 
@@ -403,6 +570,7 @@ function handleCreateSheet(sheetName, headers, data, textColumns) {
     rowCount = rows.length;
   }
 
+  invalidateSheetCache_(sheetName);
   return { success: true, created: sheetName, rows: rowCount };
 }
 
@@ -487,6 +655,7 @@ function handleUpdateSheet(sheetName, keyColumn, newColumns, data) {
     }
   });
 
+  invalidateSheetCache_(sheetName);
   return { success: true, updated: updatedCount };
 }
 
@@ -524,6 +693,7 @@ function handleAppendRows(sheetName, data) {
   var startRow = sheet.getLastRow() + 1;
   sheet.getRange(startRow, 1, rows.length, headers.length).setValues(rows);
 
+  invalidateSheetCache_(sheetName);
   return { success: true, appended: rows.length };
 }
 
@@ -540,6 +710,7 @@ function handleDeleteSheet(sheetName) {
   }
 
   ss.deleteSheet(sheet);
+  invalidateSheetCache_(sheetName);
   return { success: true, deleted: sheetName };
 }
 
@@ -553,6 +724,8 @@ function handleRenameSheet(sheetName, newName) {
   if (ss.getSheetByName(newName)) throw new Error('Sheet already exists: ' + newName);
 
   sheet.setName(newName);
+  invalidateSheetCache_(sheetName);
+  invalidateSheetCache_(newName);
   return { success: true, renamed: sheetName + ' → ' + newName };
 }
 
@@ -586,7 +759,23 @@ function handleDeleteRows(sheetName, keyColumn, keys) {
     }
   }
 
+  invalidateSheetCache_(sheetName);
   return { success: true, deleted: deletedCount };
+}
+
+/** 刪除指定欄位（整欄，含表頭） */
+function handleDeleteColumn_(sheetName, colName) {
+  if (!sheetName) throw new Error('Missing required parameter: sheet');
+  if (!colName) throw new Error('Missing required parameter: column');
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(sheetName);
+  if (!sheet) throw new Error('Sheet not found: ' + sheetName);
+  var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  var idx = headers.indexOf(colName);
+  if (idx === -1) return { success: true, message: 'Column not found, nothing to delete: ' + colName };
+  sheet.deleteColumn(idx + 1);
+  invalidateSheetCache_(sheetName);
+  return { success: true, deleted: colName };
 }
 
 /** 清空表資料（保留表頭） */
@@ -601,6 +790,7 @@ function handleClearSheet(sheetName) {
     sheet.deleteRows(2, lastRow - 1);
   }
 
+  invalidateSheetCache_(sheetName);
   return { success: true, cleared: sheetName };
 }
 
@@ -847,13 +1037,23 @@ function getHeroInstSheet_() {
   return sheet;
 }
 
-/** 用 guestToken 取 playerId */
+/** 用 guestToken 取 playerId（含快取） */
 function resolvePlayerId_(guestToken) {
   if (!guestToken) return null;
+
+  // 快取查詢：token→playerId 映射建立後不會變
+  var cacheKey = 'pid:' + guestToken;
+  var cached = cacheGet_(cacheKey);
+  if (cached) return cached;
+
   var pSheet = getPlayersSheet_();
   var row = findRowByColumn_(pSheet, 'guestToken', guestToken);
   if (row === 0) return null;
-  return readRow_(pSheet, row).playerId;
+  var playerId = readRow_(pSheet, row).playerId;
+
+  // 寫入快取
+  if (playerId) cacheSet_(cacheKey, playerId, CACHE_TTL_PLAYER_);
+  return playerId;
 }
 
 /** 讀取某玩家所有 hero_instances */
@@ -1075,6 +1275,13 @@ function handleCollectResources_(params) {
     var lastCollect = saveData.resourceTimerLastCollect;
     if (!lastCollect) return { success: false, error: 'timer_not_started' };
 
+    // 尚未通關 1-1 → 離線獎勵未解鎖
+    var sp;
+    try { sp = JSON.parse(saveData.storyProgress); } catch(e) { sp = {chapter:1,stage:1}; }
+    if (sp && sp.chapter === 1 && sp.stage === 1) {
+      return { success: true, gold: 0, expItems: 0, message: 'not_unlocked' };
+    }
+
     var elapsed = (Date.now() - new Date(lastCollect).getTime()) / (3600 * 1000);
     var maxHours = 24;
     var hours = Math.min(maxHours, Math.max(0, elapsed));
@@ -1210,6 +1417,10 @@ function getItemQty_(playerId, itemId) {
 
 /** 載入道具定義表 */
 function handleLoadItemDefinitions_() {
+  // 快取查詢
+  var cached = cacheGet_('itemDefs');
+  if (cached) { cached._cached = true; return cached; }
+
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getSheetByName('item_definitions');
   if (!sheet) return { success: true, items: [] };
@@ -1222,7 +1433,9 @@ function handleLoadItemDefinitions_() {
     for (var i = 0; i < headers.length; i++) obj[headers[i]] = row[i];
     return obj;
   });
-  return { success: true, items: items };
+  var result = { success: true, items: items };
+  cacheSet_('itemDefs', result, CACHE_TTL_CONFIG_);
+  return result;
 }
 
 /** 載入完整背包 */
@@ -1936,9 +2149,12 @@ function handleCompleteDaily_(params) {
 var GACHA_REFILL_COUNT_ = 400;
 
 /**
- * 載入英雄池模板 (heroes sheet)
+ * 載入英雄池模板 (heroes sheet)（含快取）
  */
 function loadHeroPool_() {
+  var cached = cacheGet_('heroPool');
+  if (cached) return cached;
+
   var heroesSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('heroes');
   var pool = [];
   if (heroesSheet && heroesSheet.getLastRow() > 1) {
@@ -1950,6 +2166,8 @@ function loadHeroPool_() {
       pool.push({ heroId: Number(hData[h][idIdx]), rarity: Number(hData[h][rarIdx]) });
     }
   }
+
+  cacheSet_('heroPool', pool, CACHE_TTL_CONFIG_);
   return pool;
 }
 
@@ -2199,7 +2417,7 @@ function handleGachaPoolStatus_(params) {
   return {
     success: true,
     remaining: Array.isArray(pool) ? pool.length : 0,
-    total: GACHA_POOL_SIZE_
+    total: GACHA_REFILL_COUNT_
   };
 }
 

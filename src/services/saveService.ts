@@ -35,6 +35,7 @@ export interface SaveData {
   towerFloor: number
   storyProgress: { chapter: number; stage: number }
   formation: (string | null)[] // 6 slots, heroInstanceId or null
+  stageStars: Record<string, number> // stageId → best star (1-3)
   lastSaved: string
   gachaPity?: { pullsSinceLastSSR: number; guaranteedFeatured: boolean }
 }
@@ -273,6 +274,17 @@ function sanitizeSaveData(sd: SaveData): SaveData {
   if (!Array.isArray(sd.formation)) {
     sd.formation = [null, null, null, null, null, null]
   }
+  // stageStars
+  if (typeof sd.stageStars === 'string') {
+    try { sd.stageStars = JSON.parse(sd.stageStars as unknown as string) } catch { sd.stageStars = {} }
+  }
+  if (!sd.stageStars || typeof sd.stageStars !== 'object' || Array.isArray(sd.stageStars)) {
+    sd.stageStars = {}
+  }
+  // towerFloor
+  if (!sd.towerFloor || sd.towerFloor < 1) {
+    sd.towerFloor = 1
+  }
   // gachaPity
   if (typeof sd.gachaPity === 'string') {
     try { sd.gachaPity = JSON.parse(sd.gachaPity as unknown as string) } catch { sd.gachaPity = { pullsSinceLastSSR: 0, guaranteedFeatured: false } }
@@ -407,21 +419,31 @@ export function updateStoryProgress(chapter: number, stage: number): void {
 }
 
 /**
- * 儲存陣型（立即寫入，不經 debounce）
+ * 更新關卡星級（只保留最佳）
  */
-export async function saveFormation(formation: (string | null)[]): Promise<boolean> {
+export function updateStageStars(stageId: string, stars: number): void {
+  if (currentData) {
+    const prev = currentData.save.stageStars[stageId] || 0
+    if (stars > prev) {
+      currentData.save.stageStars[stageId] = stars
+      saveToLocal(currentData)
+      notify()
+      enqueueSave({ stageStars: JSON.stringify(currentData.save.stageStars) })
+    }
+  }
+}
+
+/**
+ * 儲存陣型（樂觀佇列 — 立即本地更新 + 背景 API + localStorage 備份）
+ */
+export function saveFormation(formation: (string | null)[]): boolean {
   if (currentData) {
     currentData.save.formation = formation
     saveToLocal(currentData)
     notify()
   }
-  try {
-    const res = await callApi('save-formation', { formation })
-    return res.success
-  } catch {
-    console.warn('[save] save-formation failed')
-    return false
-  }
+  fireOptimistic('save-formation', { formation })
+  return true
 }
 
 /**
@@ -490,6 +512,10 @@ export async function addHero(heroId: number): Promise<HeroInstance | null> {
  */
 export async function collectResources(): Promise<AccumulatedResources | null> {
   if (!currentData) return null
+
+  // 尚未通關 1-1 → 離線獎勵未解鎖
+  const sp = currentData.save.storyProgress
+  if (sp && sp.chapter === 1 && sp.stage === 1) return null
 
   const resources = getAccumulatedResources(
     currentData.save.resourceTimerStage,

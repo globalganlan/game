@@ -47,6 +47,52 @@ import {
 import { selectTargets, selectNormalAttackTarget } from './targetStrategy'
 
 /* ════════════════════════════════════
+   中斷大招（能量滿即放）
+   ════════════════════════════════════ */
+
+/**
+ * 檢查所有存活英雄，能量滿就立即施放大招（中斷式）。
+ * 遞迴直到無人可中斷，或達到安全上限。
+ */
+async function processInterruptUltimates(
+  players: BattleHero[],
+  enemies: BattleHero[],
+  turn: number,
+  allHeroes: BattleHero[],
+  cfg: BattleEngineConfig,
+  excludeUid?: string, // 剛行動完的角色（本回合已行動，不再中斷）
+): Promise<boolean> {
+  const MAX_INTERRUPTS = 20 // 安全上限
+  let count = 0
+  let anyFired = false
+  let found = true
+  while (found && count < MAX_INTERRUPTS) {
+    found = false
+    const candidates = allHeroes
+      .filter(h => h.currentHP > 0 && canCastUltimate(h) && h.uid !== excludeUid)
+      .sort((a, b) => {
+        const spdA = getBuffedStats(a).SPD
+        const spdB = getBuffedStats(b).SPD
+        if (spdB !== spdA) return spdB - spdA
+        return a.side === 'player' ? -1 : 1
+      })
+    for (const hero of candidates) {
+      if (hero.currentHP <= 0 || !canCastUltimate(hero)) continue
+      const allies = hero.side === 'player' ? players : enemies
+      const foes = hero.side === 'player' ? enemies : players
+      await executeSkill(hero, hero.activeSkill!, allies, foes, turn, allHeroes, cfg)
+      found = true
+      anyFired = true
+      count++
+      // 戰鬥結束？
+      if (players.every(p => p.currentHP <= 0) || enemies.every(e => e.currentHP <= 0)) return true
+      break // 重新掃描（因為大招可能改變其他人能量）
+    }
+  }
+  return anyFired
+}
+
+/* ════════════════════════════════════
    引擎配置
    ════════════════════════════════════ */
 
@@ -121,7 +167,7 @@ export async function runBattle(
       // DOT 結算
       const dotResults = processDotEffects(actor, allHeroes)
       for (const dot of dotResults) {
-        await cfg.onAction({ type: 'DOT_TICK', targetUid: actor.uid, dotType: dot.type, damage: dot.damage })
+        await cfg.onAction({ type: 'DOT_TICK', targetUid: actor.uid, dotType: dot.type, damage: dot.damage, sourceUid: dot.sourceUid })
       }
       if (actor.currentHP <= 0) {
         await cfg.onAction({ type: 'DEATH', targetUid: actor.uid })
@@ -151,6 +197,10 @@ export async function runBattle(
       } else {
         await executeNormalAttack(actor, allies, foes, turn, allHeroes, cfg)
       }
+
+      // ── 中斷大招：其他角色能量滿了立即施放 ──
+      await processInterruptUltimates(players, enemies, turn, allHeroes, cfg, actor.uid)
+      if (players.every(p => p.currentHP <= 0) || enemies.every(e => e.currentHP <= 0)) break
 
       // 清理已死亡角色的行動能力（但保留在陣列中給表現層播放死亡動畫）
     }

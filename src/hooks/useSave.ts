@@ -14,6 +14,7 @@ import {
   onSaveChange,
   updateProgress,
   updateStoryProgress,
+  updateStageStars,
   saveFormation,
   addHero,
   collectResources,
@@ -43,6 +44,8 @@ export interface UseSaveReturn {
   >>) => void
   /** 更新劇情進度 */
   doUpdateStory: (chapter: number, stage: number) => void
+  /** 更新關卡星級 */
+  doUpdateStageStars: (stageId: string, stars: number) => void
   /** 儲存陣型 */
   doSaveFormation: (formation: (string | null)[]) => Promise<boolean>
   /** 新增英雄 */
@@ -110,6 +113,10 @@ export function useSave(): UseSaveReturn {
     updateStoryProgress(chapter, stage)
   }, [])
 
+  const doUpdateStageStars = useCallback((stageId: string, stars: number) => {
+    updateStageStars(stageId, stars)
+  }, [])
+
   const doSaveFormation = useCallback(async (formation: (string | null)[]) => {
     return saveFormation(formation)
   }, [])
@@ -125,6 +132,9 @@ export function useSave(): UseSaveReturn {
   const getResourcePreview = useCallback((): AccumulatedResources | null => {
     const data = getSaveState()
     if (!data) return null
+    // 尚未通關 1-1 → 離線獎勵未解鎖
+    const sp = data.save.storyProgress
+    if (sp && sp.chapter === 1 && sp.stage === 1) return null
     return getAccumulatedResources(
       data.save.resourceTimerStage,
       data.save.resourceTimerLastCollect,
@@ -147,6 +157,7 @@ export function useSave(): UseSaveReturn {
     doLoadSave,
     doUpdateProgress,
     doUpdateStory,
+    doUpdateStageStars,
     doSaveFormation,
     doAddHero,
     doCollectResources,

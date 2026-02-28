@@ -6,8 +6,8 @@
  */
 
 import { useState, useMemo, useRef, useEffect, Suspense } from 'react'
-import { Canvas, useFrame } from '@react-three/fiber'
-import { useAnimations } from '@react-three/drei'
+import { Canvas } from '@react-three/fiber'
+import { useAnimations, OrbitControls } from '@react-three/drei'
 import * as SkeletonUtils from 'three/examples/jsm/utils/SkeletonUtils'
 import * as THREE from 'three'
 import type { RawHeroData } from '../types'
@@ -104,7 +104,7 @@ function IdlePreviewModel({ modelId }: { modelId: string }) {
   const meshAsset = getGlbForSuspense(`${modelFolder}/${modelId}.glb`)
   const idleAsset = getGlbForSuspense(`${modelFolder}/${modelId}_idle.glb`)
 
-  const { scene: clonedScene, modelScale } = useMemo(() => {
+  const { scene: clonedScene, modelScale, centerOffset } = useMemo(() => {
     const cloned = SkeletonUtils.clone(meshAsset.scene)
     cloned.traverse((child) => {
       if ((child as THREE.Mesh).isMesh) {
@@ -123,7 +123,10 @@ function IdlePreviewModel({ modelId }: { modelId: string }) {
     const bbox = new THREE.Box3().setFromObject(cloned)
     const height = bbox.max.z - bbox.min.z // GLB Armature 保留 Z-up
     const s = height > 0 ? 2.5 / height : 1
-    return { scene: cloned, modelScale: s }
+    // 計算縮放後的垂直中心偏移（Z-up → Y-up after primitive rendering）
+    const centerZ = (bbox.min.z + bbox.max.z) / 2
+    const yOffset = -centerZ * s
+    return { scene: cloned, modelScale: s, centerOffset: yOffset }
   }, [meshAsset])
 
   const { actions } = useAnimations(idleAsset.animations, groupRef)
@@ -134,13 +137,8 @@ function IdlePreviewModel({ modelId }: { modelId: string }) {
     return () => { idle?.stop() }
   }, [actions])
 
-  // 緩慢旋轉展示模型
-  useFrame((_, delta) => {
-    if (groupRef.current) groupRef.current.rotation.y += delta * 0.35
-  })
-
   return (
-    <group ref={groupRef}>
+    <group ref={groupRef} position={[0, centerOffset, 0]}>
       <primitive object={clonedScene} scale={modelScale} />
     </group>
   )
@@ -151,12 +149,18 @@ function HeroModelPreview({ modelId }: { modelId: string }) {
   return (
     <div className="hero-model-preview">
       <Canvas
-        camera={{ position: [0, 1.0, 4.2], fov: 30 }}
+        camera={{ position: [0, 0, 4.5], fov: 28 }}
         className="hero-model-canvas"
         gl={{ alpha: true, antialias: true, powerPreference: 'low-power' }}
       >
         <ambientLight intensity={0.7} />
         <directionalLight position={[3, 5, 2]} intensity={0.9} />
+        <OrbitControls
+          enableZoom={false}
+          enablePan={false}
+          minPolarAngle={Math.PI / 3}
+          maxPolarAngle={Math.PI / 1.8}
+        />
         <Suspense fallback={null}>
           <IdlePreviewModel modelId={modelId} />
         </Suspense>
@@ -469,7 +473,7 @@ export function HeroListPanel({ heroesList, heroInstances, onBack, skills, heroS
             <button
               className={`filter-btn ${filter === 'owned' ? 'filter-active' : ''}`}
               onClick={() => setFilter('owned')}
-            >已獲得 ({heroInstances.length})</button>
+            >已獲得 ({new Set(heroInstances.map(h => h.heroId)).size})</button>
           </div>
         </div>
 

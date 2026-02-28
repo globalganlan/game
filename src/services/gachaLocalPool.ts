@@ -14,6 +14,8 @@ import { fireOptimistic, generateOpId } from './optimisticQueue'
 import {
   SINGLE_PULL_COST,
   TEN_PULL_COST,
+  DUPLICATE_STARDUST,
+  DUPLICATE_FRAGMENTS,
   type GachaRarity,
   type PityState,
 } from '../domain/gachaSystem'
@@ -49,6 +51,10 @@ export interface LocalPullResult {
   rarity: GachaRarity
   isNew: boolean
   isFeatured: boolean
+  /** 重複角色轉換的星塵（新角色為 0） */
+  stardust: number
+  /** 重複角色轉換的碎片（新角色為 0） */
+  fragments: number
 }
 
 export interface LocalPullResponse {
@@ -253,11 +259,21 @@ export function localPull(
 
   // ── 本地處理每筆結果 ──
   const results: LocalPullResult[] = []
+  const RARITY_STARS: Record<string, number> = { N: 1, R: 2, SR: 3, SSR: 4 }
   for (const entry of consumed) {
     const heroId = entry.h
     const rarity = entry.r as GachaRarity
     const isFeatured = entry.f || false
     const isNew = !_ownedHeroIds.has(heroId)
+
+    // 重複角色：計算星塵 + 碎片
+    let stardust = 0
+    let fragments = 0
+    if (!isNew) {
+      stardust = DUPLICATE_STARDUST[rarity] ?? 0
+      const stars = RARITY_STARS[rarity] ?? 1
+      fragments = DUPLICATE_FRAGMENTS[stars] ?? 5
+    }
 
     if (isNew) {
       _ownedHeroIds.add(heroId)
@@ -271,7 +287,7 @@ export function localPull(
       _pityState.pullsSinceLastSSR++
     }
 
-    results.push({ heroId, rarity, isNew, isFeatured })
+    results.push({ heroId, rarity, isNew, isFeatured, stardust, fragments })
   }
 
   // ── localStorage 持久化 ──

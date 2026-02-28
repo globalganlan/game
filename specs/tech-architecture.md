@@ -1,7 +1,7 @@
 # 技術架構 Spec
 
-> 版本：v1.1 ｜ 狀態：🟢 定稿（含 Domain Engine + Services 層）
-> 最後更新：2025-02-26
+> 版本：v1.3 ｜ 狀態：🟢 定稿（含 Domain Engine + Services 層 + Optimistic Queue + GAS CacheService）
+> 最後更新：2026-02-28
 > 負責角色：🔧 CODING → 🏗️ ARCHITECT
 
 ## 概述
@@ -57,7 +57,7 @@ src/
     Arena.tsx               場景（地面/碎片/雨/天空/霧）
     Hero.tsx                英雄容器（移動/動畫狀態機）
     ZombieModel.tsx         GLB 模型 + 受擊閃光
-    SceneWidgets.tsx        血條/飄字/鏡頭/控制
+    SceneWidgets.tsx        血條/飄字/鏡頭/控制/SkillToast3D/ElementHint3D
     UIOverlay.tsx           HUD 元件
 
  hooks/
@@ -211,9 +211,12 @@ main.tsx
                <Arena />           場景
                <SlotMarker /> 12  格子標記
                <Hero /> N         場上英雄
-                  <ZombieModel />   GLB + 骨骼動畫
+                  <ZombieModel />   GLB + 骨骼動畫 + visibilitychange 補時
                   <HealthBar3D />   3D 血條
+                  <EnergyBar3D />   3D 能量條
                   <DamagePopup />   飄字傷害
+                  <SkillToast3D />  技能名稱 3D 飄字
+                  <ElementHint3D /> 屬性提示 3D 飄字
                   <Billboard><Text /></Billboard>
                <DragPlane />
             <ResponsiveCamera />
@@ -232,7 +235,51 @@ main.tsx
 
 ---
 
-## 資料流（v1.1 更新）
+## 資料流（v1.2 更新）
+
+### 三階段載入架構
+
+```
+Phase 0（掛載即刻、登入前）：
+  - 預取英雄列表（heroes API）
+  - 預取 gameData（skill_templates / hero_skills / element_matrix）
+  - 預載 GLB 模型 + 縮圖（fire-and-forget，不阻塞）
+
+Phase 1（登入後）：
+  - 載入存檔（load-save API）
+  - 載入信箱（load-mail API）
+  - 初始化抽卡池（initLocalPool）
+
+Phase 2（進入遊戲 / fetchData）：
+  - 復用 Phase 0 已 prefetch 的資料
+  - 還原陣型（save.formation → playerSlots）
+  - 設定 IDLE 狀態
+載入進度簡化為 2 階（fetch 70% / finalize 30%）
+```
+
+### 樂觀更新架構（Optimistic Queue）
+
+```
+前端狀態變更
+    ↓
+立即更新 localStorage + React state（UI 立刻反映）
+    ↓
+fireOptimistic / fireOptimisticAsync
+加入佇列（帶自動生成的 opId 確保媣等性）
+    ↓
+背景批次同步到 Google Sheets API
+失敗 → 重試 → Toast 提示
+```
+
+**已採用 Optimistic Queue 的服務**：
+| 服務 | 操作數 |
+|------|--------|
+| `inventoryService` | 5（equip/unequip/lock/expand/useItem） |
+| `progressionService` | 8（upgrade/ascend/starUp/enhance/forge/dismantle/completeStage/tower/daily） |
+| `mailService` | 2（deleteMail/deleteAllRead） |
+| `saveService` | 1（saveFormation） |
+
+### 資料流圖
 
 ```
 
@@ -384,6 +431,63 @@ export default defineConfig({
 
 - [ ] **狀態管理庫**：若複雜度上升，可引入 Zustand 或 Jotai
 - [ ] **後端**：目前純前端 + Google Sheets API，未來可接 Firebase / Supabase
+
+---
+
+## GAS CacheService 快取層
+
+後端 Google Apps Script 使用 [`CacheService.getScriptCache()`](https://developers.google.com/apps-script/reference/cache/cache-service) 進行伺服端快取，減少 SpreadsheetApp 讀取次數。
+
+### 限制
+
+| 項目 | 限制 |
+|------|------|
+| 每個 key-value | **100 KB** |
+| 最長 TTL | **21600 秒（6 小時）** |
+| ScriptCache | 全部署實例共用（全使用者共享） |
+
+### 分片機制
+
+當 JSON 超過 90KB 時，自動分片存儲：
+- `meta:key` → chunk 數量
+- `chunk:key:0`, `chunk:key:1`, … → 分片內容
+- 讀取時自動組裝；任一 chunk miss 視為 cache miss
+
+### 快取策略分級
+
+| 級別 | 對象 | Cache Key | TTL | 說明 |
+|------|------|-----------|-----|------|
+| **A. 全域配表** | heroes, skill_templates, hero_skills, element_matrix, item_definitions | `sheet:{name}` | 6h | 所有玩家共用、極少變動 |
+| **B. 衍生結果** | loadHeroPool_() | `heroPool` | 6h | 從 heroes 表衍生的抽卡池模板 |
+| **C. 用戶映射** | resolvePlayerId_() | `pid:{guestToken}` | 6h | token→playerId 建立後不變 |
+| **D. 道具配表** | handleLoadItemDefinitions_() | `itemDefs` | 6h | 道具定義表，極少變動 |
+
+### 不快取的資料
+
+| 資料 | 原因 |
+|------|------|
+| save_data (load-save) | 含 gachaPool JSON，可超過 100KB；且頻繁變動 |
+| hero_instances | 抽卡/升級隨時新增修改 |
+| inventory / equipment | 交易型資料，每次操作都會變 |
+| mailbox | 每位玩家不同且隨時有新郵件 |
+| 所有寫入操作 | save-progress, gacha-pull, complete-stage 等純寫入 |
+
+### 自動失效
+
+所有寫入 handler（`updateSheet`, `createSheet`, `deleteSheet`, `clearSheet`, `deleteRows`, `deleteColumn`, `appendRows`, `renameSheet`）在操作成功後自動呼叫 `invalidateSheetCache_(sheetName)` 清除對應快取。
+
+特殊連動：修改 `heroes` 表 → 同時清除 `heroPool` 快取；修改 `item_definitions` 表 → 同時清除 `itemDefs` 快取。
+
+### 手動清除
+
+```
+POST { "action": "invalidate-cache" }
+→ { "success": true, "message": "All cache invalidated" }
+```
+
+### 快取命中標記
+
+快取命中的回應會附加 `_cached: true` 欄位，供偵錯使用。
 - [ ] **音效引擎**：Howler.js 或 Web Audio API
 - [ ] **Shader 特效**：自訂材質效果
 - [ ] **PWA**：離線支援
@@ -395,3 +499,5 @@ export default defineConfig({
 |------|------|---------|
 | v1.0 | 2025-02-26 | 從現有程式碼逆向整理完整技術架構 |
 | v1.1 | 2025-02-26 | 新增 `src/domain/` + `src/services/` 分層架構、更新資料流圖 |
+| v1.2 | 2026-02-28 | 三階段載入架構（prefetch）、全面 Optimistic Queue、SkillToast3D / ElementHint3D 3D 元件、ZombieModel visibilitychange 補時、heroesListRef、資源 HUD 僅主選單顯示 |
+| v1.3 | 2026-02-28 | 新增 GAS CacheService 快取層：全域配表快取（6h TTL）、resolvePlayerId_ 快取、loadHeroPool_ 快取、分片機制、自動/手動失效、invalidate-cache API |

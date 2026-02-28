@@ -19,6 +19,7 @@ import {
 } from '../domain/gachaSystem'
 import type { RawHeroData } from '../types'
 import { Thumbnail3D } from './UIOverlay'
+import { addItemsLocally } from '../services/inventoryService'
 
 /** 將原始英雄資料的 ID 正規化為 `zombie_N` 格式 */
 function resolveModelId(h: RawHeroData): string {
@@ -65,6 +66,8 @@ interface PullResult {
   rarity: string
   isNew: boolean
   isFeatured: boolean
+  stardust: number
+  fragments: number
 }
 
 function ResultCard({ result, hero }: { result: PullResult; hero?: RawHeroData }) {
@@ -78,12 +81,19 @@ function ResultCard({ result, hero }: { result: PullResult; hero?: RawHeroData }
       style={{ borderColor: cfg.color, boxShadow: cfg.glow }}
     >
       {result.isNew && <span className="gacha-new-badge">NEW!</span>}
+      {!result.isNew && <span className="gacha-dupe-badge">重複</span>}
       {result.isFeatured && <span className="gacha-featured-badge">UP</span>}
       <div className="gacha-result-portrait">
         <Thumbnail3D modelId={modelId} />
       </div>
       <span className="gacha-result-name">{name}</span>
       <span className="gacha-result-rarity" style={{ color: cfg.color }}>{cfg.label}</span>
+      {!result.isNew && (result.stardust > 0 || result.fragments > 0) && (
+        <span className="gacha-dupe-reward">
+          {result.stardust > 0 && <span>✨{result.stardust}</span>}
+          {result.fragments > 0 && <span>🧩{result.fragments}</span>}
+        </span>
+      )}
     </div>
   )
 }
@@ -119,7 +129,7 @@ export function GachaScreen({ diamond, heroesList, onBack, onDiamondChange, onPu
   const doPull = useCallback((count: 1 | 10) => {
     const cost = count === 10 ? TEN_PULL_COST : SINGLE_PULL_COST
     if (diamond < cost) {
-      setError(`鑽石不足！需要 💎${cost}，目前 💎${diamond}`)
+      setError(`鑽石不足！需要 ${cost} 鑽石，目前 ${diamond} 鑽石`)
       return
     }
 
@@ -146,6 +156,20 @@ export function GachaScreen({ diamond, heroesList, onBack, onDiamondChange, onPu
     // 通知父元件本次抽到的新英雄 ID
     const newIds = res.results.filter(r => r.isNew).map(r => r.heroId)
     if (newIds.length > 0) onPullSuccess?.(newIds)
+
+    // 重複角色的星塵 + 碎片即時寫入本地背包
+    const dupeItems: { itemId: string; quantity: number }[] = []
+    let totalStardust = 0
+    for (const r of res.results) {
+      if (!r.isNew) {
+        if (r.stardust > 0) totalStardust += r.stardust
+        if (r.fragments > 0) {
+          dupeItems.push({ itemId: `asc_fragment_${r.heroId}`, quantity: r.fragments })
+        }
+      }
+    }
+    if (totalStardust > 0) dupeItems.push({ itemId: 'currency_stardust', quantity: totalStardust })
+    if (dupeItems.length > 0) addItemsLocally(dupeItems)
   }, [diamond, banner.id, onDiamondChange, onPullSuccess])
 
   const closeResults = () => {
@@ -160,7 +184,7 @@ export function GachaScreen({ diamond, heroesList, onBack, onDiamondChange, onPu
         <div className="panel-header">
           <button className="panel-back-btn" onClick={onBack}>← 返回</button>
           <h2 className="panel-title">🎰 {banner.name}</h2>
-          <span className="gacha-diamond">💎 {diamond.toLocaleString()}</span>
+          <span className="gacha-diamond"><i className="icon-dia">D</i> {diamond.toLocaleString()}</span>
         </div>
 
         {/* Banner Info */}
@@ -204,7 +228,7 @@ export function GachaScreen({ diamond, heroesList, onBack, onDiamondChange, onPu
             onClick={() => doPull(1)}
           >
             <span className="gacha-btn-label">單抽</span>
-            <span className="gacha-btn-cost">💎 {SINGLE_PULL_COST}</span>
+            <span className="gacha-btn-cost"><i className="icon-dia">D</i> {SINGLE_PULL_COST}</span>
           </button>
           <button
             className="gacha-pull-btn gacha-pull-ten"
@@ -212,7 +236,7 @@ export function GachaScreen({ diamond, heroesList, onBack, onDiamondChange, onPu
             onClick={() => doPull(10)}
           >
             <span className="gacha-btn-label">十連抽</span>
-            <span className="gacha-btn-cost">💎 {TEN_PULL_COST}</span>
+            <span className="gacha-btn-cost"><i className="icon-dia">D</i> {TEN_PULL_COST}</span>
           </button>
         </div>
       </div>

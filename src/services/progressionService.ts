@@ -7,7 +7,7 @@
  */
 
 import { getAuthState } from './authService'
-import { generateOpId } from './optimisticQueue'
+import { fireOptimistic, fireOptimisticAsync, generateOpId } from './optimisticQueue'
 import type { EquipmentInstance } from '../domain/progressionSystem'
 
 const POST_URL =
@@ -44,12 +44,15 @@ export interface UpgradeHeroResult {
   materialsConsumed: { itemId: string; quantity: number }[]
 }
 
-/** 英雄升級（消耗經驗素材） */
+/** 英雄升級（消耗經驗素材，帶樂觀佇列保護） */
 export async function upgradeHero(
   instanceId: string,
   materials: { itemId: string; quantity: number }[],
 ): Promise<UpgradeHeroResult> {
-  const res = await callApi<UpgradeHeroResult>('upgrade-hero', { instanceId, materials })
+  const { serverResult } = fireOptimisticAsync<UpgradeHeroResult>(
+    'upgrade-hero', { instanceId, materials },
+  )
+  const res = await serverResult
   return {
     success: res.success,
     newLevel: res.newLevel || 0,
@@ -65,9 +68,12 @@ export interface AscendHeroResult {
   newLevelCap: number
 }
 
-/** 英雄突破 */
+/** 英雄突破（帶樂觀佇列保護） */
 export async function ascendHero(instanceId: string): Promise<AscendHeroResult> {
-  const res = await callApi<AscendHeroResult>('ascend-hero', { instanceId })
+  const { serverResult } = fireOptimisticAsync<AscendHeroResult>(
+    'ascend-hero', { instanceId },
+  )
+  const res = await serverResult
   return {
     success: res.success,
     newAscension: res.newAscension || 0,
@@ -81,9 +87,12 @@ export interface StarUpResult {
   fragmentsConsumed: number
 }
 
-/** 英雄升星 */
+/** 英雄升星（帶樂觀佇列保護） */
 export async function starUpHero(instanceId: string): Promise<StarUpResult> {
-  const res = await callApi<StarUpResult>('star-up-hero', { instanceId })
+  const { serverResult } = fireOptimisticAsync<StarUpResult>(
+    'star-up-hero', { instanceId },
+  )
+  const res = await serverResult
   return {
     success: res.success,
     newStars: res.newStars || 0,
@@ -103,12 +112,15 @@ export interface EnhanceEquipmentResult {
   goldConsumed: number
 }
 
-/** 裝備強化 */
+/** 裝備強化（帶樂觀佇列保護） */
 export async function enhanceEquipment(
   equipId: string,
   materials: { itemId: string; quantity: number }[],
 ): Promise<EnhanceEquipmentResult> {
-  const res = await callApi<EnhanceEquipmentResult>('enhance-equipment', { equipId, materials })
+  const { serverResult } = fireOptimisticAsync<EnhanceEquipmentResult>(
+    'enhance-equipment', { equipId, materials },
+  )
+  const res = await serverResult
   return {
     success: res.success,
     newLevel: res.newLevel || 0,
@@ -123,25 +135,29 @@ export interface ForgeResult {
   equipment: EquipmentInstance | null
 }
 
-/** 鍛造裝備 */
+/** 鍛造裝備（帶樂觀佇列保護） */
 export async function forgeEquipment(
   blueprintItemId: string,
 ): Promise<ForgeResult> {
-  const res = await callApi<{ equipment: EquipmentInstance }>('forge-equipment', { blueprintItemId })
+  const { serverResult } = fireOptimisticAsync<{ equipment: EquipmentInstance }>(
+    'forge-equipment', { blueprintItemId },
+  )
+  const res = await serverResult
   return {
     success: res.success,
     equipment: res.equipment || null,
   }
 }
 
-/** 拆解裝備 */
+/** 拆解裝備（帶樂觀佇列保護） */
 export async function dismantleEquipment(
   equipId: string,
 ): Promise<{ success: boolean; goldGained: number; materialsGained: { itemId: string; quantity: number }[] }> {
-  const res = await callApi<{
+  const { serverResult } = fireOptimisticAsync<{
     goldGained: number
     materialsGained: { itemId: string; quantity: number }[]
   }>('dismantle-equipment', { equipId })
+  const res = await serverResult
   return {
     success: res.success,
     goldGained: res.goldGained || 0,
@@ -166,10 +182,12 @@ export interface StageCompleteResult {
   newStoryProgress?: { chapter: number; stage: number }
 }
 
-/** 通關結算（主線，帶 opId 幂等保護） */
+/** 通關結算（主線，樂觀佇列 + 幂等保護） */
 export async function completeStage(stageId: string, starsEarned: number): Promise<StageCompleteResult> {
-  const opId = generateOpId()
-  const res = await callApi<StageCompleteResult>('complete-stage', { stageId, starsEarned, opId })
+  const { serverResult } = fireOptimisticAsync<StageCompleteResult>(
+    'complete-stage', { stageId, starsEarned },
+  )
+  const res = await serverResult
   return {
     success: res.success,
     rewards: res.rewards || { gold: 0, exp: 0, diamond: 0, items: [] },
@@ -179,17 +197,17 @@ export async function completeStage(stageId: string, starsEarned: number): Promi
   }
 }
 
-/** 爬塔通關結算（帶 opId 幂等保護） */
+/** 爬塔通關結算（樂觀佇列 + 幂等保護） */
 export async function completeTower(floor: number): Promise<{
   success: boolean
   rewards: { gold: number; exp: number; diamond: number; items: { itemId: string; quantity: number }[] }
   newFloor: number
 }> {
-  const opId = generateOpId()
-  const res = await callApi<{
+  const { serverResult } = fireOptimisticAsync<{
     rewards: { gold: number; exp: number; diamond: number; items: { itemId: string; quantity: number }[] }
     newFloor: number
-  }>('complete-tower', { floor, opId })
+  }>('complete-tower', { floor })
+  const res = await serverResult
   return {
     success: res.success,
     rewards: res.rewards || { gold: 0, exp: 0, diamond: 0, items: [] },
@@ -197,17 +215,17 @@ export async function completeTower(floor: number): Promise<{
   }
 }
 
-/** 副本結算（帶 opId 幂等保護） */
+/** 副本結算（樂觀佇列 + 幂等保護） */
 export async function completeDaily(dungeonId: string, tier: string): Promise<{
   success: boolean
   rewards: { gold: number; exp: number; items: { itemId: string; quantity: number }[] }
   remainingAttempts: number
 }> {
-  const opId = generateOpId()
-  const res = await callApi<{
+  const { serverResult } = fireOptimisticAsync<{
     rewards: { gold: number; exp: number; items: { itemId: string; quantity: number }[] }
     remainingAttempts: number
-  }>('complete-daily', { dungeonId, tier, opId })
+  }>('complete-daily', { dungeonId, tier })
+  const res = await serverResult
   return {
     success: res.success,
     rewards: res.rewards || { gold: 0, exp: 0, items: [] },
@@ -215,7 +233,7 @@ export async function completeDaily(dungeonId: string, tier: string): Promise<{
   }
 }
 
-/** 抽卡（帶 opId 幂等保護） */
+/** 抽卡（舊版 server-side 路徑，樂觀佇列保護） */
 export async function gachaPull(bannerId: string, count: 1 | 10): Promise<{
   success: boolean
   results: { heroId: number; rarity: string; isNew: boolean; isFeatured: boolean }[]
@@ -223,13 +241,13 @@ export async function gachaPull(bannerId: string, count: 1 | 10): Promise<{
   newPityState: { pullsSinceLastSSR: number; guaranteedFeatured: boolean }
   gachaPoolRemaining: number
 }> {
-  const opId = generateOpId()
-  const res = await callApi<{
+  const { serverResult } = fireOptimisticAsync<{
     results: { heroId: number; rarity: string; isNew: boolean; isFeatured: boolean }[]
     diamondCost: number
     newPityState: { pullsSinceLastSSR: number; guaranteedFeatured: boolean }
     gachaPoolRemaining: number
-  }>('gacha-pull', { bannerId, count, opId })
+  }>('gacha-pull', { bannerId, count })
+  const res = await serverResult
   return {
     success: res.success,
     results: res.results || [],

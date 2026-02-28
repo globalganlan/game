@@ -24,7 +24,7 @@ import {
 interface MailboxPanelProps {
   onBack: () => void
   /** 領取獎勵後通知上層刷新資源（鑽石/金幣） */
-  onRewardsClaimed?: () => void
+  onRewardsClaimed?: (rewards: MailReward[]) => void
   /** App 預加載的信件列表 */
   mailItems: MailItem[]
   /** 預加載是否完成 */
@@ -100,7 +100,7 @@ export function MailboxPanel({
 
     // 背景 API（claimMailReward 內部走 optimisticQueue）
     claimMailReward(selected.mailId).catch(() => { /* 備份在 localStorage，登入時 reconcile */ })
-    onRewardsClaimed?.()
+    onRewardsClaimed?.(rewards)
   }, [selected, mails, setMails, onRewardsClaimed])
 
   /* ── 一鍵領取（樂觀更新 — 零等待） ── */
@@ -129,7 +129,7 @@ export function MailboxPanel({
 
     // 背景 API
     claimAllMail().catch(() => { /* localStorage 備份 */ })
-    onRewardsClaimed?.()
+    onRewardsClaimed?.(allRewards)
   }, [mails, setMails, onRewardsClaimed])
 
   /* ── 刪除單封（樂觀更新） ── */

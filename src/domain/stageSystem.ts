@@ -441,6 +441,27 @@ export const DAILY_DUNGEONS: DailyDungeon[] = [
   },
 ]
 
+/** 根據每日副本 stageId（如 "power_trial_easy"）查找副本設定 */
+export function getDailyDungeonConfig(stageId: string): { dungeon: DailyDungeon; difficulty: DungeonDifficulty } | null {
+  for (const dungeon of DAILY_DUNGEONS) {
+    for (const diff of dungeon.difficulties) {
+      if (`${dungeon.dungeonId}_${diff.tier}` === stageId) {
+        return { dungeon, difficulty: diff }
+      }
+    }
+  }
+  return null
+}
+
+const TIER_NAMES: Record<string, string> = { easy: '簡單', normal: '普通', hard: '困難' }
+
+/** 取得每日副本中文顯示名稱（如 "力量試煉 - 簡單"） */
+export function getDailyDungeonDisplayName(stageId: string): string {
+  const config = getDailyDungeonConfig(stageId)
+  if (!config) return stageId
+  return `${config.dungeon.name} - ${TIER_NAMES[config.difficulty.tier] ?? config.difficulty.tier}`
+}
+
 /** 取得今日可用的每日副本 */
 export function getTodayDungeons(): DailyDungeon[] {
   const dayOfWeek = new Date().getDay() // 0=Sun, 1=Mon, ...
