@@ -26,6 +26,9 @@ import {
   EQUIPMENT_SLOT_BASE,
   EQUIPMENT_SLOT_MAX,
   EQUIPMENT_SETS,
+  RARITY_LEVEL_GROWTH,
+  RARITY_ASC_MULT,
+  RARITY_STAR_MULT,
 } from '../progressionSystem'
 import type { EquipmentInstance, HeroInstanceData, BaseStats } from '../progressionSystem'
 
@@ -61,6 +64,20 @@ describe('progressionSystem — 等級經驗', () => {
 
   it('getStatAtLevel: lv11 = base * 1.4', () => {
     expect(getStatAtLevel(100, 11)).toBe(140)
+  })
+
+  it('getStatAtLevel: ★1 rarity lv11 = base * 1.3 (3%/lv)', () => {
+    // 1 + 10 * 0.03 = 1.30
+    expect(getStatAtLevel(100, 11, 1)).toBe(130)
+  })
+
+  it('getStatAtLevel: ★4 rarity lv11 = base * 1.5 (5%/lv)', () => {
+    // 1 + 10 * 0.05 = 1.50
+    expect(getStatAtLevel(100, 11, 4)).toBe(150)
+  })
+
+  it('getStatAtLevel: default rarity=3 same as old formula', () => {
+    expect(getStatAtLevel(100, 11)).toBe(getStatAtLevel(100, 11, 3))
   })
 
   it('getLevelCap: ascension 0 → 20', () => {
@@ -115,6 +132,17 @@ describe('progressionSystem — 突破', () => {
     expect(getAscensionMultiplier(5)).toBeGreaterThan(1.0)
   })
 
+  it('getAscensionMultiplier: ★4 > ★3 > ★2 > ★1', () => {
+    expect(getAscensionMultiplier(5, 4)).toBeGreaterThan(getAscensionMultiplier(5, 3))
+    expect(getAscensionMultiplier(5, 3)).toBeGreaterThan(getAscensionMultiplier(5, 2))
+    expect(getAscensionMultiplier(5, 2)).toBeGreaterThan(getAscensionMultiplier(5, 1))
+  })
+
+  it('getAscensionMultiplier: default rarity=3 same as old', () => {
+    expect(getAscensionMultiplier(5)).toBe(getAscensionMultiplier(5, 3))
+    expect(getAscensionMultiplier(5)).toBe(1.30)
+  })
+
   it('getAscensionCost(0) 有值', () => {
     const cost = getAscensionCost(0)
     expect(cost).not.toBeNull()
@@ -149,6 +177,17 @@ describe('progressionSystem — 星級', () => {
 
   it('getStarMultiplier(6) 最高', () => {
     expect(getStarMultiplier(6)).toBeGreaterThan(getStarMultiplier(1))
+  })
+
+  it('getStarMultiplier: ★4 > ★3 > ★2 > ★1', () => {
+    expect(getStarMultiplier(6, 4)).toBeGreaterThan(getStarMultiplier(6, 3))
+    expect(getStarMultiplier(6, 3)).toBeGreaterThan(getStarMultiplier(6, 2))
+    expect(getStarMultiplier(6, 2)).toBeGreaterThan(getStarMultiplier(6, 1))
+  })
+
+  it('getStarMultiplier: default rarity=3 same as old', () => {
+    expect(getStarMultiplier(6)).toBe(getStarMultiplier(6, 3))
+    expect(getStarMultiplier(6)).toBe(1.30)
   })
 
   it('getStarPassiveSlots 遞增', () => {
@@ -300,6 +339,27 @@ describe('progressionSystem — getFinalStats', () => {
     const hero: HeroInstanceData = { heroId: 1, level: 1, exp: 0, ascension: 0, stars: 1, equipment: [eq] }
     const s = getFinalStats(base, hero)
     expect(s.ATK).toBe(250) // 200 + 50
+  })
+
+  it('★4 rarity lv11 → ATK 增加 50% (5%/lv)', () => {
+    const hero: HeroInstanceData = { heroId: 1, level: 11, exp: 0, ascension: 0, stars: 1, equipment: [] }
+    const s = getFinalStats(base, hero, 4)
+    expect(s.ATK).toBe(300)  // 200 * (1 + 10*0.05) = 200 * 1.5
+  })
+
+  it('★1 rarity lv11 → ATK 增加 30% (3%/lv)', () => {
+    const hero: HeroInstanceData = { heroId: 1, level: 11, exp: 0, ascension: 0, stars: 1, equipment: [] }
+    const s = getFinalStats(base, hero, 1)
+    expect(s.ATK).toBe(260)  // 200 * (1 + 10*0.03) = 200 * 1.3
+  })
+
+  it('★4 asc5 star6 全部成長高於 ★1', () => {
+    const hero: HeroInstanceData = { heroId: 1, level: 60, exp: 0, ascension: 5, stars: 6, equipment: [] }
+    const s4 = getFinalStats(base, hero, 4)
+    const s1 = getFinalStats(base, hero, 1)
+    expect(s4.HP).toBeGreaterThan(s1.HP)
+    expect(s4.ATK).toBeGreaterThan(s1.ATK)
+    expect(s4.DEF).toBeGreaterThan(s1.DEF)
   })
 })
 

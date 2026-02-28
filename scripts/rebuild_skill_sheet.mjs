@@ -54,7 +54,7 @@ async function main() {
 
   // 4. Verify (read back + check Chinese)
   console.log('[4/4] Verifying sheet data...');
-  const verify = await get({ action: 'read', sheet: 'skill_templates' });
+  const verify = await get({ action: 'readSheet', sheet: 'skill_templates' });
   if (!verify.data || !verify.data.length) {
     console.error('  ✖ EMPTY SHEET — create failed!');
     process.exit(1);

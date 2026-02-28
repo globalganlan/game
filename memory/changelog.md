@@ -3,6 +3,61 @@
 > 按時間倒序排列，最新的在最上面。
 
 ---
+### [2026-06-14] 技能與成長系統全面平衡重設計
+
+- **觸發者**：使用者 4 項平衡原則要求
+- **執行角色**：🎯 GAME_DESIGN + 🔧 CODING
+- **設計原則**：
+  1. 主動技能作用單位越多 → 係數越低
+  2. 英雄稀有度越高 → 成長係數越高
+  3. 稀有度越高 → 被動技能越 OP
+  4. 低稀有度英雄 → 光環被動技（加全隊/削敵方）
+- **成長系統修改**（`src/domain/progressionSystem.ts`）：
+  - 新增 `RARITY_LEVEL_GROWTH`: ★1=3%/lv, ★2=3.5%, ★3=4%(不變), ★4=5%
+  - 新增 `RARITY_ASC_MULT`: 突破乘數依稀有度差異化（★4 最高 ×1.42）
+  - 新增 `RARITY_STAR_MULT`: 星級乘數依稀有度差異化（★4 最高 ×1.42）
+  - `getStatAtLevel` / `getAscensionMultiplier` / `getStarMultiplier` / `getFinalStats` 新增可選 rarity 參數
+- **主動技能倍率調整**（`scripts/skill_data_zh.json` → Google Sheets）：
+  - single_enemy: 280% → 350%（+25%）
+  - back_row: 250% → 220%（-12%）
+  - front_row: 220% → 180%（-18%）
+  - random_3: 120%×3 → 140%×3（+17%）
+  - all_enemies: 180% → 120%（-33%）
+  - single_ally heal: 300% → 350%（+17%）
+  - all_allies heal: 25% → 20%（-20%）
+- **被動技能重設計**：
+  - ★4（#3,#4,#10,#12,#13）：數值全面提升（+20~55%）
+  - ★3（#2,#5,#7,#8,#11）：保持原設計
+  - ★2（#1,#9,#14）：新增光環被動（全隊 SPD/DEF +5~8%）
+  - ★1（#6 無名活屍）：全面改為光環型（群聚嘶吼/腐臭領域/群聚本能/求生號令）
+- **其他修改**：
+  - `battleEngine.ts`：`createBattleHero` 新增 rarity 參數
+  - `App.tsx`：傳遞英雄稀有度至戰鬥系統
+  - `HeroListPanel.tsx`：數值顯示使用稀有度
+  - `rebuild_skill_sheet.mjs`：修正 verify action (`read` → `readSheet`)
+- **測試**：537→547 (新增 10 個稀有度成長測試)
+- **規格更新**：`specs/progression.md` v1.2→v1.3, `specs/skill-system.md` v1.0→v1.1
+
+---
+### [2026-03-01] 主線 1-1 難度平衡修正
+
+- **觸發者**：使用者回報（新玩家 3 隻 Lv1 初始英雄打不贏 1-1）
+- **執行角色**：🎯 GAME_DESIGN + 🔧 CODING
+- **根本原因**：
+  1. 敵方倍率 ×1.0 起始 — 等於與初始英雄同戰力，但敵方多（2-4 隻）
+  2. 敵方從全 14 隻殭屍池抽選 — 可能出 4 星高攻角色（屠宰者 ATK=60）
+  3. `maxCount = minCount + 2` — 1-1 最多出 4 隻敵人，壓倒性數量劣勢
+- **修正**（`src/domain/stageSystem.ts`）：
+  - HP 倍率起始 0.5（原 1.0）→ 1-1 敵人 HP 只有一半
+  - ATK 倍率起始 0.4（原 1.0）→ 1-1 敵人攻擊力僅四成
+  - 早期敵方數量公式改緩：1-1~1-4 固定 2 隻，1-5 開始 3 隻
+  - 章節 1 專用弱殭屍池 `[1,5,6,7,9,11,14]`（排除 4 星力量型高攻角色）
+  - 章節 2+ 恢復完整殭屍池
+- **數值對比（1-1）**：修正前 hpMult=1.0/atkMult=1.0/2~4隻/全池 → 修正後 hpMult=0.5/atkMult=0.4/固定2隻/弱池
+- **Spec 更新**：`specs/stage-system.md` v1.1→v1.2
+- **測試**：`tsc --noEmit` 零錯誤、`vite build` 成功、537 測試全通過
+
+---
 ### [2026-03-01] 修復 AudioContext 警告 + BGM 無法播放
 
 - **觸發者**：使用者回報（console 13 次 "AudioContext was not allowed to start" 警告，BGM 完全沒有聲音）

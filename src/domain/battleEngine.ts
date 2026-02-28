@@ -774,6 +774,7 @@ export function createBattleHero(
   starLevel: number = 1,
   uid?: string,
   heroInstance?: HeroInstanceData,
+  rarity: number = 3,
 ): BattleHero {
   // 根據星級決定開放幾個被動
   // 1星=1被動, 2星=2被動, 4星=3被動, 6星=4被動
@@ -790,7 +791,7 @@ export function createBattleHero(
 
   // Apply progression bonuses (level / ascension / stars / equipment) if available
   const baseStats: FinalStats = heroInstance
-    ? getFinalStats(rawStats, heroInstance)
+    ? getFinalStats(rawStats, heroInstance, rarity)
     : { ...rawStats }
 
   return {

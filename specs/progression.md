@@ -1,7 +1,7 @@
 # 養成系統 Spec
 
-> 版本：v1.2 ｜ 狀態：🟢 已實作
-> 最後更新：2026-02-28
+> 版本：v1.3 ｜ 狀態：🟢 已實作
+> 最後更新：2026-06-14
 > 負賬角色：🎯 GAME_DESIGN → 🔧 CODING
 
 ## 概述
@@ -70,13 +70,21 @@ function consumeExpMaterials(
 ): { level: number; exp: number; expConsumed: number }
 ```
 
-### 數值成長
+### 數值成長（稀有度差異化）
 
 ```typescript
-function getStatAtLevel(baseStat: number, level: number): number {
-  return Math.floor(baseStat * (1 + (level - 1) * 0.04))  // 每級 +4% of base
+function getStatAtLevel(baseStat: number, level: number, rarity: number = 3): number {
+  const growth = RARITY_LEVEL_GROWTH[rarity] ?? 0.04
+  return Math.floor(baseStat * (1 + (level - 1) * growth))
 }
 ```
+
+| 稀有度 | 每級成長 | Lv60 乘數 |
+|--------|----------|------------|
+| ★1 | +3.0% | ×2.77 |
+| ★2 | +3.5% | ×3.07 |
+| ★3 | +4.0% | ×3.36（與舊公式相同） |
+| ★4 | +5.0% | ×3.95 |
 
 > **SPD / CritRate / CritDmg** 不受等級影響，只受裝備/buff。
 
@@ -98,11 +106,14 @@ function getStatAtLevel(baseStat: number, level: number): number {
 |---------|----------|---|---|---|---|----------|
 | 等級上限 | 20 | 30 | 40 | 50 | 60 | 60 |
 
-### 突破屬性乘數（ASCENSION_MULTIPLIER）
+### 突破屬性乘數（RARITY_ASC_MULT，依稀有度差異化）
 
-| 突破階段 | 0 | 1 | 2 | 3 | 4 | 5 |
-|---------|---|---|---|---|---|---|
-| 乘數 | 1.0 | 1.05 | 1.10 | 1.15 | 1.20 | 1.30 |
+| 稀有度 \ 突破 | 0 | 1 | 2 | 3 | 4 | 5 |
+|---|---|---|---|---|---|---|
+| ★1 | 1.00 | 1.03 | 1.06 | 1.09 | 1.12 | 1.18 |
+| ★2 | 1.00 | 1.04 | 1.08 | 1.12 | 1.16 | 1.24 |
+| ★3 | 1.00 | 1.05 | 1.10 | 1.15 | 1.20 | 1.30 |
+| ★4 | 1.00 | 1.07 | 1.14 | 1.22 | 1.30 | 1.42 |
 
 ### 突破條件
 
@@ -128,14 +139,23 @@ function canAscend(level: number, ascension: number): boolean {
 
 ### 星級與被動解鎖
 
-| 星級 | 乘數 | 被動槽數 | 基礎數值加成 |
-|------|------|---------|-------------|
-| ★1 | 1.0 | 1 | — |
-| ★2 | 1.05 | 2 | 全屬性 +5% |
-| ★3 | 1.10 | 2 | 全屬性 +10% |
-| ★4 | 1.15 | 3 | 全屬性 +15% |
-| ★5 | 1.20 | 3 | 全屬性 +20% |
-| ★6 | 1.30 | 4 | 全屬性 +30% |
+**星級乘數（RARITY_STAR_MULT，依稀有度差異化）：**
+
+| 稀有度 \ 星級 | 1 | 2 | 3 | 4 | 5 | 6 |
+|---|---|---|---|---|---|---|
+| ★1 | 1.00 | 1.03 | 1.06 | 1.09 | 1.13 | 1.18 |
+| ★2 | 1.00 | 1.04 | 1.08 | 1.12 | 1.17 | 1.24 |
+| ★3 | 1.00 | 1.05 | 1.10 | 1.15 | 1.20 | 1.30 |
+| ★4 | 1.00 | 1.07 | 1.14 | 1.22 | 1.30 | 1.42 |
+
+**星級被動解鎖：**
+
+| 星級 | 被動槽數 |
+|------|--------|
+| ★1 | 1 |
+| ★2 | 2 |
+| ★4 | 3 |
+| ★6 | 4 |
 
 ### 升星碎片消耗（STAR_UP_COST）
 
@@ -335,3 +355,4 @@ function getFinalStats(base: BaseStats, hero: HeroInstanceData): FinalStats {
 | v1.0 | 2026-03-01 | 全面同步實作：補齊所有 domain 常數表（ASCENSION_LEVEL_CAP / MULTIPLIER / STAR系列 / SUB_STAT_POOL / 8 套裝）、所有匯出函式簽名、getFinalStats 5 步計算流程、consumeExpMaterials 函式、service 層 11 個 API 全列、UI 養成按鈕狀態（disabled）、裝備槽數不一致標注、鍛造/拆解 domain 缺失說明 |
 | v1.1 | 2026-02-28 | 養成 UI 全面實作：升級（素材選擇 exp_core S/M/L + 預覽 + optimistic update）、突破（canAscend 驗證 + 費用顯示）、升星（canStarUp 驗證 + 碎片費用）、裝備穿脫（4 槽 weapon/armor/ring/boots + 選擇彈窗 + 卸下）、全部走 Optimistic Queue |
 | v1.2 | 2026-02-28 | **Bug Fix**：升級/突破/升星操作新增本地樂觀扣除素材（`removeItemsLocally`）；戰鬥 HP 條改讀實際 `battleHero.maxHP`；存檔星級改讀 `inst.stars` |
+| v1.3 | 2026-06-14 | **稀有度差異化成長**：新增 RARITY_LEVEL_GROWTH / RARITY_ASC_MULT / RARITY_STAR_MULT 三張查找表，等級/突破/星級成長係數依稀有度差異化（★1=3%/lv, ★2=3.5%, ★3=4%不變, ★4=5%）；getStatAtLevel / getAscensionMultiplier / getStarMultiplier / getFinalStats 新增可選 rarity 參數（預設=3 向下相容） |

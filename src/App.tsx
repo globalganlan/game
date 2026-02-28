@@ -110,6 +110,7 @@ const CURTAIN_FADE_MS   = 1000  // CSS curtainFadeOut 動畫持續時間
 const SCENE_RENDER_GRACE_MS = 300   // closeCurtain delay：場景渲染餘裕
 const INITIAL_CURTAIN_GRACE_MS = 350 // 初始載入收幕前的額外等待
 const REPLAY_SCENE_SETTLE_MS = 400   // 回放：收幕後等場景更新再啟動 loop
+const ATTACK_DELAY_MS = 840   // 等待攻擊動畫的傷害觸發點（對應 Hero.tsx 中攻擊動畫的 timing）
 
 /** 等待 N 個 requestAnimationFrame（確保 DOM/WebGL 已 commit） */
 const waitFrames = (n = 2): Promise<void> =>
@@ -1225,8 +1226,9 @@ export default function App() {
         equipment: [],     // TODO: load equipped EquipmentInstance[]
       } : undefined
       const starLevel = heroInstanceData?.stars ?? 1
+      const heroRarity = Number((p as Record<string, unknown>).Rarity ?? 3)
 
-      const bh = createBattleHero(input, 'player', i, activeSkill, passives, starLevel, p._uid, heroInstanceData)
+      const bh = createBattleHero(input, 'player', i, activeSkill, passives, starLevel, p._uid, heroInstanceData, heroRarity)
       playerBH.push(bh)
       heroMap.set(bh.uid, bh)
     }
@@ -1237,7 +1239,8 @@ export default function App() {
       const heroId = Number(e.HeroID ?? e.id ?? 0)
       const input = slotToInput(e, heroId)
       const { activeSkill, passives } = getHeroSkillSet(heroId, skills, heroSkillsMap)
-      const bh = createBattleHero(input, 'enemy', i, activeSkill, passives, 1, e._uid)
+      const enemyRarity = Number((e as Record<string, unknown>).Rarity ?? 3)
+      const bh = createBattleHero(input, 'enemy', i, activeSkill, passives, 1, e._uid, undefined, enemyRarity)
       enemyBH.push(bh)
       heroMap.set(bh.uid, bh)
     }
@@ -1296,6 +1299,7 @@ export default function App() {
     const playHitOrDeath = async (targetUid: string, dmg: number, killed: boolean, isDodge: boolean) => {
       if (isDodge) {
         addDamage(targetUid, 0) // MISS
+        await delay(350) // 讓 MISS 文字可視 + 給攻擊者後退動畫緩衝
         return
       }
       addDamage(targetUid, dmg)
@@ -1326,10 +1330,12 @@ export default function App() {
     /** 背景動畫（死亡等長動畫）—— 不阻塞下一個 action，Phase C 前統一等待 */
     const backgroundAnims: Promise<void>[] = []
     const onAction = async (action: BattleAction) => {
-      // ★ 若此 action 的攻擊者上一次有待完成的後退，先等它完成
+      // ★ 等待所有待完成的後退動畫（閃避時無受傷動畫緩衝，前一位攻擊者可能仍在回位）
       if (action.type === 'NORMAL_ATTACK' || action.type === 'SKILL_CAST') {
-        const pending = pendingRetreats.get(action.attackerUid)
-        if (pending) { await pending; pendingRetreats.delete(action.attackerUid) }
+        if (pendingRetreats.size > 0) {
+          await Promise.all(pendingRetreats.values())
+          pendingRetreats.clear()
+        }
       }
       switch (action.type) {
 
@@ -1369,7 +1375,7 @@ export default function App() {
               return { ...prev, [action.attackerUid]: { current: action._atkEnergyNew!, max: prev[action.attackerUid]?.max ?? 1000 } }
             })
           }
-          await delay(840) // 等待攻擊動畫揮擊命中點
+          await delay(ATTACK_DELAY_MS) // 等待攻擊動畫揮擊命中點
 
           // 3) 傷害/受傷 or 閃避/死亡
           // ★ 受擊動畫開始前 → 立即更新受擊者能量
@@ -1468,7 +1474,7 @@ export default function App() {
               return { ...prev, [action.attackerUid]: { current: action._atkEnergyNew!, max: prev[action.attackerUid]?.max ?? 1000 } }
             })
           }
-          await delay(420) // 等待攻擊動畫揮擊命中點（~40-50% of animation）
+          await delay(ATTACK_DELAY_MS) // 等待攻擊動畫揮擊命中點
 
           // 3) 所有目標同時播放效果（Promise.all 取代 for...of await）
           //    ★ 合併重複 uid（random_enemies 可重複選擇同一個目標）
@@ -1739,13 +1745,18 @@ export default function App() {
       flowValidatorRef.current = null
     }
 
-    // 等待所有背景動畫完成（後退 + 死亡動畫，確保 Phase C 狀態正確）
+    // 等待背景動畫（後退 + 死亡），但設速度感知上限，避免最後一擊全滅後長等
     const allPending: Promise<void>[] = [...backgroundAnims]
     if (pendingRetreats.size > 0) {
       allPending.push(...pendingRetreats.values())
       pendingRetreats.clear()
     }
-    if (allPending.length > 0) await Promise.all(allPending)
+    if (allPending.length > 0) {
+      await Promise.race([
+        Promise.all(allPending),
+        delay(1200),            // 最多等 1.2s（1×）/ 0.6s（2×）/ 0.3s（4×）/ 0.15s（8×）
+      ])
+    }
 
     // 播放結束後保存完整 actions（供回放 + 統計使用）
     if (!isReplay) battleActionsRef.current = allActions

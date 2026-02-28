@@ -86,7 +86,7 @@ export const ASCENSION_LEVEL_CAP: Record<number, number> = {
   5: 60,
 }
 
-/** 突破屬性加成（乘算） */
+/** 突破屬性加成（乘算）— ★3 預設，向下相容 */
 export const ASCENSION_MULTIPLIER: Record<number, number> = {
   0: 1.0,
   1: 1.05,
@@ -96,7 +96,7 @@ export const ASCENSION_MULTIPLIER: Record<number, number> = {
   5: 1.30,
 }
 
-/** 星級屬性加成（乘算） */
+/** 星級屬性加成（乘算）— ★3 預設，向下相容 */
 export const STAR_MULTIPLIER: Record<number, number> = {
   1: 1.0,
   2: 1.05,
@@ -104,6 +104,34 @@ export const STAR_MULTIPLIER: Record<number, number> = {
   4: 1.15,
   5: 1.20,
   6: 1.30,
+}
+
+/* ════════════════════════════════════
+   稀有度差異化成長（高稀有度 → 高成長）
+   ════════════════════════════════════ */
+
+/** 等級成長率：每級 +X% of base（稀有度越高越強） */
+export const RARITY_LEVEL_GROWTH: Record<number, number> = {
+  1: 0.030,   // ★1：Lv60 → ×2.77
+  2: 0.035,   // ★2：Lv60 → ×3.07
+  3: 0.040,   // ★3：Lv60 → ×3.36（與舊公式一致）
+  4: 0.050,   // ★4：Lv60 → ×3.95
+}
+
+/** 突破加成（依稀有度）— ★3 等同 ASCENSION_MULTIPLIER */
+export const RARITY_ASC_MULT: Record<number, Record<number, number>> = {
+  1: { 0: 1.00, 1: 1.03, 2: 1.06, 3: 1.09, 4: 1.12, 5: 1.18 },
+  2: { 0: 1.00, 1: 1.04, 2: 1.08, 3: 1.12, 4: 1.16, 5: 1.24 },
+  3: { 0: 1.00, 1: 1.05, 2: 1.10, 3: 1.15, 4: 1.20, 5: 1.30 },
+  4: { 0: 1.00, 1: 1.07, 2: 1.14, 3: 1.22, 4: 1.30, 5: 1.42 },
+}
+
+/** 星級加成（依稀有度）— ★3 等同 STAR_MULTIPLIER */
+export const RARITY_STAR_MULT: Record<number, Record<number, number>> = {
+  1: { 1: 1.00, 2: 1.03, 3: 1.06, 4: 1.09, 5: 1.13, 6: 1.18 },
+  2: { 1: 1.00, 2: 1.04, 3: 1.08, 4: 1.12, 5: 1.17, 6: 1.24 },
+  3: { 1: 1.00, 2: 1.05, 3: 1.10, 4: 1.15, 5: 1.20, 6: 1.30 },
+  4: { 1: 1.00, 2: 1.07, 3: 1.14, 4: 1.22, 5: 1.30, 6: 1.42 },
 }
 
 /** 星級解鎖被動數量 */
@@ -207,9 +235,10 @@ export function totalExpForLevel(targetLevel: number): number {
   return total
 }
 
-/** 等級數值成長（每級 +4% of base） */
-export function getStatAtLevel(baseStat: number, level: number): number {
-  return Math.floor(baseStat * (1 + (level - 1) * 0.04))
+/** 等級數值成長（依稀有度差異化：★1=3%/lv, ★2=3.5%, ★3=4%, ★4=5%） */
+export function getStatAtLevel(baseStat: number, level: number, rarity: number = 3): number {
+  const growth = RARITY_LEVEL_GROWTH[rarity] ?? 0.04
+  return Math.floor(baseStat * (1 + (level - 1) * growth))
 }
 
 /** 取得等級上限 */
@@ -259,9 +288,9 @@ export function consumeExpMaterials(
    突破系統
    ════════════════════════════════════ */
 
-/** 取得突破加成乘數 */
-export function getAscensionMultiplier(ascension: number): number {
-  return ASCENSION_MULTIPLIER[ascension] ?? 1.0
+/** 取得突破加成乘數（依稀有度差異化） */
+export function getAscensionMultiplier(ascension: number, rarity: number = 3): number {
+  return RARITY_ASC_MULT[rarity]?.[ascension] ?? ASCENSION_MULTIPLIER[ascension] ?? 1.0
 }
 
 /** 取得突破消耗 */
@@ -280,9 +309,9 @@ export function canAscend(level: number, ascension: number): boolean {
    星級系統
    ════════════════════════════════════ */
 
-/** 取得星級屬性乘數 */
-export function getStarMultiplier(stars: number): number {
-  return STAR_MULTIPLIER[stars] ?? 1.0
+/** 取得星級屬性乘數（依稀有度差異化） */
+export function getStarMultiplier(stars: number, rarity: number = 3): number {
+  return RARITY_STAR_MULT[rarity]?.[stars] ?? STAR_MULTIPLIER[stars] ?? 1.0
 }
 
 /** 取得星級可用被動數 */
@@ -391,11 +420,12 @@ export function getActiveSetBonuses(equipment: EquipmentInstance[]): EquipmentSe
    最終數值結算
    ════════════════════════════════════ */
 
-/** 結算英雄最終數值（等級+突破+星級+裝備+套裝） */
-export function getFinalStats(base: BaseStats, hero: HeroInstanceData): FinalStats {
-  const levelMult = 1 + (hero.level - 1) * 0.04
-  const ascMult = getAscensionMultiplier(hero.ascension)
-  const starMult = getStarMultiplier(hero.stars)
+/** 結算英雄最終數值（等級+突破+星級+裝備+套裝，依稀有度差異化成長） */
+export function getFinalStats(base: BaseStats, hero: HeroInstanceData, rarity: number = 3): FinalStats {
+  const growth = RARITY_LEVEL_GROWTH[rarity] ?? 0.04
+  const levelMult = 1 + (hero.level - 1) * growth
+  const ascMult = getAscensionMultiplier(hero.ascension, rarity)
+  const starMult = getStarMultiplier(hero.stars, rarity)
 
   // Step 1: base × level × ascension × star（HP/ATK/DEF 受影響，SPD/Crit 不受等級影響）
   const stats: FinalStats = {

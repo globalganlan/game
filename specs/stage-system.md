@@ -1,7 +1,7 @@
 # 關卡系統 Spec
 
-> 版本：v1.1 ｜ 狀態：🟢 已實作
-> 最後更新：2026-02-28
+> 版本：v1.2 ｜ 狀態：🟢 已實作
+> 最後更新：2026-03-01
 > 負責角色：🎯 GAME_DESIGN → 🔧 CODING
 
 ## 概述
@@ -90,17 +90,17 @@ function seededRandom(seed: number): () => number {
 linearIndex = (chapter - 1) * 8 + stage  // 1~24
 seed = chapter * 1000 + stage
 
-// 敵人數量
-minCount = min(2 + floor(linearIndex / 4), 6)
-maxCount = min(minCount + 2, 6)
+// 敵人數量（早期固定少量，逐漸增加）
+minCount = min(2 + floor((linearIndex - 1) / 4), 6)
+maxCount = min(minCount + floor(linearIndex / 6), 6)
 enemyCount = minCount + floor(rng() * (maxCount - minCount + 1))
 
-// 倍率
-hpMult    = 1.0 + (linearIndex - 1) * 0.12
-atkMult   = 1.0 + (linearIndex - 1) * 0.08
+// 倍率（1-1 起始較弱，給新玩家緩衝）
+hpMult    = 0.5 + (linearIndex - 1) * 0.12
+atkMult   = 0.4 + (linearIndex - 1) * 0.08
 speedMult = 1.0 + (linearIndex - 1) * 0.015
 
-// 敵人 heroId 從 ZOMBIE_IDS [1-14] 隨機選取
+// 章節 1 使用弱殭屍池 [1,5,6,7,9,11,14]，章節 2+ 使用完整池 [1-14]
 recommendedLevel = min(1 + (linearIndex - 1) * 2, 60)
 ```
 

@@ -249,13 +249,14 @@ interface HeroDetailProps {
 function HeroDetail({ hero, instance, onClose, skills, heroSkills }: HeroDetailProps) {
   const lvl = instance?.level ?? 1
   const asc = instance?.ascension ?? 0
-  const ascMult = getAscensionMultiplier(asc)
-  const stars = instance?.stars ?? initialStars((hero as Record<string, unknown>).Rarity)
-  const starMult = getStarMultiplier(stars)
-  const calcStat = (base: number | undefined) =>
-    base != null ? Math.floor(getStatAtLevel(Number(base), lvl) * ascMult * starMult) : '?'
-
   const heroAny = hero as Record<string, unknown>
+  const rarityNum = Number(heroAny.Rarity ?? 3)
+  const ascMult = getAscensionMultiplier(asc, rarityNum)
+  const stars = instance?.stars ?? initialStars((hero as Record<string, unknown>).Rarity)
+  const starMult = getStarMultiplier(stars, rarityNum)
+  const calcStat = (base: number | undefined) =>
+    base != null ? Math.floor(getStatAtLevel(Number(base), lvl, rarityNum) * ascMult * starMult) : '?'
+
   const rarity = numToRarity(heroAny.Rarity)
   const rcfg = RARITY_CONFIG[rarity]
   const passiveSlots = getStarPassiveSlots(stars)

@@ -84,6 +84,9 @@ export type StarRating = 1 | 2 | 3
 
 const ZOMBIE_IDS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]
 
+/** 章節 1 用較弱的殭屍池（1~3 星，排除高攻力量型 4 星） */
+const CHAPTER1_ZOMBIE_IDS = [1, 5, 6, 7, 9, 11, 14]  // 女喪屍/口器者/無名活屍/腐學者/倖存者/白面鬼/脫逃者
+
 function seededRandom(seed: number): () => number {
   let s = seed
   return () => {
@@ -109,19 +112,22 @@ export function getStoryStageConfig(stageId: string): StageConfig {
   // Seed: chapter * 1000 + stage → deterministic
   const rng = seededRandom(chapter * 1000 + stage)
 
-  // 敵方數量：隨關卡遞增 2~6
-  const minCount = Math.min(2 + Math.floor(linearIndex / 4), 6)
-  const maxCount = Math.min(minCount + 2, 6)
+  // 敵方數量：早期固定少量，隨關卡遞增 2~6
+  const minCount = Math.min(2 + Math.floor((linearIndex - 1) / 4), 6)
+  const maxCount = Math.min(minCount + Math.floor(linearIndex / 6), 6)
   const enemyCount = minCount + Math.floor(rng() * (maxCount - minCount + 1))
 
-  // 難度倍率：隨關卡遞增
-  const hpMult  = 1.0 + (linearIndex - 1) * 0.12
-  const atkMult = 1.0 + (linearIndex - 1) * 0.08
+  // 難度倍率：1-1 起始較弱（hpMult=0.5, atkMult=0.4），隨關卡逐漸增強
+  const hpMult  = 0.5 + (linearIndex - 1) * 0.12
+  const atkMult = 0.4 + (linearIndex - 1) * 0.08
   const spdMult = 1.0 + (linearIndex - 1) * 0.015
+
+  // 章節 1 使用較弱殭屍池，章節 2+ 使用完整池
+  const pool = chapter <= 1 ? CHAPTER1_ZOMBIE_IDS : ZOMBIE_IDS
 
   const enemies: StageEnemy[] = []
   for (let i = 0; i < enemyCount; i++) {
-    const heroId = ZOMBIE_IDS[Math.floor(rng() * ZOMBIE_IDS.length)]
+    const heroId = pool[Math.floor(rng() * pool.length)]
     enemies.push({
       heroId,
       slot: i,
