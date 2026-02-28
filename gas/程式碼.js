@@ -421,6 +421,10 @@ function doPost(e) {
       case 'delete-column':
         result = handleDeleteColumn_(body.sheet, body.column);
         break;
+      // ── Battle ──
+      case 'run-battle':
+        result = handleRunBattle_(body);
+        break;
       // ── Cache ──
       case 'invalidate-cache':
         invalidateAllCache_();
@@ -891,6 +895,24 @@ function handleRegisterGuest_(params) {
     playerId, token, '', '', displayName, now, now, false
   ]);
 
+  // ── 新用戶歡迎禮包信件 ──
+  try {
+    handleSendMail_({
+      targetPlayerIds: [playerId],
+      title: '🎉 歡迎來到全球感染！',
+      body: '感謝加入末日生存之旅！這是你的新手禮包，祝你在感染的世界中存活下來！',
+      rewards: [
+        { itemId: 'diamond', quantity: 300 },
+        { itemId: 'gold', quantity: 10000 },
+        { itemId: 'exp_core_m', quantity: 5 },
+        { itemId: 'exp_core_l', quantity: 2 }
+      ],
+      expiresAt: ''
+    });
+  } catch (e) {
+    Logger.log('Welcome mail failed for ' + playerId + ': ' + e.message);
+  }
+
   return { success: true, playerId: playerId, displayName: displayName, alreadyExists: false };
 }
 
@@ -1159,24 +1181,39 @@ function handleInitSave_(params) {
   var lastRow = sheet.getLastRow();
   sheet.getRange(lastRow, 7).setNumberFormat('@').setValue('1-1');
 
-  // 贈送初始英雄：無名活屍 HeroID=6
+  // 贈送初始英雄（3 隻）：無名活屍(6/N) + 女喪屍(1/R) + 倖存者(9/R)
   var heroSheet = getHeroInstSheet_();
-  var instanceId = playerId + '_6_' + Date.now();
-  heroSheet.appendRow([
-    playerId,
-    instanceId,
-    6,       // heroId
-    1,       // level
-    0,       // exp
-    0,       // ascension
-    '{}',    // equippedItems
-    now      // obtainedAt
-  ]);
+  var starterHeroIds = [6, 1, 9];
+  var starterInstanceIds = [];
+  for (var si = 0; si < starterHeroIds.length; si++) {
+    var hid = starterHeroIds[si];
+    var instId = playerId + '_' + hid + '_' + (Date.now() + si);
+    heroSheet.appendRow([
+      playerId,
+      instId,
+      hid,     // heroId
+      1,       // level
+      0,       // exp
+      0,       // ascension
+      '{}',    // equippedItems
+      now      // obtainedAt
+    ]);
+    starterInstanceIds.push(instId);
+  }
+
+  // 自動上陣：3 隻初始英雄分別放在 slot 0, 1, 2
+  var autoFormation = [
+    starterHeroIds[0], starterHeroIds[1], starterHeroIds[2],
+    null, null, null
+  ];
+  var saveLastRow = sheet.getLastRow();
+  // formation 欄位（第 11 欄）
+  sheet.getRange(saveLastRow, 11).setValue(JSON.stringify(autoFormation));
 
   return {
     success: true,
     alreadyExists: false,
-    starterHeroInstanceId: instanceId
+    starterHeroInstanceId: starterInstanceIds[0]
   };
 }
 

@@ -1,7 +1,7 @@
 # 存檔系統 Spec
 
-> 版本：v1.0 ｜ 狀態：🟢 已實作
-> 最後更新：2026-03-01
+> 版本：v1.2 ｜ 狀態：🟢 已實作
+> 最後更新：2026-02-28
 > 負責角色：🎯 GAME_DESIGN → 🔧 CODING
 
 ## 概述
@@ -270,12 +270,16 @@ const INITIAL_SAVE = {
   resourceTimerLastCollect: now,       // ISO 8601
   towerFloor: 0,
   storyProgress: '{"chapter":1,"stage":1}',
-  formation: '[null,null,null,null,null,null]',
+  formation: '[6,1,9,null,null,null]',   // 自動上陣 3 隻初始英雄
   lastSaved: now,
 }
 
-// 初始英雄：贈送「無名活屍」（HeroID=6, ★1, 均衡型）
-// instanceId = playerId + '_6_' + Date.now()
+// 初始英雄（3 隻）：
+//  HeroID=6  無名活屍（N, 均衡, 闇）
+//  HeroID=1  女喪屍（R, 敏捷, 闇）
+//  HeroID=9  倖存者（R, 均衡, 光）
+// instanceId = playerId + '_{heroId}_' + (Date.now() + index)
+// formation 自動填入前 3 格：[6, 1, 9, null, null, null]
 ```
 
 ---
@@ -372,3 +376,5 @@ GAS handleCollectResources_:（包在 executeWithIdempotency_ 中）
 | v0.3 | 2026-02-28 | 新增 `stageStars` / `battleSpeed` 欄位、陣型自動存讀、sanitization 防護、`saveFormation` 改 sync + Optimistic、全面採用 Optimistic Queue、`getSaveState()` 新 API |
 | v0.4 | 2026-02-28 | 移除 `battleSpeed` 欄位（改存 localStorage，不再同步到 Google Sheet）、GAS 新增 `delete-column` handler |
 | v1.0 | 2026-03-01 | 全面同步實作：新增 gachaPity/gachaPool 欄位至 Sheet 結構、補齊 loadSave 完整流程（含 isNew/initSave/sanitize/reconcile/fallback）、enqueueSave debounce 2s + retry 3x 機制、collectResources 幂等保護 + 樂觀更新、陣型改為戰鬥開始時才保存、完整列出所有導出函式簽名、init-save 初始值詳列 |
+| v1.1 | 2026-02-28 | 初始英雄從 1 隻（無名活屍 N）改為 3 隻（+女喪屍 R、倖存者 R），formation 自動填入前 3 格，修復新帳號卡關 1-1 問題 |
+| v1.2 | 2026-02-28 | 新增完整登出狀態重置（`handleFullLogout`）：清除 8 個服務層快取 + 20+ 個 React state + 5 個 ref 守門旗標，修復登出再登入殘留舊帳號資料問題 |

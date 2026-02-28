@@ -1,5 +1,5 @@
 /**
- * 小型 3D 元件 — DamagePopup / HealthBar3D / SlotMarker / ResponsiveCamera / SkillToast3D / ElementHint3D
+ * 小型 3D 元件 — DamagePopup / HealthBar3D / SlotMarker / ResponsiveCamera / SkillToast3D / ElementHint3D / PassiveHint3D
  *
  * 這些元件都在 R3F Canvas 內使用。
  */
@@ -9,6 +9,9 @@ import { useFrame, useThree } from '@react-three/fiber'
 import { OrbitControls, Billboard, Text } from '@react-three/drei'
 import * as THREE from 'three'
 import type { Vector3Tuple } from 'three'
+
+/** 本機中文字型（避免等待 CDN 下載） */
+export const LOCAL_FONT = `${import.meta.env.BASE_URL}fonts/NotoSansSC-Regular.ttf`
 
 /* ────────────────────────────
    工具：圓角矩形 Shape
@@ -92,6 +95,7 @@ export function DamagePopup({ value, position, textScale = 1 }: DamagePopupProps
   return (
     <Billboard position={position} ref={ref}>
       <Text
+        font={LOCAL_FONT}
         fontSize={0.8 * textScale}
         color={textColor}
         outlineColor="white"
@@ -185,7 +189,6 @@ export function EnergyBar3D({
   const isFull = clampedRatio >= 1
   const radius = height * 0.5
 
-  const groupRef = useRef<THREE.Group>(null)
   const fgRef = useRef<THREE.Mesh>(null)
   const glowRef = useRef<THREE.Mesh>(null)
 
@@ -343,6 +346,7 @@ export function SkillToast3D({ heroName, skillName, position, textScale = 1 }: S
       </mesh>
       {/* 英雄名 */}
       <Text
+        font={LOCAL_FONT}
         fontSize={0.32 * textScale}
         color="#ffd866"
         outlineColor="#000"
@@ -353,9 +357,11 @@ export function SkillToast3D({ heroName, skillName, position, textScale = 1 }: S
         renderOrder={31}
       >
         {heroName}
+        <meshBasicMaterial transparent depthTest={false} />
       </Text>
       {/* 技能名（更大更亮） */}
       <Text
+        font={LOCAL_FONT}
         fontSize={0.55 * textScale}
         color="#fff"
         outlineColor="#ff6600"
@@ -367,6 +373,7 @@ export function SkillToast3D({ heroName, skillName, position, textScale = 1 }: S
         renderOrder={31}
       >
         {skillName}
+        <meshBasicMaterial transparent depthTest={false} />
       </Text>
     </Billboard>
   )
@@ -398,16 +405,71 @@ export function ElementHint3D({ text, color, position, textScale = 1 }: ElementH
   if (opacity <= 0) return null
 
   return (
-    <Billboard position={position} ref={ref}>
+    <Billboard position={position} ref={ref} renderOrder={28}>
       <Text
+        font={LOCAL_FONT}
         fontSize={0.45 * textScale}
         color={color}
         outlineColor="#000"
         outlineWidth={0.04}
         fillOpacity={opacity}
         outlineOpacity={opacity}
+        renderOrder={28}
       >
         {text}
+        <meshBasicMaterial transparent depthTest={false} />
+      </Text>
+    </Billboard>
+  )
+}
+
+/* ────────────────────────────
+   PassiveHint3D — 被動觸發浮動標示
+   ──────────────────────────── */
+
+interface PassiveHint3DProps {
+  skillName: string
+  position: Vector3Tuple
+  textScale?: number
+}
+
+/** 英雄頭頂顯示被動觸發名稱（紫色上浮淡出） */
+export function PassiveHint3D({ skillName, position, textScale = 1 }: PassiveHint3DProps) {
+  const ref = useRef<THREE.Group>(null)
+  const [opacity, setOpacity] = useState(1)
+  const elapsed = useRef(0)
+
+  useFrame((_state, delta) => {
+    if (ref.current) {
+      elapsed.current += delta
+      ref.current.position.y += delta * 0.13
+      // 前 0.4 秒保持不透明，之後淡出
+      if (elapsed.current > 0.4) {
+        setOpacity((prev) => Math.max(0, prev - delta * 0.6))
+      }
+      // 開頭微彈（前 0.1s 放大到 1.1x 再回縮）
+      const t = elapsed.current
+      const scale = t < 0.05 ? 1 + t / 0.05 * 0.1 : t < 0.15 ? 1.1 - (t - 0.05) / 0.1 * 0.1 : 1
+      ref.current.scale.set(scale, scale, scale)
+    }
+  })
+
+  if (opacity <= 0) return null
+
+  return (
+    <Billboard position={position} ref={ref} renderOrder={29}>
+      <Text
+        font={LOCAL_FONT}
+        fontSize={0.36 * textScale}
+        color="#d4a0ff"
+        outlineColor="#3a0066"
+        outlineWidth={0.04}
+        fillOpacity={opacity}
+        outlineOpacity={opacity}
+        renderOrder={29}
+      >
+        {'★ ' + skillName}
+        <meshBasicMaterial transparent depthTest={false} />
       </Text>
     </Billboard>
   )

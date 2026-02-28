@@ -18,6 +18,7 @@ import {
   type GachaRarity,
 } from '../domain/gachaSystem'
 import type { RawHeroData } from '../types'
+import { translateError } from '../utils/errorMessages'
 import { Thumbnail3D } from './UIOverlay'
 import { addItemsLocally } from '../services/inventoryService'
 
@@ -47,15 +48,11 @@ interface GachaScreenProps {
 }
 
 /* ────────────────────────────
-   Rarity Config
+   Rarity Config（共用常數）
    ──────────────────────────── */
 
-const RARITY_CONFIG: Record<GachaRarity, { color: string; glow: string; label: string }> = {
-  SSR: { color: '#ffd43b', glow: '0 0 20px #ffd43b', label: '★★★★ SSR' },
-  SR:  { color: '#be4bdb', glow: '0 0 15px #be4bdb', label: '★★★ SR' },
-  R:   { color: '#4dabf7', glow: '0 0 10px #4dabf7', label: '★★ R' },
-  N:   { color: '#aaa',    glow: 'none',              label: '★ N' },
-}
+import { RARITY_CONFIG } from '../constants/rarity'
+import { CurrencyIcon } from './CurrencyIcon'
 
 /* ────────────────────────────
    Result Card
@@ -90,7 +87,7 @@ function ResultCard({ result, hero }: { result: PullResult; hero?: RawHeroData }
       <span className="gacha-result-rarity" style={{ color: cfg.color }}>{cfg.label}</span>
       {!result.isNew && (result.stardust > 0 || result.fragments > 0) && (
         <span className="gacha-dupe-reward">
-          {result.stardust > 0 && <span>✨{result.stardust}</span>}
+          {result.stardust > 0 && <span><CurrencyIcon type="stardust" />{result.stardust}</span>}
           {result.fragments > 0 && <span>🧩{result.fragments}</span>}
         </span>
       )}
@@ -106,7 +103,7 @@ export function GachaScreen({ diamond, heroesList, onBack, onDiamondChange, onPu
   const [results, setResults] = useState<PullResult[]>([])
   const [showResults, setShowResults] = useState(false)
   const [pityCount, setPityCount] = useState(getPityState().pullsSinceLastSSR || initialPity)
-  const [poolRemaining, setPoolRemainingState] = useState(getPoolRemaining())
+  const [_poolRemaining, setPoolRemainingState] = useState(getPoolRemaining())
   const [error, setError] = useState<string | null>(null)
 
   const banner = STANDARD_BANNER
@@ -142,7 +139,7 @@ export function GachaScreen({ diamond, heroesList, onBack, onDiamondChange, onPu
       if (res.error === 'pool_empty') {
         setError('伺服器忙碌中，請稍後再試...')
       } else {
-        setError('抽卡失敗：' + (res.error || '未知錯誤'))
+        setError(translateError(res.error, '抽卡失敗'))
       }
       return
     }
@@ -184,7 +181,7 @@ export function GachaScreen({ diamond, heroesList, onBack, onDiamondChange, onPu
         <div className="panel-header">
           <button className="panel-back-btn" onClick={onBack}>← 返回</button>
           <h2 className="panel-title">🎰 {banner.name}</h2>
-          <span className="gacha-diamond"><i className="icon-dia">D</i> {diamond.toLocaleString()}</span>
+          <span className="gacha-diamond"><CurrencyIcon type="diamond" /> {diamond.toLocaleString()}</span>
         </div>
 
         {/* Banner Info */}
@@ -196,10 +193,10 @@ export function GachaScreen({ diamond, heroesList, onBack, onDiamondChange, onPu
 
           {/* Rate Info */}
           <div className="gacha-rates">
-            <span className="gacha-rate-item" style={{ color: '#ffd43b' }}>SSR 1.5%</span>
-            <span className="gacha-rate-item" style={{ color: '#be4bdb' }}>SR 10%</span>
-            <span className="gacha-rate-item" style={{ color: '#4dabf7' }}>R 35%</span>
-            <span className="gacha-rate-item" style={{ color: '#aaa' }}>N 53.5%</span>
+            <span className="gacha-rate-item" style={{ color: RARITY_CONFIG.SSR.color }}>SSR 1.5%</span>
+            <span className="gacha-rate-item" style={{ color: RARITY_CONFIG.SR.color }}>SR 10%</span>
+            <span className="gacha-rate-item" style={{ color: RARITY_CONFIG.R.color }}>R 35%</span>
+            <span className="gacha-rate-item" style={{ color: RARITY_CONFIG.N.color }}>N 53.5%</span>
           </div>
 
           {/* Pity Counter */}
@@ -228,7 +225,7 @@ export function GachaScreen({ diamond, heroesList, onBack, onDiamondChange, onPu
             onClick={() => doPull(1)}
           >
             <span className="gacha-btn-label">單抽</span>
-            <span className="gacha-btn-cost"><i className="icon-dia">D</i> {SINGLE_PULL_COST}</span>
+            <span className="gacha-btn-cost"><CurrencyIcon type="diamond" /> {SINGLE_PULL_COST}</span>
           </button>
           <button
             className="gacha-pull-btn gacha-pull-ten"
@@ -236,7 +233,7 @@ export function GachaScreen({ diamond, heroesList, onBack, onDiamondChange, onPu
             onClick={() => doPull(10)}
           >
             <span className="gacha-btn-label">十連抽</span>
-            <span className="gacha-btn-cost"><i className="icon-dia">D</i> {TEN_PULL_COST}</span>
+            <span className="gacha-btn-cost"><CurrencyIcon type="diamond" /> {TEN_PULL_COST}</span>
           </button>
         </div>
       </div>

@@ -6,7 +6,7 @@
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { calculateDamage, calculateHeal, calculateDot, calculateReflect } from '../damageFormula'
-import { applyStatus, absorbDamageByShields } from '../buffSystem'
+import { applyStatus } from '../buffSystem'
 import { makeHero, makeDamageEffect, makeHealEffect, resetUidCounter } from './testHelper'
 import type { BattleHero } from '../types'
 

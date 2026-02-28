@@ -4,8 +4,8 @@
  * 檢查極端值、空陣列、overflow、underflow 等
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { calculateDamage, calculateHeal, calculateDot } from '../damageFormula'
-import { applyStatus, cleanse, processDotEffects, getBuffedStats, absorbDamageByShields } from '../buffSystem'
+import { calculateDamage, calculateHeal } from '../damageFormula'
+import { applyStatus, cleanse, processDotEffects, getBuffedStats } from '../buffSystem'
 import { addEnergy, canCastUltimate, consumeEnergy } from '../energySystem'
 import { selectTargets, selectNormalAttackTarget } from '../targetStrategy'
 import { getElementMultiplier } from '../elementSystem'

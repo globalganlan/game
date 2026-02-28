@@ -1,13 +1,15 @@
 # 背包與道具系統 Spec
 
-> 版本：v1.0 ｜ 狀態：🟢 已實作（部分 UI 操作待開發）
-> 最後更新：2026-03-01
-> 負責角色：🎯 GAME_DESIGN → 🔧 CODING
+> 版本：v1.2 ｜ 狀態：🟢 已實作
+> 最後更新：2026-02-28
+> 負賬角色：🎯 GAME_DESIGN → 🔧 CODING
 
 ## 概述
 
 統一管理所有可堆疊道具、消耗品、素材、裝備的儲存與使用。
-背包是玩家的核心資源中心，所有養成系統（升級/突破/升星/裝備強化/鍛造）的素材消耗都從背包扣除。
+背包是玩家的核心資源中心，所有養成系統（升級/突破/升星/裝備強化/鑫造）的素材消耗都從背包扣除。
+
+UI 已全面實作：9 個分類 Tab、排序功能、4 種排序模式、使用/出售按鈕、裝備詳情彈窗、金幣鉇石 Header。
 
 ## 依賴
 
@@ -357,7 +359,7 @@ interface InventoryPanelProps {
 }
 ```
 
-### 分頁（6 個）
+### 分頁（9 個）
 
 | key | icon | label |
 |-----|------|-------|
@@ -365,32 +367,49 @@ interface InventoryPanelProps {
 | `exp_material` | 📗 | 經驗 |
 | `ascension_material` | 🔥 | 突破 |
 | `equipment_material` | 🔧 | 裝備素材 |
+| `forge_material` | ⚒️ | 鑫造 |
+| `general_material` | 🧪 | 通用 |
 | `equipment` | 🗡️ | 裝備 |
 | `chest` | 🎁 | 寶箱 |
+| `currency` | `CurrencyIcon(gold)` | 貨幣 |
 
-> ⚠️ **缺少的分頁**：`forge_material`（鍛造素材）、`general_material`（通用素材）、`currency`（貨幣代幣）尚無對應 Tab。
+### 排序功能（✅ 已實作）
 
-### 已實作的功能
+```typescript
+type SortMode = 'default' | 'rarity-desc' | 'quantity-desc' | 'name-asc'
+```
+
+| 排序模式 | 說明 |
+|---------|------|
+| `default` | 原始順序 |
+| `rarity-desc` | 稀有度由高到低（SSR → N） |
+| `quantity-desc` | 數量由多到少 |
+| `name-asc` | 名稱 A-Z |
+
+> ⬜ **缺少的分頁**：~~`forge_material`、`general_material`、`currency` 尚無對應 Tab~~（✅ 已新增）
+
+### ✅ 已實作的 UI 操作
 
 | 功能 | 說明 |
 |------|------|
 | 容量顯示 | Header 顯示 `{equipment.length}/{equipmentCapacity} 裝備` |
+| 金幣/鑽石 Header | 顯示 `<CurrencyIcon type="gold"/>` + `<CurrencyIcon type="diamond"/>` （CSS badge，非 emoji） |
 | 點擊查看 | 點擊道具 → ItemDetail 彈窗（名稱、稀有度、描述、數量、出售價格） |
 | 英雄碎片辨識 | `asc_fragment_{heroId}` 自動顯示英雄縮圖 + 🧩 角標 |
+| 使用按鈕 | 寶箱開啟 / 經驗核心升級（依 item.useAction 判斷） |
+| 出售按鈕 | 道具換金幣（顯示價格 + 確認） |
+| 鎖定按鈕 | 裝備鎖定/解鎖（防拆解） |
+| 裝備詳情 | 裝備樣式彈窗：主屬性 + 副屬性 + 強化等級 + 套裝名 |
+| 排序功能 | 4 種排序模式（default / rarity-desc / quantity-desc / name-asc） |
+| 9 個分類 Tab | 新增 forge_material、general_material、currency 3 個 Tab |
 
-### ⚠️ 未實作的 UI 操作
+### ⚠️ 尚未實作的 UI 操作
 
-| 操作 | Spec 設計 | 狀態 |
-|------|-----------|------|
-| 使用按鈕 | 寶箱開啟 / 經驗核心升級 | ❌ 未實作 |
-| 出售按鈕 | 道具換金幣 | ❌ 未實作（僅顯示價格） |
-| 鎖定按鈕 | 裝備鎖定 | ❌ 未實作 |
-| 排序功能 | 時間/稀有度/類別/數量 | ❌ 未實作 |
-| 批量出售 | 長按多選 | ❌ 未實作 |
-| 批量使用 | 素材批量使用 | ❌ 未實作 |
-| 裝備詳情 | 顯示主/副屬性/套裝 | ❌ 未實作（共用一般 ItemDetail） |
-| 擴容入口 | 背包擴容按鈕 | ❌ 未實作（僅顯示容量） |
-| 金幣/鑽石 | Header 顯示 | ❌ 未傳入 Props |
+| 操作 | 狀態 |
+|------|------|
+| 批量出售 | ❌ 未實作（單件出售已實作） |
+| 批量使用 | ❌ 未實作 |
+| 擴容入口 | ❌ 未實作（僅顯示容量） |
 
 ---
 
@@ -445,12 +464,14 @@ interface InventoryPanelProps {
 
 ## 擴展點
 
-- [ ] **UI 操作按鈕**：使用/出售/鎖定/批量操作
-- [ ] **排序功能**：時間/稀有度/類別/數量 排序
+- [x] **UI 操作按鈕**：使用/出售/鎖定（✅ 已完成）
+- [x] **排序功能**：4 種排序模式（✅ 已完成）
+- [x] **缺少的分頁**：forge_material / general_material / currency Tab（✅ 已完成）
+- [x] **裝備詳情面板**：獨立於一般道具的裝備資訊（✅ 已完成）
+- [x] **金幣/鉇石 Header 顯示**（✅ 已完成）
 - [ ] **商店系統**：5 種商店 + 3 個 API
-- [ ] **缺少的分頁**：forge_material / general_material / currency Tab
-- [ ] **裝備詳情面板**：獨立於一般道具的裝備資訊（主副屬性/套裝/強化等級）
-- [ ] **金幣/鑽石 Header 顯示**
+- [ ] **批量出售**：長按多選
+- [ ] **批量使用**：素材批量使用
 - [ ] **道具合成**：低級素材合成高級（如 3×小型強化石 → 1×中型強化石）
 - [ ] **禮物系統**：玩家之間贈送道具
 - [ ] **公會倉庫**：公會共享道具池
@@ -467,3 +488,5 @@ interface InventoryPanelProps {
 | v0.1 | 2026-02-27 | 初版：道具分類（8 類）、ID 命名規則、三表結構、背包 UI、容量機制、11 個 API 端點、商店系統、與養成/關卡/抽卡的交互定義 |
 | v0.2 | 2026-02-28 | 全面採用 Optimistic Queue（equip/unequip/lock/expand/useItem）、localStorage 快取、local/server 合併策略、新增 `addItemsLocally()`、英雄碎片縮圖 |
 | v1.0 | 2026-03-01 | 全面同步實作：修正 InventoryState 型別（含 equipmentCapacity/definitions）、補齊 18 個 Service 匯出函式簽名、10 個 GAS handler、UI 6 分頁對照（缺 forge/general/currency）、未實作操作完整列表、addItemsLocally 用途場景（戰鬥/抽卡/信件）、背包獨立載入流程、裝備同 slot 自動卸下行為、商店系統標示為未實作 |
+| v1.1 | 2026-02-28 | UI 全面強化：分類 Tab 擴充至 9 個、排序功能 4 種模式、使用/出售/鎖定按鈕、裝備詳情彈窗、金幣鑽石 Header 顯示 |
+| v1.2 | 2026-02-28 | 統一 icon 系統：Header 金幣/鑽石改用 `CurrencyIcon` CSS badge、出售按鈕金幣 icon 統一、貨幣分類 Tab icon 改用 CSS badge、移除散落 emoji |

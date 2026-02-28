@@ -15,7 +15,7 @@ import { Sky, Sparkles } from '@react-three/drei'
 import * as THREE from 'three'
 import type { DebrisItem, DebrisType } from '../types'
 
-export type SceneMode = 'story' | 'tower' | 'daily'
+export type SceneMode = 'story' | 'tower' | 'daily' | 'pvp' | 'boss'
 
 /* ════════════════════════════════════
    場景配色表
@@ -41,6 +41,76 @@ interface SceneTheme {
   rubbleColors: Record<string, string[]>
   groundRoughness: number
   groundMetalness: number
+}
+
+const pvpTheme: SceneTheme = {
+  fogColor: '#0a0a1e', fogNear: 6, fogFar: 32,
+  sparkleColor: '#6688ff', sparkleCount: 100,
+  skyConfig: { sunY: -0.1, rayleigh: 0.3, turbidity: 15 },
+  hemiArgs: ['#4466ff', '#110033'], hemiIntensity: 1.4,
+  ambientIntensity: 2.8,
+  pointLights: [
+    { pos: [15, 10, 10], color: '#4488ff', intensity: 45 },
+    { pos: [-15, 12, -10], color: '#6644ff', intensity: 35 },
+    { pos: [0, 15, 5], color: '#ffffff', intensity: 20 },
+  ],
+  dirLights: [
+    { pos: [5, 25, 15], color: '#aaccff', intensity: 5 },
+    { pos: [-5, 20, 10], color: '#8866ff', intensity: 3 },
+  ],
+  particleType: 'ash', particleColor: '#6688ff', particleOpacity: 0.4,
+  groundColorFn: (v, bm) => [
+    (0.08 + bm * 0.05) * v,
+    (0.08 + bm * 0.05) * v,
+    (0.16 + bm * 0.10) * v,
+  ],
+  wallColors: {
+    slab: ['#606080', '#505070', '#707090', '#808098'],
+    box: ['#303050', '#404060', '#252545'],
+    pillar: ['#505068', '#404058', '#606078'],
+  },
+  rubbleColors: {
+    rock: ['#404060', '#505070', '#353555'],
+    pipe: ['#556688', '#667799'],
+    small: ['#454565', '#555575'],
+  },
+  groundRoughness: 0.85,
+  groundMetalness: 0.15,
+}
+
+const bossTheme: SceneTheme = {
+  fogColor: '#1a0808', fogNear: 6, fogFar: 30,
+  sparkleColor: '#ff3333', sparkleCount: 120,
+  skyConfig: { sunY: -0.2, rayleigh: 0.15, turbidity: 25 },
+  hemiArgs: ['#ff2200', '#330000'], hemiIntensity: 1.6,
+  ambientIntensity: 3.0,
+  pointLights: [
+    { pos: [15, 10, 10], color: '#ff3300', intensity: 50 },
+    { pos: [-15, 12, -10], color: '#ff0000', intensity: 40 },
+    { pos: [0, 15, 5], color: '#ff8800', intensity: 30 },
+  ],
+  dirLights: [
+    { pos: [5, 25, 15], color: '#ff6644', intensity: 6 },
+    { pos: [-5, 20, 10], color: '#ff4422', intensity: 4 },
+  ],
+  particleType: 'ash', particleColor: '#ff4400', particleOpacity: 0.5,
+  groundColorFn: (v, bm) => [
+    (0.20 + bm * 0.12) * v,
+    (0.06 + bm * 0.03) * v,
+    (0.04 + bm * 0.02) * v,
+  ],
+  wallColors: {
+    slab: ['#8a605a', '#7e5048', '#9c7068', '#a07860'],
+    box: ['#5a2820', '#6b3423', '#4a2018'],
+    pillar: ['#706058', '#585048', '#907870'],
+  },
+  rubbleColors: {
+    rock: ['#604838', '#785840', '#504028'],
+    pipe: ['#886644', '#997755'],
+    small: ['#553322', '#664433'],
+  },
+  groundRoughness: 0.95,
+  groundMetalness: 0.05,
 }
 
 const THEMES: Record<SceneMode, SceneTheme> = {
@@ -154,6 +224,10 @@ const THEMES: Record<SceneMode, SceneTheme> = {
     },
     groundRoughness: 0.9, groundMetalness: 0.05,
   },
+  /* ── PvP 競技場：冷藍電光 ── */
+  pvp: pvpTheme,
+  /* ── Boss 挑戰：煉獄深紅 ── */
+  boss: bossTheme,
 }
 
 /* ────────────────────────────
@@ -164,12 +238,13 @@ interface DebrisProps extends DebrisItem {} // eslint-disable-line @typescript-e
 
 /** 偽噪波 hash */
 function hash(x: number, y: number, z: number = 0): number {
-  let h = Math.sin(x * 127.1 + y * 311.7 + z * 74.7) * 43758.5453
+  const h = Math.sin(x * 127.1 + y * 311.7 + z * 74.7) * 43758.5453
   return h - Math.floor(h)
 }
 
 function Debris({ position, scale, rotation, color = '#222', type = 'box' }: DebrisProps) {
   const { geometry, material } = useMemo(() => {
+    /* eslint-disable react-hooks/purity */
     let geo: THREE.BufferGeometry
     switch (type as DebrisType) {
       case 'slab':
@@ -275,6 +350,7 @@ function FallingParticles({
   const windZ = isRain ? -1.5 : isSnow ? 0.8 : -0.5
 
   const { positions, velocities } = useMemo(() => {
+    /* eslint-disable react-hooks/purity */
     const ptCount = isRain ? count * 2 : count
     const pos = new Float32Array(ptCount * 3)
     const vel = new Float32Array(count)
@@ -432,7 +508,7 @@ function createGroundGeometry(theme: SceneTheme): THREE.PlaneGeometry {
   const colors = new Float32Array(pos.count * 3)
 
   const hash2 = (x: number, y: number) => {
-    let h = Math.sin(x * 127.1 + y * 311.7) * 43758.5453
+    const h = Math.sin(x * 127.1 + y * 311.7) * 43758.5453
     return h - Math.floor(h)
   }
 

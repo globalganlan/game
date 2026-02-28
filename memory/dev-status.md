@@ -1,6 +1,6 @@
 # 開發狀態快照 — Dev Status
 
-> 最後更新：2026-02-28（第十二次更新 — 每日副本中文修復 + 戰鬥回放 + 戰鬥統計）
+> 最後更新：2026-03-01（第二十五次更新 — 被動觸發浮動文字顯示）
 
 ## 截至 2026-02-28 的開發狀態
 
@@ -33,11 +33,16 @@
   - `runBattleLoop()` 改用 `runBattle()` + `onAction` callback
   - SlotHero → BattleHero 轉換（保留 _uid 對應）
   - 3D 演出回調完整映射（前進/攻擊/受傷/死亡/DOT/技能施放）
-- [x] **🧪 QA 測試完成** — 133 測試全通過
-  - Vitest 1.6.1 單元測試（7 test files / 133 tests）
-  - 1000 場數值模擬（玩家 50.8% / 敵方 49.2%）
+- [x] **🐛 修復遠端戰鬥動畫卡住** — for-of 無限迴圈（allActions 共用參考）+ `needsHpSync` 旗標 + 反彈傷害 HP 條同步
+- [x] **🐛 修復死亡動畫視覺問題** — `playHitOrDeath` killed 分支改 HURT→DEAD 序列（4 路徑全統一）+ GAS turn_end 被動傷害致死時發射 DEATH 事件（POST @64 / GET @65）
+- [x] **🐛 修復 on_attack 被動雙倍傷害** — 新增 `damage_mult` / `damage_mult_random` effect type 取代 `damage`，被動不再獨立計算傷害改為乘算加成；新增 `PASSIVE_DAMAGE` action type；6 個被動技能效果已更新（POST @66 / GET @67）
+- [x] **✨ 被動觸發浮動文字** — 新增 `PassiveHint3D` 元件，被動觸發時在英雄頭頂顯示紫色浮動文字（☕ + 技能名）
+- [x] **🧪 QA 測試完成** — 492 測試全通過（21 test files）
+  - Vitest 1.6.1 單元測試（21 test files / 492 tests）
+  - Domain 層：battleEngine、buffSystem、damageFormula、targetStrategy、stageSystem、gachaSystem、progressionSystem、elementSystem、energySystem、boundary
+  - Services 層：battleService、saveService、dataService、optimisticQueue
+  - 1000 場數值模擬（玩家 ~50% / 敵方 ~50%）
   - 邊界條件 & 安全性測試（24 項）
-  - ESLint TypeScript parser 修復
   - 已修復 3 個 bug（tickStatusDurations 永久 buff 誤判 / runBattle break 誤判平手 / ESLint 配置）
   - 詳見 `memory/qa-report.md`
 
@@ -45,18 +50,18 @@
 
 | Spec | 版本 | 狀態 |
 |------|------|------|
-| core-combat.md | v2.3 | 🟢 battleSpeed 改 localStorage + visibilitychange |
+| core-combat.md | v2.6 | 🟢 後端戰鬥引擎 + 前端純回放 + 本地 fallback |
 | hero-schema.md | v2.1 | 🟢 4 層型別 + 14 角色完整數值表 |
 | damage-formula.md | v1.0 | 🟢 10 步完整傷害公式 |
 | skill-system.md | v1.0 | 🟢 SkillTemplate + 13 PassiveTrigger |
 | progression.md | v0.3 | 🟢 樂觀佇列 + 自動等級 + EXP bar |
-| tech-architecture.md | v1.2 | 🟢 三階段載入 + 樂觀佇列 + visibilitychange |
+| tech-architecture.md | v1.5 | 🟢 CurrencyIcon 統一 icon + constants 層 |
 | auth-system.md | v0.1 | 🟡 草案 |
-| save-system.md | v0.4 | 🟢 移除 battleSpeed + stageStars + 陣型存讀 |
+| save-system.md | v1.2 | 🟢 初始英雄 3 隻 + 自動陣型 + 登出重置 |
 | stage-system.md | v0.3 | 🟢 三星鎖定 + 模式解鎖 toast + 過場遮幕 |
 | gacha.md | v1.1 | 🟢 stardust/fragments + 本地池 |
 | element-system.md | v1.0 | 🟢 7 屬性 + 倍率矩陣 |
-| inventory.md | v0.2 | 🟢 樂觀佇列 + localStorage cache |
+| inventory.md | v1.2 | 🟢 CurrencyIcon 統一 icon |
 | optimistic-queue.md | v1.0 | 🟢 3 種套用模式 |
 | local-storage-migration.md | v1.0 | 🟢 版本化遷移鏈 |
 
@@ -88,7 +93,7 @@
 ### 2026-02-28 新增功能（8 項 UI/UX 改善）
 - [x] 陣型自動存讀 — 登入後從 save.formation 還原 playerSlots，變更時自動回存（不阻塞 loading）
 - [x] 三星通關鎖定 — SaveData + stageStars；3 星關卡 `.stage-maxed` 禁止再戰
-- [x] 統一貨幣圖標 — `.icon-coin` / `.icon-dia` / `.icon-exp` CSS icon class 取代 emoji
+- [x] 統一貨幣圖標 — `CurrencyIcon.tsx` 元件（CSS badge: `.icon-coin` / `.icon-dia` / `.icon-exp` / `.icon-stardust`）統一所有介面的金幣/鑽石/經驗/星塵顯示，替代原本各元件散落的 inline CSS icon 和 emoji
 - [x] 切換關卡過場遮幕 — `handleStageSelect` 用 curtain 遮蔽敵方切換
 - [x] 爬塔勝利結算 + 預設 1F — 勝利面板爬塔模式顯示樓層；towerFloor 預設 1
 - [x] 未解鎖玩法鎖定 — 英雄(1-2)/抽卡(1-3)/背包(1-2) 灰階 🔒 + toast
@@ -98,6 +103,14 @@
 - [x] 陣型還原修復 — `getSaveState()` 取代 `saveHook.playerData` 閉包，解決 race condition
 - [x] 關卡模式鎖定 toast — StageSelect mode tab 移除 `disabled`，改用 toast 顯示解鎖條件
 - [x] 戰鬥準備隱藏 HUD — 資源列僅在 MAIN_MENU 顯示
+
+### 2026-03-01 新帳號初始英雄擴充
+- [x] 初始英雄 1→3 隻 — 無名活屍(N) + 女喪屍(R) + 倖存者(R)
+- [x] 自動陣型 — formation 預填 [6,1,9,null,null,null]，新玩家無需手動拖曳即可開戰
+
+### 2026-02-28 登出狀態殘留修復
+- [x] `handleFullLogout()` — 8 服務快取 + 20+ React state + 5 ref 守門旗標全重置
+- [x] `clearInventoryCache()` — inventoryService 新增導出函式
 - [x] 多目標同時受擊 — SKILL_CAST `Promise.all` 取代逐一 `await`
 - [x] 背包掉落物修復 — `addItemsLocally` null inventoryState 自動初始化
 - [x] 跳過戰鬥按鈕 — `skipBattleRef` + flush resolvers → 已寫入 spec

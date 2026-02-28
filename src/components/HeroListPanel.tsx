@@ -3,34 +3,47 @@
  *
  * 顯示玩家擁有的英雄，含等級/突破/星級/裝備資訊。
  * 點擊英雄可查看詳細數值（3D 待機模型 + 屬性 + 技能 + 裝備）。
+ * 養成操作：升級/突破/升星（v2 — 完整功能版）。
  */
 
-import { useState, useMemo, useRef, useEffect, Suspense } from 'react'
+import { useState, useMemo, useRef, useEffect, useCallback, Suspense } from 'react'
 import { Canvas } from '@react-three/fiber'
 import { useAnimations, OrbitControls } from '@react-three/drei'
 import * as SkeletonUtils from 'three/examples/jsm/utils/SkeletonUtils'
 import * as THREE from 'three'
 import type { RawHeroData } from '../types'
 import type { HeroInstance } from '../services/saveService'
+import { updateHeroLocally, getSaveState, updateProgress } from '../services/saveService'
 import type { SkillTemplate, HeroSkillConfig } from '../domain/types'
 import { getHeroSkillSet } from '../services/dataService'
-import { getStarPassiveSlots } from '../domain/progressionSystem'
+import {
+  getStarPassiveSlots, getAscensionMultiplier, getStarMultiplier,
+  getStatAtLevel, getLevelCap, consumeExpMaterials,
+  canAscend, canStarUp, getAscensionCost, getStarUpCost,
+  getInitialStars, enhancedMainStat,
+} from '../domain/progressionSystem'
+import type { EquipmentInstance } from '../domain/progressionSystem'
+import {
+  upgradeHero as apiUpgradeHero,
+  ascendHero as apiAscendHero,
+  starUpHero as apiStarUpHero,
+} from '../services/progressionService'
+import {
+  getItemQuantity, onInventoryChange,
+  getHeroEquipment, getUnequippedEquipment,
+  equipItem, unequipItem,
+  removeItemsLocally,
+} from '../services/inventoryService'
 import { getGlbForSuspense } from '../loaders/glbLoader'
 // 3D idle animation is the hero detail showcase; Thumbnail3D kept for grid cards only
 import { Thumbnail3D } from './UIOverlay'
 
 /* ────────────────────────────
-   Rarity Config
+   Rarity Config（共用常數）
    ──────────────────────────── */
 
+import { RARITY_CONFIG } from '../constants/rarity'
 type RarityLabel = 'SSR' | 'SR' | 'R' | 'N'
-
-const RARITY_CONFIG: Record<RarityLabel, { color: string; border: string; bg: string }> = {
-  SSR: { color: '#ffd43b', border: '#ffd43b', bg: 'rgba(255,212,59,0.12)' },
-  SR:  { color: '#be4bdb', border: '#be4bdb', bg: 'rgba(190,75,219,0.10)' },
-  R:   { color: '#4dabf7', border: '#4dabf7', bg: 'rgba(77,171,247,0.08)' },
-  N:   { color: '#888',    border: '#555',    bg: 'rgba(136,136,136,0.06)' },
-}
 
 function numToRarity(n: number | string | unknown): RarityLabel {
   const v = Number(n)
@@ -46,13 +59,23 @@ function raritySortWeight(h: RawHeroData): number {
   return -r  // 負數讓高稀有度排前
 }
 
-/** 初始星數（依稀有度：SSR→3, SR→2, others→1） */
+/** 初始星數（使用 domain 函式） */
 function initialStars(rarity: number | string | unknown): number {
-  const v = Number(rarity)
-  if (v >= 4) return 3
-  if (v === 3) return 2
-  return 1
+  return getInitialStars(Number(rarity))
 }
+
+/* ────────────────────────────
+   Exp Materials
+   ──────────────────────────── */
+
+import { getItemIcon as _getItemIcon, getItemName as _getItemName } from '../constants/rarity'
+import { CurrencyIcon, ItemIcon } from './CurrencyIcon'
+
+const EXP_MATERIALS = [
+  { itemId: 'exp_core_s', name: _getItemName('exp_core_s'), exp: 100, icon: _getItemIcon('exp_core_s') },
+  { itemId: 'exp_core_m', name: _getItemName('exp_core_m'), exp: 500, icon: _getItemIcon('exp_core_m') },
+  { itemId: 'exp_core_l', name: _getItemName('exp_core_l'), exp: 2000, icon: _getItemIcon('exp_core_l') },
+] as const
 
 /** 將原始英雄資料的 ID 正規化為 `zombie_N` 格式 */
 function resolveModelId(h: RawHeroData, idx = 0): string {
@@ -226,15 +249,15 @@ interface HeroDetailProps {
 function HeroDetail({ hero, instance, onClose, skills, heroSkills }: HeroDetailProps) {
   const lvl = instance?.level ?? 1
   const asc = instance?.ascension ?? 0
-  const statMult = 1 + (lvl - 1) * 0.04
-  const ascMult = 1 + asc * 0.05
+  const ascMult = getAscensionMultiplier(asc)
+  const stars = instance?.stars ?? initialStars((hero as Record<string, unknown>).Rarity)
+  const starMult = getStarMultiplier(stars)
   const calcStat = (base: number | undefined) =>
-    base != null ? Math.floor(Number(base) * statMult * ascMult) : '?'
+    base != null ? Math.floor(getStatAtLevel(Number(base), lvl) * ascMult * starMult) : '?'
 
   const heroAny = hero as Record<string, unknown>
   const rarity = numToRarity(heroAny.Rarity)
   const rcfg = RARITY_CONFIG[rarity]
-  const stars = initialStars(heroAny.Rarity)
   const passiveSlots = getStarPassiveSlots(stars)
   const element = String(heroAny.Element ?? '')
   const heroType = String(heroAny.Type ?? '?')
@@ -248,13 +271,184 @@ function HeroDetail({ hero, instance, onClose, skills, heroSkills }: HeroDetailP
     [heroId, skills, heroSkills],
   )
 
-  // 裝備
-  const equippedItems = instance?.equippedItems ?? {}
+  // 裝備 (4 格位 — 與 domain EquipmentSlot 一致)
   const EQUIP_SLOTS = [
     { key: 'weapon', label: '武器', icon: '⚔️' },
     { key: 'armor', label: '護甲', icon: '🛡️' },
-    { key: 'accessory', label: '飾品', icon: '💍' },
+    { key: 'ring', label: '戒指', icon: '💍' },
+    { key: 'boots', label: '鞋子', icon: '👢' },
   ]
+
+  // ── 養成 Modal 狀態 ──
+  const [modalMode, setModalMode] = useState<'none' | 'upgrade' | 'ascend' | 'starUp' | 'equip'>('none')
+  const [isProcessing, setIsProcessing] = useState(false)
+  const [resultMsg, setResultMsg] = useState('')
+  const [useQty, setUseQty] = useState<Record<string, number>>({})
+  const [equipSelectSlot, setEquipSelectSlot] = useState<string>('')
+  // 背包訂閱（用於讀取素材數量）
+  const [, setInvTick] = useState(0)
+  useEffect(() => {
+    const unsub = onInventoryChange(() => setInvTick(t => t + 1))
+    return unsub
+  }, [])
+
+  const levelCap = getLevelCap(asc)
+  const isOwned = !!instance
+  const isMaxLevel = lvl >= levelCap
+
+  // ── 升級 helpers ──
+  const totalExpFromSelection = useMemo(() => {
+    let total = 0
+    for (const m of EXP_MATERIALS) {
+      total += (useQty[m.itemId] ?? 0) * m.exp
+    }
+    return total
+  }, [useQty])
+
+  const upgradePreview = useMemo(() => {
+    if (totalExpFromSelection <= 0) return null
+    return consumeExpMaterials(lvl, instance?.exp ?? 0, levelCap, totalExpFromSelection)
+  }, [totalExpFromSelection, lvl, instance?.exp, levelCap])
+
+  const handleOpenUpgrade = useCallback(() => {
+    const init: Record<string, number> = {}
+    for (const m of EXP_MATERIALS) init[m.itemId] = 0
+    setUseQty(init)
+    setResultMsg('')
+    setModalMode('upgrade')
+  }, [])
+
+  const handleAutoMax = useCallback(() => {
+    const init: Record<string, number> = {}
+    for (const m of EXP_MATERIALS) {
+      init[m.itemId] = getItemQuantity(m.itemId)
+    }
+    setUseQty(init)
+  }, [])
+
+  const handleConfirmUpgrade = useCallback(async () => {
+    if (!instance || totalExpFromSelection <= 0 || isProcessing) return
+    setIsProcessing(true)
+    try {
+      const materials = EXP_MATERIALS
+        .filter(m => (useQty[m.itemId] ?? 0) > 0)
+        .map(m => ({ itemId: m.itemId, quantity: useQty[m.itemId] }))
+      const preview = consumeExpMaterials(lvl, instance.exp, levelCap, totalExpFromSelection)
+      // 樂觀更新本地
+      updateHeroLocally(heroId, { level: preview.level, exp: preview.exp })
+      // 樂觀扣除經驗素材
+      removeItemsLocally(materials)
+      // 背景 API
+      apiUpgradeHero(instance.instanceId, materials).catch(console.warn)
+      setResultMsg(`升級成功！Lv.${lvl} → Lv.${preview.level}`)
+      setTimeout(() => setModalMode('none'), 1200)
+    } catch (e) {
+      setResultMsg('升級失敗：' + String(e))
+    } finally {
+      setIsProcessing(false)
+    }
+  }, [instance, totalExpFromSelection, isProcessing, useQty, lvl, levelCap, heroId])
+
+  // ── 突破 helpers ──
+  const ascCost = getAscensionCost(asc)
+  const canDoAscend = isOwned && canAscend(lvl, asc)
+  const fragmentId = `asc_fragment_${heroId}`
+  const ownedFragments = getItemQuantity(fragmentId)
+  const heroClassType = String(heroAny.Type ?? '').toLowerCase()
+  const classStoneId = heroClassType === '力量' ? 'asc_class_power'
+    : heroClassType === '敏捷' ? 'asc_class_agility'
+    : heroClassType === '防禦' ? 'asc_class_defense'
+    : 'asc_class_universal'
+  const ownedClassStones = getItemQuantity(classStoneId) + getItemQuantity('asc_class_universal')
+  const currentGold = getSaveState()?.save.gold ?? 0
+  const hasAscMaterials = ascCost
+    ? ownedFragments >= ascCost.fragments
+      && ownedClassStones >= ascCost.classStones
+      && currentGold >= ascCost.gold
+    : false
+
+  const handleConfirmAscend = useCallback(async () => {
+    if (!instance || !canDoAscend || !hasAscMaterials || isProcessing) return
+    setIsProcessing(true)
+    try {
+      const newAsc = asc + 1
+      updateHeroLocally(heroId, { ascension: newAsc })
+      if (ascCost) {
+        updateProgress({ gold: currentGold - ascCost.gold })
+        // 樂觀扣除突破素材（碎片 + 職業石）
+        const matDeductions: { itemId: string; quantity: number }[] = []
+        if (ascCost.fragments > 0) matDeductions.push({ itemId: fragmentId, quantity: ascCost.fragments })
+        if (ascCost.classStones > 0) matDeductions.push({ itemId: classStoneId, quantity: ascCost.classStones })
+        if (matDeductions.length > 0) removeItemsLocally(matDeductions)
+      }
+      apiAscendHero(instance.instanceId).catch(console.warn)
+      setResultMsg(`突破成功！突破 ${asc} → ${newAsc}，等級上限 ${getLevelCap(newAsc)}`)
+      setTimeout(() => setModalMode('none'), 1200)
+    } catch (e) {
+      setResultMsg('突破失敗：' + String(e))
+    } finally {
+      setIsProcessing(false)
+    }
+  }, [instance, canDoAscend, hasAscMaterials, isProcessing, asc, heroId, ascCost, currentGold])
+
+  // ── 升星 helpers ──
+  const starCost = stars < 6 ? getStarUpCost(stars) : Infinity
+  const canDoStarUp = isOwned && canStarUp(stars, ownedFragments)
+
+  const handleConfirmStarUp = useCallback(async () => {
+    if (!instance || !canDoStarUp || isProcessing) return
+    setIsProcessing(true)
+    try {
+      const newStars = stars + 1
+      updateHeroLocally(heroId, { stars: newStars })
+      // 樂觀扣除升星碎片
+      if (starCost > 0 && starCost !== Infinity) {
+        removeItemsLocally([{ itemId: fragmentId, quantity: starCost }])
+      }
+      apiStarUpHero(instance.instanceId).catch(console.warn)
+      setResultMsg(`升星成功！★${stars} → ★${newStars}`)
+      setTimeout(() => setModalMode('none'), 1200)
+    } catch (e) {
+      setResultMsg('升星失敗：' + String(e))
+    } finally {
+      setIsProcessing(false)
+    }
+  }, [instance, canDoStarUp, isProcessing, stars, heroId])
+
+  // ── 裝備 helpers ──
+  const heroEquipment = isOwned ? getHeroEquipment(instance!.instanceId) : []
+  const equippedBySlot = useMemo(() => {
+    const map: Record<string, EquipmentInstance | undefined> = {}
+    for (const eq of heroEquipment) map[eq.slot] = eq
+    return map
+  }, [heroEquipment])
+
+  const availableForSlot = useMemo(() => {
+    if (!equipSelectSlot) return []
+    return getUnequippedEquipment().filter(eq => eq.slot === equipSelectSlot)
+  }, [equipSelectSlot])
+
+  const handleSlotClick = useCallback((slotKey: string) => {
+    if (!isOwned) return
+    const equipped = equippedBySlot[slotKey]
+    if (equipped) {
+      // 已裝備 → 卸下
+      unequipItem(equipped.equipId).catch(console.warn)
+      setResultMsg(`已卸下 ${equipped.templateId}`)
+    } else {
+      // 空欄位 → 打開裝備選擇
+      setEquipSelectSlot(slotKey)
+      setResultMsg('')
+      setModalMode('equip')
+    }
+  }, [isOwned, equippedBySlot])
+
+  const handleEquipSelect = useCallback(async (eq: EquipmentInstance) => {
+    if (!instance) return
+    await equipItem(eq.equipId, instance.instanceId)
+    setResultMsg(`已裝備 ${eq.templateId}`)
+    setModalMode('none')
+  }, [instance])
 
   return (
     <div className="hero-detail-backdrop" onClick={onClose}>
@@ -343,28 +537,236 @@ function HeroDetail({ hero, instance, onClose, skills, heroSkills }: HeroDetailP
         </div>
 
         {/* ── 裝備 ── */}
-        <div className="hd2-section-title">裝備</div>
+        <div className="hd2-section-title">裝備 {isOwned && <span className="hd2-section-hint">（點擊欄位穿脫）</span>}</div>
         <div className="hd2-equip-row">
-          {EQUIP_SLOTS.map(({ key, label, icon }) => (
-            <div key={key} className={`hd2-equip-slot ${equippedItems[key] ? 'equipped' : ''}`}>
-              <span className="hd2-equip-icon">{icon}</span>
-              <span className="hd2-equip-text">{equippedItems[key] || `${label}：空`}</span>
-            </div>
-          ))}
+          {EQUIP_SLOTS.map(({ key, label, icon }) => {
+            const eq = equippedBySlot[key]
+            return (
+              <div
+                key={key}
+                className={`hd2-equip-slot ${eq ? 'equipped' : ''} ${isOwned ? 'clickable' : ''}`}
+                onClick={() => handleSlotClick(key)}
+                title={eq ? `${eq.templateId} +${eq.enhanceLevel}\n點擊卸下` : `${label}：空\n點擊裝備`}
+              >
+                <span className="hd2-equip-icon">{icon}</span>
+                {eq ? (
+                  <div className="hd2-equip-detail">
+                    <span className="hd2-equip-name">{eq.templateId}</span>
+                    <span className="hd2-equip-stats">
+                      {eq.mainStat} +{enhancedMainStat(eq.mainStatValue, eq.enhanceLevel)}
+                      {eq.enhanceLevel > 0 && <span className="hd2-equip-lv">+{eq.enhanceLevel}</span>}
+                    </span>
+                  </div>
+                ) : (
+                  <span className="hd2-equip-text">{label}：空</span>
+                )}
+              </div>
+            )
+          })}
         </div>
 
         {/* ── 操作按鈕 ── */}
         <div className="hd2-actions">
-          <button className="hd2-btn hd2-btn-upgrade" disabled title="升級素材系統（開發中）">
+          <button
+            className="hd2-btn hd2-btn-upgrade"
+            disabled={!isOwned || isMaxLevel}
+            title={!isOwned ? '尚未擁有' : isMaxLevel ? '已達等級上限' : '消耗經驗素材提升等級'}
+            onClick={handleOpenUpgrade}
+          >
             <span className="hd2-btn-icon">📈</span><span>升級</span>
           </button>
-          <button className="hd2-btn hd2-btn-ascend" disabled title="突破系統（開發中）">
+          <button
+            className="hd2-btn hd2-btn-ascend"
+            disabled={!canDoAscend}
+            title={!isOwned ? '尚未擁有' : asc >= 5 ? '已達最高突破' : !canAscend(lvl, asc) ? `需達到 Lv.${levelCap}` : '突破提升等級上限'}
+            onClick={() => { setResultMsg(''); setModalMode('ascend') }}
+          >
             <span className="hd2-btn-icon">🔥</span><span>突破</span>
           </button>
-          <button className="hd2-btn hd2-btn-star" disabled title="升星系統（開發中）">
+          <button
+            className="hd2-btn hd2-btn-star"
+            disabled={!isOwned || stars >= 6}
+            title={!isOwned ? '尚未擁有' : stars >= 6 ? '已達最高星級' : '消耗碎片提升星級'}
+            onClick={() => { setResultMsg(''); setModalMode('starUp') }}
+          >
             <span className="hd2-btn-icon">⭐</span><span>升星</span>
           </button>
         </div>
+
+        {/* ═══════ 升級 Modal ═══════ */}
+        {modalMode === 'upgrade' && (
+          <div className="hd2-modal-backdrop" onClick={() => setModalMode('none')}>
+            <div className="hd2-modal" onClick={e => e.stopPropagation()}>
+              <h4 className="hd2-modal-title">📈 英雄升級</h4>
+              <div className="hd2-modal-info">
+                Lv.{lvl} (EXP: {instance?.exp ?? 0}) → 等級上限 Lv.{levelCap}
+              </div>
+              <div className="hd2-material-list">
+                {EXP_MATERIALS.map(m => {
+                  const owned = getItemQuantity(m.itemId)
+                  const qty = useQty[m.itemId] ?? 0
+                  return (
+                    <div key={m.itemId} className="hd2-material-row">
+                      <span className="hd2-mat-icon">{m.icon}</span>
+                      <span className="hd2-mat-name">{m.name}</span>
+                      <span className="hd2-mat-exp">(+{m.exp} EXP)</span>
+                      <div className="hd2-mat-controls">
+                        <button
+                          className="hd2-mat-btn"
+                          disabled={qty <= 0}
+                          onClick={() => setUseQty(q => ({ ...q, [m.itemId]: Math.max(0, qty - 1) }))}
+                        >−</button>
+                        <span className="hd2-mat-qty">{qty}/{owned}</span>
+                        <button
+                          className="hd2-mat-btn"
+                          disabled={qty >= owned}
+                          onClick={() => setUseQty(q => ({ ...q, [m.itemId]: Math.min(owned, qty + 1) }))}
+                        >+</button>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+              <button className="hd2-auto-btn" onClick={handleAutoMax}>全部使用</button>
+              {upgradePreview && (
+                <div className="hd2-preview">
+                  預覽：Lv.{lvl} → <strong>Lv.{upgradePreview.level}</strong>
+                  {upgradePreview.level < levelCap && <span> (EXP: {upgradePreview.exp})</span>}
+                  <span className="hd2-exp-total"> 共 {totalExpFromSelection.toLocaleString()} EXP</span>
+                </div>
+              )}
+              {resultMsg && <div className="hd2-result-msg">{resultMsg}</div>}
+              <div className="hd2-modal-btns">
+                <button className="hd2-modal-cancel" onClick={() => setModalMode('none')}>取消</button>
+                <button
+                  className="hd2-modal-confirm"
+                  disabled={totalExpFromSelection <= 0 || isProcessing}
+                  onClick={handleConfirmUpgrade}
+                >{isProcessing ? '處理中...' : '確認升級'}</button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ═══════ 突破 Modal ═══════ */}
+        {modalMode === 'ascend' && ascCost && (
+          <div className="hd2-modal-backdrop" onClick={() => setModalMode('none')}>
+            <div className="hd2-modal" onClick={e => e.stopPropagation()}>
+              <h4 className="hd2-modal-title">🔥 英雄突破</h4>
+              <div className="hd2-modal-info">
+                突破 {asc} → {asc + 1}（等級上限 {levelCap} → {getLevelCap(asc + 1)}）
+              </div>
+              <div className="hd2-material-list">
+                <div className="hd2-material-row">
+                  <span className="hd2-mat-icon">{_getItemIcon('asc_fragment_0')}</span>
+                  <span className="hd2-mat-name">英雄碎片</span>
+                  <span className={`hd2-mat-qty ${ownedFragments >= ascCost.fragments ? 'sufficient' : 'insufficient'}`}>
+                    {ownedFragments}/{ascCost.fragments}
+                  </span>
+                </div>
+                <div className="hd2-material-row">
+                  <span className="hd2-mat-icon">{_getItemIcon('asc_class_power')}</span>
+                  <span className="hd2-mat-name">職業石</span>
+                  <span className={`hd2-mat-qty ${ownedClassStones >= ascCost.classStones ? 'sufficient' : 'insufficient'}`}>
+                    {ownedClassStones}/{ascCost.classStones}
+                  </span>
+                </div>
+                <div className="hd2-material-row">
+                  <span className="hd2-mat-icon"><CurrencyIcon type="gold" /></span>
+                  <span className="hd2-mat-name">金幣</span>
+                  <span className={`hd2-mat-qty ${currentGold >= ascCost.gold ? 'sufficient' : 'insufficient'}`}>
+                    {currentGold.toLocaleString()}/{ascCost.gold.toLocaleString()}
+                  </span>
+                </div>
+              </div>
+              {resultMsg && <div className="hd2-result-msg">{resultMsg}</div>}
+              <div className="hd2-modal-btns">
+                <button className="hd2-modal-cancel" onClick={() => setModalMode('none')}>取消</button>
+                <button
+                  className="hd2-modal-confirm"
+                  disabled={!hasAscMaterials || isProcessing}
+                  onClick={handleConfirmAscend}
+                >{isProcessing ? '處理中...' : '確認突破'}</button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ═══════ 升星 Modal ═══════ */}
+        {modalMode === 'starUp' && (
+          <div className="hd2-modal-backdrop" onClick={() => setModalMode('none')}>
+            <div className="hd2-modal" onClick={e => e.stopPropagation()}>
+              <h4 className="hd2-modal-title">⭐ 英雄升星</h4>
+              <div className="hd2-modal-info">
+                <StarDisplay count={stars} /> → <StarDisplay count={Math.min(6, stars + 1)} />
+              </div>
+              <div className="hd2-material-list">
+                <div className="hd2-material-row">
+                  <span className="hd2-mat-icon">{_getItemIcon('asc_fragment_0')}</span>
+                  <span className="hd2-mat-name">英雄碎片</span>
+                  <span className={`hd2-mat-qty ${ownedFragments >= starCost ? 'sufficient' : 'insufficient'}`}>
+                    {ownedFragments}/{starCost}
+                  </span>
+                </div>
+              </div>
+              <div className="hd2-star-bonus">
+                升星加成：屬性 ×{getStarMultiplier(stars + 1).toFixed(2)} · 被動欄位 {getStarPassiveSlots(stars + 1)} 個
+              </div>
+              {resultMsg && <div className="hd2-result-msg">{resultMsg}</div>}
+              <div className="hd2-modal-btns">
+                <button className="hd2-modal-cancel" onClick={() => setModalMode('none')}>取消</button>
+                <button
+                  className="hd2-modal-confirm"
+                  disabled={!canDoStarUp || isProcessing}
+                  onClick={handleConfirmStarUp}
+                >{isProcessing ? '處理中...' : '確認升星'}</button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ═══════ 裝備選擇 Modal ═══════ */}
+        {modalMode === 'equip' && (
+          <div className="hd2-modal-backdrop" onClick={() => setModalMode('none')}>
+            <div className="hd2-modal" onClick={e => e.stopPropagation()}>
+              <h4 className="hd2-modal-title">
+                {EQUIP_SLOTS.find(s => s.key === equipSelectSlot)?.icon}{' '}
+                選擇{EQUIP_SLOTS.find(s => s.key === equipSelectSlot)?.label ?? '裝備'}
+              </h4>
+              {availableForSlot.length === 0 ? (
+                <div className="hd2-modal-info">沒有可用的裝備</div>
+              ) : (
+                <div className="hd2-equip-list">
+                  {availableForSlot.map(eq => (
+                    <button
+                      key={eq.equipId}
+                      className="hd2-equip-option"
+                      onClick={() => handleEquipSelect(eq)}
+                    >
+                      <div className="hd2-equip-option-header">
+                        <span className={`hd2-equip-rarity rarity-${eq.rarity.toLowerCase()}`}>{eq.rarity}</span>
+                        <span className="hd2-equip-option-name">{eq.templateId}</span>
+                        {eq.enhanceLevel > 0 && <span className="hd2-equip-lv">+{eq.enhanceLevel}</span>}
+                      </div>
+                      <div className="hd2-equip-option-stats">
+                        <span>{eq.mainStat} +{enhancedMainStat(eq.mainStatValue, eq.enhanceLevel)}</span>
+                        {eq.subStats.map((sub, i) => (
+                          <span key={i} className="hd2-sub-stat">
+                            {sub.stat} +{sub.value}{sub.isPercent ? '%' : ''}
+                          </span>
+                        ))}
+                      </div>
+                      {eq.setId && <span className="hd2-equip-set">{eq.setId}</span>}
+                    </button>
+                  ))}
+                </div>
+              )}
+              <div className="hd2-modal-btns">
+                <button className="hd2-modal-cancel" onClick={() => setModalMode('none')}>取消</button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )
@@ -386,7 +788,7 @@ function HeroCard({ hero, instance, onClick }: HeroCardProps) {
   const isOwned = !!instance
   const rarity = numToRarity((hero as Record<string, unknown>).Rarity)
   const rcfg = RARITY_CONFIG[rarity]
-  const stars = initialStars((hero as Record<string, unknown>).Rarity)
+  const stars = instance?.stars ?? initialStars((hero as Record<string, unknown>).Rarity)
 
   return (
     <button

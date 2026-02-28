@@ -1,6 +1,6 @@
 # 技術架構 Spec
 
-> 版本：v1.3 ｜ 狀態：🟢 定稿（含 Domain Engine + Services 層 + Optimistic Queue + GAS CacheService）
+> 版本：v1.5 ｜ 狀態：🟢 定稿（含 Domain Engine + Services 層 + Optimistic Queue + GAS CacheService + Audio Engine + CurrencyIcon 統一 icon）
 > 最後更新：2026-02-28
 > 負責角色：🔧 CODING → 🏗️ ARCHITECT
 
@@ -52,6 +52,7 @@ src/
     index.ts                統一匯出
     sheetApi.ts             Google Sheets API 封裝 + 快取
     dataService.ts          Sheet  domain 型別轉換 + 中英對照
+    audioService.ts         音效與背景音樂管理器（Web Audio API 合成）
 
  components/
     Arena.tsx               場景（地面/碎片/雨/天空/霧）
@@ -59,12 +60,18 @@ src/
     ZombieModel.tsx         GLB 模型 + 受擊閃光
     SceneWidgets.tsx        血條/飄字/鏡頭/控制/SkillToast3D/ElementHint3D
     UIOverlay.tsx           HUD 元件
+    ShopPanel.tsx           商店面板（4 類每日/素材/裝備/特殊 + 購買流程）
+    CurrencyIcon.tsx        統一貨幣 icon 元件（CSS badge: gold/diamond/exp/stardust）
+    SettingsPanel.tsx       設定面板（音量滑桿 + 靜音 + 帳號 + 清除快取）
 
  hooks/
     useResponsive.ts        RWD 偵測 hook
 
  loaders/
      glbLoader.ts            GLB 載入器（全域快取 + Suspense）
+
+ constants/
+     rarity.ts              道具 icon/名稱/稀有度共用常數（ITEM_ICONS、ITEM_NAMES、RARITY_CONFIG、getItemIcon/getItemName）
 ```
 
 ### 架構分層
@@ -488,7 +495,7 @@ POST { "action": "invalidate-cache" }
 ### 快取命中標記
 
 快取命中的回應會附加 `_cached: true` 欄位，供偵錯使用。
-- [ ] **音效引擎**：Howler.js 或 Web Audio API
+- [x] **音效引擎**：Web Audio API 合成 BGM + SFX（`audioService.ts`）
 - [ ] **Shader 特效**：自訂材質效果
 - [ ] **PWA**：離線支援
 - [ ] **多人對戰**：WebSocket / WebRTC
@@ -501,3 +508,5 @@ POST { "action": "invalidate-cache" }
 | v1.1 | 2025-02-26 | 新增 `src/domain/` + `src/services/` 分層架構、更新資料流圖 |
 | v1.2 | 2026-02-28 | 三階段載入架構（prefetch）、全面 Optimistic Queue、SkillToast3D / ElementHint3D 3D 元件、ZombieModel visibilitychange 補時、heroesListRef、資源 HUD 僅主選單顯示 |
 | v1.3 | 2026-02-28 | 新增 GAS CacheService 快取層：全域配表快取（6h TTL）、resolvePlayerId_ 快取、loadHeroPool_ 快取、分片機制、自動/手動失效、invalidate-cache API |
+| v1.4 | 2026-02-28 | 新增 audioService.ts（Web Audio API 合成 BGM 6 曲目 + SFX 9 種）、ShopPanel.tsx、SettingsPanel.tsx 音效控制 UI、標記音效引擎為已實作 |
+| v1.5 | 2026-02-28 | 新增 `constants/rarity.ts` 共用常數層 + `CurrencyIcon.tsx` 統一貨幣 icon 元件，替代各元件散落的 CSS inline icon 和 emoji |

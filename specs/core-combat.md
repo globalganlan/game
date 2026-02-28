@@ -1,9 +1,9 @@
 # 戰鬥系統 Spec
 
-> 版本：v2.4 ｜ 狀態：🟢 已實作
+> 版本：v2.7 ｜ 狀態：🟢 已實作
 > 最後更新：2026-02-28
 > 負責角色：🎯 GAME_DESIGN → 🔧 CODING
-> 原始碼：`src/domain/battleEngine.ts`（邏輯）、`src/App.tsx`（3D 演出整合）
+> 原始碼：`src/domain/battleEngine.ts`（前端邏輯）、`gas/battleEngine.js`（後端引擎）、`src/App.tsx`（3D 演出整合）
 
 ## 概述
 
@@ -29,7 +29,7 @@
 |------|----------|--------|------|
 | 遊戲狀態機 | 1 | `src/App.tsx` useState | ✅ |
 | 陣型系統 | 2 | `src/App.tsx` SLOT_POSITIONS | ✅ |
-| 戰鬥迴圈 | 3 | `src/domain/battleEngine.ts` `runBattle()` | ✅ |
+| 戰鬥迴圈 | 3 | `gas/battleEngine.js` `runBattleEngine_()` + `src/domain/battleEngine.ts` `runBattleCollect()`（fallback） | ✅ |
 | 能量系統 | 4 | `src/domain/energySystem.ts` | ✅ |
 | Buff/Debuff | 5 | `src/domain/buffSystem.ts` | ✅ |
 | 被動觸發 | 6 | `src/domain/battleEngine.ts` `triggerPassives()` | ✅ |
@@ -37,6 +37,7 @@
 | 傷害計算 | 8 | `src/domain/damageFormula.ts` | ✅ |
 | 3D 演出 | 10 | `src/App.tsx` `onAction` callback | ✅ |
 | 插入式大招 | 3.1 | `src/domain/battleEngine.ts` `processInterruptUltimates()` | ✅ |
+| 後端戰鬥引擎 | 3.2 | `gas/battleEngine.js` + `src/services/battleService.ts` | ✅ |
 | 跳過戰鬥 | 11 | `src/App.tsx` `skipBattleRef` | ✅ |
 | 戰鬥回放 | 12 | `src/App.tsx` `battleActionsRef` + `replayBattle()` | ✅ |
 | 戰鬥統計 | 13 | `src/App.tsx` `battleStats` + stats panel UI | ✅ |
@@ -120,7 +121,40 @@ fetchData() 觸發：
 
 ## 三、戰鬥迴圈  Domain Engine 架構 
 
-### v2.1 架構：Command Pattern
+### v2.6 架構：後端計算 + 前端回放
+
+```
+前端 App.tsx
+│ 建構 BattleHero[] │
+│ 含所有 stats/skills │
+└──────────────────┘
+         │ POST {action:'run-battle', players, enemies}
+         ▼
+┌───────────────────────────┐
+│ GAS gas/battleEngine.js │
+│ runBattleEngine_() │
+│ 純邏輯，完整戰鬥引擎 │
+│ → { winner, actions[] } │
+└───────────────────────────┘
+         │ { winner, actions[] }
+         ▼
+┌───────────────────────────┐
+│ 前端 Phase B: 回放 │
+│ onAction → 3D 動畫/音效 │
+│ skip → continue（零延遲） │
+└───────────────────────────┘
+         │
+         ▼
+┌───────────────────────────┐
+│ 前端 Phase C: 結算 │
+│ 同步 HP + removeSlot │
+│ → GAMEOVER │
+└───────────────────────────┘
+```
+
+**Fallback**：後端 API 失敗時自動降級為前端 `runBattleCollect()` 本地計算。
+
+### v2.1 架構（舊，保留為 fallback）：Command Pattern
 
 ```
 
@@ -578,10 +612,11 @@ IDLE → ADVANCING → ATTACKING → RETREATING → IDLE
 3. setActorState(uid, 'ATTACKING') → delay
 4. playHitOrDeath(targetUid, damage, killed, isDodge)
    - 命中：HURT + 傷害飄字 + 受擊閃光
-   - 擊殺：DEAD
+   - 擊殺：DEAD（★ 背景執行，不阻塞下一個 action）
    - 閃避：MISS 飄字
-5. setActorState(uid, 'RETREATING') → 等待回原位
-6. setActorState(uid, 'IDLE')
+5. 攻擊者後退（pendingRetreats，與受傷/死亡並行）
+   ★ 致死攻擊：死亡動畫在 backgroundAnims 背景執行，
+     攻擊者立刻後退 + 下一個 action 可立即開始
 ```
 
 ### 技能演出（onAction: SKILL_CAST）
@@ -592,7 +627,9 @@ IDLE → ADVANCING → ATTACKING → RETREATING → IDLE
    - AOE → 中場 [0, 0, 0]
 2. ATTACKING 動畫
 3. 逐目標播放效果
-4. 後退回原位
+   - 非致死：await HURT 動畫
+   - 致死：DEAD 動畫推入 backgroundAnims（不阻塞）
+4. 後退回原位（pendingRetreats）
 ```
 
 ### 受擊閃光
@@ -649,16 +686,25 @@ IDLE → ADVANCING → ATTACKING → RETREATING → IDLE
 - 有效值限 1 / 2 / 4，不合規則重置為 1
 - 不再同步到 Google Sheet，純前端本地儲存
 
-### 跳過戰鬥
+### 跳過戰鬥（v2.6 後端計算 + 前端回放）
 
 - 戰鬥中右下角顯示「跳過 ⏭」按鈕
-- 點擊後 `skipBattleRef.current = true`：
-  - `delay()` 立即 resolve（所有等待歸零）
-  - `waitForAction()` / `waitForMove()` 立即 resolve
-  - 所有已排隊的 action/move resolve 被即時 flush
-- 引擎 `runBattle()` 正常跑完所有回合（邏輯不變），僅跳過 3D 演出等待
+- **Phase A — 後端計算**：`runBattleRemote()` POST 到 GAS `run-battle` handler，後端 `runBattleEngine_()` 跑完整場戰鬥，回傳 `{ winner, actions[] }`
+  - 失敗時自動降級為本地 `runBattleCollect()` 計算（零網路依賴）
+- **Phase B — 逐筆回放**：playback loop 依序迭代 `allActions`：
+  - 每筆 action 前檢查 `skipBattleRef.current`
+  - 若已跳過 → `continue`（不呼叫 `onAction`、不播 SFX、不等待動畫）
+  - 若未跳過 → 正常呼叫 `onAction` 播放 3D 演出 + 音效
+- **Phase C — 最終同步**：回放結束後，遍歷 heroMap 最終狀態，死亡者 removeSlot，存活者 syncHp
+- **SFX 防護**：所有 `playSfx()` 呼叫加上 `!skipBattleRef.current` 守衛
+- **stopAllSfx()**：點擊跳過同時呼叫 `audioManager.stopAllSfx()` 立即靜音
 - 結束後自然進入 GAMEOVER，顯示勝負結果與獎勵
-- 實作：`src/App.tsx` — `skipBattleRef`、btn-skip-battle UI、flush pending resolvers
+- 實作：
+  - `gas/battleEngine.js` — `runBattleEngine_()` 後端戰鬥引擎（~650 行 JS，完整移植 domain 層）
+  - `src/services/battleService.ts` — `runBattleRemote()` POST API 呼叫 + BattleHero 序列化
+  - `src/domain/battleEngine.ts` — `runBattleCollect()` 本地 fallback
+  - `src/App.tsx` — `skipBattleRef`、Phase A/B/C 回放迴圈、btn-skip-battle UI
+  - `src/services/audioService.ts` — `stopAllSfx()` + `activeSfxGains[]` 追蹤
 
 ---
 
@@ -760,3 +806,6 @@ App.tsx
 | v2.2 | 2026-02-28 | 新增：插入式大招（processInterruptUltimates）、跳過戰鬥、速度持久化、技能/屬性 3D 飄字、waitForAction 碰撞防護（三層：合併 uid + 搶佔 resolve + 5s timeout）、分頁隱藏 mixer 補時（visibilitychange）、攻擊者反彈致死播 DEAD 動畫、非攻擊技能不前進 |
 | v2.3 | 2026-02-28 | 戰鬥速度持久化改用 localStorage（移除 saveService.battleSpeed，不再同步 Google Sheet） |
 | v2.4 | 2026-02-28 | 新增戰鬥回放（紀錄 BattleAction[] → GAMEOVER 點擊「回放」重播 3D 動畫）、戰鬥統計面板（每位英雄輸出/治療/承傷）、DOT_TICK 攜帶 sourceUid、SKILL_CAST reflectDamage 統計+回放修正 |
+| v2.5 | 2026-02-28 | **戰鬥跳過重構**：新增 `runBattleCollect()` 同步計算模式（Phase A 計算 → Phase B 回放 → Phase C 最終同步），修復跳過後敗方英雄殘留+音效爆發；`AudioManager.stopAllSfx()` 即時靜音；所有 SFX 加 skip 守衛 |
+| v2.6 | 2026-02-28 | **後端戰鬥引擎**：將戰鬥引擎移植到 GAS（`gas/battleEngine.js` ~650 行），前端 POST `run-battle` 取得 `{ winner, actions[] }`，僅負責 3D 動畫回放；失敗時自動降級為本地 `runBattleCollect()` |
+| v2.7 | 2026-03-01 | **能量滿即施放大招**：重構 `processInterruptUltimates` 移除 `excludeUid` 改用 `alreadyActedUids` Set，每個 action 後掃描**所有**角色（含攻擊者自己、被攻擊者），能量滿即插入大招；前後端（`battleEngine.ts` + `gas/battleEngine.js`）同步修正；GAS POST @68、GET @69；**致死攻擊不阻塞**：死亡動畫推入 `backgroundAnims`（不 await），攻擊者立刻後退 |

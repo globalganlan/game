@@ -16,6 +16,7 @@ import {
   type MailItem,
   type MailReward,
 } from '../services/mailService'
+import { translateError } from '../utils/errorMessages'
 
 /* ────────────────────────────
    Props
@@ -49,12 +50,11 @@ function formatDate(iso: string): string {
   return `${mm}/${dd} ${hh}:${mi}`
 }
 
+import { getItemName } from '../constants/rarity'
+import { ItemIcon } from './CurrencyIcon'
+
 function rewardLabel(r: MailReward): string {
-  const names: Record<string, string> = {
-    diamond: '💎 鑽石',
-    gold: '🪙 金幣',
-  }
-  return `${names[r.itemId] ?? r.itemId} ×${r.quantity}`
+  return `${getItemName(r.itemId)} ×${r.quantity}`
 }
 
 /* ────────────────────────────
@@ -67,7 +67,7 @@ export function MailboxPanel({
   mailItems: mails,
   mailLoaded,
   onMailItemsChange: setMails,
-  onRefreshMail,
+  onRefreshMail: _onRefreshMail,
 }: MailboxPanelProps) {
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [actionMsg, setActionMsg] = useState<{ ok: boolean; text: string } | null>(null)
@@ -152,7 +152,7 @@ export function MailboxPanel({
         setMails(prevMails)
         setSelectedId(mailId)
         const errMap: Record<string, string> = { has_unclaimed_rewards: '請先領取獎勵再刪除' }
-        setActionMsg({ ok: false, text: errMap[res.error || ''] || `刪除失敗：${res.error}` })
+        setActionMsg({ ok: false, text: errMap[res.error || ''] || translateError(res.error, '刪除失敗') })
       }
     } catch (e) {
       // 回滾
@@ -262,7 +262,10 @@ export function MailboxPanel({
                   <div className="mail-rewards-label">📦 附件獎勵</div>
                   <div className="mail-rewards-list">
                     {selected.rewards.map((r, i) => (
-                      <span key={i} className="mail-reward-tag">{rewardLabel(r)}</span>
+                      <span key={i} className="mail-reward-tag">
+                        <span className="mail-reward-tag-icon"><ItemIcon itemId={r.itemId} /></span>
+                        {rewardLabel(r)}
+                      </span>
                     ))}
                   </div>
                   {!selected.claimed && (

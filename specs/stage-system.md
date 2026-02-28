@@ -1,13 +1,12 @@
 # 關卡系統 Spec
 
-> 版本：v1.0 ｜ 狀態：🟢 已實作
-> 最後更新：2026-03-01
+> 版本：v1.1 ｜ 狀態：🟢 已實作
+> 最後更新：2026-02-28
 > 負責角色：🎯 GAME_DESIGN → 🔧 CODING
 
 ## 概述
 
-三種已實作關卡模式：**主線章節**（劇情推進）、**無盡爬塔**（挑戰極限）、**每日副本**（素材農場）。
-PvP 競技場和 Boss 戰定義了解鎖條件但**尚未實作**。
+五種已實作關卡模式：**主線章節**（劇情推進）、**無盡爬塔**（挑戰極限）、**每日副本**（素材農場）、**PvP 競技場**（每日對手）、**Boss 挑戰**（高難度單體戰）。
 所有模式共用 `core-combat.md` 戰鬥引擎，差異在於敵方配置、勝負條件、獎勵。
 敵方配置全部由**前端 seeded PRNG** 確定性生成，無需 GAS 端提供關卡配置。
 
@@ -23,7 +22,7 @@ PvP 競技場和 Boss 戰定義了解鎖條件但**尚未實作**。
 | 原始碼 | 說明 |
 |--------|------|
 | `src/domain/stageSystem.ts` | 核心邏輯 — 配置生成 / PRNG / 星級計算 / 副本定義 / 掉落擲骰 |
-| `src/components/StageSelect.tsx` | 關卡選擇 UI — 3 個分頁（主線/爬塔/每日） |
+| `src/components/StageSelect.tsx` | 關卡選擇 UI — 5 個分頁（主線/爬塔/每日/競技場/Boss） |
 | `src/App.tsx` | 遊戲流程整合 — handleStageSelect / buildEnemySlots / 勝利結算 / goNextStage |
 | `gas/程式碼.js` | GAS Handler — `handleCompleteStage_ / handleCompleteTower_ / handleCompleteDaily_` |
 
@@ -212,15 +211,116 @@ enemies = randomFormation(enemyCount, hpMult, atkMult, speedMult)
 
 ---
 
-## 四、PvP 競技場（⚠️ 未實作）
+## 四、PvP 競技場（✅ 已實作）
 
-已定義解鎖條件（通過 2-1），但前端/後端均未實作。
+### 機制
+
+每日刷新 3 位 AI 對手（seeded by 日期 + 玩家進度），分為 3 個難度梯隊。
+
+| 項目 | 值 |
+|------|-----|
+| 體力消耗 | **0** |
+| 解鎖條件 | 通關 2-1 |
+| 刷新週期 | 每日自動刷新（基於日期 seed） |
+| stageId 格式 | `"pvp_{opponentId}"` |
+| 對手數量 | 固定 3 位 |
+
+### PvPOpponent 型別
+
+```typescript
+interface PvPOpponent {
+  opponentId: string   // 'pvp_0' | 'pvp_1' | 'pvp_2'
+  name: string         // 隨機中文名
+  power: number        // 戰力估算
+  enemies: StageEnemy[]
+}
+```
+
+### 對手生成（getPvPOpponents）
+
+```typescript
+function getPvPOpponents(storyProgress: { chapter: number; stage: number }): PvPOpponent[]
+```
+
+| 梯隊 | 敵人數 | HP 倍率 | ATK 倍率 | SPD 倍率 |
+|------|--------|---------|----------|----------|
+| i=0（易） | `3 + floor(progress/6)` | `1.0 + progress×0.10` | `1.0 + progress×0.06` | `1.0 + progress×0.01` |
+| i=1（中） | `3 + floor(progress/6) + 1` | `1.0 + progress×0.10 + 0.3` | `1.0 + progress×0.06 + 0.2` | 同上 |
+| i=2（難） | `3 + floor(progress/6) + 2` | `1.0 + progress×0.10 + 0.6` | `1.0 + progress×0.06 + 0.4` | 同上 |
+
+Seed = `年×10000 + 月×100 + 日 + progress×7`
+
+### PvP 獎勵（getPvPReward）
+
+| exp | gold | diamond | items |
+|-----|------|---------|-------|
+| `80 + progress×10` | `200 + progress×40` | 10 | `pvp_coin ×(3 + floor(progress/4))` |
+
+### 場景主題
+
+PvP 使用專屬「冷藍電光」競技場主題（Arena `SceneMode = 'pvp'`、`pvpTheme`）。
 
 ---
 
-## 五、Boss 戰（⚠️ 未實作）
+## 五、Boss 挑戰（✅ 已實作）
 
-已定義解鎖條件（通過 2-8），但前端/後端均未實作。
+### 機制
+
+3 位固定 Boss，單體高數值、30 回合限制、傷害段位獎勵。
+
+| 項目 | 值 |
+|------|-----|
+| 體力消耗 | **0** |
+| 解鎖條件 | 通關 2-8 |
+| Boss 數量 | 3 位 |
+| 回合限制 | 30 回合 |
+| stageId 格式 | `"boss_{bossId}"` |
+
+### BOSS_CONFIGS 常數
+
+```typescript
+const BOSS_CONFIGS: BossConfig[] = [
+  { bossId: 'boss_1', name: '腐化巨獸', heroId: 5,  hp: 5000,  atk: 120, speed: 80,  turnLimit: 30, damageThresholds: { S: 15000, A: 10000, B: 5000, C: 2000 } },
+  { bossId: 'boss_2', name: '暗夜領主', heroId: 9,  hp: 8000,  atk: 180, speed: 100, turnLimit: 30, damageThresholds: { S: 25000, A: 18000, B: 10000, C: 4000 } },
+  { bossId: 'boss_3', name: '末日審判者', heroId: 14, hp: 12000, atk: 250, speed: 120, turnLimit: 30, damageThresholds: { S: 40000, A: 28000, B: 15000, C: 6000 } },
+]
+```
+
+### BossConfig 型別
+
+```typescript
+interface BossConfig {
+  bossId: string
+  name: string
+  heroId: number
+  hp: number
+  atk: number
+  speed: number
+  turnLimit: number
+  damageThresholds: { S: number; A: number; B: number; C: number }
+}
+```
+
+### API 函式
+
+| 函式 | 說明 |
+|------|------|
+| `getBossConfig(bossId)` | 回傳 BossConfig 或 null |
+| `getBossEnemies(bossId)` | 回傳 StageEnemy[]（單一 Boss，倍率由 hp/atk/speed 除以基礎值算出） |
+| `getBossReward(bossId, totalDamage)` | 依累計傷害判定段位（S/A/B/C），回傳分級獎勵 |
+
+### Boss 獎勵分級（getBossReward）
+
+| 段位 | 傷害門檻 | exp | gold | diamond | items |
+|------|---------|-----|------|---------|-------|
+| S | `≥ damageThresholds.S` | 600 | 3000 | 100 | `chest_equipment ×2` |
+| A | `≥ damageThresholds.A` | 400 | 2000 | 50 | `chest_equipment ×1` |
+| B | `≥ damageThresholds.B` | 200 | 1000 | 20 | `exp_core_l ×1` |
+| C | 其他 | 100 | 500 | 0 | `exp_core_m ×1` |
+
+### 場景主題
+
+Boss 使用專屬「煉獄深紅」場景主題（Arena `SceneMode = 'boss'`、`bossTheme`）。
 
 ---
 
@@ -230,8 +330,8 @@ enemies = randomFormation(enemyCount, hpMult, atkMult, speedMult)
 const MODE_UNLOCK = {
   tower: { chapter: 1, stage: 4 },   // 通關 1-4
   daily: { chapter: 1, stage: 8 },   // 通關 1-8
-  pvp:   { chapter: 2, stage: 1 },   // 通關 2-1（未實作）
-  boss:  { chapter: 2, stage: 8 },   // 通關 2-8（未實作）
+  pvp:   { chapter: 2, stage: 1 },   // 通關 2-1（✅ 已實作）
+  boss:  { chapter: 2, stage: 8 },   // 通關 2-8（✅ 已實作）
 }
 
 function isModeUnlocked(mode, storyProgress): boolean {
@@ -276,6 +376,8 @@ handleStageSelect(mode, stageId):
 | 主線 | ✅ 計算並記錄 | 星級評價 + 首通 Badge + 獎勵 + 資源速度 | 返回大廳 / 下一關 |
 | 爬塔 | ❌ 不計算 | 「🗼 第 N 層通關！」+ 獎勵 | 返回大廳 / 下一層 |
 | 副本 | ❌ 不計算 | 獎勵 | 返回大廳 |
+| PvP | ❌ 不計算 | 獎勵 + 競技幣 | 返回大廳 |
+| Boss | ❌ 不計算 | 傷害段位（S/A/B/C）+ 分級獎勵 | 返回大廳 |
 
 - 勝利時不顯示「再戰一次」（僅敗北時顯示）
 
@@ -319,8 +421,9 @@ mergeDrops(items: InventoryItem[]): InventoryItem[]   // 合併同 itemId
 
 ## 擴展點
 
-- [ ] **PvP 競技場**：異步 PvP（防守陣容 + 排行榜）
-- [ ] **Boss 戰**：高難度單體，30 回合限制，傷害段位獎勵
+- [x] **PvP 競技場**：每日 seeded 對手 × 3 梯隊 + 競技幣獎勵 + 專屬場景
+- [x] **Boss 挑戰**：3 Boss + 30 回合限制 + 傷害段位獎勵 + 專屬場景
+- [ ] **PvP 排行榜**：異步 PvP 防守陣容 + 排名
 - [ ] **困難模式**：主線 Hard 難度
 - [ ] **掃蕩功能**：已三星通關的關卡跳過戰鬥直接領獎
 - [ ] **活動關卡**：限時活動副本
@@ -335,3 +438,4 @@ mergeDrops(items: InventoryItem[]): InventoryItem[]   // 合併同 itemId
 | v0.3 | 2026-02-28 | 新增三星鎖定、關卡鎖定 toast、模式解鎖 toast、選關過場遮幕 |
 | v0.4 | 2026-02-28 | 每日副本 stageId 中文名、副本專用 config、副本獎勵 |
 | v1.0 | 2026-03-01 | 全面同步實作：補齊 stageSystem.ts 所有公式（seeded PRNG / 敵方配置 / 獎勵 / 星級 / 掉落 / 解鎖條件）、3 副本完整數據表、GAS 3 個結算 Handler、標記 PvP + Boss 為未實作、前端勝利結算完整流程、goNextStage 機制 |
+| v1.1 | 2026-02-28 | PvP 競技場完整實作：PvPOpponent 型別 + getPvPOpponents()（seeded daily 3 梯隊）+ getPvPReward() + StageSelect 競技場分頁 + Arena pvpTheme；Boss 挑戰完整實作：3 Boss（腐化巨獸/暗夜領主/末日審判者）+ BossConfig + BOSS_CONFIGS + getBossConfig/getBossEnemies/getBossReward + 傷害段位(S/A/B/C)獎勵 + Arena bossTheme；SceneMode 擴展為 5 種 |

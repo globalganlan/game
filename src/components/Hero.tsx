@@ -11,9 +11,9 @@ import { Billboard, Text } from '@react-three/drei'
 import * as THREE from 'three'
 
 import { ZombieModel } from './ZombieModel'
-import { DamagePopup, HealthBar3D, EnergyBar3D, SkillToast3D, ElementHint3D } from './SceneWidgets'
+import { DamagePopup, HealthBar3D, EnergyBar3D, SkillToast3D, ElementHint3D, PassiveHint3D, LOCAL_FONT } from './SceneWidgets'
 import type { SlotHero, ActorState, AnimationState, DamagePopupData } from '../types'
-import type { SkillToast, ElementHint } from './BattleHUD'
+import type { SkillToast, ElementHint, PassiveHint } from './BattleHUD'
 
 import type { Vector3Tuple } from 'three'
 
@@ -51,6 +51,8 @@ interface HeroProps {
   skillToasts?: SkillToast[]
   /** 屬性提示（顯示在此英雄頭頂） */
   elementHints?: ElementHint[]
+  /** 被動觸發提示（顯示在此英雄頭頂） */
+  passiveHints?: PassiveHint[]
 }
 
 /* ────────────────────────────
@@ -82,6 +84,7 @@ export function Hero({
   energyRatio,
   skillToasts = [],
   elementHints = [],
+  passiveHints = [],
 }: HeroProps) {
   const meshRef = useRef<THREE.Group>(null)
   const [basePosition] = useState<Vector3Tuple>(position)
@@ -224,18 +227,23 @@ export function Hero({
           <DamagePopup key={pop.id} value={pop.value} position={[0, 2.5, 0]} textScale={textScale} />
         ))}
 
-        {/* 技能名稱浮動標示 */}
+        {/* 技能名稱浮動標示（身體位置） */}
         {skillToasts.map((t) => (
-          <SkillToast3D key={t.id} heroName={t.heroName} skillName={t.skillName} position={[0, 4.2, 0]} textScale={textScale} />
+          <SkillToast3D key={t.id} heroName={t.heroName} skillName={t.skillName} position={[0, 1.5, 0]} textScale={textScale} />
         ))}
 
-        {/* 屬性克制/抵抗浮動標示 */}
+        {/* 屬性克制/抵抗浮動標示（身體位置） */}
         {elementHints.map((h) => (
-          <ElementHint3D key={h.id} text={h.text} color={h.color} position={[0, 3.8, 0]} textScale={textScale} />
+          <ElementHint3D key={h.id} text={h.text} color={h.color} position={[0, 1.2, 0]} textScale={textScale} />
+        ))}
+
+        {/* 被動觸發浮動標示（身體位置） */}
+        {passiveHints.map((ph) => (
+          <PassiveHint3D key={ph.id} skillName={ph.skillName} position={[0, 1.0, 0]} textScale={textScale} />
         ))}
 
         <Billboard position={[0, 3.5, 0]} renderOrder={15}>
-          <Text fontSize={0.4 * textScale} color="white" outlineColor="black" outlineWidth={0.06}>
+          <Text font={LOCAL_FONT} fontSize={0.4 * textScale} color="white" outlineColor="black" outlineWidth={0.06}>
             {heroData.Name}
           </Text>
         </Billboard>

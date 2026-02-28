@@ -9,6 +9,7 @@ import { useState, useEffect, useCallback } from 'react'
 import type { MenuScreen } from '../types'
 import type { SaveData } from '../services/saveService'
 import { getTimerYield } from '../services/saveService'
+import { CurrencyIcon } from './CurrencyIcon'
 
 /* ────────────────────────────
    Props
@@ -46,6 +47,7 @@ const MENU_ITEMS: MenuItem[] = [
   { key: 'heroes',    icon: '🧟', label: '英雄',  sub: '養成·突破·升星',   color: '#2a9d8f', unlock: { chapter: 1, stage: 2, hint: '通關 1-1 後解鎖' } },
   { key: 'gacha',     icon: '🎰', label: '召喚',  sub: '招募新同伴',       color: '#e9c46a', unlock: { chapter: 1, stage: 3, hint: '通關 1-2 後解鎖' } },
   { key: 'inventory', icon: '🎒', label: '背包',  sub: '道具·裝備',        color: '#f4a261', unlock: { chapter: 1, stage: 2, hint: '通關 1-1 後解鎖' } },
+  { key: 'shop',      icon: '🏪', label: '商店',  sub: '購買素材·禮包',    color: '#72b01d', unlock: { chapter: 1, stage: 3, hint: '通關 1-2 後解鎖' } },
   { key: 'mailbox',   icon: '📬', label: '信箱',  sub: '信件·獎勵',        color: '#7ec8e3' },
   { key: 'settings',  icon: '⚙️', label: '設定',  sub: '帳號·綁定',        color: '#888' },
 ]
@@ -116,8 +118,8 @@ export function MainMenu({
           <span className="menu-player-level" title="指揮官等級 — 提升等級解鎖更多功能與內容">Lv.{level}</span>
         </div>
         <div className="menu-resources">
-          <span className="menu-res-item menu-gold" title="金幣 — 升級、購買、強化"><i className="icon-coin">G</i>{gold.toLocaleString()}</span>
-          <span className="menu-res-item menu-diamond" title="鑽石 — 召喚、加速、購買稀有道具"><i className="icon-dia">D</i>{diamond.toLocaleString()}</span>
+          <span className="menu-res-item menu-gold" title="金幣 — 升級、購買、強化"><CurrencyIcon type="gold" />{gold.toLocaleString()}</span>
+          <span className="menu-res-item menu-diamond" title="鑽石 — 召喚、加速、購買稀有道具"><CurrencyIcon type="diamond" />{diamond.toLocaleString()}</span>
         </div>
       </div>
 
@@ -133,7 +135,7 @@ export function MainMenu({
               <span className="menu-progress-stage">🗺️ 關卡進度：{storyText}</span>
               {hasCleared && (
                 <span className="menu-progress-speed">
-                  產速：<i className="icon-coin">G</i>{speed.goldPerHour}/h · <i className="icon-exp">E</i>{speed.expItemsPerHour}/h
+                  產速：<CurrencyIcon type="gold" />{speed.goldPerHour}/h · <CurrencyIcon type="exp" />{speed.expItemsPerHour}/h
                 </span>
               )}
             </div>
@@ -144,7 +146,7 @@ export function MainMenu({
                   <div className="menu-timer-info">
                     {resourcePreview && resourcePreview.gold > 0 ? (
                       <>
-                        <span>⏱️ 待領取：<i className="icon-coin">G</i>{resourcePreview.gold.toLocaleString()} / <i className="icon-exp">E</i>{resourcePreview.expItems}</span>
+                        <span>⏱️ 待領取：<CurrencyIcon type="gold" />{resourcePreview.gold.toLocaleString()} / <CurrencyIcon type="exp" />{resourcePreview.expItems}</span>
                         <span className="menu-timer-hours">({resourcePreview.hoursElapsed}h 累積)</span>
                       </>
                     ) : (

@@ -3,6 +3,298 @@
 > 按時間倒序排列，最新的在最上面。
 
 ---
+### [2026-03-01] 修復 AudioContext 警告 + BGM 無法播放
+
+- **觸發者**：使用者回報（console 13 次 "AudioContext was not allowed to start" 警告，BGM 完全沒有聲音）
+- **執行角色**：🔧 CODING
+- **根本原因**：
+  1. `playSfx()` 每次呼叫都執行 `ensureContext()` → 在無使用者手勢時建立 `new AudioContext()` 導致大量警告
+  2. `playBgm()` 在 `ctx` 存在但仍為 `suspended` 時不會 resume，振盪器排程後無聲音
+  3. `ensureContext()` 只在 LoginScreen 的 `onEnterGame` 回呼中呼叫，其他使用者互動不觸發
+- **修復**：
+  - `playSfx()` 不再主動建立 AudioContext — 若 `ctx` 不存在或 suspended 直接 return
+  - `playBgm()` 加入 `ctx.state === 'suspended'` 時自動 `resume()`
+  - 新增**全域使用者手勢偵測**：constructor 中綁定 `click`/`touchstart`/`keydown`（capture phase），任何互動自動 `ensureContext()` + 播放暫存 BGM，啟動後自動解綁
+- **測試**：`tsc --noEmit` 零錯誤、`vite build` 成功、537 測試全通過
+
+---
+### [2026-03-01] 錯誤訊息全面中文化
+
+- **觸發者**：使用者回報（登入失敗顯示 key 如 `wrong_password` 而非中文訊息）
+- **執行角色**：🔧 CODING
+- **變更摘要**：
+  - 新增 `src/utils/errorMessages.ts` — 集中管理 API 錯誤 key → 繁中對照表（`translateError()` 函式）
+  - 涵蓋所有 GAS 回傳 key：`token_not_found`、`email_taken`、`wrong_password`、`account_not_bound` 等 25+ 組
+  - 修改 `src/hooks/useAuth.ts`：所有 `setError()` 改用 `translateError()`
+  - 修改 `src/hooks/useSave.ts`：loadSave 錯誤改用 `translateError()`
+  - 修改 `src/components/SettingsPanel.tsx`：移除 local errMap，統一用 `translateError()`
+  - 修改 `src/components/GachaScreen.tsx`：抽卡錯誤改用 `translateError()`
+  - 修改 `src/components/MailboxPanel.tsx`：刪除錯誤 fallback 改用 `translateError()`
+  - 已包含中文偵測：若訊息已是中文則直接顯示，避免二次翻譯
+- **測試**：`tsc --noEmit` 零錯誤、`vite build` 成功、537 測試全通過
+
+---
+### [2026-03-01] 被動觸發浮動文字顯示
+
+- **觸發者**：使用者需求（被動效果觸發時想看到像大招/屬性克制那樣的浮動文字）
+- **執行角色**：🔧 CODING
+- **變更摘要**：
+  - 新增 `PassiveHint3D` 3D 浮動文字元件（`src/components/SceneWidgets.tsx`）— 紫色帶☕ 前綴，微彈動畫 + 上浮淡出
+  - 新增 `PassiveHint` 型別定義（`src/components/BattleHUD.tsx`）
+  - `src/components/Hero.tsx`：新增 `passiveHints` prop，在英雄頭頂 Y=4.5 位置渲染 `PassiveHint3D`
+  - `src/App.tsx`：新增 `passiveHints` state + `passiveHintIdRef`，`PASSIVE_TRIGGER` case 推入浮動文字（2 秒後自動移除），所有重置點已同步清空
+- **測試**：`tsc --noEmit` 零錯誤、492 測試全通過
+
+---
+### [2026-02-28] 修復 on_attack 被動 damage 效果造成雙倍傷害 — 新增 damage_mult 機制
+
+- **觸發者**：使用者回報（無名活屍 zombie_6 HP=100 只受 32+34 傷害就死了）
+- **執行角色**：🔧 CODING + 🧪 QA
+- **根本原因**：`executePassiveEffect_` 的 `damage` 類效果在 `on_attack` 觸發時，會呼叫完整的 `calculateDamage_()` 對目標造成一次獨立的額外攻擊（不發射 action，前端看不到），等於每次攻擊實際造成 **雙倍傷害**。zombie_11 的「瘋狂演出」PAS_11_1 每次普攻都隱形打一次目標
+- **設計意圖 vs 實際**：
+  - 原意：「傷害在 ×0.5~×1.8 間隨機浮動」→ 應修改攻擊倍率
+  - 實際：發射一次完整獨立攻擊（倍率 1.0）→ 每次攻擊造成 2× 傷害
+- **修復**：
+  1. **新增 `damage_mult` effect type**：在 `context.damageMult` 上乘算固定倍率（多被動可疊加）
+  2. **新增 `damage_mult_random` effect type**：在 `context.damageMult` 上乘算 [min, max] 隨機倍率
+  3. 在 `executeNormalAttack_` / `executeSkill_` 中，`triggerPassives_` 後將 `context.damageMult` 套用到 `calculateDamage_` 結果
+  4. 原 `damage` effect type 保留給非 on_attack 觸發（如 on_dodge 反擊），並加上 `PASSIVE_DAMAGE` action 發射 + DEATH 檢查
+  5. 更新 6 個被動技能效果類型：
+     - PAS_2_3「力量爆發」→ `damage_mult`（×1.5, 15% 機率）
+     - PAS_4_4「處決」→ `damage_mult`（×1.5）
+     - PAS_11_1「瘋狂演出」→ `damage_mult_random`（0.5~1.8）
+     - PAS_11_4「謝幕演出」→ `damage_mult_random`（0.8~2.5）
+     - PAS_13_1「巨人踐踏」→ `damage_mult`（×1.5, 30% 機率）
+     - PAS_13_4「災厄領主」→ `damage_mult`（×1.8, 45% 機率）
+- **影響範圍**：
+  - `src/domain/types.ts`（BattleContext + SkillEffect + BattleAction）
+  - `src/domain/battleEngine.ts`（executePassiveEffect + executeNormalAttack + executeSkill）
+  - `gas/battleEngine.js`（同上 GAS 版）
+  - `src/App.tsx`（PASSIVE_DAMAGE handler + applyHpFromAction + battleStats）
+  - `scripts/skill_data_zh.json` + `scripts/rebuild_skill_templates.ps1`
+  - Google Sheet `skill_templates`（6 筆 effects 已更新）
+- **GAS 部署**：POST @66、GET @67
+- **測試結果**：tsc --noEmit 0 錯誤、21 test files / 492 tests 全部通過
+
+---
+### [2026-02-28] 修復死亡動畫視覺問題 — HURT→DEAD 序列 + GAS 被動傷害 DEATH 事件
+
+- **觸發者**：使用者回報（血條還沒扣完就死掉了 / 最後存活的英雄被攻擊沒有播放受傷扣血與死亡動畫）
+- **執行角色**：🔧 CODING + 🧪 QA
+- **Bug #1 — 血條同時跳零**：`playHitOrDeath` killed 分支直接設定 `DEAD` + `syncHpToSlot(HP=0)`，HP 條與死亡動畫同時發生，視覺上看不到扣血
+- **Bug #1 修復**：killed 分支改為 **HURT + syncHpToSlot → await hurtDone → DEAD + death SFX → await deadDone → removeSlot**，四個死亡路徑全部統一：
+  1. `playHitOrDeath` killed 分支
+  2. `DEATH` action handler
+  3. `NORMAL_ATTACK` 反彈致死分支
+  4. `SKILL_CAST` 反彈致死分支
+- **Bug #2 — turn_end 被動傷害無 DEATH 事件**：GAS `executePassiveEffect_` 的 `damage` 類被動在 `turn_end` 觸發時可直接扣血致死，但不會發射任何 action（無 DOT_TICK 也無 DEATH）→ 前端無法播放死亡動畫 → 英雄直接消失
+- **Bug #2 修復**：在 `gas/battleEngine.js` turn_end buff 持續時間迴圈中，`triggerPassives_` 執行前記錄 `hpBeforePassive`，執行後若 HP 從 >0 降至 ≤0 則 `emit({ type: 'DEATH', targetUid })`
+- **影響範圍**：`src/App.tsx`（playHitOrDeath + DEATH handler + NORMAL_ATTACK + SKILL_CAST）、`gas/battleEngine.js`（turn_end 被動迴圈）
+- **GAS 部署**：POST @64、GET @65
+- **測試結果**：tsc --noEmit 0 錯誤、21 test files / 492 tests 全部通過
+
+---
+### [2026-02-28] 修復遠端戰鬥動畫卡住 — for-of 無限迴圈 + HP 未同步
+
+- **觸發者**：使用者回報（戰鬥過程動畫卡住 + waitForAction/waitForMove timeout）
+- **執行角色**：🔧 CODING + 🧪 QA
+- **根本原因（主要）**：`battleActionsRef.current = allActions` 與 `for (const act of allActions)` 共用同一陣列參考，而 `onAction` 內部 `battleActionsRef.current.push(action)` 不斷把 action 推回同一陣列 → `for...of` 迭代器讀 `length` 發現陣列持續增長 → **無限迴圈**（已死亡的英雄被再次攻擊 → Hero 已卸載 → 動畫回呼永不觸發 → 5 秒 timeout）
+- **根本原因（次要）**：`applyHpFromAction` 只在 `isReplay` 時執行，遠端戰鬥未同步 heroMap HP
+- **修復內容**：
+  1. 移除 for 迴圈前的 `battleActionsRef.current = allActions`（消除共用參考）
+  2. 移除 `onAction` 內的 `battleActionsRef.current.push(action)`（action 已由 allActions 完整持有）
+  3. 在 for 迴圈結束後指派 `if (!isReplay) battleActionsRef.current = allActions`（供回放/統計）
+  4. 新增 `needsHpSync` 旗標：遠端/回放 = true、本地 = false
+  5. NORMAL_ATTACK / SKILL_CAST 存活分支加入反彈傷害 HP 條同步
+- **影響範圍**：`src/App.tsx`（Phase A/B + onAction）、`src/components/ZombieModel.tsx`（移除除錯日誌）
+- **測試結果**：tsc --noEmit 0 錯誤、vite build 成功、21 test files / 492 tests 全部通過
+
+---
+### [2026-02-28] 全功能自動化測試擴充 — 224→492 測試
+
+- **觸發者**：使用者需求（所有功能都要寫自動化測試，尤其戰鬥流程）
+- **執行角色**：🔧 CODING + 🧪 QA
+- **目標**：大幅提升測試覆蓋率，從 224 個測試擴充到 492 個（+268 個新測試）
+- **新增測試檔案**：
+  - `src/domain/__tests__/battleEngineAdvanced.test.ts` — 39 tests（runBattleCollect、技能施放、被動觸發、中斷大招、DOT/Buff、大型模擬、createBattleHero）
+  - `src/domain/__tests__/buffSystemAdvanced.test.ts` — 33 tests（免疫、永久效果、控制效果交互、多重DOT、護盾吸收、getBuffedStats、淨化）
+  - `src/domain/__tests__/damageFormulaAdvanced.test.ts` — 18 tests（技能倍率、暴擊、閃避上限、反彈、DOT計算、恐懼加傷、減傷）
+  - `src/domain/__tests__/targetStrategyAdvanced.test.ts` — 19 tests（random_enemies_N、前後排、鄰近、嘲諷、友方目標）
+  - `src/domain/__tests__/stageSystemAdvanced.test.ts` — 47 tests（關卡配置、每日副本、Boss系統、PvP對手、星級評價）
+  - `src/domain/__tests__/gachaSystemAdvanced.test.ts` — 17 tests（軟硬保底、featured 50/50、池子耗盡、十連保底）
+  - `src/domain/__tests__/progressionSystemAdvanced.test.ts` — 34 tests（套裝激活、getFinalStats 組合、百分比副屬、經驗消耗邊界）
+  - `src/services/__tests__/battleService.test.ts` — 15 tests（遠端 API 成功/錯誤、序列化邊界）
+  - `src/services/__tests__/saveServiceAdvanced.test.ts` — 12 tests（getTimerYield、getAccumulatedResources 純函式）
+  - `src/services/__tests__/dataServiceAdvanced.test.ts` — 22 tests（toElement 中英文轉換、getHeroSkillSet）
+  - `src/services/__tests__/optimisticQueueAdvanced.test.ts` — 12 tests（generateOpId、pending ops 過期過濾、localStorage mock）
+- **測試結果**：21 test files / 492 tests 全部通過、tsc --noEmit 0 錯誤
+
+---
+### [2026-02-28] 後端戰鬥引擎 — GAS 伺服器權威計算
+
+- **觸發者**：使用者需求（戰鬥計算移至後端）
+- **執行角色**：🔧 CODING
+- **目標**：戰鬥邏輯由後端 GAS 計算，前端只負責播放動畫和音效，徹底消除跳過戰鬥時的 lag/SFX 問題
+- **主要變更**：
+  - `gas/battleEngine.js` — **新建** ~650 行 JavaScript，完整移植 domain 層 6 個模組（battleEngine + damageFormula + buffSystem + energySystem + targetStrategy + elementSystem）
+    - `runBattleEngine_(players, enemies, maxTurns)` — 伺服器端戰鬥引擎主入口
+    - `handleRunBattle_(body)` — POST handler，接收前端序列化的 BattleHero[] 並回傳 `{ winner, actions[] }`
+  - `gas/程式碼.js` — doPost switch-case 新增 `run-battle` action
+  - `src/services/battleService.ts` — **新建** `runBattleRemote()` — POST 到 GAS `run-battle`，序列化 BattleHero[]，回傳 `{ winner, actions[] }`
+  - `src/services/index.ts` — 匯出 `runBattleRemote` + `RemoteBattleResult`
+  - `src/App.tsx` Phase A — 改呼叫 `runBattleRemote()`，失敗時自動降級為本地 `runBattleCollect()`
+- **測試**：
+  - GAS API 手動測試 1v1 戰鬥 → success=true, winner=player, actions=30
+  - `tsc --noEmit` 0 錯
+  - `vite build` 成功
+  - `vitest run` 224/224 通過
+- **部署**：GAS v@62 (POST) + v@63 (GET)
+- **Spec 更新**：core-combat v2.5→v2.6
+
+---
+### [2026-02-28] 戰鬥跳過重構 — 三階段架構（計算→回放→同步）
+
+- **觸發者**：使用者回報（跳過後敗方英雄殘留 + 音效一瞬間爆發）
+- **執行角色**：🔧 CODING
+- **問題**：
+  1. 跳過戰鬥後打輸了，我方英雄仍留在戰場上
+  2. 跳過戰鬥時 lag + 所有音效瞬間播完
+- **根因**：舊架構 `runBattle()` 用 async `onAction` callback，跳過時所有 action 毫秒內觸發 → SFX 同時建立數十個 OscillatorNode；`removeSlot()` 只在 onAction 動畫中執行，跳過時可能遺漏死亡英雄
+- **主要變更**：
+  - `src/domain/battleEngine.ts` — 新增 `BattleResult` interface + `runBattleCollect()` 同步收集模式（毫秒級完成整場戰鬥，回傳 `{ winner, actions }`)
+  - `src/domain/index.ts` — 匯出 `runBattleCollect` + `BattleResult`
+  - `src/App.tsx` — `runBattleLoop` 完全重寫為三階段：
+    - Phase A：`runBattleCollect()` 同步計算所有 BattleAction
+    - Phase B：逐筆回放，`skipBattleRef.current` 時直接 `continue`（不呼叫 onAction、不播 SFX）
+    - Phase C：遍歷 heroMap 最終狀態，同步所有 HP 到 React state，死亡者確實 removeSlot
+  - `src/App.tsx` — 所有 `playSfx()` 加 `!skipBattleRef.current` 守衛
+  - `src/App.tsx` — 跳過按鈕增加 `audioManager.stopAllSfx()` 呼叫
+  - `src/services/audioService.ts` — 新增 `activeSfxGains: GainNode[]` 追蹤 + `stopAllSfx()` 方法（靜音+斷開所有活躍音效）
+- **測試**：`tsc --noEmit` 0 錯、`vite build` 成功、`vitest run` 224/224 通過
+- **Spec 更新**：core-combat v2.4→v2.5
+
+---
+### [2026-02-28] 登出狀態殘留修復 — 完整重置所有快取與狀態
+
+- **觸發者**：使用者回報
+- **執行角色**：🔧 CODING
+- **問題**：登出再登入時 UI 顯示舊帳號資料（英雄、資源、陣型、信箱、背包全殘留）
+- **根因**：登出只清 token + auth state + showGame，未清除 8 個服務層快取、多個 localStorage key、20+ React state/ref、5 個守門旗標阻止重新載入
+- **主要變更**：
+  - `src/App.tsx` — 新增 `handleFullLogout()` callback，替換原本簡單的 `doLogout() + setShowGame(false)`
+    - 清除 8 個服務快取：clearLocalSaveCache / clearLocalPool / clearGachaPreload / clearGameDataCache / clearSheetCache / invalidateMailCache / clearInventoryCache / clearPendingOps
+    - 重置 20+ React state（gameState/playerSlots/enemySlots/mailItems/battleResult/battleBuffs 等）
+    - 重置 5 個 ref 守門旗標（didInitFetch/earlySaveStarted/earlyHeroesRef/earlySaveRef/formationRestoredRef）
+    - 重置過場幕狀態（curtain visible/fading/text + initialReady + curtainClosePromiseRef）
+  - `src/services/inventoryService.ts` — 新增 `clearInventoryCache()` 導出函式
+- **Spec 更新**：save-system v1.1→v1.2
+
+---
+### [2026-02-28] 新帳號初始英雄擴充 — 修復 1-1 卡關
+
+- **觸發者**：使用者回報
+- **執行角色**：🔧 CODING + 🎯 GAME_DESIGN
+- **問題**：新帳號只有 1 隻 N 級「無名活屍」（HP=100, ATK=30），1-1 關卡 2~4 隻敵人完全打不贏
+- **主要變更**：
+  - `gas/程式碼.js` — `handleInitSave_()` 初始英雄從 1 隻改為 3 隻：
+    - HeroID 6 — 無名活屍（N, 均衡, 闇）← 原有
+    - HeroID 1 — 女喪屍（R, 敏捷, 闇）← 新增
+    - HeroID 9 — 倖存者（R, 均衡, 光）← 新增
+  - `gas/程式碼.js` — formation 自動填入 `[6, 1, 9, null, null, null]`，新玩家無需手動拖曳即可開戰
+- **Spec 更新**：save-system v1.0→v1.1
+- **部署**：GAS v@60 (POST) + v@61 (GET)
+
+---
+### [2026-02-28] CurrencyIcon 統一貨幣 icon 系統
+
+- **觸發者**：使用者需求
+- **執行角色**：🔧 CODING
+- **主要變更**：
+  - `src/components/CurrencyIcon.tsx` — **新建** 統一貨幣 icon 元件（`CurrencyIcon` 4 種 CSS badge + `ItemIcon` 通用元件）
+  - `src/App.css` — 新增 `.icon-stardust` 樣式
+  - `App.tsx` — HUD + 勝利獎勵：inline CSS icon → `<CurrencyIcon>` + `<ItemIcon>`
+  - `MainMenu.tsx` — 資源列 + 產速 + 待領取：inline CSS icon → `<CurrencyIcon>`
+  - `GachaScreen.tsx` — 鑽石顯示 + 抽卡費用 + 星塵：inline CSS icon / ✨ emoji → `<CurrencyIcon>`
+  - `StageSelect.tsx` — 爬塔獎勵：inline CSS icon → `<CurrencyIcon>`
+  - `ShopPanel.tsx` — 貨幣列 + 價格：💰💎 emoji → `<CurrencyIcon>`，移除 CURRENCY_ICON map
+  - `InventoryPanel.tsx` — 貨幣列 + 出售 + 貨幣 Tab：💰💎 emoji → `<CurrencyIcon>`
+  - `MailboxPanel.tsx` — 獎勵 icon：`getItemIcon()` → `<ItemIcon>`
+  - `HeroListPanel.tsx` — 突破金幣 icon：`_getItemIcon('gold')` → `<CurrencyIcon type="gold">`
+- **Spec 更新**：ui-flow v1.0→v1.1、inventory v1.1→v1.2、tech-architecture v1.4→v1.5
+
+---
+### [2026-02-28] 物品外觀全面統一化
+
+- **觸發者**：使用者需求
+- **執行角色**：🔧 CODING
+- **主要變更**：
+  - `src/constants/rarity.ts` — 新增共用 `ITEM_NAMES` 映射 + `getItemName()` 函式；擴充 `ITEM_ICONS` 覆蓋所有 itemId（含 exp_core/currency_/eqm_/forge_）；修正 N 稀有度 border 不一致
+  - `MailboxPanel` — 移除本地 `names` 映射，改用共用 `getItemName()`
+  - `InventoryPanel` — 移除 `KNOWN_ITEM_NAMES` + `resolveFallbackName` 獨立邏輯，統一使用共用 `getItemIcon()` / `getItemName()`、碎片 icon 🔮→🧩
+  - `App.tsx` — 勝利獎勵移除本地 `itemNames`，改用 `getItemName()`
+  - `ShopPanel` — 購買成功訊息改用 `getItemName()`（不再顯示 raw itemId）、金幣 icon 💰→🪙、力量職業石 icon 💪→🗡️、稀有鍛造礦 icon 💎→💠
+  - `GachaScreen` — 機率顯示色彩改用 `RARITY_CONFIG` 常數
+  - `UIOverlay` — 移除本地 `RARITY_CONFIG` 重複定義，改用共用版本
+  - `HeroListPanel` — EXP_MATERIALS icon/name 改用共用常數、突破职業石 icon 💎→🗡️
+  - `gas/程式碼.js` — 歡迎信 itemId `exp_stone_m/l` → `exp_core_m/l`
+- **統一結果**：所有 itemId 的名稱、icon、稀有度色彩均從 `rarity.ts` 單一來源管理
+
+---
+### [2026-02-28] 新用戶歡迎禮包信件
+
+- **觸發者**：使用者需求
+- **執行角色**：🔧 CODING
+- **主要變更**：
+  - `gas/程式碼.js` — `handleRegisterGuest_` 新增 `handleSendMail_` 呼叫，新玩家自動獲得歡迎信（💎300 + 🪙10000 + 📘×5 + 📙×2）
+  - try-catch 包裝確保不影響註冊流程
+  - 前端無需修改（信箱系統自動載入新信件）
+- **測試**：新 token 註冊 → load-mail → 歡迎信存在 → 獎勵正確 → 領取成功 ✅
+- **Spec 更新**：auth-system v1.1→v1.2、mailbox v1.0→v1.1
+
+---
+### [2026-02-28] 七項 Bug 修復 + 物品外觀統一
+
+- **觸發者**：使用者回報 7 項 Bug
+- **執行角色**：🔧 CODING
+- **主要變更**：
+
+  **Bug Fix 1：戰鬥 HP 條前幾次被攻擊不扣血**
+  - `src/App.tsx` — `heroInstanceData.stars` 從硬編碼 `1` 改為讀取存檔實際星級 `inst.stars ?? 1`
+  - `src/App.tsx` — BattleHUD `maxHP` 從讀取原始 `s.HP`（基礎值）改為讀取 `battleHeroesRef` 的 `battleHero.maxHP`（含等級/突破/星級加成的實際最大血量）
+
+  **Bug Fix 2：升級/突破/升星不扣素材**
+  - `src/services/inventoryService.ts` — 新增 `removeItemsLocally()` 函式，樂觀扣除本地背包道具
+  - `src/components/HeroListPanel.tsx` — `handleConfirmUpgrade` 升級後呼叫 `removeItemsLocally(materials)` 扣除經驗素材
+  - `src/components/HeroListPanel.tsx` — `handleConfirmAscend` 突破後扣除碎片 + 職業石
+  - `src/components/HeroListPanel.tsx` — `handleConfirmStarUp` 升星後扣除碎片
+
+  **Bug Fix 3：AudioContext not allowed to start**
+  - `src/services/audioService.ts` — `playBgm()` 若 AudioContext 尚未建立（無使用者手勢），不再自動建立，改為暫存曲目
+  - `src/services/audioService.ts` — `ensureContext()` 建立 ctx 後自動播放暫存 BGM
+
+  **Bug Fix 4：N 卡星塵有小數 0.2**
+  - `src/domain/gachaSystem.ts` — `DUPLICATE_STARDUST.N` 從 `0.2` 改為 `1`
+
+  **Bug Fix 5：清除快取後碎片/經驗核心顯示 0**
+  - `src/App.tsx` — Phase 1 認證後立即呼叫 `loadInventory()` 提前載入背包，避免其他畫面讀到 null 狀態
+
+  **Bug Fix 6：登出後自動建立新訪客帳號**
+  - `src/services/authService.ts` — `autoLogin()` 無 token 時不再自動 `register-guest`，改為回傳未登入狀態
+  - `src/services/authService.ts` — 新增 `registerGuest()` 函式，由 UI 按鈕觸發；優先嘗試複用本地 token
+
+  **Bug Fix 7：訪客登入優先複用 token**
+  - `src/hooks/useAuth.ts` — 新增 `doRegisterGuest` 方法
+  - `src/components/LoginScreen.tsx` — 「訪客模式進入」「返回訪客模式」按鈕改為呼叫 `doRegisterGuest`
+
+  **物品外觀統一**
+  - `src/constants/rarity.ts` — 新增共用稀有度常數（`RARITY_COLORS`、`RARITY_CONFIG`、`ITEM_ICONS`、`getItemIcon()`）
+  - `src/components/InventoryPanel.tsx` — 移除本地 `RARITY_COLORS`，改從共用常數匯入
+  - `src/components/GachaScreen.tsx` — 移除本地 `RARITY_CONFIG`，改從共用常數匯入
+  - `src/components/HeroListPanel.tsx` — 移除本地 `RARITY_CONFIG`，改從共用常數匯入
+  - `src/components/MailboxPanel.tsx` — 信件獎勵改用 `getItemIcon()` 顯示對應 icon
+  - `src/App.tsx` — 戰鬥掉落獎勵改用 `getItemIcon()` 顯示對應 icon
+
+---
 ### [2026-02-28] 建立 UI 流程 Spec（ui-flow.md v1.0）
 
 - **觸發者**：使用者要求建立 UI flow spec

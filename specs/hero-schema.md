@@ -1,9 +1,9 @@
 # 英雄資料結構 Spec
 
-> 版本：v2.1 ｜ 狀態：🟢 已實作
-> 最後更新：2025-02-26
-> 負責角色：🎯 GAME_DESIGN → 🔧 CODING
-> 原始碼：`src/types.ts`（表現層）、`src/domain/types.ts`（domain 層）、`src/services/dataService.ts`（資料轉換）
+> 版本：v2.2 ｜ 狀態：🟢 已實作
+> 最後更新：2026-02-28
+> 負賬角色：🎯 GAME_DESIGN → 🔧 CODING
+> 原始碼：`src/types.ts`（表現層）、`src/domain/types.ts`（domain 層）、`src/services/dataService.ts`（資料轉換）、`src/services/saveService.ts`（HeroInstance）
 
 ## 概述
 
@@ -12,6 +12,7 @@
 
 **v2.0**：新增 DEF / CritRate / CritDmg / Element、星級系統、模組化技能表。
 **v2.1**：Domain 層新增 `RawHeroInput`、`BattleHero`、`FinalStats` 三層型別。
+**v2.2**：HeroInstance 新增 `stars` 欄位，舊存檔自動遷移預設 stars=1。
 
 ## 依賴
 
@@ -287,28 +288,29 @@ const passiveSlots = starLevel >= 6 ? 4 : starLevel >= 4 ? 3 : starLevel >= 2 ? 
 
 ---
 
-## 七、HeroInstance（養成層 — ⬜ 未實作）
+## 七、HeroInstance（養成層 — ✅ 已實作）
 
 ```typescript
+// src/services/saveService.ts
 interface HeroInstance {
   instanceId: string
   heroId: number
   level: number           // 1~60
+  exp: number             // 當前經驗
   ascension: number       // 突破 0~5
-  star: number            // 星級 1~6
-  shards: number          // 碎片數
-  equipment: { weapon | armor | ring | shoes }
-  finalStats: FinalStats  // 結算後數值
+  stars: number           // 星級 1~6
+  equippedItems: Record<string, string>  // slot → equipId
+  obtainedAt: string
 }
 ```
 
-### 數值結算公式（設計中）
+> `stars` 欄位於 v2.2 新增。舊存檔缺少此欄位時，`stripPlayerId()` 會自動補上預設值 `stars = 1`。
 
-```
-finalStats = base × (1 + (level-1) × 0.02) + ascensionBonus + equipmentBonus
-```
+### 星級用途
 
-> 此部分尚未實作。目前 `finalStats === baseStats`。
+- 決定被動技能解鎖數（見 `skill-system.md`）
+- 星級乘數加成全屬性（見 `progression.md`）
+- 升星消耗英雄碎片（見 `progression.md`）
 
 ---
 
@@ -330,8 +332,7 @@ public/models/zombie_N/
 ## 擴展點
 
 - [ ] **新英雄**：加入 Google Sheets 即可自動識別
-- [ ] **HeroInstance 養成系統**：等級/突破/裝備影響 finalStats
-- [ ] **覺醒系統**：6 後的額外突破
+- [ ] **HeroInstance 覺醒系統**：☆ 6 後的額外突破
 - [ ] **外觀系統**：替換模型皮膚
 - [ ] **天賦樹**：小天賦點數分配
 
@@ -342,3 +343,4 @@ public/models/zombie_N/
 | v1.0 | 2025-02-26 | 從程式碼逆向整理 |
 | v2.0 | 2025-02-26 | 新增 DEF/CritRate/CritDmg/Element、星級系統、14 隻角色數值 |
 | v2.1 | 2025-02-26 | **已實作**：Domain 三層型別（RawHeroInput → BattleHero）、dataService 轉換流程 |
+| v2.2 | 2026-02-28 | HeroInstance 新增 `stars: number` 欄位（定義於 saveService.ts），舊存檔自動遷移預設 stars=1，用於升星養成 + 被動技能解鎖 |

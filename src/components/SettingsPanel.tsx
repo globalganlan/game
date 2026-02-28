@@ -4,8 +4,10 @@
  * 功能：帳號綁定（email + 密碼）、修改暱稱、登出
  */
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { bindAccount, changeName, changePassword, logout, getAuthState } from '../services/authService'
+import { audioManager } from '../services/audioService'
+import { translateError } from '../utils/errorMessages'
 
 /* ────────────────────────────
    Props
@@ -23,6 +25,12 @@ interface SettingsPanelProps {
    ──────────────────────────── */
 
 export function SettingsPanel({ onBack, onLogout, displayName, isBound: initialBound }: SettingsPanelProps) {
+  /* ── 音量設定 ── */
+  const [audioSettings, setAudioSettings] = useState(audioManager.getSettings())
+  useEffect(() => {
+    return audioManager.subscribe(() => setAudioSettings(audioManager.getSettings()))
+  }, [])
+
   /* ── 綁定帳號 ── */
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -56,15 +64,10 @@ export function SettingsPanel({ onBack, onLogout, displayName, isBound: initialB
         setBindMsg({ ok: true, text: '帳號綁定成功！' })
         setIsBound(true)
       } else {
-        const errMap: Record<string, string> = {
-          email_taken: '此 Email 已被使用',
-          not_logged_in: '尚未登入',
-          invalid_token: '登入狀態異常，請重新登入',
-        }
-        setBindMsg({ ok: false, text: errMap[res.error || ''] || `綁定失敗: ${res.error}` })
+        setBindMsg({ ok: false, text: translateError(res.error, '綁定失敗') })
       }
     } catch (e) {
-      setBindMsg({ ok: false, text: `網路錯誤: ${e}` })
+      setBindMsg({ ok: false, text: '網路連線失敗，請稍後再試' })
     } finally {
       setBindLoading(false)
     }
@@ -83,10 +86,10 @@ export function SettingsPanel({ onBack, onLogout, displayName, isBound: initialB
       if (res.success) {
         setNameMsg({ ok: true, text: '暱稱已更新！' })
       } else {
-        setNameMsg({ ok: false, text: `更新失敗: ${res.error}` })
+        setNameMsg({ ok: false, text: translateError(res.error, '暱稱更新失敗') })
       }
     } catch (e) {
-      setNameMsg({ ok: false, text: `網路錯誤: ${e}` })
+      setNameMsg({ ok: false, text: '網路連線失敗，請稍後再試' })
     } finally {
       setNameLoading(false)
     }
@@ -105,14 +108,10 @@ export function SettingsPanel({ onBack, onLogout, displayName, isBound: initialB
         setPwMsg({ ok: true, text: '密碼已更新！' })
         setOldPw(''); setNewPw(''); setNewPwConfirm('')
       } else {
-        const errMap: Record<string, string> = {
-          wrong_password: '目前密碼不正確',
-          account_not_bound: '帳號尚未綁定',
-        }
-        setPwMsg({ ok: false, text: errMap[res.error || ''] || `更新失敗: ${res.error}` })
+        setPwMsg({ ok: false, text: translateError(res.error, '密碼更新失敗') })
       }
     } catch (e) {
-      setPwMsg({ ok: false, text: `網路錯誤: ${e}` })
+      setPwMsg({ ok: false, text: '網路連線失敗，請稍後再試' })
     } finally {
       setPwLoading(false)
     }
@@ -135,6 +134,58 @@ export function SettingsPanel({ onBack, onLogout, displayName, isBound: initialB
         </div>
 
         <div className="settings-scroll">
+          {/* ── 音量設定 ── */}
+          <section className="settings-section">
+            <h3 className="settings-section-title">🔊 音量設定</h3>
+            <div className="settings-audio-row">
+              <label className="settings-audio-label">
+                <span>主音量</span>
+                <input
+                  type="range"
+                  min={0} max={100} step={1}
+                  value={Math.round(audioSettings.masterVolume * 100)}
+                  onChange={(e) => audioManager.setMasterVolume(Number(e.target.value) / 100)}
+                  className="settings-slider"
+                />
+                <span className="settings-audio-val">{Math.round(audioSettings.masterVolume * 100)}%</span>
+              </label>
+            </div>
+            <div className="settings-audio-row">
+              <label className="settings-audio-label">
+                <span>BGM</span>
+                <input
+                  type="range"
+                  min={0} max={100} step={1}
+                  value={Math.round(audioSettings.bgmVolume * 100)}
+                  onChange={(e) => audioManager.setBgmVolume(Number(e.target.value) / 100)}
+                  className="settings-slider"
+                />
+                <span className="settings-audio-val">{Math.round(audioSettings.bgmVolume * 100)}%</span>
+              </label>
+            </div>
+            <div className="settings-audio-row">
+              <label className="settings-audio-label">
+                <span>SFX</span>
+                <input
+                  type="range"
+                  min={0} max={100} step={1}
+                  value={Math.round(audioSettings.sfxVolume * 100)}
+                  onChange={(e) => audioManager.setSfxVolume(Number(e.target.value) / 100)}
+                  className="settings-slider"
+                />
+                <span className="settings-audio-val">{Math.round(audioSettings.sfxVolume * 100)}%</span>
+              </label>
+            </div>
+            <div className="settings-audio-row">
+              <button
+                className={`settings-btn ${audioSettings.muted ? 'settings-btn-danger' : 'settings-btn-secondary'}`}
+                onClick={() => audioManager.toggleMute()}
+              >
+                {audioSettings.muted ? '🔇 已靜音 — 點擊取消' : '🔊 靜音'}
+              </button>
+            </div>
+          </section>
+
           {/* ── 帳號資訊 ── */}
           <section className="settings-section">
             <h3 className="settings-section-title">帳號資訊</h3>

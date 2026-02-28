@@ -1,16 +1,18 @@
 # 養成系統 Spec
 
-> 版本：v1.0 ｜ 狀態：🟢 已實作（部分 UI 開發中）
-> 最後更新：2026-03-01
-> 負責角色：🎯 GAME_DESIGN → 🔧 CODING
+> 版本：v1.2 ｜ 狀態：🟢 已實作
+> 最後更新：2026-02-28
+> 負賬角色：🎯 GAME_DESIGN → 🔧 CODING
 
 ## 概述
 
 角色成長路徑：**等級**（消耗素材升級）、**突破**（提升等級上限+屬性加成）、**星級**（碎片升星，解鎖被動技能）、**裝備**（4 格位 + 套裝效果 + 強化，可完整重置退還素材）。
 
+養成 UI 已全面實作：升級（素材選擇 + 預覽）、突破、升星、裝備穿脫均可操作，全部走 Optimistic Queue。
+
 ## 依賴
 
-- `specs/hero-schema.md` — HeroInstance 結構（HP, ATK, DEF, SPD, CritRate, CritDmg）
+- `specs/hero-schema.md` — HeroInstance 結構（HP, ATK, DEF, SPD, CritRate, CritDmg, stars）
 - `specs/skill-system.md` — 被動技能星級解鎖
 - `specs/save-system.md` — 存檔結構
 - `specs/inventory.md` — 素材消耗與背包操作（經驗核心/碎片/職業石/強化石等）
@@ -179,7 +181,7 @@ type EquipmentSlot = 'weapon' | 'armor' | 'ring' | 'boots'
 | 戒指 (ring) | CritRate 或 CritDmg | 提升暴擊 |
 | 鞋子 (boots) | SPD | 提升速度 |
 
-> ⚠️ **UI 不一致**：HeroListPanel 只顯示 3 個裝備槽（weapon/armor/accessory），與 domain 4 槽不一致。
+> ✅ **UI 已對齊**：HeroListPanel 顯示 4 個裝備槽（weapon/armor/ring/boots），與 domain 4 槽一致。支援裝備選擇彈窗 + 卸下功能。
 
 ### 裝備稀有度
 
@@ -302,12 +304,12 @@ function getFinalStats(base: BaseStats, hero: HeroInstanceData): FinalStats {
 
 | 操作 | UI 按鈕 | 狀態 |
 |------|--------|------|
-| 升級 | 📈 升級 | ❌ **disabled**（開發中） |
-| 突破 | 🔥 突破 | ❌ **disabled**（開發中） |
-| 升星 | ⭐ 升星 | ❌ **disabled**（開發中） |
-| 裝備穿脫 | — | 僅顯示 3 槽，無互動操作 |
+| 升級 | 📈 升級 | ✅ **已實作** — 素材選擇（經驗核心 S/M/L）+ 預覽 + Optimistic update |
+| 突破 | 🔥 突破 | ✅ **已實作** — canAscend 檢查 + 費用顯示 + Optimistic update |
+| 升星 | ⭐ 升星 | ✅ **已實作** — canStarUp 檢查 + 碎片費用 + Optimistic update |
+| 裝備穿脫 | ⚔️/🛡️/💍/👢 | ✅ **已實作** — 4 槽位（weapon/armor/ring/boots）、裝備選擇彈窗、卸下功能 |
 
-> ⚠️ HeroListPanel 屬性計算使用內聯公式（`ascMult = 1 + asc * 0.05`），與 domain 查表（非線性 1.0/1.05/1.10/1.15/1.20/1.30）有微小差異。
+> 全部養成操作均透過 `progressionService` 走 Optimistic Queue，本地即時更新 + 背景同步 GAS。
 
 ---
 
@@ -320,8 +322,8 @@ function getFinalStats(base: BaseStats, hero: HeroInstanceData): FinalStats {
 - [ ] **外觀系統**：覺醒後替換模型
 - [ ] **好感度系統**：互動解鎖語音/劇情
 - [ ] **合成系統**：3×同稀有度裝備 → 高一級（Spec 設計中）
-- [ ] **UI 槽位對齊**：HeroListPanel 3 槽 → 與 domain 4 槽一致
-- [ ] **UI 養成按鈕啟用**：升級/突破/升星功能已有 service+domain，缺 UI 串接
+- [x] **UI 槽位對齊**：~~HeroListPanel 3 槽 → 與 domain 4 槽一致~~（✅ 已完成）
+- [x] **UI 養成按鈕啟用**：~~升級/突破/升星功能已有 service+domain，缺 UI 串接~~（✅ 已完成）
 
 ## 變更歷史
 
@@ -331,3 +333,5 @@ function getFinalStats(base: BaseStats, hero: HeroInstanceData): FinalStats {
 | v0.2 | 2026-02-26 | 重寫：4 格位裝備 + 套裝 + 鍛造合成 + 強化重置 + 星級系統 + 素材式升級 |
 | v0.3 | 2026-02-28 | Optimistic Queue、自動升級計算、EXP 進度條、addItemsLocally |
 | v1.0 | 2026-03-01 | 全面同步實作：補齊所有 domain 常數表（ASCENSION_LEVEL_CAP / MULTIPLIER / STAR系列 / SUB_STAT_POOL / 8 套裝）、所有匯出函式簽名、getFinalStats 5 步計算流程、consumeExpMaterials 函式、service 層 11 個 API 全列、UI 養成按鈕狀態（disabled）、裝備槽數不一致標注、鍛造/拆解 domain 缺失說明 |
+| v1.1 | 2026-02-28 | 養成 UI 全面實作：升級（素材選擇 exp_core S/M/L + 預覽 + optimistic update）、突破（canAscend 驗證 + 費用顯示）、升星（canStarUp 驗證 + 碎片費用）、裝備穿脫（4 槽 weapon/armor/ring/boots + 選擇彈窗 + 卸下）、全部走 Optimistic Queue |
+| v1.2 | 2026-02-28 | **Bug Fix**：升級/突破/升星操作新增本地樂觀扣除素材（`removeItemsLocally`）；戰鬥 HP 條改讀實際 `battleHero.maxHP`；存檔星級改讀 `inst.stars` |

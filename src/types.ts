@@ -20,7 +20,7 @@ export type GameState =
   | 'GAMEOVER'
 
 /** 主選單子畫面 */
-export type MenuScreen = 'none' | 'heroes' | 'inventory' | 'gacha' | 'stages' | 'settings' | 'mailbox'
+export type MenuScreen = 'none' | 'heroes' | 'inventory' | 'gacha' | 'stages' | 'settings' | 'mailbox' | 'shop'
 
 /** 單一角色的即時狀態 */
 export type ActorState =

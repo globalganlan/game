@@ -37,11 +37,16 @@ import { GachaScreen } from './components/GachaScreen'
 import { StageSelect } from './components/StageSelect'
 import { SettingsPanel } from './components/SettingsPanel'
 import { MailboxPanel } from './components/MailboxPanel'
+import { ShopPanel } from './components/ShopPanel'
 import { preloadMail, invalidateMailCache, loadMail } from './services/mailService'
+import { clearCache as clearSheetCache } from './services/sheetApi'
+import { clearGachaPreload } from './services/gachaPreloadService'
+import { clearLocalPool } from './services/gachaLocalPool'
+import { clearPendingOps } from './services/optimisticQueue'
 import type { MailItem } from './services/mailService'
 /* ── Phase 7: Battle HUD ── */
 import { BattleHUD } from './components/BattleHUD'
-import type { BattleBuffMap, BattleEnergyMap, SkillToast, ElementHint } from './components/BattleHUD'
+import type { BattleBuffMap, BattleEnergyMap, SkillToast, ElementHint, PassiveHint } from './components/BattleHUD'
 
 import type {
   GameState,
@@ -58,8 +63,10 @@ import type { Vector3Tuple } from 'three'
 /* ── Domain Engine & Data Service ── */
 import type { BattleHero, BattleAction, SkillTemplate, DamageResult } from './domain'
 import type { Element as DomainElement } from './domain/types'
-import { runBattle, createBattleHero } from './domain'
-import { loadAllGameData, getHeroSkillSet, toElement } from './services'
+import { BattleFlowValidator } from './domain/battleFlowValidator'
+import { runBattleCollect, createBattleHero } from './domain'
+import { runBattleRemote } from './services/battleService'
+import { loadAllGameData, getHeroSkillSet, toElement, clearGameDataCache } from './services'
 import type { RawHeroInput, HeroInstanceData } from './domain'
 import {
   getStoryStageConfig,
@@ -71,11 +78,18 @@ import {
   mergeDrops,
   getDailyDungeonConfig,
   getDailyDungeonDisplayName,
+  getPvPOpponents,
+  getPvPReward,
+  getBossEnemies,
+  getBossReward,
 } from './domain/stageSystem'
 import type { StageReward } from './domain/stageSystem'
-import { getTimerYield, addHeroesLocally, getSaveState } from './services/saveService'
-import { addItemsLocally } from './services/inventoryService'
+import { getTimerYield, addHeroesLocally, getSaveState, clearLocalSaveCache } from './services/saveService'
+import { addItemsLocally, loadInventory, clearInventoryCache } from './services/inventoryService'
 import { expToNextLevel } from './domain/progressionSystem'
+import { audioManager } from './services/audioService'
+import { getItemName } from './constants/rarity'
+import { CurrencyIcon, ItemIcon } from './components/CurrencyIcon'
 
 /* ────────────────────────────
    常數
@@ -176,7 +190,7 @@ const clamp01 = (v: number) => Math.max(0, Math.min(1, v))
  * heroesList: 所有英雄原始資料（用於取得 HP/ATK 等基礎值）
  */
 function buildEnemySlotsFromStage(
-  mode: 'story' | 'tower' | 'daily',
+  mode: 'story' | 'tower' | 'daily' | 'pvp' | 'boss',
   stageId: string,
   heroesList: RawHeroData[],
 ): (SlotHero | null)[] {
@@ -188,6 +202,14 @@ function buildEnemySlotsFromStage(
   } else if (mode === 'daily') {
     const cfg = getDailyDungeonConfig(stageId)
     enemies = cfg ? cfg.difficulty.enemies : []
+  } else if (mode === 'pvp') {
+    // stageId = "pvp_0" ~ "pvp_2"
+    const idx = Number(stageId.replace('pvp_', '')) || 0
+    const opponents = getPvPOpponents({ chapter: 1, stage: 1 }) // progress doesn't matter; opponents seeded by date
+    enemies = opponents[idx]?.enemies ?? []
+  } else if (mode === 'boss') {
+    // stageId = bossId e.g. "boss_1"
+    enemies = getBossEnemies(stageId)
   } else {
     // story
     enemies = getStoryStageConfig(stageId).enemies
@@ -318,7 +340,7 @@ export default function App() {
   const [heroesList, setHeroesList] = useState<RawHeroData[]>([])
   const heroesListRef = useRef<RawHeroData[]>([])
   /** 目前選定的關卡模式（影響場景外觀） */
-  const [stageMode, setStageMode] = useState<'story' | 'tower' | 'daily'>('story')
+  const [stageMode, setStageMode] = useState<'story' | 'tower' | 'daily' | 'pvp' | 'boss'>('story')
   const [stageId, setStageId] = useState<string>('1-1')
   const ownedHeroesList = useMemo(() => {
     const ownedIds = new Set(
@@ -335,7 +357,7 @@ export default function App() {
   const { showToast, toastElements } = useToast()
   const [turn, setTurn] = useState(0)
   const turnRef = useRef(0)
-  const [log, setLog] = useState('選擇你的英雄，準備戰鬥！')
+  const [battleCalculating, setBattleCalculating] = useState(false)
   const [damagePopups, setDamagePopups] = useState<DamagePopupData[]>([])
   /** 受擊閃光訊號：uid → 遞增整數，每次受擊 +1 */
   const [hitFlashSignals, setHitFlashSignals] = useState<Record<string, number>>({})
@@ -349,8 +371,10 @@ export default function App() {
   const [battleEnergy, setBattleEnergy] = useState<BattleEnergyMap>({})
   const [skillToasts, setSkillToasts] = useState<SkillToast[]>([])
   const [elementHints, setElementHints] = useState<ElementHint[]>([])
+  const [passiveHints, setPassiveHints] = useState<PassiveHint[]>([])
   const skillToastIdRef = useRef(0)
   const elementHintIdRef = useRef(0)
+  const passiveHintIdRef = useRef(0)
   useEffect(() => { speedRef.current = speed }, [speed])
   const [battleResult, setBattleResult] = useState<'victory' | 'defeat' | null>(null)
 
@@ -410,6 +434,80 @@ export default function App() {
       setMailLoaded(true)
     } catch { /* silent */ }
   }, [])
+
+  /** 完整登出：清除所有服務層快取 + React state + ref 守門旗標 */
+  const handleFullLogout = useCallback(() => {
+    // 1. Auth
+    authHook.doLogout()
+
+    // 2. 服務層快取全清
+    clearLocalSaveCache()          // save cache + pending + debounce
+    clearLocalPool()               // gacha pool/pity/owned/pending localStorage + memory
+    clearGachaPreload()            // preloaded gacha results
+    clearGameDataCache()           // heroes/skills/heroSkills memory cache
+    clearSheetCache()              // sheet API memory cache
+    invalidateMailCache()          // mail preload memory cache
+    clearInventoryCache()          // inventory state + localStorage
+    clearPendingOps()              // optimistic queue localStorage
+
+    // 3. React state 重設
+    setGameState('PRE_BATTLE')
+    setMenuScreen('none')
+    setHeroesList([])
+    heroesListRef.current = []
+    setPlayerSlots(EMPTY_SLOTS)
+    setEnemySlots(EMPTY_SLOTS)
+    pSlotsRef.current = EMPTY_SLOTS
+    eSlotsRef.current = EMPTY_SLOTS
+    preBattlePlayerSlotsRef.current = EMPTY_SLOTS
+    setMailItems([])
+    setMailLoaded(false)
+    setBattleResult(null)
+    setVictoryRewards(null)
+    setBattleBuffs({})
+    setBattleEnergy({})
+    setSkillToasts([])
+    setElementHints([])
+    setPassiveHints([])
+    setBattleStats({})
+    setShowBattleStats(false)
+    setStageId('1-1')
+    setStageMode('story')
+    setTurn(0)
+    turnRef.current = 0
+    setDamagePopups([])
+    setHitFlashSignals({})
+    setActorStates({})
+    actorStatesRef.current = {}
+    moveTargetsRef.current = {}
+    setSpeed(1)
+    speedRef.current = 1
+    skipBattleRef.current = false
+    skillToastIdRef.current = 0
+    elementHintIdRef.current = 0
+    passiveHintIdRef.current = 0
+    battleHeroesRef.current = new Map()
+    battleActionsRef.current = []
+    isReplayingRef.current = false
+    setPreloadProgress(null)
+
+    // 4. ref 守門旗標重設（最關鍵 — 允許重新登入時重跑 Phase 0/1/2）
+    didInitFetch.current = false
+    earlySaveStarted.current = false
+    earlyHeroesRef.current = null
+    earlySaveRef.current = null
+    formationRestoredRef.current = false
+
+    // 5. 過場幕重設
+    setCurtainVisible(true)
+    setCurtainFading(false)
+    setCurtainText('載入資源中...')
+    initialReady.current = false
+    curtainClosePromiseRef.current = null
+
+    // 6. 切回登入畫面
+    setShowGame(false)
+  }, [authHook]) // eslint-disable-line react-hooks/exhaustive-deps
 
   /* ── 槽位 ── */
   const [playerSlots, setPlayerSlots] = useState<(SlotHero | null)[]>(EMPTY_SLOTS)
@@ -483,7 +581,13 @@ export default function App() {
   const actorStatesRef = useRef<Record<string, ActorState>>({})
   /** 前進目標位置（世界座標），uid → [x, y, z] */
   const moveTargetsRef = useRef<Record<string, Vector3Tuple>>({})
+  /** 戰鬥流程驗證器（僅 dev 模式啟用） */
+  const flowValidatorRef = useRef<BattleFlowValidator | null>(null)
   const setActorState = (id: string, s: ActorState) => {
+    // dev 模式：驗證狀態轉換合法性
+    if (import.meta.env.DEV && flowValidatorRef.current) {
+      flowValidatorRef.current.transition(id, s)
+    }
     actorStatesRef.current = { ...actorStatesRef.current, [id]: s }
     setActorStates(actorStatesRef.current)
   }
@@ -737,7 +841,7 @@ export default function App() {
       // ★ 從 localStorage 恢復戰鬥倍速（非阻塞）
       try {
         const savedSpeed = Number(localStorage.getItem('battleSpeed'))
-        if (savedSpeed && [1, 2, 4, 8].includes(savedSpeed)) {
+        if (savedSpeed && [1, 2, 4, 6].includes(savedSpeed)) {
           setSpeed(savedSpeed)
         }
       } catch (e) { console.warn('[speed restore]', e) }
@@ -756,11 +860,9 @@ export default function App() {
       stageProgress.finalize = 1; refresh()
 
       setGameState('MAIN_MENU')
-      setLog('歡迎回到末日世界')
       await closeCurtain(INITIAL_CURTAIN_GRACE_MS)
     } catch (err) {
       console.error('[fetchData]', err)
-      setLog(`通訊設施已毀壞: ${err}`)
       setPreloadProgress(null)
       await closeCurtain(INITIAL_CURTAIN_GRACE_MS)
     }
@@ -800,13 +902,15 @@ export default function App() {
         img.src = `${base}/thumbnail.png`
       }
     })
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [])  
 
-  // ── Phase 1: 認證成功 → 立刻背景載入存檔 & 信箱（不等 showGame）──
+  // ── Phase 1: 認證成功 → 立刻背景載入存檔 & 信箱 & 背包（不等 showGame）──
   useEffect(() => {
     if (!authHook.auth.isLoggedIn || earlySaveStarted.current) return
     earlySaveStarted.current = true
     earlySaveRef.current = saveHook.doLoadSave().catch(e => console.warn('[early] save load failed:', e))
+    // 背包提前載入，避免升級/升星面板看到素材數量 0
+    loadInventory().catch(e => console.warn('[early] inventory load failed:', e))
     preloadMail()
       .then(({ mails }) => { setMailItems(mails); setMailLoaded(true) })
       .catch(e => console.warn('[early] mail preload failed:', e))
@@ -819,7 +923,7 @@ export default function App() {
     didInitFetch.current = true
     // save + mail 已在 Phase 1 啟動，不再重複
     fetchData.current?.()
-  }, [showGame]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [showGame])  
 
   // （陣型儲存移至 runBattleLoop 開戰時執行，避免尚未開戰就存檔）
 
@@ -830,6 +934,27 @@ export default function App() {
     }, 12000)
     return () => clearTimeout(t)
   }, [gameState])
+
+  /* ── BGM 自動切換 ── */
+  useEffect(() => {
+    if (!showGame) {
+      audioManager.playBgm('login')
+      return
+    }
+    if (gameState === 'GAMEOVER') {
+      audioManager.playBgm(battleResult === 'victory' ? 'victory' : 'defeat')
+    } else if (gameState === 'BATTLE') {
+      audioManager.playBgm('battle')
+    } else if (gameState === 'MAIN_MENU') {
+      if (menuScreen === 'gacha') {
+        audioManager.playBgm('gacha')
+      } else {
+        audioManager.playBgm('lobby')
+      }
+    } else if (gameState === 'IDLE') {
+      audioManager.playBgm('lobby')
+    }
+  }, [showGame, gameState, menuScreen, battleResult])
 
   /* ── 重試（在同一關卡重置到選擇上陣階段） ── */
   const retryBattle = async () => {
@@ -853,7 +978,6 @@ export default function App() {
 
     // 清除戰鬥狀態
     setTurn(0); turnRef.current = 0
-    setLog('重新編排你的隊伍吧')
     setDamagePopups([])
     setBattleResult(null)
     setVictoryRewards(null)
@@ -866,9 +990,9 @@ export default function App() {
     setBattleEnergy({})
     setSkillToasts([])
     setElementHints([])
+    setPassiveHints([])
 
     setGameState('IDLE')
-
     // 收幕
     closeCurtain()
   }
@@ -896,7 +1020,6 @@ export default function App() {
 
     // 清除戰鬥狀態
     setTurn(0); turnRef.current = 0
-    setLog('戰鬥回放中...')
     setDamagePopups([])
     setBattleResult(null)
     actorStatesRef.current = {}
@@ -907,6 +1030,7 @@ export default function App() {
     setBattleEnergy({})
     setSkillToasts([])
     setElementHints([])
+    setPassiveHints([])
 
     closeCurtain()
 
@@ -928,7 +1052,6 @@ export default function App() {
     updatePlayerSlots(() => Array(6).fill(null))
     updateEnemySlots(() => Array(6).fill(null))
     setTurn(0); turnRef.current = 0
-    setLog('')
     setDamagePopups([])
     setBattleResult(null)
     setVictoryRewards(null)
@@ -940,6 +1063,7 @@ export default function App() {
     setBattleEnergy({})
     setSkillToasts([])
     setElementHints([])
+    setPassiveHints([])
     setMenuScreen('none')
     setGameState('MAIN_MENU')
 
@@ -966,7 +1090,6 @@ export default function App() {
       setStageId(String(nextFloor))
       updateEnemySlots(() => buildEnemySlotsFromStage('tower', String(nextFloor), heroesList))
       setTurn(0); turnRef.current = 0
-      setLog('準備挑戰下一層')
       setDamagePopups([])
       setBattleResult(null)
       setVictoryRewards(null)
@@ -978,6 +1101,7 @@ export default function App() {
       setBattleEnergy({})
       setSkillToasts([])
       setElementHints([])
+      setPassiveHints([])
       setGameState('IDLE')
       closeCurtain()
       return
@@ -1006,7 +1130,6 @@ export default function App() {
     setStageId(nextId)
     updateEnemySlots(() => buildEnemySlotsFromStage(stageMode, nextId, heroesList))
     setTurn(0); turnRef.current = 0
-    setLog(`前進至關卡 ${nextId}`)
     setDamagePopups([])
     setBattleResult(null)
     setVictoryRewards(null)
@@ -1018,6 +1141,7 @@ export default function App() {
     setBattleEnergy({})
     setSkillToasts([])
     setElementHints([])
+    setPassiveHints([])
     setGameState('IDLE')
     closeCurtain()
   }
@@ -1097,7 +1221,7 @@ export default function App() {
         level: inst.level,
         exp: inst.exp,
         ascension: inst.ascension,
-        stars: 1,          // TODO: track stars in save system
+        stars: inst.stars ?? 1,
         equipment: [],     // TODO: load equipped EquipmentInstance[]
       } : undefined
       const starLevel = heroInstanceData?.stars ?? 1
@@ -1120,6 +1244,13 @@ export default function App() {
 
     battleHeroesRef.current = heroMap
 
+    // ── dev 模式：初始化戰鬥流程驗證器 ──
+    if (import.meta.env.DEV) {
+      const fv = new BattleFlowValidator()
+      fv.registerActors([...heroMap.keys()])
+      flowValidatorRef.current = fv
+    }
+
     // Initialize Phase 7 battle HUD state
     setBattleBuffs({})
     setBattleEnergy(
@@ -1129,6 +1260,7 @@ export default function App() {
     )
     setSkillToasts([])
     setElementHints([])
+    setPassiveHints([])
 
     /* ── Helpers ── */
     const syncHpToSlot = (hero: BattleHero) => {
@@ -1167,13 +1299,16 @@ export default function App() {
         return
       }
       addDamage(targetUid, dmg)
+      if (!skipBattleRef.current) audioManager.playSfx('hit_normal')
       const hero = heroMap.get(targetUid)
       if (!hero) return
 
       if (killed) {
+        // 致死攻擊：直接閃紅光 + 扣血 → 死亡動畫（跳過受傷動畫避免往後仰再回正再倒）
+        syncHpToSlot(hero)
+        if (!skipBattleRef.current) audioManager.playSfx('death')
         const deadDone = waitForAction(targetUid, 'DEAD')
         setActorState(targetUid, 'DEAD')
-        syncHpToSlot(hero)
         await deadDone
         removeSlot(hero)
       } else {
@@ -1186,9 +1321,16 @@ export default function App() {
     }
 
     /* ── onAction: 引擎行動 → 3D 演出 ── */
+    /** 待完成的後退動畫（uid → Promise）—— 不阻塞下一個 action，讓中斷大招可立即開始 */
+    const pendingRetreats = new Map<string, Promise<void>>()
+    /** 背景動畫（死亡等長動畫）—— 不阻塞下一個 action，Phase C 前統一等待 */
+    const backgroundAnims: Promise<void>[] = []
     const onAction = async (action: BattleAction) => {
-      // 紀錄所有行動（用於回放 + 統計）
-      if (!isReplay) battleActionsRef.current.push(action)
+      // ★ 若此 action 的攻擊者上一次有待完成的後退，先等它完成
+      if (action.type === 'NORMAL_ATTACK' || action.type === 'SKILL_CAST') {
+        const pending = pendingRetreats.get(action.attackerUid)
+        if (pending) { await pending; pendingRetreats.delete(action.attackerUid) }
+      }
       switch (action.type) {
 
         case 'TURN_START':
@@ -1203,7 +1345,6 @@ export default function App() {
         case 'NORMAL_ATTACK': {
           const atk = heroMap.get(action.attackerUid)!
           const tgt = heroMap.get(action.targetUid)!
-          setLog(`ROUND ${turnRef.current}：${atk.side === 'player' ? '玩家' : '敵人'} ${atk.name} 發動攻擊`)
 
           // Phase 7: 屬性相剋指示
           if (action.result.elementMult && action.result.elementMult !== 1.0) {
@@ -1228,7 +1369,7 @@ export default function App() {
               return { ...prev, [action.attackerUid]: { current: action._atkEnergyNew!, max: prev[action.attackerUid]?.max ?? 1000 } }
             })
           }
-          await delay(180)
+          await delay(840) // 等待攻擊動畫揮擊命中點
 
           // 3) 傷害/受傷 or 閃避/死亡
           // ★ 受擊動畫開始前 → 立即更新受擊者能量
@@ -1238,34 +1379,59 @@ export default function App() {
               return { ...prev, [action.targetUid]: { current: action._tgtEnergyNew!, max: prev[action.targetUid]?.max ?? 1000 } }
             })
           }
-          await playHitOrDeath(action.targetUid, action.result.damage, action.killed, action.result.isDodge)
+          if (action.result.isCrit && !skipBattleRef.current) audioManager.playSfx('hit_critical')
 
-          // 4) 後退 / 反彈致死
-          await atkDone
-          if ((heroMap.get(action.attackerUid)?.currentHP ?? 0) > 0) {
-            setActorState(action.attackerUid, 'RETREATING')
-            await waitForMove(action.attackerUid)
-            setActorState(action.attackerUid, 'IDLE')
-          } else {
-            // ★ 攻擊者被反彈傷害致死 — 播放死亡動畫並移除
-            const atkHero = heroMap.get(action.attackerUid)
-            if (atkHero) {
-              if (action.result.reflectDamage > 0) addDamage(action.attackerUid, action.result.reflectDamage)
-              const deadDone = waitForAction(action.attackerUid, 'DEAD')
-              setActorState(action.attackerUid, 'DEAD')
-              syncHpToSlot(atkHero)
-              await deadDone
-              removeSlot(atkHero)
+          // 3+4) 受傷/死亡 與 攻擊者後退 同時並行
+          const hitPromise = playHitOrDeath(action.targetUid, action.result.damage, action.killed, action.result.isDodge)
+
+          // 攻擊者後退（與受傷動畫並行）
+          const retreatPromise = (async () => {
+            await atkDone
+            if ((heroMap.get(action.attackerUid)?.currentHP ?? 0) > 0) {
+              // ★ 反彈傷害但存活 — 顯示反彈數字並同步 HP 條
+              if (action.result.reflectDamage > 0) {
+                addDamage(action.attackerUid, action.result.reflectDamage)
+                const atkHero = heroMap.get(action.attackerUid)
+                if (atkHero) syncHpToSlot(atkHero)
+              }
+              setActorState(action.attackerUid, 'RETREATING')
+              await waitForMove(action.attackerUid)
+              setActorState(action.attackerUid, 'IDLE')
+            } else {
+              // ★ 攻擊者被反彈傷害致死 — 播放受擊 → 死亡動畫並移除
+              const atkHero = heroMap.get(action.attackerUid)
+              if (atkHero) {
+                if (action.result.reflectDamage > 0) addDamage(action.attackerUid, action.result.reflectDamage)
+                // 先播受擊 + HP 條下降
+                const hurtDone = waitForAction(action.attackerUid, 'HURT')
+                setActorState(action.attackerUid, 'HURT')
+                syncHpToSlot(atkHero)
+                await hurtDone
+                // 再播死亡
+                if (!skipBattleRef.current) audioManager.playSfx('death')
+                const deadDone = waitForAction(action.attackerUid, 'DEAD')
+                setActorState(action.attackerUid, 'DEAD')
+                await deadDone
+                removeSlot(atkHero)
+              }
             }
-          }
+          })()
 
-          await delay(120)
+          // ★ 致死攻擊：死亡動畫在背景執行（不阻塞下一個 action）
+          //   非致死：等受擊動畫完成（短，且需保證狀態正確）
+          if (action.killed) {
+            backgroundAnims.push(hitPromise)
+          } else {
+            await hitPromise
+          }
+          pendingRetreats.set(action.attackerUid, retreatPromise)
+
           break
         }
 
         case 'SKILL_CAST': {
           const atk = heroMap.get(action.attackerUid)!
-          setLog(`ROUND ${turnRef.current}：${atk.name} 使用 ${action.skillName}！`)
+          if (!skipBattleRef.current) audioManager.playSfx('skill_cast')
 
           // Phase 7: 技能名稱彈幕
           setSkillToasts((prev) => [...prev, {
@@ -1302,7 +1468,7 @@ export default function App() {
               return { ...prev, [action.attackerUid]: { current: action._atkEnergyNew!, max: prev[action.attackerUid]?.max ?? 1000 } }
             })
           }
-          await delay(180)
+          await delay(420) // 等待攻擊動畫揮擊命中點（~40-50% of animation）
 
           // 3) 所有目標同時播放效果（Promise.all 取代 for...of await）
           //    ★ 合併重複 uid（random_enemies 可重複選擇同一個目標）
@@ -1331,7 +1497,8 @@ export default function App() {
             }
           }
 
-          const hitPromises: Promise<void>[] = []
+          const hurtPromises: Promise<void>[] = []
+          const deathPromises: Promise<void>[] = []
           for (const [uid, m] of mergedTargets) {
             // ★ 受擊動畫前 → 更新該目標能量
             if (action._tgtEnergyMap?.[uid] != null) {
@@ -1341,7 +1508,9 @@ export default function App() {
               })
             }
             if (m.damage > 0 || m.isDodge) {
-              hitPromises.push(playHitOrDeath(uid, m.damage, m.killed, m.isDodge))
+              const p = playHitOrDeath(uid, m.damage, m.killed, m.isDodge)
+              if (m.killed) deathPromises.push(p)
+              else hurtPromises.push(p)
             }
             if (m.heal > 0) {
               addDamage(uid, -m.heal) // 負值 = 治療
@@ -1349,29 +1518,48 @@ export default function App() {
               if (hero) syncHpToSlot(hero)
             }
           }
-          await Promise.all(hitPromises)
+          // ★ 只等非致死受傷動畫（短）；死亡動畫在背景執行不阻塞
+          await Promise.all(hurtPromises)
+          backgroundAnims.push(...deathPromises)
 
-          // 4) 後退 / 反彈致死
-          await atkDone
-          if ((heroMap.get(action.attackerUid)?.currentHP ?? 0) > 0) {
-            if (hasDamageTargets) {
-              setActorState(action.attackerUid, 'RETREATING')
-              await waitForMove(action.attackerUid)
+          // 4) 攻擊者後退（與受傷動畫並行）
+          const skillRetreatPromise = (async () => {
+            await atkDone
+            if ((heroMap.get(action.attackerUid)?.currentHP ?? 0) > 0) {
+              // ★ 反彈傷害但存活
+              const totalReflect = action.targets.reduce((sum: number, t: { uid: string; result: DamageResult | { heal: number }; killed?: boolean }) => {
+                if ('damage' in t.result) return sum + (t.result as DamageResult).reflectDamage
+                return sum
+              }, 0)
+              if (totalReflect > 0) {
+                addDamage(action.attackerUid, totalReflect)
+                const atkHeroAlive = heroMap.get(action.attackerUid)
+                if (atkHeroAlive) syncHpToSlot(atkHeroAlive)
+              }
+              if (hasDamageTargets) {
+                setActorState(action.attackerUid, 'RETREATING')
+                await waitForMove(action.attackerUid)
+              }
+              setActorState(action.attackerUid, 'IDLE')
+            } else {
+              // ★ 攻擊者被反彈傷害致死
+              const atkHero = heroMap.get(action.attackerUid)
+              if (atkHero) {
+                const hurtDone2 = waitForAction(action.attackerUid, 'HURT')
+                setActorState(action.attackerUid, 'HURT')
+                syncHpToSlot(atkHero)
+                await hurtDone2
+                if (!skipBattleRef.current) audioManager.playSfx('death')
+                const deadDone2 = waitForAction(action.attackerUid, 'DEAD')
+                setActorState(action.attackerUid, 'DEAD')
+                await deadDone2
+                removeSlot(atkHero)
+              }
             }
-            setActorState(action.attackerUid, 'IDLE')
-          } else {
-            // ★ 攻擊者被反彈傷害致死 — 播放死亡動畫並移除
-            const atkHero = heroMap.get(action.attackerUid)
-            if (atkHero) {
-              const deadDone = waitForAction(action.attackerUid, 'DEAD')
-              setActorState(action.attackerUid, 'DEAD')
-              syncHpToSlot(atkHero)
-              await deadDone
-              removeSlot(atkHero)
-            }
-          }
+          })()
 
-          await delay(120)
+          pendingRetreats.set(action.attackerUid, skillRetreatPromise)
+
           break
         }
 
@@ -1385,13 +1573,29 @@ export default function App() {
           break
         }
 
+        case 'PASSIVE_DAMAGE': {
+          if (action.damage > 0) {
+            addDamage(action.targetUid, action.damage)
+            const hero = heroMap.get(action.targetUid)
+            if (hero) syncHpToSlot(hero)
+          }
+          await delay(200)
+          break
+        }
+
         case 'DEATH': {
-          // DOT / 反彈等非攻擊致死
+          // DOT / 被動傷害 / 反彈等非攻擊致死
           const hero = heroMap.get(action.targetUid)
           if (hero) {
+            // 先播受擊動畫 + HP 條下降
+            const hurtDone = waitForAction(action.targetUid, 'HURT')
+            setActorState(action.targetUid, 'HURT')
+            syncHpToSlot(hero)
+            await hurtDone
+            // 再播死亡動畫
+            if (!skipBattleRef.current) audioManager.playSfx('death')
             const deadDone = waitForAction(action.targetUid, 'DEAD')
             setActorState(action.targetUid, 'DEAD')
-            syncHpToSlot(hero)
             await deadDone
             removeSlot(hero)
           }
@@ -1429,58 +1633,143 @@ export default function App() {
           break
         }
 
-        case 'PASSIVE_TRIGGER':
-          // 被動觸發目前無特殊 3D 演出
+        case 'PASSIVE_TRIGGER': {
+          const phId = ++passiveHintIdRef.current
+          setPassiveHints((prev) => [...prev, {
+            id: phId,
+            skillName: action.skillName,
+            timestamp: Date.now(),
+            heroUid: action.heroUid,
+          }])
+          setTimeout(() => setPassiveHints((prev) => prev.filter((h) => h.id !== phId)), 2000)
           break
+        }
 
         case 'BATTLE_END':
           break
       }
     }
 
-    // ── 執行戰鬥（正常 or 回放） ──
+    // ── Phase A：由後端計算戰鬥結果 ──
+    setBattleCalculating(true)
+    let allActions: BattleAction[]
     let winner: 'player' | 'enemy' | 'draw'
+    // needsHpSync: heroMap 的 HP 未被引擎直接修改，需在播放動畫前手動同步
+    //  - 遠端戰鬥：伺服器計算結果，本地 heroMap 未變動 → true
+    //  - 回放模式：heroMap 是重新建立的物件 → true
+    //  - 本地降級：runBattleCollect 直接修改 heroMap → false
+    let needsHpSync = false
+
     if (replayActions) {
-      // 回放模式：逐一重現已紀錄的行動
-      for (const act of replayActions) {
-        // 回放前手動更新 BattleHero 的 HP 狀態（引擎不再驅動）
-        if (act.type === 'NORMAL_ATTACK') {
-          const tgt = heroMap.get(act.targetUid)
-          if (tgt && !act.result.isDodge) {
-            tgt.currentHP = Math.max(0, tgt.currentHP - act.result.damage)
-          }
-          // 反彈傷害
-          if (act.result.reflectDamage > 0) {
-            const atk = heroMap.get(act.attackerUid)
-            if (atk) atk.currentHP = Math.max(0, atk.currentHP - act.result.reflectDamage)
-          }
-        } else if (act.type === 'SKILL_CAST') {
-          const atkHero = heroMap.get(act.attackerUid)
-          for (const t of act.targets) {
-            const h = heroMap.get(t.uid)
-            if (!h) continue
-            if ('damage' in t.result) {
-              const dr = t.result as DamageResult
-              h.currentHP = Math.max(0, h.currentHP - dr.damage)
-              // 技能反彈傷害
-              if (dr.reflectDamage > 0 && atkHero) {
-                atkHero.currentHP = Math.max(0, atkHero.currentHP - dr.reflectDamage)
-              }
-            } else if ('heal' in t.result) {
-              h.currentHP = Math.min(h.maxHP, h.currentHP + (t.result as { heal: number }).heal)
-            }
-          }
-        } else if (act.type === 'DOT_TICK') {
-          const h = heroMap.get(act.targetUid)
-          if (h) h.currentHP = Math.max(0, h.currentHP - act.damage)
-        }
-        await onAction(act)
-      }
-      // 從紀錄中取得勝者
+      allActions = replayActions
       const endAct = replayActions.find(a => a.type === 'BATTLE_END') as { type: 'BATTLE_END'; winner: 'player' | 'enemy' | 'draw' } | undefined
       winner = endAct?.winner ?? 'draw'
+      needsHpSync = true
     } else {
-      winner = await runBattle(playerBH, enemyBH, { maxTurns: 50, onAction })
+      // 後端引擎計算 → 失敗時降級為本地計算
+      try {
+        const result = await runBattleRemote(playerBH, enemyBH, 50)
+        allActions = result.actions
+        winner = result.winner
+        needsHpSync = true  // 伺服器計算，本地 heroMap HP 未更新
+      } catch (err) {
+        console.warn('[Battle] 後端引擎呼叫失敗，降級為本地計算:', err)
+        const result = await runBattleCollect(playerBH, enemyBH, { maxTurns: 50 })
+        allActions = result.actions
+        winner = result.winner
+        needsHpSync = false  // 本地引擎已直接修改 heroMap
+      }
+      // ★ 注意：不可在此設 battleActionsRef.current = allActions
+      // 因為 onAction 的 for-of 迭代 allActions，如果兩者共用同一參考，
+      // 任何 push 都會讓陣列在迭代中增長 → 無限迴圈
+    }
+
+    // ── Phase B：播放動畫（可中途跳過） ──
+    setBattleCalculating(false)
+    /** 從 actions 更新 heroMap 的 HP（回放模式用，正常模式引擎已內部更新） */
+    const applyHpFromAction = (act: BattleAction) => {
+      if (act.type === 'NORMAL_ATTACK') {
+        const tgt = heroMap.get(act.targetUid)
+        if (tgt && !act.result.isDodge) tgt.currentHP = Math.max(0, tgt.currentHP - act.result.damage)
+        if (act.result.reflectDamage > 0) {
+          const atk = heroMap.get(act.attackerUid)
+          if (atk) atk.currentHP = Math.max(0, atk.currentHP - act.result.reflectDamage)
+        }
+      } else if (act.type === 'SKILL_CAST') {
+        const atkHero = heroMap.get(act.attackerUid)
+        for (const t of act.targets) {
+          const h = heroMap.get(t.uid)
+          if (!h) continue
+          if ('damage' in t.result) {
+            const dr = t.result as DamageResult
+            h.currentHP = Math.max(0, h.currentHP - dr.damage)
+            if (dr.reflectDamage > 0 && atkHero) atkHero.currentHP = Math.max(0, atkHero.currentHP - dr.reflectDamage)
+          } else if ('heal' in t.result) {
+            h.currentHP = Math.min(h.maxHP, h.currentHP + (t.result as { heal: number }).heal)
+          }
+        }
+      } else if (act.type === 'DOT_TICK') {
+        const h = heroMap.get(act.targetUid)
+        if (h) h.currentHP = Math.max(0, h.currentHP - act.damage)
+      } else if (act.type === 'PASSIVE_DAMAGE') {
+        const h = heroMap.get(act.targetUid)
+        if (h) h.currentHP = Math.max(0, h.currentHP - act.damage)
+      }
+    }
+
+    for (const act of allActions) {
+      // 跳過偵測：一旦 skipBattleRef 為 true，停止播放任何後續動畫/音效
+      if (skipBattleRef.current) {
+        // 即使跳過，仍需更新 heroMap HP（遠端/回放模式下 heroMap 未被引擎修改）
+        if (needsHpSync) applyHpFromAction(act)
+        continue
+      }
+      // 遠端戰鬥 & 回放：在播放動畫前先同步 HP，確保死亡/存活判斷正確
+      if (needsHpSync) applyHpFromAction(act)
+      // dev 模式：驗證 action 前後狀態
+      if (import.meta.env.DEV && flowValidatorRef.current) flowValidatorRef.current.beforeAction(act)
+      await onAction(act)
+      if (import.meta.env.DEV && flowValidatorRef.current) flowValidatorRef.current.afterAction(act)
+    }
+
+    // dev 模式：戰鬥結束驗證 + 問題報告
+    if (import.meta.env.DEV && flowValidatorRef.current) {
+      flowValidatorRef.current.validateEnd()
+      flowValidatorRef.current.report()
+      flowValidatorRef.current = null
+    }
+
+    // 等待所有背景動畫完成（後退 + 死亡動畫，確保 Phase C 狀態正確）
+    const allPending: Promise<void>[] = [...backgroundAnims]
+    if (pendingRetreats.size > 0) {
+      allPending.push(...pendingRetreats.values())
+      pendingRetreats.clear()
+    }
+    if (allPending.length > 0) await Promise.all(allPending)
+
+    // 播放結束後保存完整 actions（供回放 + 統計使用）
+    if (!isReplay) battleActionsRef.current = allActions
+
+    // ── Phase C：應用最終狀態到 slot（確保 UI 正確顯示勝/敗） ──
+    for (const [, bh] of heroMap) {
+      if (bh.currentHP <= 0) {
+        // 確保死亡角色從 slot 中移除
+        const updater = bh.side === 'player' ? updatePlayerSlots : updateEnemySlots
+        updater((prev) => {
+          const ns = [...prev]
+          if (ns[bh.slot]?._uid === bh.uid) ns[bh.slot] = null
+          return ns
+        })
+      } else {
+        // 同步存活角色的 HP
+        const updater = bh.side === 'player' ? updatePlayerSlots : updateEnemySlots
+        updater((prev) => {
+          const ns = [...prev]
+          const entry = ns[bh.slot]
+          if (entry && entry._uid === bh.uid) ns[bh.slot] = { ...entry, currentHP: Math.max(0, bh.currentHP) }
+          return ns
+        })
+      }
     }
 
     // ── 計算戰鬥統計 ──
@@ -1528,13 +1817,17 @@ export default function App() {
           ensureStat(act.sourceUid)
           stats[act.sourceUid].damageDealt += act.damage
         }
+      } else if (act.type === 'PASSIVE_DAMAGE') {
+        ensureStat(act.targetUid)
+        ensureStat(act.attackerUid)
+        stats[act.targetUid].damageTaken += act.damage
+        stats[act.attackerUid].damageDealt += act.damage
       }
     }
     setBattleStats(stats)
 
     // ── 結算 ──
     if (winner === 'player') {
-      setLog(isReplay ? '【回放結束】你生存了下來' : '戰鬥結果：你生存了下來，但代價是什麼？')
       setBattleResult('victory')
 
       if (!isReplay) {
@@ -1570,6 +1863,17 @@ export default function App() {
           const cfg = getTowerFloorConfig(floor)
           rewards = cfg.rewards
           saveHook.doUpdateProgress({ towerFloor: floor + 1 })
+        } else if (stageMode === 'pvp') {
+          // PvP — 依據劇情進度計算獎勵
+          const progress = saveHook.playerData?.save.storyProgress ?? { chapter: 1, stage: 1 }
+          const linearProgress = (progress.chapter - 1) * 8 + progress.stage
+          rewards = getPvPReward(linearProgress)
+        } else if (stageMode === 'boss') {
+          // Boss — 依據總傷害量計算獎勵等級
+          const totalDamage = Object.values(stats)
+            .filter((_, i) => i < playerSlots.filter(Boolean).length)
+            .reduce((sum, s) => sum + s.damageDealt, 0)
+          rewards = getBossReward(stageId, totalDamage)
         } else {
           // daily — 使用副本自身的獎勵設定
           const cfg = getDailyDungeonConfig(stageId)
@@ -1627,11 +1931,9 @@ export default function App() {
         if (leveledUp) showToast(`🎉 帳號升級！Lv.${newLevel}`)
       }
     } else if (winner === 'enemy') {
-      setLog(isReplay ? '【回放結束】你淪為了它們的一員' : '戰鬥結果：你淪為了它們的一員...')
       setBattleResult('defeat')
       if (!isReplay) setVictoryRewards(null)
     } else {
-      setLog(isReplay ? '【回放結束】' : '戰鬥結束')
       setBattleResult('defeat')
       if (!isReplay) setVictoryRewards(null)
     }
@@ -1689,7 +1991,7 @@ export default function App() {
       })
     }
     clearDrag()
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+   
   }, [canAdjustFormation, updatePlayerSlots])
 
   const startDrag = (i: number, pointerOrPoint: unknown) => {
@@ -1756,12 +2058,14 @@ export default function App() {
   /* ── 主選單導航 ── */
   const handleMenuNavigate = (screen: MenuScreen) => { setMenuScreen(screen) }
   const handleBackToMenu = () => { setMenuScreen('none') }
-  const handleStageSelect = async (mode: 'story' | 'tower' | 'daily', sid: string) => {
+  const handleStageSelect = async (mode: 'story' | 'tower' | 'daily' | 'pvp' | 'boss', sid: string) => {
     // 拉起過場幕 → 等 DOM commit → 切換敵方陣型 → 收幕
     setCurtainVisible(true)
     setCurtainFading(false)
     const displayName = mode === 'tower' ? `第 ${sid} 層`
       : mode === 'daily' ? getDailyDungeonDisplayName(sid)
+      : mode === 'pvp' ? '競技場對戰'
+      : mode === 'boss' ? `Boss 挑戰`
       : `關卡 ${sid}`
     setCurtainText(`準備${mode === 'tower' ? '挑戰' : ''}${displayName}...`)
     curtainClosePromiseRef.current = null
@@ -1797,7 +2101,7 @@ export default function App() {
     >
     {/* ── 登入畫面 ── */}
     {!showGame && (
-      <LoginScreen auth={authHook} onEnterGame={() => setShowGame(true)} />
+      <LoginScreen auth={authHook} onEnterGame={() => { audioManager.ensureContext(); setShowGame(true) }} />
     )}
 
     {/* 遊戲主體（登入後才渲染） */}
@@ -1868,6 +2172,7 @@ export default function App() {
                 energyRatio={gameState === 'BATTLE' && battleEnergy[p._uid] ? battleEnergy[p._uid].current / battleEnergy[p._uid].max : undefined}
                 skillToasts={skillToasts.filter((t) => t.attackerUid === p._uid)}
                 elementHints={elementHints.filter((h) => h.attackerUid === p._uid)}
+                passiveHints={passiveHints.filter((ph) => ph.heroUid === p._uid)}
               />
             ) : null,
           )}
@@ -1901,6 +2206,7 @@ export default function App() {
                 energyRatio={gameState === 'BATTLE' && battleEnergy[e._uid] ? battleEnergy[e._uid].current / battleEnergy[e._uid].max : undefined}
                 skillToasts={skillToasts.filter((t) => t.attackerUid === e._uid)}
                 elementHints={elementHints.filter((h) => h.attackerUid === e._uid)}
+                passiveHints={passiveHints.filter((ph) => ph.heroUid === e._uid)}
               />
             ) : null,
           )}
@@ -1973,7 +2279,7 @@ export default function App() {
       {gameState === 'MAIN_MENU' && menuScreen === 'settings' && (
         <SettingsPanel
           onBack={handleBackToMenu}
-          onLogout={() => { authHook.doLogout(); setShowGame(false) }}
+          onLogout={handleFullLogout}
           displayName={authHook.auth.displayName || '倖存者'}
           isBound={authHook.auth.isBound}
         />
@@ -2004,6 +2310,9 @@ export default function App() {
           onRefreshMail={refreshMailData}
         />
       )}
+      {gameState === 'MAIN_MENU' && menuScreen === 'shop' && (
+        <ShopPanel onBack={handleBackToMenu} />
+      )}
 
       {/* ── 戰鬥 HUD（Phase 7） ── */}
       {gameState === 'BATTLE' && (
@@ -2015,7 +2324,7 @@ export default function App() {
               uid: s._uid,
               name: String(s.Name ?? ''),
               currentHP: s.currentHP,
-              maxHP: Number(s.HP ?? s.currentHP ?? 1),
+              maxHP: battleHeroesRef.current?.get(s._uid)?.maxHP ?? Number(s.HP ?? s.currentHP ?? 1),
               element: ((s.element as string) || '') as DomainElement | '',
             }))}
           enemyHeroes={enemySlots
@@ -2024,7 +2333,7 @@ export default function App() {
               uid: s._uid,
               name: String(s.Name ?? ''),
               currentHP: s.currentHP,
-              maxHP: Number(s.HP ?? s.currentHP ?? 1),
+              maxHP: battleHeroesRef.current?.get(s._uid)?.maxHP ?? Number(s.HP ?? s.currentHP ?? 1),
               element: ((s.element as string) || '') as DomainElement | '',
             }))}
           buffMap={battleBuffs}
@@ -2040,8 +2349,8 @@ export default function App() {
         {/* 玩家資源顯示（戰鬥準備/戰鬥中/結算時隱藏） */}
         {saveHook.playerData && gameState === 'MAIN_MENU' && (
           <div className="hud-resources">
-            <span className="hud-gold" title="金幣 — 升級、購買、強化"><i className="icon-coin">G</i>{saveHook.playerData.save.gold.toLocaleString()}</span>
-            <span className="hud-diamond" title="鑽石 — 召喚、加速、購買稀有道具"><i className="icon-dia">D</i>{saveHook.playerData.save.diamond.toLocaleString()}</span>
+            <span className="hud-gold" title="金幣 — 升級、購買、強化"><CurrencyIcon type="gold" />{saveHook.playerData.save.gold.toLocaleString()}</span>
+            <span className="hud-diamond" title="鑽石 — 召喚、加速、購買稀有道具"><CurrencyIcon type="diamond" />{saveHook.playerData.save.diamond.toLocaleString()}</span>
             <span className="hud-level">Lv.{saveHook.playerData.save.level}</span>
             {/* 經驗條 */}
             {(() => {
@@ -2085,41 +2394,40 @@ export default function App() {
               {stageMode === 'tower' && (
                 <div className="reward-floor-clear">🗼 第 {stageId} 層通關！</div>
               )}
+              {stageMode === 'pvp' && (
+                <div className="reward-floor-clear">⚔️ 競技場勝利！</div>
+              )}
+              {stageMode === 'boss' && (
+                <div className="reward-floor-clear">👹 Boss 討伐完成！</div>
+              )}
               {victoryRewards.isFirst && <div className="reward-first-clear">🏆 首次通關獎勵</div>}
 
               {/* 獎勵明細 */}
               <div className="reward-items-list">
                 <div className="reward-item">
-                  <span className="reward-icon gold"><i className="icon-coin">G</i></span>
+                  <span className="reward-icon gold"><CurrencyIcon type="gold" /></span>
                   <span className="reward-label">金幣</span>
                   <span className="reward-value">+{victoryRewards.gold.toLocaleString()}</span>
                 </div>
                 {victoryRewards.diamond > 0 && (
                   <div className="reward-item">
-                    <span className="reward-icon diamond"><i className="icon-dia">D</i></span>
+                    <span className="reward-icon diamond"><CurrencyIcon type="diamond" /></span>
                     <span className="reward-label">鑽石</span>
                     <span className="reward-value">+{victoryRewards.diamond}</span>
                   </div>
                 )}
                 <div className="reward-item">
-                  <span className="reward-icon exp"><i className="icon-exp">E</i></span>
+                  <span className="reward-icon exp"><CurrencyIcon type="exp" /></span>
                   <span className="reward-label">經驗</span>
                   <span className="reward-value">+{victoryRewards.exp}</span>
                 </div>
-                {victoryRewards.drops.map((d, i) => {
-                  const itemNames: Record<string, string> = {
-                    exp_core_s: '小型經驗核心', exp_core_m: '中型經驗核心', exp_core_l: '大型經驗核心',
-                    chest_equipment: '裝備寶箱', eqm_enhance_s: '小型強化石', eqm_enhance_m: '中型強化石', eqm_enhance_l: '大型強化石',
-                    asc_class_power: '力量突破材料', asc_class_agility: '敏捷突破材料', asc_class_defense: '防禦突破材料',
-                  }
-                  return (
-                    <div className="reward-item" key={i}>
-                      <span className="reward-icon drop">🎁</span>
-                      <span className="reward-label">{itemNames[d.itemId] ?? d.itemId.replace(/_/g, ' ')}</span>
-                      <span className="reward-value">×{d.quantity}</span>
-                    </div>
-                  )
-                })}
+                {victoryRewards.drops.map((d, i) => (
+                  <div className="reward-item" key={i}>
+                    <span className="reward-icon drop"><ItemIcon itemId={d.itemId} /></span>
+                    <span className="reward-label">{getItemName(d.itemId)}</span>
+                    <span className="reward-value">×{d.quantity}</span>
+                  </div>
+                ))}
               </div>
 
               {/* 資源產出速度（僅主線關卡） */}
@@ -2142,7 +2450,7 @@ export default function App() {
       {/* ── GAMEOVER 按鈕 ── */}
       {gameState === 'GAMEOVER' && (
         <div className="btn-bottom-center">
-          {battleResult === 'victory' && stageMode !== 'daily' && (
+          {battleResult === 'victory' && stageMode !== 'daily' && stageMode !== 'pvp' && stageMode !== 'boss' && (
             <button onClick={goNextStage} className="btn-next-stage">
               {stageMode === 'tower' ? '下一層 ▶' : '下一關 ▶'}
             </button>
@@ -2213,6 +2521,12 @@ export default function App() {
           </div>
         )
       })()}
+      {gameState === 'BATTLE' && battleCalculating && (
+        <div className="battle-calculating-overlay">
+          <div className="battle-calculating-spinner" />
+          <span>戰鬥計算中…</span>
+        </div>
+      )}
       {gameState === 'BATTLE' && (
         <div className="btn-speed-wrap">
           <button
@@ -2225,7 +2539,7 @@ export default function App() {
             className="btn-skip-battle"
             onClick={() => {
               skipBattleRef.current = true
-              // 立即 resolve 所有等待中的動畫/移動 Promise
+              // 立即 resolve 所有等待中的動畫/移動 Promise（讓當前 onAction 結束）
               for (const key of Object.keys(actionResolveRefs.current)) {
                 actionResolveRefs.current[key]?.resolve()
                 delete actionResolveRefs.current[key]
@@ -2234,6 +2548,8 @@ export default function App() {
                 moveResolveRefs.current[key]?.()
                 delete moveResolveRefs.current[key]
               }
+              // 停止所有音效
+              audioManager.stopAllSfx()
             }}
           >
             跳過 ⏭

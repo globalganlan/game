@@ -334,6 +334,14 @@ export function getInventoryState(): InventoryState | null {
   return inventoryState
 }
 
+/** 清除背包快取（登出時呼叫） */
+export function clearInventoryCache(): void {
+  inventoryState = null
+  cachedDefinitions = null
+  localStorage.removeItem(STORAGE_KEY_INVENTORY)
+  notify()
+}
+
 /**
  * 樂觀新增道具到本地背包（不呼叫 API）
  * 用於戰勝掉落、抽卡重複、信件獎勵等即時更新場景。
@@ -360,6 +368,36 @@ export function addItemsLocally(items: { itemId: string; quantity: number }[]): 
       inventoryState.items.push({ itemId, quantity })
     }
     changed = true
+  }
+  if (changed) {
+    saveInventoryToLocal()
+    notify()
+  }
+}
+
+/**
+ * 樂觀扣除道具（不呼叫 API）
+ * 用於升級消耗經驗石、突破消耗碎片/職業石、升星消耗碎片等即時扣除場景。
+ * Server 扣除由對應的背景 API 處理。
+ */
+export function removeItemsLocally(items: { itemId: string; quantity: number }[]): void {
+  if (!inventoryState) {
+    const localItems = loadInventoryFromLocal() ?? []
+    inventoryState = {
+      items: localItems,
+      equipment: [],
+      equipmentCapacity: 200,
+      definitions: cachedDefinitions ?? new Map(),
+    }
+  }
+  let changed = false
+  for (const { itemId, quantity } of items) {
+    if (quantity <= 0) continue
+    const existing = inventoryState.items.find(i => i.itemId === itemId)
+    if (existing) {
+      existing.quantity = Math.max(0, existing.quantity - quantity)
+      changed = true
+    }
   }
   if (changed) {
     saveInventoryToLocal()

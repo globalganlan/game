@@ -1,0 +1,120 @@
+/**
+ * 共用物品 & 稀有度常數
+ *
+ * 所有 UI 畫面（背包、抽卡、英雄列表、信箱、商店、獎勵等）統一使用，
+ * 避免各檔案重複定義導致不一致。
+ */
+
+export type Rarity = 'N' | 'R' | 'SR' | 'SSR'
+
+/** 基礎邊框/文字顏色 */
+export const RARITY_COLORS: Record<Rarity, string> = {
+  N: '#aaa',
+  R: '#4dabf7',
+  SR: '#be4bdb',
+  SSR: '#ffd43b',
+}
+
+/** 完整稀有度視覺配置（含光暈、標籤、背景） */
+export const RARITY_CONFIG: Record<Rarity, {
+  color: string
+  border: string
+  bg: string
+  glow: string
+  label: string
+}> = {
+  SSR: { color: '#ffd43b', border: '#ffd43b', bg: 'rgba(255,212,59,0.12)', glow: '0 0 20px #ffd43b', label: '★★★★ SSR' },
+  SR:  { color: '#be4bdb', border: '#be4bdb', bg: 'rgba(190,75,219,0.10)', glow: '0 0 15px #be4bdb', label: '★★★ SR' },
+  R:   { color: '#4dabf7', border: '#4dabf7', bg: 'rgba(77,171,247,0.08)', glow: '0 0 10px #4dabf7', label: '★★ R' },
+  N:   { color: '#aaa',    border: '#666',    bg: 'rgba(136,136,136,0.06)', glow: 'none',              label: '★ N' },
+}
+
+/* ────────────────────────────
+   道具 Icon 映射（emoji）
+   ──────────────────────────── */
+
+/** 道具 itemId → 顯示 Emoji icon */
+export const ITEM_ICONS: Record<string, string> = {
+  // 貨幣
+  diamond: '💎',
+  gold: '💰',
+  stardust: '✨',
+  currency_diamond: '💎',
+  currency_gold: '💰',
+  currency_stardust: '✨',
+  // 經驗素材
+  exp_core_s: '🟢',
+  exp_core_m: '🔵',
+  exp_core_l: '🟣',
+  exp_stone_s: '🟢',
+  exp_stone_m: '🔵',
+  exp_stone_l: '🟣',
+  // 突破職業石
+  asc_class_power: '🗡️',
+  asc_class_agility: '🏃',
+  asc_class_defense: '🛡️',
+  asc_class_universal: '🌐',
+  // 裝備相關
+  chest_equipment: '📦',
+  eqm_enhance_s: '🔨',
+  eqm_enhance_m: '🔨',
+  eqm_enhance_l: '🔨',
+  eqm_reroll: '🔮',
+  forge_ore_common: '⛏️',
+  forge_ore_rare: '💠',
+  // 其他
+  stamina_potion: '⚡',
+  gold_pack_10k: '💰',
+}
+
+/** 根據 itemId 取得顯示 icon（碎片用 🧩，未知用 🎁） */
+export function getItemIcon(itemId: string): string {
+  if (ITEM_ICONS[itemId]) return ITEM_ICONS[itemId]
+  if (itemId.startsWith('asc_fragment_')) return '🧩'
+  return '🎁'
+}
+
+/* ────────────────────────────
+   道具名稱映射（中文）
+   ──────────────────────────── */
+
+/** 道具 itemId → 中文名稱 */
+export const ITEM_NAMES: Record<string, string> = {
+  // 貨幣
+  diamond: '鑽石',
+  gold: '金幣',
+  stardust: '星塵',
+  currency_diamond: '鑽石',
+  currency_gold: '金幣',
+  currency_stardust: '星塵',
+  // 經驗素材
+  exp_core_s: '小型經驗核心',
+  exp_core_m: '中型經驗核心',
+  exp_core_l: '大型經驗核心',
+  exp_stone_s: '小型經驗核心',
+  exp_stone_m: '中型經驗核心',
+  exp_stone_l: '大型經驗核心',
+  // 突破職業石
+  asc_class_power: '力量職業石',
+  asc_class_agility: '敏捷職業石',
+  asc_class_defense: '防禦職業石',
+  asc_class_universal: '通用職業石',
+  // 裝備相關
+  chest_equipment: '裝備寶箱',
+  eqm_enhance_s: '小型強化石',
+  eqm_enhance_m: '中型強化石',
+  eqm_enhance_l: '大型強化石',
+  eqm_reroll: '重洗石',
+  forge_ore_common: '普通鍛造礦',
+  forge_ore_rare: '稀有鍛造礦',
+  // 其他
+  stamina_potion: '體力藥水',
+  gold_pack_10k: '金幣禮包',
+}
+
+/** 根據 itemId 取得中文名稱（碎片顯示「突破碎片」，未知回傳 itemId） */
+export function getItemName(itemId: string): string {
+  if (ITEM_NAMES[itemId]) return ITEM_NAMES[itemId]
+  if (itemId.startsWith('asc_fragment_')) return '突破碎片'
+  return itemId
+}

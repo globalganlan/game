@@ -414,6 +414,25 @@
   box-shadow: 0 1px 2px rgba(0,0,0,0.3);
 }
 
+.icon-stardust {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.2em;
+  height: 1.2em;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #ffd43b, #fab005);
+  color: #5a3e00;
+  font-size: 0.75em;
+  font-weight: 900;
+  font-style: normal;
+  margin-right: 3px;
+  text-shadow: none;
+  line-height: 1;
+  flex-shrink: 0;
+  box-shadow: 0 0 6px rgba(255,212,59,0.5);
+}
+
 .btn-start {
   padding: clamp(6px, 1.2vh, 12px) clamp(18px, 5vw, 40px);
   font-size: clamp(0.8rem, 2.2vw, 1.1rem);
@@ -2026,6 +2045,274 @@
   filter: brightness(1.2);
 }
 
+/* ── 養成 Modal ── */
+
+.hd2-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.65);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+}
+
+.hd2-modal {
+  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+  border: 1px solid rgba(255,255,255,0.15);
+  border-radius: 16px;
+  padding: 20px 24px;
+  width: min(380px, 90vw);
+  max-height: 80vh;
+  overflow-y: auto;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+}
+
+.hd2-modal-title {
+  margin: 0 0 12px;
+  font-size: 1.15rem;
+  color: #fff;
+  text-align: center;
+}
+
+.hd2-modal-info {
+  color: #aaa;
+  font-size: 0.82rem;
+  text-align: center;
+  margin-bottom: 14px;
+}
+
+.hd2-material-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.hd2-material-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(255,255,255,0.04);
+  border-radius: 8px;
+  padding: 8px 10px;
+}
+
+.hd2-mat-icon { font-size: 1.1rem; flex-shrink: 0; }
+.hd2-mat-name { color: #ccc; font-size: 0.82rem; flex: 1; white-space: nowrap; }
+.hd2-mat-exp  { color: #7ec8e3; font-size: 0.72rem; flex-shrink: 0; }
+
+.hd2-mat-controls {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.hd2-mat-btn {
+  width: 26px;
+  height: 26px;
+  border: 1px solid rgba(255,255,255,0.2);
+  background: rgba(255,255,255,0.06);
+  color: #fff;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.hd2-mat-btn:disabled { opacity: 0.3; cursor: default; }
+.hd2-mat-btn:not(:disabled):hover { background: rgba(255,255,255,0.15); }
+
+.hd2-mat-qty {
+  color: #ddd;
+  font-size: 0.78rem;
+  min-width: 40px;
+  text-align: center;
+}
+.hd2-mat-qty.sufficient { color: #51cf66; }
+.hd2-mat-qty.insufficient { color: #ff6b6b; }
+
+.hd2-auto-btn {
+  display: block;
+  width: 100%;
+  padding: 6px;
+  border: 1px solid rgba(77,171,247,0.4);
+  background: rgba(77,171,247,0.1);
+  color: #4dabf7;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.82rem;
+  margin-bottom: 8px;
+}
+.hd2-auto-btn:hover { background: rgba(77,171,247,0.2); }
+
+.hd2-preview {
+  background: rgba(81,207,102,0.08);
+  border: 1px solid rgba(81,207,102,0.2);
+  border-radius: 8px;
+  padding: 8px 12px;
+  color: #51cf66;
+  font-size: 0.82rem;
+  text-align: center;
+  margin-bottom: 8px;
+}
+.hd2-preview strong { color: #fff; }
+.hd2-exp-total { color: #7ec8e3; font-size: 0.72rem; margin-left: 6px; }
+
+.hd2-star-bonus {
+  background: rgba(255,212,59,0.08);
+  border: 1px solid rgba(255,212,59,0.2);
+  border-radius: 8px;
+  padding: 8px 12px;
+  color: #ffd43b;
+  font-size: 0.78rem;
+  text-align: center;
+  margin-bottom: 8px;
+}
+
+.hd2-result-msg {
+  text-align: center;
+  color: #ffd43b;
+  font-size: 0.82rem;
+  margin: 6px 0;
+  animation: hd2FadeIn 0.3s ease;
+}
+@keyframes hd2FadeIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+
+.hd2-modal-btns {
+  display: flex;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.hd2-modal-cancel {
+  flex: 1;
+  padding: 8px;
+  border: 1px solid rgba(255,255,255,0.15);
+  background: rgba(255,255,255,0.04);
+  color: #aaa;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.85rem;
+}
+.hd2-modal-cancel:hover { background: rgba(255,255,255,0.1); }
+
+.hd2-modal-confirm {
+  flex: 1;
+  padding: 8px;
+  border: 1px solid rgba(81,207,102,0.5);
+  background: rgba(81,207,102,0.15);
+  color: #51cf66;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+.hd2-modal-confirm:disabled { opacity: 0.4; cursor: default; }
+.hd2-modal-confirm:not(:disabled):hover { background: rgba(81,207,102,0.3); }
+
+/* ── 裝備 UI 增強 ── */
+
+.hd2-section-hint {
+  font-size: 0.65rem;
+  color: #666;
+  font-weight: 400;
+}
+
+.hd2-equip-slot.clickable {
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.hd2-equip-slot.clickable:hover {
+  background: rgba(255,255,255,0.08);
+}
+
+.hd2-equip-detail {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.hd2-equip-name {
+  font-size: 0.75rem;
+  color: #ddd;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.hd2-equip-stats {
+  font-size: 0.65rem;
+  color: #7ec8e3;
+}
+.hd2-equip-lv {
+  color: #51cf66;
+  font-size: 0.65rem;
+  margin-left: 3px;
+}
+
+.hd2-equip-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 40vh;
+  overflow-y: auto;
+  margin-bottom: 10px;
+}
+
+.hd2-equip-option {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 8px 10px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 8px;
+  cursor: pointer;
+  text-align: left;
+  color: #ddd;
+}
+.hd2-equip-option:hover {
+  background: rgba(77,171,247,0.1);
+  border-color: rgba(77,171,247,0.3);
+}
+
+.hd2-equip-option-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.hd2-equip-option-name {
+  flex: 1;
+  font-size: 0.82rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hd2-equip-rarity {
+  font-size: 0.7rem;
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-weight: 600;
+}
+.hd2-equip-rarity.rarity-ssr { color: #ffd43b; background: rgba(255,212,59,0.15); }
+.hd2-equip-rarity.rarity-sr  { color: #be4bdb; background: rgba(190,75,219,0.15); }
+.hd2-equip-rarity.rarity-r   { color: #4dabf7; background: rgba(77,171,247,0.15); }
+.hd2-equip-rarity.rarity-n   { color: #888;    background: rgba(136,136,136,0.1); }
+
+.hd2-equip-option-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  font-size: 0.72rem;
+  color: #aaa;
+}
+.hd2-sub-stat { color: #7ec8e3; }
+.hd2-equip-set {
+  font-size: 0.65rem;
+  color: #51cf66;
+  margin-top: 2px;
+}
+
 /* ══════════════════════════════════════════════════
    Phase 3 — Inventory Panel
    ══════════════════════════════════════════════════ */
@@ -2194,6 +2481,256 @@
   margin-top: 12px;
   color: #aaa;
   font-size: 0.8rem;
+}
+
+/* ── 背包新增 UI ── */
+
+.inv-currency-bar {
+  display: flex;
+  gap: 10px;
+  font-size: 0.78rem;
+}
+.inv-currency {
+  color: #ddd;
+  white-space: nowrap;
+}
+
+.inv-sort-bar {
+  display: flex;
+  justify-content: flex-end;
+  padding: 0 16px 6px;
+}
+.inv-sort-select {
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.15);
+  color: #ccc;
+  border-radius: 6px;
+  padding: 3px 8px;
+  font-size: 0.72rem;
+  cursor: pointer;
+}
+.inv-sort-select:focus { outline: 1px solid rgba(77,171,247,0.5); }
+
+.inv-action-msg {
+  text-align: center;
+  color: #ffd43b;
+  font-size: 0.78rem;
+  margin: 6px 0;
+}
+
+.inv-detail-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.inv-action-btn {
+  flex: 1;
+  padding: 8px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.82rem;
+  font-weight: 500;
+  border: 1px solid;
+}
+
+.inv-use-btn {
+  border-color: rgba(81,207,102,0.5);
+  background: rgba(81,207,102,0.12);
+  color: #51cf66;
+}
+.inv-use-btn:hover { background: rgba(81,207,102,0.25); }
+
+.inv-sell-btn {
+  border-color: rgba(255,107,107,0.4);
+  background: rgba(255,107,107,0.1);
+  color: #ff6b6b;
+}
+.inv-sell-btn:hover { background: rgba(255,107,107,0.2); }
+
+.inv-lock-btn {
+  border-color: rgba(77,171,247,0.4);
+  background: rgba(77,171,247,0.1);
+  color: #4dabf7;
+}
+.inv-lock-btn:hover { background: rgba(77,171,247,0.2); }
+
+.inv-equip-cell {
+  cursor: pointer;
+}
+
+.inv-equip-detail .inv-equip-main-stat {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 12px;
+  background: rgba(255,255,255,0.04);
+  border-radius: 8px;
+  margin-top: 10px;
+  color: #ddd;
+  font-size: 0.85rem;
+}
+.inv-equip-stat-val { color: #51cf66; font-weight: 600; }
+
+.inv-equip-sub-stats {
+  margin-top: 6px;
+  padding: 6px 12px;
+  background: rgba(255,255,255,0.02);
+  border-radius: 8px;
+}
+.inv-equip-sub-row {
+  display: flex;
+  justify-content: space-between;
+  color: #7ec8e3;
+  font-size: 0.78rem;
+  padding: 2px 0;
+}
+.inv-equip-set-tag {
+  color: #51cf66;
+  font-size: 0.72rem;
+  margin-top: 6px;
+  text-align: center;
+}
+.inv-equip-equipped-by {
+  color: #ffa94d;
+  font-size: 0.72rem;
+  text-align: center;
+  margin-top: 4px;
+}
+.inv-equip-enhance {
+  color: #51cf66;
+  font-size: 0.85rem;
+}
+
+/* ══════════════════════════════════════════════════
+   Phase 3 — Shop Panel
+   ══════════════════════════════════════════════════ */
+
+.shop-currency-bar {
+  display: flex;
+  gap: 10px;
+  font-size: 0.78rem;
+}
+.shop-currency { color: #ddd; white-space: nowrap; }
+.shop-currency.gold { color: #ffd43b; }
+.shop-currency.diamond { color: #4dabf7; }
+
+.shop-tabs {
+  display: flex;
+  gap: 4px;
+  overflow-x: auto;
+  padding: 8px 16px;
+}
+.shop-tab {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 10px;
+  border: 1px solid rgba(255,255,255,0.1);
+  background: rgba(255,255,255,0.03);
+  color: #888;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.75rem;
+  white-space: nowrap;
+}
+.shop-tab-active {
+  background: rgba(114,176,29,0.15);
+  border-color: rgba(114,176,29,0.4);
+  color: #72b01d;
+}
+
+.shop-msg {
+  text-align: center;
+  color: #ffd43b;
+  font-size: 0.82rem;
+  padding: 4px 16px;
+  animation: hd2FadeIn 0.3s ease;
+}
+
+.shop-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px 16px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.shop-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 10px;
+  transition: background 0.2s;
+}
+.shop-item:not(.shop-item-disabled):hover {
+  background: rgba(255,255,255,0.07);
+}
+.shop-item-disabled {
+  opacity: 0.5;
+}
+
+.shop-item-icon {
+  font-size: 1.8rem;
+  flex-shrink: 0;
+  width: 40px;
+  text-align: center;
+}
+
+.shop-item-body {
+  flex: 1;
+  min-width: 0;
+}
+.shop-item-name {
+  color: #ddd;
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+.shop-item-desc {
+  color: #888;
+  font-size: 0.7rem;
+  margin-top: 2px;
+}
+.shop-item-footer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.shop-price {
+  font-size: 0.78rem;
+  color: #ddd;
+  font-weight: 500;
+}
+.shop-price-insufficient { color: #ff6b6b; }
+
+.shop-remaining {
+  font-size: 0.68rem;
+  color: #7ec8e3;
+}
+.shop-remaining.sold-out { color: #ff6b6b; }
+
+.shop-buy-btn {
+  flex-shrink: 0;
+  padding: 6px 14px;
+  border: 1px solid rgba(114,176,29,0.5);
+  background: rgba(114,176,29,0.15);
+  color: #72b01d;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+.shop-buy-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.shop-buy-btn:not(:disabled):hover {
+  background: rgba(114,176,29,0.3);
 }
 
 /* ══════════════════════════════════════════════════
@@ -2757,6 +3294,140 @@
 }
 
 /* ══════════════════════════════════════════════════
+   PvP 競技場
+   ══════════════════════════════════════════════════ */
+
+.stage-pvp {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.pvp-header { text-align: center; margin-bottom: 8px; }
+.pvp-title { display: block; font-size: 1.2rem; font-weight: bold; color: #6688ff; }
+.pvp-subtitle { display: block; font-size: 0.75rem; color: #aaa; margin-top: 4px; }
+
+.pvp-opponent-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.pvp-opponent-card {
+  background: rgba(50, 60, 120, 0.25);
+  border: 1px solid rgba(100, 136, 255, 0.3);
+  border-radius: 10px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.pvp-opponent-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.pvp-opponent-name { font-weight: bold; color: #dde; font-size: 0.95rem; }
+.pvp-opponent-power { color: #ffcc44; font-size: 0.8rem; font-weight: bold; }
+.pvp-opponent-info { font-size: 0.78rem; color: #aab; }
+
+.pvp-challenge-btn {
+  align-self: flex-end;
+  padding: 8px 24px;
+  border: none;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #4466dd, #6688ff);
+  color: #fff;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.15s;
+  font-size: 0.9rem;
+}
+
+.pvp-challenge-btn:hover { transform: translateY(-2px); filter: brightness(1.15); }
+
+/* ══════════════════════════════════════════════════
+   Boss 挑戰
+   ══════════════════════════════════════════════════ */
+
+.stage-boss {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.boss-header { text-align: center; margin-bottom: 8px; }
+.boss-title { display: block; font-size: 1.2rem; font-weight: bold; color: #ff4444; }
+.boss-subtitle { display: block; font-size: 0.75rem; color: #aaa; margin-top: 4px; }
+
+.boss-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.boss-card {
+  background: rgba(120, 30, 30, 0.25);
+  border: 1px solid rgba(255, 80, 60, 0.3);
+  border-radius: 10px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  transition: opacity 0.2s;
+}
+
+.boss-card-locked { opacity: 0.5; }
+
+.boss-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.boss-card-name { font-weight: bold; color: #fdb; font-size: 1rem; }
+.boss-card-lock { font-size: 1.2rem; }
+
+.boss-card-stats {
+  display: flex;
+  gap: 16px;
+  font-size: 0.78rem;
+  color: #cba;
+}
+
+.boss-card-thresholds {
+  display: flex;
+  gap: 12px;
+  font-size: 0.72rem;
+}
+
+.boss-card-thresholds .rank-s { color: #ffd700; font-weight: bold; }
+.boss-card-thresholds .rank-a { color: #ff8844; }
+.boss-card-thresholds .rank-b { color: #88aaff; }
+
+.boss-challenge-btn {
+  align-self: flex-end;
+  padding: 8px 24px;
+  border: none;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #cc3322, #ff5544);
+  color: #fff;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.15s;
+  font-size: 0.9rem;
+}
+
+.boss-challenge-btn:hover:not(:disabled) { transform: translateY(-2px); filter: brightness(1.15); }
+.boss-challenge-btn:disabled {
+  background: #444;
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+/* ══════════════════════════════════════════════════
    Phase 7 — Battle HUD
    ══════════════════════════════════════════════════ */
 
@@ -3170,6 +3841,37 @@
   font-weight: 600;
 }
 
+/* ── Audio Settings ── */
+.settings-audio-row {
+  margin-bottom: 10px;
+}
+
+.settings-audio-label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #ddd;
+  font-size: 0.85rem;
+}
+
+.settings-audio-label > span:first-child {
+  min-width: 50px;
+}
+
+.settings-slider {
+  flex: 1;
+  height: 6px;
+  accent-color: #e63946;
+  cursor: pointer;
+}
+
+.settings-audio-val {
+  min-width: 40px;
+  text-align: right;
+  color: #aaa;
+  font-size: 0.78rem;
+}
+
 /* ═══════════════════════════════════════
    Mailbox Panel
    ═══════════════════════════════════════ */
@@ -3376,4 +4078,45 @@
   border-top: 1px solid rgba(255,255,255,0.06);
   display: flex;
   justify-content: flex-end;
+}
+
+/* ── Battle Calculating Overlay ── */
+.battle-calculating-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 900;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  background: rgba(0, 0, 0, 0.55);
+  pointer-events: none;
+  animation: bco-fadeIn 0.25s ease-out;
+}
+@keyframes bco-fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+.battle-calculating-overlay span {
+  color: #fff;
+  font-size: 1.1rem;
+  letter-spacing: 2px;
+  text-shadow: 0 0 8px rgba(255,200,60,0.6);
+  animation: bco-pulse 1.2s ease-in-out infinite;
+}
+@keyframes bco-pulse {
+  0%, 100% { opacity: 0.6; }
+  50%      { opacity: 1; }
+}
+.battle-calculating-spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid rgba(255,255,255,0.15);
+  border-top-color: #ffc83c;
+  border-radius: 50%;
+  animation: bco-spin 0.8s linear infinite;
+}
+@keyframes bco-spin {
+  to { transform: rotate(360deg); }
 }

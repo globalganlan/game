@@ -26,13 +26,13 @@ import {
   getBuffedStats,
   isControlled,
   isFeared,
-  isSilenced,
+  isSilenced as _isSilenced,
   processDotEffects,
   processRegen,
   tickStatusDurations,
   tickShieldDurations,
   applyStatus,
-  hasStatus,
+  hasStatus as _hasStatus,
   cleanse,
 } from './buffSystem'
 import {
@@ -60,7 +60,7 @@ async function processInterruptUltimates(
   turn: number,
   allHeroes: BattleHero[],
   cfg: BattleEngineConfig,
-  excludeUid?: string, // 剛行動完的角色（本回合已行動，不再中斷）
+  alreadyActedUids: Set<string>, // 本輪已施放過大招的角色（防同一輪重複施放）
 ): Promise<boolean> {
   const MAX_INTERRUPTS = 20 // 安全上限
   let count = 0
@@ -69,7 +69,7 @@ async function processInterruptUltimates(
   while (found && count < MAX_INTERRUPTS) {
     found = false
     const candidates = allHeroes
-      .filter(h => h.currentHP > 0 && canCastUltimate(h) && h.uid !== excludeUid)
+      .filter(h => h.currentHP > 0 && canCastUltimate(h) && !alreadyActedUids.has(h.uid))
       .sort((a, b) => {
         const spdA = getBuffedStats(a).SPD
         const spdB = getBuffedStats(b).SPD
@@ -81,6 +81,7 @@ async function processInterruptUltimates(
       const allies = hero.side === 'player' ? players : enemies
       const foes = hero.side === 'player' ? enemies : players
       await executeSkill(hero, hero.activeSkill!, allies, foes, turn, allHeroes, cfg)
+      alreadyActedUids.add(hero.uid) // 標記已施放過大招，防止同一輪重複施放
       found = true
       anyFired = true
       count++
@@ -198,8 +199,9 @@ export async function runBattle(
         await executeNormalAttack(actor, allies, foes, turn, allHeroes, cfg)
       }
 
-      // ── 中斷大招：其他角色能量滿了立即施放 ──
-      await processInterruptUltimates(players, enemies, turn, allHeroes, cfg, actor.uid)
+      // ── 中斷大招：任何角色能量滿了立即施放（含剛行動的自己、被攻擊的對手） ──
+      const interruptActed = new Set<string>()
+      await processInterruptUltimates(players, enemies, turn, allHeroes, cfg, interruptActed)
       if (players.every(p => p.currentHP <= 0) || enemies.every(e => e.currentHP <= 0)) break
 
       // 清理已死亡角色的行動能力（但保留在陣列中給表現層播放死亡動畫）
@@ -247,8 +249,31 @@ export async function runBattle(
 }
 
 /* ════════════════════════════════════
-   普攻執行
+   同步收集模式
    ════════════════════════════════════ */
+
+export interface BattleResult {
+  winner: 'player' | 'enemy' | 'draw'
+  actions: BattleAction[]
+}
+
+/**
+ * 同步（同步式 await）跑完整場戰鬥，收集所有 BattleAction。
+ * 不需要表現層回調，幾 ms 內完成。
+ * 前端可拿到 actions 後再決定「播放動畫」或「跳過直接結算」。
+ */
+export async function runBattleCollect(
+  players: BattleHero[],
+  enemies: BattleHero[],
+  config: Partial<Pick<BattleEngineConfig, 'maxTurns'>> = {},
+): Promise<BattleResult> {
+  const actions: BattleAction[] = []
+  const winner = await runBattle(players, enemies, {
+    maxTurns: config.maxTurns ?? 50,
+    onAction: (action) => { actions.push(action) },
+  })
+  return { winner, actions }
+}
 
 async function executeNormalAttack(
   attacker: BattleHero,
@@ -262,10 +287,16 @@ async function executeNormalAttack(
   if (!target) return
 
   // 觸發「攻擊前」被動
-  triggerPassives(attacker, 'on_attack', makeContext(turn, attacker, allHeroes, target), cfg)
+  const ctx = makeContext(turn, attacker, allHeroes, target)
+  triggerPassives(attacker, 'on_attack', ctx, cfg)
 
   // 計算傷害
   const result = calculateDamage(attacker, target)
+
+  // 套用 on_attack 被動傷害倍率（damage_mult / damage_mult_random）
+  if (ctx.damageMult != null && ctx.damageMult !== 1.0 && !result.isDodge) {
+    result.damage = Math.max(1, Math.floor(result.damage * ctx.damageMult))
+  }
 
   // 套用傷害（先套用再通知表現層，確保 killed flag 正確）
   let killed = false
@@ -350,7 +381,8 @@ async function executeSkill(
   if (targets.length === 0) return
 
   // 觸發「攻擊前」被動
-  triggerPassives(attacker, 'on_attack', makeContext(turn, attacker, allHeroes, targets[0]), cfg)
+  const ctx = makeContext(turn, attacker, allHeroes, targets[0])
+  triggerPassives(attacker, 'on_attack', ctx, cfg)
 
   const skillResults: Array<{ uid: string; result: DamageResult | HealResult; killed?: boolean }> = []
   const killedUids: string[] = []
@@ -363,6 +395,10 @@ async function executeSkill(
       switch (effect.type) {
         case 'damage': {
           const result = calculateDamage(attacker, target, effect)
+          // 套用 on_attack 被動傷害倍率
+          if (ctx.damageMult != null && ctx.damageMult !== 1.0 && !result.isDodge) {
+            result.damage = Math.max(1, Math.floor(result.damage * ctx.damageMult))
+          }
           let killed = false
 
           if (!result.isDodge) {
@@ -524,7 +560,7 @@ function triggerPassives(
 export function checkLethalPassive(
   hero: BattleHero,
   incomingDamage: number,
-  allHeroes: BattleHero[],
+  _allHeroes: BattleHero[],
 ): boolean {
   const wouldDie = hero.currentHP - incomingDamage <= 0
 
@@ -630,13 +666,36 @@ function executePassiveEffect(
       addEnergy(hero, effect.flatValue ?? 0)
       break
     }
+    case 'damage_mult': {
+      // on_attack 被動：乘算傷害倍率（多個被動可疊加）
+      context.damageMult = (context.damageMult ?? 1.0) * (effect.multiplier ?? 1.0)
+      break
+    }
+    case 'damage_mult_random': {
+      // on_attack 被動：隨機傷害倍率
+      const min = effect.min ?? 0.5
+      const max = effect.max ?? 1.8
+      context.damageMult = (context.damageMult ?? 1.0) * (min + Math.random() * (max - min))
+      break
+    }
     case 'damage': {
-      // 被動反擊
+      // 非 on_attack 觸發的額外傷害（如 on_dodge 反擊）
       if (context.target && context.target.currentHP > 0) {
         const dmg = calculateDamage(hero, context.target, effect)
         if (!dmg.isDodge) {
           context.target.currentHP = Math.max(0, context.target.currentHP - dmg.damage)
           hero.totalDamageDealt += dmg.damage
+          const killed = context.target.currentHP <= 0
+          cfg.onAction({
+            type: 'PASSIVE_DAMAGE',
+            attackerUid: hero.uid,
+            targetUid: context.target.uid,
+            damage: dmg.damage,
+            killed,
+          })
+          if (killed) {
+            cfg.onAction({ type: 'DEATH', targetUid: context.target.uid })
+          }
         }
       }
       break

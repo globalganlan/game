@@ -532,6 +532,137 @@ export function getNextStageId(currentStageId: string): string | null {
   return `${chapter}-${stage}`
 }
 
+/* ════════════════════════════════════
+   PvP 競技場
+   ════════════════════════════════════ */
+
+export interface PvPOpponent {
+  opponentId: string
+  name: string
+  power: number
+  enemies: StageEnemy[]
+}
+
+/** 根據玩家進度產生 3 位 PvP 對手（seeded by date + progress） */
+export function getPvPOpponents(
+  storyProgress: { chapter: number; stage: number },
+): PvPOpponent[] {
+  const today = new Date()
+  const daySeed = today.getFullYear() * 10000 + (today.getMonth() + 1) * 100 + today.getDate()
+  const progress = (storyProgress.chapter - 1) * 8 + storyProgress.stage
+  const rng = seededRandom(daySeed + progress * 7)
+
+  const names = ['暗影獵人', '末日行者', '腐蝕之王', '殭屍領主', '瘟疫使者', '深淵守望者']
+  const opponents: PvPOpponent[] = []
+
+  for (let i = 0; i < 3; i++) {
+    const enemyCount = Math.min(6, 3 + Math.floor(progress / 6) + i)
+    const hpMult  = 1.0 + progress * 0.10 + i * 0.3
+    const atkMult = 1.0 + progress * 0.06 + i * 0.2
+    const spdMult = 1.0 + progress * 0.01
+    const enemies: StageEnemy[] = []
+    for (let j = 0; j < enemyCount; j++) {
+      enemies.push({
+        heroId: ZOMBIE_IDS[Math.floor(rng() * ZOMBIE_IDS.length)],
+        slot: j,
+        levelMultiplier: 1,
+        hpMultiplier: hpMult,
+        atkMultiplier: atkMult,
+        speedMultiplier: spdMult,
+      })
+    }
+    const nameIdx = Math.floor(rng() * names.length)
+    const power = Math.floor((hpMult + atkMult) * 1000 + enemyCount * 500)
+    opponents.push({
+      opponentId: `pvp_${i}`,
+      name: names[nameIdx],
+      power,
+      enemies,
+    })
+  }
+  return opponents
+}
+
+export function getPvPReward(progress: number): StageReward {
+  return {
+    exp: 80 + progress * 10,
+    gold: 200 + progress * 40,
+    diamond: 10,
+    items: [{ itemId: 'pvp_coin', quantity: 3 + Math.floor(progress / 4), dropRate: 1.0 }],
+  }
+}
+
+/* ════════════════════════════════════
+   Boss 挑戰
+   ════════════════════════════════════ */
+
+export const BOSS_CONFIGS: BossConfig[] = [
+  {
+    bossId: 'boss_1',
+    name: '腐化巨獸',
+    heroId: 5,
+    hp: 5000,
+    atk: 120,
+    speed: 80,
+    turnLimit: 30,
+    damageThresholds: { S: 15000, A: 10000, B: 5000, C: 2000 },
+  },
+  {
+    bossId: 'boss_2',
+    name: '暗夜領主',
+    heroId: 9,
+    hp: 8000,
+    atk: 180,
+    speed: 100,
+    turnLimit: 30,
+    damageThresholds: { S: 25000, A: 18000, B: 10000, C: 4000 },
+  },
+  {
+    bossId: 'boss_3',
+    name: '末日審判者',
+    heroId: 14,
+    hp: 12000,
+    atk: 250,
+    speed: 120,
+    turnLimit: 30,
+    damageThresholds: { S: 40000, A: 28000, B: 15000, C: 6000 },
+  },
+]
+
+export function getBossConfig(bossId: string): BossConfig | null {
+  return BOSS_CONFIGS.find(b => b.bossId === bossId) ?? null
+}
+
+/** 根據 bossId 產生 StageEnemy 陣列（單一 Boss） */
+export function getBossEnemies(bossId: string): StageEnemy[] {
+  const boss = getBossConfig(bossId)
+  if (!boss) return []
+  return [{
+    heroId: boss.heroId,
+    slot: 1,
+    levelMultiplier: 1,
+    hpMultiplier: boss.hp / 100,   // base HP is 100 → multiply to target
+    atkMultiplier: boss.atk / 20,  // base ATK is 20
+    speedMultiplier: boss.speed / 80,
+  }]
+}
+
+export function getBossReward(bossId: string, totalDamage: number): StageReward {
+  const boss = getBossConfig(bossId)
+  if (!boss) return { exp: 0, gold: 0 }
+  let rank: 'S' | 'A' | 'B' | 'C' = 'C'
+  if (totalDamage >= boss.damageThresholds.S) rank = 'S'
+  else if (totalDamage >= boss.damageThresholds.A) rank = 'A'
+  else if (totalDamage >= boss.damageThresholds.B) rank = 'B'
+  const rewards: Record<string, StageReward> = {
+    S: { exp: 600, gold: 3000, diamond: 100, items: [{ itemId: 'chest_equipment', quantity: 2, dropRate: 1.0 }] },
+    A: { exp: 400, gold: 2000, diamond: 50, items: [{ itemId: 'chest_equipment', quantity: 1, dropRate: 1.0 }] },
+    B: { exp: 200, gold: 1000, diamond: 20, items: [{ itemId: 'exp_core_l', quantity: 1, dropRate: 1.0 }] },
+    C: { exp: 100, gold: 500, diamond: 0, items: [{ itemId: 'exp_core_m', quantity: 1, dropRate: 1.0 }] },
+  }
+  return rewards[rank]
+}
+
 /** 判斷 stageId 是否為首次通關（等於或超過目前進度的關卡都算首次） */
 export function isFirstClear(
   stageId: string,

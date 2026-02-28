@@ -7,7 +7,7 @@
  */
 
 import { getAuthState } from './authService'
-import { fireOptimistic, fireOptimisticAsync, generateOpId } from './optimisticQueue'
+import { fireOptimisticAsync } from './optimisticQueue'
 import type { EquipmentInstance } from '../domain/progressionSystem'
 
 const POST_URL =

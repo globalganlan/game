@@ -67,8 +67,8 @@ export {
 export { selectTargets, selectNormalAttackTarget } from './targetStrategy'
 
 // 戰鬥引擎
-export { runBattle, createBattleHero, checkLethalPassive } from './battleEngine'
-export type { BattleEngineConfig, RawHeroInput } from './battleEngine'
+export { runBattle, runBattleCollect, createBattleHero, checkLethalPassive } from './battleEngine'
+export type { BattleEngineConfig, BattleResult, RawHeroInput } from './battleEngine'
 
 // 養成系統
 export {

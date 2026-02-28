@@ -8,7 +8,7 @@
  *  - 屬性相剋指示
  */
 
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import type { StatusEffect, StatusType, Element } from '../domain/types'
 
 /* ════════════════════════════════════
@@ -37,6 +37,13 @@ export interface ElementHint {
   color: string
   timestamp: number
   attackerUid: string
+}
+
+export interface PassiveHint {
+  id: number
+  skillName: string
+  timestamp: number
+  heroUid: string
 }
 
 /* ════════════════════════════════════
@@ -310,12 +317,12 @@ function CompactEnergyItem({
 
 export function BattleHUD({
   visible,
-  playerHeroes,
-  enemyHeroes,
-  buffMap,
-  energyMap,
-  skillToasts,
-  elementHints,
+  playerHeroes: _playerHeroes,
+  enemyHeroes: _enemyHeroes,
+  buffMap: _buffMap,
+  energyMap: _energyMap,
+  skillToasts: _skillToasts,
+  elementHints: _elementHints,
 }: BattleHUDProps) {
   if (!visible) return null
 

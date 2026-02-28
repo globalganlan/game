@@ -1,7 +1,7 @@
 /**
  * elementSystem 單元測試
  */
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect } from 'vitest'
 import { getElementMultiplier, isWeakness, isResist, loadElementMatrix } from '../elementSystem'
 
 describe('elementSystem', () => {

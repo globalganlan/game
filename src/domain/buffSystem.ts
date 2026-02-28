@@ -293,7 +293,7 @@ export function absorbDamageByShields(hero: BattleHero, damage: number): [number
    內部工具
    ════════════════════════════════════ */
 
-function isPermaBuff(status: StatusEffect): boolean {
+function _isPermaBuff(status: StatusEffect): boolean {
   // duration === 0 的效果是永久效果（如 always 被動帶來的）
   return status.duration === 0
 }

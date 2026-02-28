@@ -84,7 +84,7 @@ export const DUPLICATE_STARDUST: Record<GachaRarity, number> = {
   SSR: 25,
   SR: 5,
   R: 1,
-  N: 0.2,
+  N: 1,
 }
 
 /** 重複轉換碎片（依稀有度等級） */

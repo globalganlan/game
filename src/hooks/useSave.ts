@@ -27,6 +27,7 @@ import {
   type AccumulatedResources,
 } from '../services/saveService'
 import { clearLocalPool } from '../services/gachaLocalPool'
+import { translateError } from '../utils/errorMessages'
 
 export interface UseSaveReturn {
   /** 完整存檔資料 */
@@ -94,7 +95,7 @@ export function useSave(): UseSaveReturn {
       return data
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e)
-      if (mounted.current) setError(msg)
+      if (mounted.current) setError(translateError(msg, '載入存檔失敗'))
       console.error('[useSave] loadSave failed:', msg)
       return null
     } finally {

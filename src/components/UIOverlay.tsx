@@ -11,14 +11,8 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import type { RawHeroData } from '../types'
 import type { HeroInstance } from '../services/saveService'
 
-/* ── 稀有度配色 ── */
-type RarityLabel = 'SSR' | 'SR' | 'R' | 'N'
-const RARITY_CONFIG: Record<RarityLabel, { color: string; border: string }> = {
-  SSR: { color: '#ffd43b', border: '#ffd43b' },
-  SR:  { color: '#be4bdb', border: '#be4bdb' },
-  R:   { color: '#4dabf7', border: '#4dabf7' },
-  N:   { color: '#888',    border: '#666' },
-}
+import { RARITY_CONFIG, type Rarity } from '../constants/rarity'
+type RarityLabel = Rarity
 function numToRarity(v: unknown): RarityLabel {
   const n = Number(v)
   if (n === 4) return 'SSR'
@@ -310,7 +304,7 @@ export function ThumbnailList({
       el.removeEventListener('pointerup', onUp)
       el.removeEventListener('pointercancel', onUp)
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+   
   }, [heroes, canAdjust, onThumbClick])
 
   if (!Array.isArray(heroes) || heroes.length === 0) return null

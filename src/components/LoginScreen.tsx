@@ -18,7 +18,7 @@ interface LoginScreenProps {
 }
 
 export function LoginScreen({ auth, onEnterGame }: LoginScreenProps) {
-  const { auth: state, loading, error, doAutoLogin, doLogin } = auth
+  const { auth: state, loading, error, doAutoLogin, doRegisterGuest, doLogin } = auth
   const [mode, setMode] = useState<'auto' | 'login'>('auto')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -84,11 +84,8 @@ export function LoginScreen({ auth, onEnterGame }: LoginScreenProps) {
         {mode === 'auto' && !loading && !state.isLoggedIn && (
           <div className="login-actions">
             {error && <div className="login-error">{error}</div>}
-            <button className="login-btn login-btn-primary" onClick={doAutoLogin}>
+            <button className="login-btn login-btn-primary" onClick={doRegisterGuest}>
               訪客模式進入
-            </button>
-            <button className="login-btn login-btn-secondary" onClick={onEnterGame}>
-              離線體驗
             </button>
             <div className="login-divider">
               <span>或</span>
@@ -131,7 +128,7 @@ export function LoginScreen({ auth, onEnterGame }: LoginScreenProps) {
             <button
               className="login-btn login-btn-ghost"
               type="button"
-              onClick={() => { setMode('auto'); doAutoLogin() }}
+              onClick={() => { setMode('auto'); doRegisterGuest() }}
               disabled={loading}
             >
               返回訪客模式

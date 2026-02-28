@@ -89,11 +89,13 @@ export type PassiveTrigger =
 
 /** 技能效果模組（一個技能可包含多個效果） */
 export interface SkillEffect {
-  type: 'damage' | 'heal' | 'buff' | 'debuff' | 'energy' | 'revive' | 'dispel_debuff' | 'extra_turn' | 'reflect'
+  type: 'damage' | 'heal' | 'buff' | 'debuff' | 'energy' | 'revive' | 'dispel_debuff' | 'extra_turn' | 'reflect' | 'damage_mult' | 'damage_mult_random'
   scalingStat?: keyof FinalStats  // 基於哪個數值（ATK / HP / DEF）
   multiplier?: number             // 倍率（1.8 = 180%）
   flatValue?: number              // 固定值加成
   hitCount?: number               // 多段攻擊次數
+  min?: number                    // damage_mult_random 最小倍率
+  max?: number                    // damage_mult_random 最大倍率
   status?: StatusType             // Buff/Debuff 類型
   statusChance?: number           // 觸發機率（0~1）
   statusValue?: number            // 效果數值
@@ -190,6 +192,8 @@ export interface BattleContext {
   isKill: boolean
   isCrit: boolean
   isDodge: boolean
+  /** on_attack 被動設定的傷害倍率修正（多個被動乘算） */
+  damageMult?: number
 }
 
 /* ════════════════════════════════════
@@ -248,6 +252,7 @@ export type BattleAction =
   | { type: 'BUFF_EXPIRE'; targetUid: string; effectType: StatusType }
   | { type: 'DEATH'; targetUid: string }
   | { type: 'PASSIVE_TRIGGER'; heroUid: string; skillId: string; skillName: string }
+  | { type: 'PASSIVE_DAMAGE'; attackerUid: string; targetUid: string; damage: number; killed: boolean }
   | { type: 'ENERGY_CHANGE'; heroUid: string; delta: number; newValue: number }
   | { type: 'TURN_START'; turn: number }
   | { type: 'TURN_END'; turn: number }

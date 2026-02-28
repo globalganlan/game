@@ -46,6 +46,7 @@ export interface HeroInstance {
   level: number
   exp: number
   ascension: number
+  stars: number
   equippedItems: Record<string, string>
   obtainedAt: string
 }
@@ -385,10 +386,11 @@ export async function loadSave(): Promise<PlayerData> {
   }
 }
 
-/** 從 HeroInstance 移除 playerId（前端不需要） */
+/** 從 HeroInstance 移除 playerId、補全缺少的欄位（前端不需要 playerId） */
 function stripPlayerId(h: HeroInstance & { playerId?: string }): HeroInstance {
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const { playerId: _, ...rest } = h
+  // 舊存檔可能沒有 stars 欄位，預設 1
+  if (rest.stars == null) (rest as HeroInstance).stars = 1
   return rest as HeroInstance
 }
 
@@ -463,6 +465,7 @@ export function addHeroesLocally(heroIds: number[]): void {
       level: 1,
       exp: 0,
       ascension: 0,
+      stars: 1,
       equippedItems: {},
       obtainedAt: now,
     })
@@ -472,6 +475,25 @@ export function addHeroesLocally(heroIds: number[]): void {
     saveToLocal(currentData)
     notify()
   }
+}
+
+/**
+ * 樂觀更新英雄資料（不呼叫 API）
+ * 用於升級/突破/升星後即時反映結果，server 入帳由各操作的 optimistic queue 處理。
+ */
+export function updateHeroLocally(
+  heroId: number,
+  changes: Partial<Pick<HeroInstance, 'level' | 'exp' | 'ascension' | 'stars'>>,
+): void {
+  if (!currentData) return
+  const hero = currentData.heroes.find(h => h.heroId === heroId)
+  if (!hero) return
+  if (changes.level !== undefined) hero.level = changes.level
+  if (changes.exp !== undefined) hero.exp = changes.exp
+  if (changes.ascension !== undefined) hero.ascension = changes.ascension
+  if (changes.stars !== undefined) hero.stars = changes.stars
+  saveToLocal(currentData)
+  notify()
 }
 
 /**
@@ -487,6 +509,7 @@ export async function addHero(heroId: number): Promise<HeroInstance | null> {
       level: 1,
       exp: 0,
       ascension: 0,
+      stars: 1,
       equippedItems: {},
       obtainedAt: new Date().toISOString(),
     }

@@ -1,7 +1,7 @@
 # 帳號系統 Spec
 
-> 版本：v1.0 ｜ 狀態：🟢 已實作
-> 最後更新：2026-03-01
+> 版本：v1.2 ｜ 狀態：🟢 已實作
+> 最後更新：2026-02-28
 > 負責角色：🎯 GAME_DESIGN → 🔧 CODING
 
 ## 概述
@@ -23,6 +23,21 @@
 | `src/components/LoginScreen.tsx` | 登入畫面 — 自動登入 + 帳密登入 + 離線模式 |
 | `src/components/SettingsPanel.tsx` | 設定面板 — 綁定帳號 / 修改暱稱 / 修改密碼 / 登出 |
 | `gas/程式碼.js` | GAS 後端 Handler — `handleRegisterGuest_  / handleLoginGuest_ / handleLogin_ / handleBindAccount_ / handleChangeName_ / handleChangePassword_` |
+
+### v1.2 新增：新用戶歡迎禮包
+
+`handleRegisterGuest_` 在建立新玩家後（`alreadyExists: false`），自動呼叫 `handleSendMail_` 寄送歡迎信件：
+
+| 獎勵 | 數量 |
+|------|------|
+| 💎 鑽石 | 300 |
+| 🪙 金幣 | 10,000 |
+| 📘 中經驗石 | 5 |
+| 📙 大經驗石 | 2 |
+
+- 信件標題：`🎉 歡迎來到全球感染！`
+- 永不過期，玩家開信箱即可領取
+- 錯誤以 try-catch 包裝，不影響註冊成功
 
 ---
 
@@ -239,4 +254,4 @@ LoginScreen（mount 時自動執行 doAutoLogin）
 | 版本 | 日期 | 變更內容 |
 |------|------|---------|
 | v0.1 | 2026-02-26 | 初版：訪客 token + 綁定帳密流程 |
-| v1.0 | 2026-03-01 | 全面同步實作：自動登入冪等保護、LoginScreen UI 三模式（auto/login/離線）、SettingsPanel 綁定/改名/改密/登出、預設暱稱「倖存者#XXXX」、resolvePlayerId_ ScriptCache 6h TTL、詳列 6 個 GAS Handler 邏輯、useAuth Hook 介面、前端驗證規則對照 |
+| v1.0 | 2026-03-01 | 全面同步實作：自動登入冪等保護、LoginScreen UI 三模式（auto/login/離線）、SettingsPanel 綁定/改名/改密/登出、預設暱稱「倖存者#XXXX」、resolvePlayerId_ ScriptCache 6h TTL、詳列 6 個 GAS Handler 邏輯、useAuth Hook 介面、前端驗證規則對照 || v1.1 | 2026-02-28 | **Bug Fix**：`autoLogin()` 無 token 時不再自動 `register-guest`，改為回傳未登入狀態；新增 `registerGuest()` 給 UI 按鈕觸發，優先複用本地 token；useAuth 新增 `doRegisterGuest` 方法；LoginScreen 「訪客模式進入」按鈕改用 `doRegisterGuest` |

@@ -7,6 +7,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import {
   autoLogin,
+  registerGuest,
   loginWithEmail,
   bindAccount,
   changeName,
@@ -15,6 +16,7 @@ import {
   onAuthChange,
   type AuthState,
 } from '../services/authService'
+import { translateError } from '../utils/errorMessages'
 
 export interface UseAuthReturn {
   /** 當前認證狀態 */
@@ -25,6 +27,8 @@ export interface UseAuthReturn {
   error: string | null
   /** 自動登入（App 啟動時呼叫一次） */
   doAutoLogin: () => Promise<void>
+  /** 訪客模式進入（手動建帳或複用 token） */
+  doRegisterGuest: () => Promise<void>
   /** 帳密登入 */
   doLogin: (email: string, password: string) => Promise<boolean>
   /** 綁定帳號 */
@@ -58,7 +62,19 @@ export function useAuth(): UseAuthReturn {
     try {
       await autoLogin()
     } catch (e) {
-      if (mounted.current) setError(String(e))
+      if (mounted.current) setError(translateError(String(e), '自動登入失敗'))
+    } finally {
+      if (mounted.current) setLoading(false)
+    }
+  }, [])
+
+  const doRegisterGuest = useCallback(async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      await registerGuest()
+    } catch (e) {
+      if (mounted.current) setError(translateError(String(e), '建立帳號失敗，請稍後再試'))
     } finally {
       if (mounted.current) setLoading(false)
     }
@@ -70,12 +86,12 @@ export function useAuth(): UseAuthReturn {
     try {
       const res = await loginWithEmail(email, password)
       if (!res.success) {
-        if (mounted.current) setError(res.error ?? '登入失敗')
+        if (mounted.current) setError(translateError(res.error, '登入失敗'))
         return false
       }
       return true
     } catch (e) {
-      if (mounted.current) setError(String(e))
+      if (mounted.current) setError(translateError(String(e), '登入失敗，請檢查網路連線'))
       return false
     } finally {
       if (mounted.current) setLoading(false)
@@ -88,12 +104,12 @@ export function useAuth(): UseAuthReturn {
     try {
       const res = await bindAccount(email, password)
       if (!res.success) {
-        if (mounted.current) setError(res.error ?? '綁定失敗')
+        if (mounted.current) setError(translateError(res.error, '綁定失敗'))
         return false
       }
       return true
     } catch (e) {
-      if (mounted.current) setError(String(e))
+      if (mounted.current) setError(translateError(String(e), '綁定失敗，請檢查網路連線'))
       return false
     } finally {
       if (mounted.current) setLoading(false)
@@ -106,12 +122,12 @@ export function useAuth(): UseAuthReturn {
     try {
       const res = await changeName(name)
       if (!res.success) {
-        if (mounted.current) setError(res.error ?? '改名失敗')
+        if (mounted.current) setError(translateError(res.error, '改名失敗'))
         return false
       }
       return true
     } catch (e) {
-      if (mounted.current) setError(String(e))
+      if (mounted.current) setError(translateError(String(e), '改名失敗，請檢查網路連線'))
       return false
     } finally {
       if (mounted.current) setLoading(false)
@@ -123,5 +139,5 @@ export function useAuth(): UseAuthReturn {
     setError(null)
   }, [])
 
-  return { auth, loading, error, doAutoLogin, doLogin, doBind, doChangeName, doLogout }
+  return { auth, loading, error, doAutoLogin, doRegisterGuest, doLogin, doBind, doChangeName, doLogout }
 }

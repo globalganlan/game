@@ -130,3 +130,7 @@ export {
   type LocalPullResult,
   type LocalPullResponse,
 } from './gachaLocalPool'
+
+// 後端戰鬥引擎
+export { runBattleRemote } from './battleService'
+export type { BattleResult as RemoteBattleResult } from './battleService'
