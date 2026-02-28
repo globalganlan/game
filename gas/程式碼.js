@@ -345,13 +345,19 @@ function doPost(e) {
         break;
       // ── Progression ──
       case 'upgrade-hero':
-        result = handleUpgradeHero_(body);
+        result = executeWithIdempotency_(body.opId, resolvePlayerId_(body.guestToken), 'upgrade-hero', function() {
+          return handleUpgradeHero_(body);
+        });
         break;
       case 'ascend-hero':
-        result = handleAscendHero_(body);
+        result = executeWithIdempotency_(body.opId, resolvePlayerId_(body.guestToken), 'ascend-hero', function() {
+          return handleAscendHero_(body);
+        });
         break;
       case 'star-up-hero':
-        result = handleStarUpHero_(body);
+        result = executeWithIdempotency_(body.opId, resolvePlayerId_(body.guestToken), 'star-up-hero', function() {
+          return handleStarUpHero_(body);
+        });
         break;
       case 'enhance-equipment':
         result = handleEnhanceEquipment_(body);
@@ -1058,7 +1064,7 @@ var SAVE_HEADERS_ = [
 
 var HERO_INST_HEADERS_ = [
   'playerId','instanceId','heroId','level','exp','ascension',
-  'equippedItems','obtainedAt'
+  'equippedItems','obtainedAt','stars'
 ];
 
 /** 取得或建立 save_data Sheet */
@@ -1222,7 +1228,8 @@ function handleInitSave_(params) {
       0,       // exp
       0,       // ascension
       '{}',    // equippedItems
-      now      // obtainedAt
+      now,     // obtainedAt
+      0        // stars (所有英雄從 ★0 開始)
     ]);
     starterInstanceIds.push(instId);
   }
@@ -1314,7 +1321,8 @@ function handleAddHero_(params) {
     0,    // exp
     0,    // ascension
     '{}', // equippedItems
-    now   // obtainedAt
+    now,  // obtainedAt
+    0     // stars (所有英雄從 ★0 開始)
   ]);
 
   return { success: true, instanceId: instanceId };
@@ -1731,7 +1739,7 @@ var ASC_COSTS_ = [
   { fragments: 40, classStones: 25, gold: 80000 },
   { fragments: 60, classStones: 40, gold: 150000 }
 ];
-var STAR_COSTS_ = { 1: 10, 2: 20, 3: 40, 4: 80, 5: 160 };
+var STAR_COSTS_ = { 0: 5, 1: 10, 2: 20, 3: 40, 4: 80, 5: 160 };
 
 function expToNextLevel_(level) {
   var base = 100;
@@ -1888,8 +1896,8 @@ function handleStarUpHero_(params) {
   var hero = readRow_(heroSheet, heroRow);
   if (String(hero.playerId) !== String(playerId)) return { success: false, error: 'not_your_hero' };
 
-  // hero_instances 需要 stars 欄位 (如果不存在就預設 1)
-  var stars = Number(hero.stars) || 1;
+  // hero_instances 需要 stars 欄位 (0 星為初始值)
+  var stars = (hero.stars != null && hero.stars !== '') ? Number(hero.stars) : 0;
   if (stars >= 6) return { success: false, error: 'max_stars' };
 
   var cost = STAR_COSTS_[stars];
@@ -2413,7 +2421,7 @@ function handleGachaPull_(params) {
     if (isNew) {
       var hSheet = getHeroInstSheet_();
       var instId = playerId + '_' + heroId + '_' + Date.now() + '_' + p;
-      hSheet.appendRow([playerId, instId, heroId, 1, 0, 0, '{}', new Date().toISOString()]);
+      hSheet.appendRow([playerId, instId, heroId, 1, 0, 0, '{}', new Date().toISOString(), 0]);
       ownedHeroes[heroId] = true;
     } else {
       var dustMap = { 'SSR': 25, 'SR': 5, 'R': 1, 'N': 1 };

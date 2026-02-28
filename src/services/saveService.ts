@@ -12,7 +12,7 @@
 
 import { getAuthState } from './authService'
 import { initLocalPool, type PoolEntry } from './gachaLocalPool'
-import { fireOptimistic, reconcilePendingOps } from './optimisticQueue'
+import { fireOptimistic, reconcilePendingOps, hasPendingOps } from './optimisticQueue'
 
 const POST_URL =
   'https://script.google.com/macros/s/AKfycbzy3EHTCyTYjA9j1CvJGvWwDM_RrkCuzNYkMhP7T9DTJ6V6g7Sodrlo4uv3h9yx0HLdsg/exec'
@@ -276,9 +276,9 @@ function sanitizeSaveData(sd: SaveData): SaveData {
   if (!Array.isArray(sd.formation)) {
     sd.formation = [null, null, null, null, null, null]
   }
-  // stageStars
-  if (typeof sd.stageStars === 'string') {
-    try { sd.stageStars = JSON.parse(sd.stageStars as unknown as string) } catch { sd.stageStars = {} }
+  // stageStars — 防穋多層序列化（GAS Sheets 可能回傳 '"{}"' 多層字串）
+  for (let i = 0; i < 3 && typeof sd.stageStars === 'string'; i++) {
+    try { sd.stageStars = JSON.parse(sd.stageStars as unknown as string) } catch { sd.stageStars = {}; break }
   }
   if (!sd.stageStars || typeof sd.stageStars !== 'object' || Array.isArray(sd.stageStars)) {
     sd.stageStars = {}
@@ -366,6 +366,30 @@ export async function loadSave(): Promise<PlayerData> {
       }
     }
 
+    // ── 合併本地樂觀英雄進度 ──
+    // 若有尚未送達 server 的樂觀操作（upgrade-hero / ascend-hero / star-up-hero），
+    // server heroes 可能還是舊值。取 MAX(local, server) 確保不倒退。
+    // level / ascension / stars 為單調遞增，取 MAX 永遠安全。
+    const localCache = loadFromLocal()
+    if (localCache?.heroes?.length) {
+      const localMap = new Map<string, HeroInstance>()
+      for (const h of localCache.heroes) localMap.set(h.instanceId, h)
+      for (const sh of currentData.heroes) {
+        const lh = localMap.get(sh.instanceId)
+        if (!lh) continue
+        if ((lh.level ?? 1) > (sh.level ?? 1)) {
+          sh.level = lh.level
+          sh.exp = lh.exp // 配套等級的經驗
+        }
+        if ((lh.ascension ?? 0) > (sh.ascension ?? 0)) {
+          sh.ascension = lh.ascension
+        }
+        if ((lh.stars ?? 0) > (sh.stars ?? 0)) {
+          sh.stars = lh.stars
+        }
+      }
+    }
+
     saveToLocal(currentData)
     notify()
 
@@ -390,8 +414,8 @@ export async function loadSave(): Promise<PlayerData> {
 /** 從 HeroInstance 移除 playerId、補全缺少的欄位（前端不需要 playerId） */
 function stripPlayerId(h: HeroInstance & { playerId?: string }): HeroInstance {
   const { playerId: _, ...rest } = h
-  // 舊存檔可能沒有 stars 欄位，預設 1
-  if (rest.stars == null) (rest as HeroInstance).stars = 1
+  // 舊存檔可能沒有 stars 欄位或為空字串，預設 0（所有英雄從 ★0 開始）
+  if (rest.stars == null || (rest.stars as unknown) === '') (rest as HeroInstance).stars = 0
   return rest as HeroInstance
 }
 
@@ -426,6 +450,13 @@ export function updateStoryProgress(chapter: number, stage: number): void {
  */
 export function updateStageStars(stageId: string, stars: number): void {
   if (currentData) {
+    // ★ 防穋：若 stageStars 意外變成字串（localStorage 反序列化或 GAS 回寫），先修復
+    if (typeof currentData.save.stageStars === 'string') {
+      try { currentData.save.stageStars = JSON.parse(currentData.save.stageStars as unknown as string) } catch { currentData.save.stageStars = {} }
+    }
+    if (!currentData.save.stageStars || typeof currentData.save.stageStars !== 'object') {
+      currentData.save.stageStars = {}
+    }
     const prev = currentData.save.stageStars[stageId] || 0
     if (stars > prev) {
       currentData.save.stageStars[stageId] = stars
@@ -466,7 +497,7 @@ export function addHeroesLocally(heroIds: number[]): void {
       level: 1,
       exp: 0,
       ascension: 0,
-      stars: 1,
+      stars: 0,
       equippedItems: {},
       obtainedAt: now,
     })
@@ -510,7 +541,7 @@ export async function addHero(heroId: number): Promise<HeroInstance | null> {
       level: 1,
       exp: 0,
       ascension: 0,
-      stars: 1,
+      stars: 0,
       equippedItems: {},
       obtainedAt: new Date().toISOString(),
     }

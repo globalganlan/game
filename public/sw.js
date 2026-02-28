@@ -5,8 +5,8 @@
  * 靜態資源：Cache First（GLB/圖片等大檔案優先快取）
  */
 
-const CACHE_NAME = 'globalganlan-v1'
-const STATIC_CACHE = 'globalganlan-static-v1'
+const CACHE_NAME = 'globalganlan-v2'
+const STATIC_CACHE = 'globalganlan-static-v2'
 
 // 預快取核心檔案
 const PRECACHE_URLS = [
@@ -48,6 +48,9 @@ self.addEventListener('fetch', (event) => {
 
   // 不快取 POST 請求
   if (event.request.method !== 'GET') return
+
+  // manifest.json 不快取（避免殘留壞檔導致 Syntax error）
+  if (url.pathname.endsWith('manifest.json')) return
 
   // 靜態資源 → Cache First
   const isStatic = STATIC_EXTENSIONS.some((ext) => url.pathname.endsWith(ext))

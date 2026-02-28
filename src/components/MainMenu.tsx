@@ -10,6 +10,7 @@ import type { MenuScreen } from '../types'
 import type { SaveData } from '../services/saveService'
 import { getTimerYield } from '../services/saveService'
 import { CurrencyIcon } from './CurrencyIcon'
+import { expToNextLevel } from '../domain/progressionSystem'
 
 /* ────────────────────────────
    Props
@@ -77,6 +78,9 @@ export function MainMenu({
   }, [refreshPreview])
   const name = saveData?.displayName || '倖存者'
   const level = saveData?.level ?? 1
+  const curExp = saveData?.exp ?? 0
+  const needed = expToNextLevel(level)
+  const expPct = needed > 0 ? Math.min(100, (curExp / needed) * 100) : 100
   const gold = saveData?.gold ?? 0
   const diamond = saveData?.diamond ?? 0
   const story = saveData?.storyProgress
@@ -116,6 +120,12 @@ export function MainMenu({
         <div className="menu-player-info">
           <span className="menu-player-name">{name}</span>
           <span className="menu-player-level" title="指揮官等級 — 提升等級解鎖更多功能與內容">Lv.{level}</span>
+          <div className="menu-exp-wrap" title={`EXP ${curExp} / ${needed}`}>
+            <div className="menu-exp-bar">
+              <div className="menu-exp-fill" style={{ width: `${expPct}%` }} />
+            </div>
+            <span className="menu-exp-text">{curExp}/{needed}</span>
+          </div>
         </div>
         <div className="menu-resources">
           <span className="menu-res-item menu-gold" title="金幣 — 升級、購買、強化"><CurrencyIcon type="gold" />{gold.toLocaleString()}</span>

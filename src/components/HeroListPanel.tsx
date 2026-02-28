@@ -252,7 +252,8 @@ function HeroDetail({ hero, instance, onClose, skills, heroSkills }: HeroDetailP
   const heroAny = hero as Record<string, unknown>
   const rarityNum = Number(heroAny.Rarity ?? 3)
   const ascMult = getAscensionMultiplier(asc, rarityNum)
-  const stars = instance?.stars ?? initialStars((hero as Record<string, unknown>).Rarity)
+  const minStars = initialStars((hero as Record<string, unknown>).Rarity)
+  const stars = Math.max(instance?.stars ?? minStars, minStars)
   const starMult = getStarMultiplier(stars, rarityNum)
   const calcStat = (base: number | undefined) =>
     base != null ? Math.floor(getStatAtLevel(Number(base), lvl, rarityNum) * ascMult * starMult) : '?'
@@ -789,7 +790,8 @@ function HeroCard({ hero, instance, onClick }: HeroCardProps) {
   const isOwned = !!instance
   const rarity = numToRarity((hero as Record<string, unknown>).Rarity)
   const rcfg = RARITY_CONFIG[rarity]
-  const stars = instance?.stars ?? initialStars((hero as Record<string, unknown>).Rarity)
+  const minStars = initialStars((hero as Record<string, unknown>).Rarity)
+  const stars = Math.max(instance?.stars ?? minStars, minStars)
 
   return (
     <button

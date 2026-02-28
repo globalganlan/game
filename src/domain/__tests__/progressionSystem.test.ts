@@ -209,13 +209,13 @@ describe('progressionSystem — 星級', () => {
     expect(canStarUp(6, 99999)).toBe(false)
   })
 
-  it('getInitialStars: rarity 4 (SSR) → 3', () => {
-    expect(getInitialStars(4)).toBe(3)
+  it('getInitialStars: rarity 4 (SSR) → 0', () => {
+    expect(getInitialStars(4)).toBe(0)
   })
 
-  it('getInitialStars: rarity 2 (R) → 1', () => {
+  it('getInitialStars: rarity 2 (R) → 0', () => {
     const stars = getInitialStars(2)
-    expect(stars).toBeGreaterThanOrEqual(1)
+    expect(stars).toBe(0)
   })
 })
 

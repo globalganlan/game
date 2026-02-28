@@ -70,67 +70,7 @@
 }
 
 /* ── 玩家資源 HUD ── */
-.hud-resources {
-  position: absolute;
-  top: 0;
-  right: 0;
-  display: flex;
-  gap: 10px;
-  align-items: center;
-  padding: 4px 12px;
-  padding-top: max(4px, env(safe-area-inset-top));
-  padding-right: max(8px, env(safe-area-inset-right));
-  font-size: clamp(0.55rem, 1.4vw, 0.8rem);
-  font-weight: bold;
-  pointer-events: none;
-}
 
-.hud-gold {
-  color: #ffd700;
-  text-shadow: 0 1px 3px rgba(0,0,0,0.7);
-}
-
-.hud-diamond {
-  color: #7df9ff;
-  text-shadow: 0 1px 3px rgba(0,0,0,0.7);
-}
-
-.hud-level {
-  color: #fff;
-  background: rgba(0, 0, 0, 0.4);
-  padding: 1px 8px;
-  border-radius: 6px;
-  text-shadow: 0 1px 3px rgba(0,0,0,0.7);
-}
-
-/* ── EXP Bar ── */
-.hud-exp-wrap {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.hud-exp-bar {
-  width: 60px;
-  height: 6px;
-  background: rgba(0,0,0,0.5);
-  border-radius: 3px;
-  overflow: hidden;
-  border: 1px solid rgba(255,255,255,0.15);
-}
-
-.hud-exp-fill {
-  height: 100%;
-  background: linear-gradient(90deg, #7df9ff, #38bdf8);
-  border-radius: 3px;
-  transition: width 0.4s ease;
-}
-
-.hud-exp-text {
-  color: #aadcf0;
-  font-size: 0.55rem;
-  white-space: nowrap;
-}
 
 /* ── Battle Result Banner ── */
 
@@ -1260,6 +1200,35 @@
   background: rgba(255,255,255,0.1);
   padding: 2px 8px;
   border-radius: 4px;
+}
+
+/* ── Menu EXP Bar ── */
+.menu-exp-wrap {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.menu-exp-bar {
+  width: 72px;
+  height: 7px;
+  background: rgba(0,0,0,0.45);
+  border-radius: 4px;
+  overflow: hidden;
+  border: 1px solid rgba(255,255,255,0.12);
+}
+
+.menu-exp-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #7df9ff, #38bdf8);
+  border-radius: 4px;
+  transition: width 0.4s ease;
+}
+
+.menu-exp-text {
+  color: #aadcf0;
+  font-size: 0.65rem;
+  white-space: nowrap;
 }
 
 .menu-resources {

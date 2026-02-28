@@ -9,7 +9,7 @@
 import { getAuthState } from './authService'
 import type { InventoryItem } from './saveService'
 import type { EquipmentInstance, EquipmentSlot, Rarity, SubStat } from '../domain/progressionSystem'
-import { fireOptimisticAsync } from './optimisticQueue'
+import { fireOptimisticAsync, hasPendingOps } from './optimisticQueue'
 
 const POST_URL =
   'https://script.google.com/macros/s/AKfycbzy3EHTCyTYjA9j1CvJGvWwDM_RrkCuzNYkMhP7T9DTJ6V6g7Sodrlo4uv3h9yx0HLdsg/exec'
@@ -147,12 +147,18 @@ export async function loadInventory(): Promise<InventoryState> {
   const localItems = loadInventoryFromLocal()
   let mergedItems = serverItems
   if (localItems) {
-    // 以 server 為基準，若 local 數量更多則取 local（樂觀寫入尚未同步）
+    const pending = hasPendingOps()
     const map = new Map<string, number>()
     for (const it of serverItems) map.set(it.itemId, it.quantity)
     for (const it of localItems) {
       const sv = map.get(it.itemId) ?? 0
-      if (it.quantity > sv) map.set(it.itemId, it.quantity)
+      if (pending) {
+        // 有待處理操作 → 信任本地值（可能包含樂觀扣除）
+        map.set(it.itemId, it.quantity)
+      } else if (it.quantity > sv) {
+        // 無待處理操作 → 只取更多的（舊邏輯，處理離線新增）
+        map.set(it.itemId, it.quantity)
+      }
     }
     mergedItems = [...map.entries()].map(([itemId, quantity]) => ({ itemId, quantity }))
   }

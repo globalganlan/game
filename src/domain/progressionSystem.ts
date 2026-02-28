@@ -97,8 +97,7 @@ export const ASCENSION_MULTIPLIER: Record<number, number> = {
 }
 
 /** 星級屬性加成（乘算）— ★3 預設，向下相容 */
-export const STAR_MULTIPLIER: Record<number, number> = {
-  1: 1.0,
+export const STAR_MULTIPLIER: Record<number, number> = {  0: 0.90,  1: 1.0,
   2: 1.05,
   3: 1.10,
   4: 1.15,
@@ -128,14 +127,15 @@ export const RARITY_ASC_MULT: Record<number, Record<number, number>> = {
 
 /** 星級加成（依稀有度）— ★3 等同 STAR_MULTIPLIER */
 export const RARITY_STAR_MULT: Record<number, Record<number, number>> = {
-  1: { 1: 1.00, 2: 1.03, 3: 1.06, 4: 1.09, 5: 1.13, 6: 1.18 },
-  2: { 1: 1.00, 2: 1.04, 3: 1.08, 4: 1.12, 5: 1.17, 6: 1.24 },
-  3: { 1: 1.00, 2: 1.05, 3: 1.10, 4: 1.15, 5: 1.20, 6: 1.30 },
-  4: { 1: 1.00, 2: 1.07, 3: 1.14, 4: 1.22, 5: 1.30, 6: 1.42 },
+  1: { 0: 0.90, 1: 1.00, 2: 1.03, 3: 1.06, 4: 1.09, 5: 1.13, 6: 1.18 },
+  2: { 0: 0.90, 1: 1.00, 2: 1.04, 3: 1.08, 4: 1.12, 5: 1.17, 6: 1.24 },
+  3: { 0: 0.90, 1: 1.00, 2: 1.05, 3: 1.10, 4: 1.15, 5: 1.20, 6: 1.30 },
+  4: { 0: 0.90, 1: 1.00, 2: 1.07, 3: 1.14, 4: 1.22, 5: 1.30, 6: 1.42 },
 }
 
 /** 星級解鎖被動數量 */
 export const STAR_PASSIVE_SLOTS: Record<number, number> = {
+  0: 0,
   1: 1,
   2: 2,
   3: 2,
@@ -147,6 +147,7 @@ export const STAR_PASSIVE_SLOTS: Record<number, number> = {
 /** 升星所需碎片 */
 export const STAR_UP_COST: Record<number, number> = {
   // from → to: fragments needed
+  0: 5,     // ★0→★1（防禦性：正常不應出現 0 星）
   1: 10,    // ★1→★2
   2: 20,    // ★2→★3
   3: 40,    // ★3→★4
@@ -185,12 +186,12 @@ export const EQUIPMENT_SLOT_EXPAND = 50
 export const EQUIPMENT_SLOT_COST = 100   // 鑽石
 export const EQUIPMENT_SLOT_MAX = 500
 
-/** 初始星級（依稀有度） */
+/** 初始星級（依稀有度）— 所有英雄從 ★0 開始培養 */
 export const RARITY_INITIAL_STARS: Record<number, number> = {
-  1: 1,  // ★1 rarity → 初始 ★1
-  2: 1,  // ★2 rarity → 初始 ★1
-  3: 2,  // ★3 rarity → 初始 ★2
-  4: 3,  // ★4 rarity → 初始 ★3
+  1: 0,  // ★1 rarity → 初始 ★0
+  2: 0,  // ★2 rarity → 初始 ★0
+  3: 0,  // ★3 rarity → 初始 ★0
+  4: 0,  // ★4 rarity → 初始 ★0
 }
 
 /** 套裝效果定義 */
@@ -316,7 +317,7 @@ export function getStarMultiplier(stars: number, rarity: number = 3): number {
 
 /** 取得星級可用被動數 */
 export function getStarPassiveSlots(stars: number): number {
-  return STAR_PASSIVE_SLOTS[stars] ?? 1
+  return STAR_PASSIVE_SLOTS[stars] ?? 0
 }
 
 /** 取得升星所需碎片 */
@@ -332,7 +333,7 @@ export function canStarUp(currentStars: number, fragmentsOwned: number): boolean
 
 /** 取得初始星級 */
 export function getInitialStars(rarity: number): number {
-  return RARITY_INITIAL_STARS[rarity] ?? 1
+  return RARITY_INITIAL_STARS[rarity] ?? 0
 }
 
 /* ════════════════════════════════════

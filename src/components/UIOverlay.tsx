@@ -21,9 +21,7 @@ function numToRarity(v: unknown): RarityLabel {
   return 'N'
 }
 function initialStars(rarity: RarityLabel): number {
-  if (rarity === 'SSR') return 3
-  if (rarity === 'SR') return 2
-  return 1
+  return 0 // 所有英雄從 ★0 開始
 }
 
 /* ────────────────────────────
@@ -338,7 +336,7 @@ export function ThumbnailList({
           const rcfg = RARITY_CONFIG[rarity]
           const inst = instanceMap.current.get(Number(h.HeroID ?? h.id ?? 0))
           const lvl = inst?.level ?? 1
-          const stars = initialStars(rarity)
+          const stars = inst?.stars ?? 0
 
           return (
             <div
@@ -353,8 +351,8 @@ export function ThumbnailList({
               <div className="thumb-stats">
                 <span className="thumb-level">Lv.{lvl}</span>
                 <span className="thumb-stars">
-                  {Array.from({ length: stars }, (_, si) => (
-                    <span key={si} className="star-filled">★</span>
+                  {Array.from({ length: 6 }, (_, si) => (
+                    <span key={si} className={si < stars ? 'star-filled' : 'star-empty'}>★</span>
                   ))}
                 </span>
               </div>

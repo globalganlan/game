@@ -165,7 +165,14 @@ export function ZombieModel({
 
     const actionName = `${state}_${zombieId}`
     const newAction = actions?.[actionName]
-    if (!newAction) return
+    if (!newAction) {
+      // ★ 動畫缺失時立即通知完成，避免 waitForAction 5s 超時
+      const singleRun = state === 'DEAD' || state === 'ATTACKING' || state === 'HURT'
+      if (singleRun) {
+        onActionDoneRef.current?.(state)
+      }
+      return
+    }
 
     // 單次動作：LoopOnce + clampWhenFinished
     const singleRun = state === 'DEAD' || state === 'ATTACKING' || state === 'HURT'

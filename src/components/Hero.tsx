@@ -118,7 +118,16 @@ export function Hero({
 
 
   useFrame(() => {
-    if (hpDepleted || !meshRef.current) return
+    if (!meshRef.current) return
+
+    // ★ HP 歸零但仍在移動狀態 → 立即觸發 moveDone 避免 waitForMove 5s 超時
+    if (hpDepleted) {
+      if ((isAdvancing || isRetreating) && !moveDoneCalledRef.current) {
+        moveDoneCalledRef.current = true
+        onMoveDoneRef.current?.(uidRef.current)
+      }
+      return
+    }
 
     // 拖曳中：直接跟隨指標
     if (amIDragged() && dragPosRef && dragOffsetRef) {

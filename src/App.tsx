@@ -1011,6 +1011,15 @@ export default function App() {
     setSkillToasts([])
     setElementHints([])
     setPassiveHints([])
+    // ★ 清除殘留的動畫/移動 Promise — 避免上一場的 stale timeout 漏進新戰鬥
+    for (const key of Object.keys(actionResolveRefs.current)) {
+      actionResolveRefs.current[key]?.resolve()
+      delete actionResolveRefs.current[key]
+    }
+    for (const key of Object.keys(moveResolveRefs.current)) {
+      moveResolveRefs.current[key]?.()
+      delete moveResolveRefs.current[key]
+    }
 
     setGameState('IDLE')
     // 收幕
@@ -1021,15 +1030,9 @@ export default function App() {
   const replayBattle = async () => {
     if (battleActionsRef.current.length === 0) { showToast('沒有可回放的戰鬥紀錄'); return }
 
-    setCurtainVisible(true)
-    setCurtainFading(false)
-    setCurtainText('回放準備中...')
-    curtainClosePromiseRef.current = null
-
     const savedActions = [...battleActionsRef.current]
 
-    await waitFrames(2) // 確保幕已不透明
-
+    // 回放使用本地資料，不需遮罩 — 直接重置場景
     // 恢復戰前陣容
     const restored = preBattlePlayerSlotsRef.current.map(slot => {
       if (!slot) return null
@@ -1042,6 +1045,7 @@ export default function App() {
     setTurn(0); turnRef.current = 0
     setDamagePopups([])
     setBattleResult(null)
+    setShowBattleStats(false)
     actorStatesRef.current = {}
     setActorStates({})
     setHitFlashSignals({})
@@ -1051,11 +1055,20 @@ export default function App() {
     setSkillToasts([])
     setElementHints([])
     setPassiveHints([])
+    // ★ 清除殘留的動畫/移動 Promise — 避免上一場的 stale timeout 漏進回放
+    for (const key of Object.keys(actionResolveRefs.current)) {
+      actionResolveRefs.current[key]?.resolve()
+      delete actionResolveRefs.current[key]
+    }
+    for (const key of Object.keys(moveResolveRefs.current)) {
+      moveResolveRefs.current[key]?.()
+      delete moveResolveRefs.current[key]
+    }
+    skipBattleRef.current = false
 
-    closeCurtain()
+    // 等 React commit + 模型掛載就緒（2~3 幀即可，無需遮罩）
+    await waitFrames(3)
 
-    // 等場景渲染就緒再啟動回放
-    await new Promise(r => setTimeout(r, REPLAY_SCENE_SETTLE_MS))
     runBattleLoop(savedActions)
   }
 
@@ -1085,6 +1098,15 @@ export default function App() {
     setElementHints([])
     setPassiveHints([])
     setMenuScreen('none')
+    // ★ 清除殘留的動畫/移動 Promise
+    for (const key of Object.keys(actionResolveRefs.current)) {
+      actionResolveRefs.current[key]?.resolve()
+      delete actionResolveRefs.current[key]
+    }
+    for (const key of Object.keys(moveResolveRefs.current)) {
+      moveResolveRefs.current[key]?.()
+      delete moveResolveRefs.current[key]
+    }
     setGameState('MAIN_MENU')
 
     closeCurtain()
@@ -1122,6 +1144,15 @@ export default function App() {
       setSkillToasts([])
       setElementHints([])
       setPassiveHints([])
+      // ★ 清除殘留的動畫/移動 Promise
+      for (const key of Object.keys(actionResolveRefs.current)) {
+        actionResolveRefs.current[key]?.resolve()
+        delete actionResolveRefs.current[key]
+      }
+      for (const key of Object.keys(moveResolveRefs.current)) {
+        moveResolveRefs.current[key]?.()
+        delete moveResolveRefs.current[key]
+      }
       setGameState('IDLE')
       closeCurtain()
       return
@@ -1162,6 +1193,15 @@ export default function App() {
     setSkillToasts([])
     setElementHints([])
     setPassiveHints([])
+    // ★ 清除殘留的動畫/移動 Promise
+    for (const key of Object.keys(actionResolveRefs.current)) {
+      actionResolveRefs.current[key]?.resolve()
+      delete actionResolveRefs.current[key]
+    }
+    for (const key of Object.keys(moveResolveRefs.current)) {
+      moveResolveRefs.current[key]?.()
+      delete moveResolveRefs.current[key]
+    }
     setGameState('IDLE')
     closeCurtain()
   }
@@ -1192,6 +1232,18 @@ export default function App() {
     setGameState('BATTLE')
     turnRef.current = 1; setTurn(1)
     skipBattleRef.current = false
+
+    // ★ 清除上一場殘留的 Promise/Ref，避免 stale resolve 和 timeout 假警報
+    for (const key of Object.keys(actionResolveRefs.current)) {
+      actionResolveRefs.current[key]?.resolve()
+      delete actionResolveRefs.current[key]
+    }
+    for (const key of Object.keys(moveResolveRefs.current)) {
+      moveResolveRefs.current[key]?.()
+      delete moveResolveRefs.current[key]
+    }
+    flowValidatorRef.current = null
+
     const delay = (ms: number) => skipBattleRef.current ? Promise.resolve() : new Promise<void>((r) => setTimeout(r, ms / speedRef.current))
 
     // ── 建立 BattleHero 陣列 ──
@@ -1241,10 +1293,10 @@ export default function App() {
         level: inst.level,
         exp: inst.exp,
         ascension: inst.ascension,
-        stars: inst.stars ?? 1,
+        stars: inst.stars ?? 0,
         equipment: [],     // TODO: load equipped EquipmentInstance[]
       } : undefined
-      const starLevel = heroInstanceData?.stars ?? 1
+      const starLevel = heroInstanceData?.stars ?? 0
       const heroRarity = Number((p as Record<string, unknown>).Rarity ?? 3)
 
       const bh = createBattleHero(input, 'player', i, activeSkill, passives, starLevel, p._uid, heroInstanceData, heroRarity)
@@ -1284,13 +1336,31 @@ export default function App() {
     setElementHints([])
     setPassiveHints([])
 
+    // ★ 戰鬥開始時立即同步所有英雄的 maxHP / currentHP，
+    //   讓 HealthBar3D 的分母使用 progression 加成後的 maxHP
+    for (const bh of [...playerBH, ...enemyBH]) {
+      const updater = bh.side === 'player' ? updatePlayerSlots : updateEnemySlots
+      updater((prev) => {
+        const ns = [...prev]
+        const entry = ns[bh.slot]
+        if (entry && entry._uid === bh.uid) {
+          ns[bh.slot] = { ...entry, HP: bh.maxHP, currentHP: bh.currentHP }
+        }
+        return ns
+      })
+    }
+
     /* ── Helpers ── */
     const syncHpToSlot = (hero: BattleHero) => {
       const updater = hero.side === 'player' ? updatePlayerSlots : updateEnemySlots
       updater((prev) => {
         const ns = [...prev]
         const entry = ns[hero.slot]
-        if (entry && entry._uid === hero.uid) ns[hero.slot] = { ...entry, currentHP: Math.max(0, hero.currentHP) }
+        if (entry && entry._uid === hero.uid) {
+          // ★ 同時更新 HP（maxHP）作為 HealthBar3D 的分母，
+          //   避免 progression 加成後 maxHP > rawHP 導致 ratio > 1 clamp 為滿血
+          ns[hero.slot] = { ...entry, currentHP: Math.max(0, hero.currentHP), HP: hero.maxHP }
+        }
         return ns
       })
     }
@@ -1325,6 +1395,9 @@ export default function App() {
       if (!skipBattleRef.current) audioManager.playSfx('hit_normal')
       const hero = heroMap.get(targetUid)
       if (!hero) return
+
+      // ★ 角色已被移除（前一次背景死亡已完成 removeSlot）→ 只顯傷害數字，不播動畫
+      if (actorStatesRef.current[targetUid] === 'DEAD') return
 
       if (killed) {
         // 致死攻擊：直接閃紅光 + 扣血 → 死亡動畫（跳過受傷動畫避免往後仰再回正再倒）
@@ -1781,6 +1854,15 @@ export default function App() {
         setActorState(uid, 'IDLE')
       }
     }
+    // ★ 清除所有殘留的動畫/移動 Promise — 避免 5s timeout 假警報
+    for (const key of Object.keys(actionResolveRefs.current)) {
+      actionResolveRefs.current[key]?.resolve()
+      delete actionResolveRefs.current[key]
+    }
+    for (const key of Object.keys(moveResolveRefs.current)) {
+      moveResolveRefs.current[key]?.()
+      delete moveResolveRefs.current[key]
+    }
 
     // dev 模式：戰鬥結束驗證 + 問題報告
     if (import.meta.env.DEV && flowValidatorRef.current) {
@@ -2150,7 +2232,7 @@ export default function App() {
     >
     {/* ── 登入畫面 ── */}
     {!showGame && (
-      <LoginScreen auth={authHook} onEnterGame={() => { audioManager.ensureContext(); setShowGame(true) }} />
+      <LoginScreen auth={authHook} onEnterGame={() => { setShowGame(true) }} />
     )}
 
     {/* 遊戲主體（登入後才渲染） */}
@@ -2173,9 +2255,22 @@ export default function App() {
         shadows
         frameloop="always"
         dpr={responsive.dpr}
+        gl={{ powerPreference: 'default', antialias: true }}
         onCreated={({ gl }) => {
           gl.shadowMap.enabled = true
           gl.shadowMap.type = THREE.PCFShadowMap
+
+          // ── WebGL Context Lost / Restored 處理 ──
+          const canvas = gl.domElement
+          canvas.addEventListener('webglcontextlost', (e) => {
+            e.preventDefault()  // 允許瀏覽器嘗試恢復 context
+            console.warn('[WebGL] Context Lost — waiting for restore…')
+          })
+          canvas.addEventListener('webglcontextrestored', () => {
+            console.info('[WebGL] Context Restored — reinitializing renderer')
+            gl.shadowMap.enabled = true
+            gl.shadowMap.type = THREE.PCFShadowMap
+          })
         }}
       >
         <Suspense fallback={null}>
@@ -2400,29 +2495,7 @@ export default function App() {
       {/* ── HUD ── */}
       <div className="game-hud">
         {turn > 0 && gameState !== 'GAMEOVER' && <div className="hud-round">ROUND {turn}</div>}
-        {/* 玩家資源顯示（戰鬥準備/戰鬥中/結算時隱藏） */}
-        {saveHook.playerData && gameState === 'MAIN_MENU' && (
-          <div className="hud-resources">
-            <span className="hud-gold" title="金幣 — 升級、購買、強化"><CurrencyIcon type="gold" />{saveHook.playerData.save.gold.toLocaleString()}</span>
-            <span className="hud-diamond" title="鑽石 — 召喚、加速、購買稀有道具"><CurrencyIcon type="diamond" />{saveHook.playerData.save.diamond.toLocaleString()}</span>
-            <span className="hud-level">Lv.{saveHook.playerData.save.level}</span>
-            {/* 經驗條 */}
-            {(() => {
-              const lv = saveHook.playerData!.save.level
-              const curExp = saveHook.playerData!.save.exp ?? 0
-              const needed = expToNextLevel(lv)
-              const pct = needed > 0 ? Math.min(100, (curExp / needed) * 100) : 100
-              return (
-                <div className="hud-exp-wrap" title={`EXP ${curExp} / ${needed}`}>
-                  <div className="hud-exp-bar">
-                    <div className="hud-exp-fill" style={{ width: `${pct}%` }} />
-                  </div>
-                  <span className="hud-exp-text">{curExp}/{needed}</span>
-                </div>
-              )
-            })()}
-          </div>
-        )}
+
       </div>
 
       {/* ── 浮動提示 ── */}
