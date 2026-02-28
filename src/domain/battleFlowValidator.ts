@@ -123,13 +123,16 @@ export class BattleFlowValidator {
       )
     }
 
-    // 驗證：攻擊者應該在動作結束後回到 IDLE、DEAD 或 RETREATING（pending retreat）
+    // 驗證：攻擊者應該在動作結束後回到 IDLE、DEAD、RETREATING 或 ATTACKING（pending retreat）
+    // ★ 注意：戰鬥引擎透過 pendingRetreats 延遲後退動畫（與下一個 action 並行），
+    //   因此 onAction 回傳時攻擊者仍在 ATTACKING 是正常行為。
+    //   只有 ADVANCING / HURT 才是真正異常的狀態。
     if (action.type === 'NORMAL_ATTACK' || action.type === 'SKILL_CAST') {
       const attackerUid = action.attackerUid
       const state = this.actorStates.get(attackerUid)
-      if (state && state !== 'IDLE' && state !== 'DEAD' && state !== 'RETREATING') {
+      if (state && state !== 'IDLE' && state !== 'DEAD' && state !== 'RETREATING' && state !== 'ATTACKING') {
         this.addIssue('warn',
-          `After ${action.type}, attacker ${attackerUid} is still in ${state} (expected IDLE, DEAD, or RETREATING)`,
+          `After ${action.type}, attacker ${attackerUid} is in unexpected state ${state}`,
         )
       }
     }

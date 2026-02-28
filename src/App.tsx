@@ -482,8 +482,11 @@ export default function App() {
     setActorStates({})
     actorStatesRef.current = {}
     moveTargetsRef.current = {}
-    setSpeed(1)
-    speedRef.current = 1
+    // ★ 戰鬥倍速從 localStorage 恢復（使用者偏好應跨局保留）
+    const savedSpd = Number(localStorage.getItem('battleSpeed'))
+    const restoredSpd = savedSpd && [1, 2, 4, 8].includes(savedSpd) ? savedSpd : 1
+    setSpeed(restoredSpd)
+    speedRef.current = restoredSpd
     skipBattleRef.current = false
     skillToastIdRef.current = 0
     elementHintIdRef.current = 0
@@ -843,7 +846,7 @@ export default function App() {
       // ★ 從 localStorage 恢復戰鬥倍速（非阻塞）
       try {
         const savedSpeed = Number(localStorage.getItem('battleSpeed'))
-        if (savedSpeed && [1, 2, 4, 6].includes(savedSpeed)) {
+        if (savedSpeed && [1, 2, 4, 8].includes(savedSpeed)) {
           setSpeed(savedSpeed)
         }
       } catch (e) { console.warn('[speed restore]', e) }
@@ -1758,13 +1761,6 @@ export default function App() {
       if (import.meta.env.DEV && flowValidatorRef.current) flowValidatorRef.current.afterAction(act)
     }
 
-    // dev 模式：戰鬥結束驗證 + 問題報告
-    if (import.meta.env.DEV && flowValidatorRef.current) {
-      flowValidatorRef.current.validateEnd()
-      flowValidatorRef.current.report()
-      flowValidatorRef.current = null
-    }
-
     // 等待背景動畫（後退 + 死亡），但設速度感知上限，避免最後一擊全滅後長等
     const allPending: Promise<void>[] = [...backgroundAnims]
     if (pendingRetreats.size > 0) {
@@ -1778,12 +1774,34 @@ export default function App() {
       ])
     }
 
+    // ★ Promise.race 可能在後退動畫完成前就結束（timeout 勝出），
+    //   強制將仍在 ATTACKING/RETREATING 的存活角色歸位為 IDLE
+    for (const [uid, st] of Object.entries(actorStatesRef.current)) {
+      if (st === 'ATTACKING' || st === 'RETREATING') {
+        setActorState(uid, 'IDLE')
+      }
+    }
+
+    // dev 模式：戰鬥結束驗證 + 問題報告
+    if (import.meta.env.DEV && flowValidatorRef.current) {
+      flowValidatorRef.current.validateEnd()
+      flowValidatorRef.current.report()
+      flowValidatorRef.current = null
+    }
+
     // 播放結束後保存完整 actions（供回放 + 統計使用）
     if (!isReplay) battleActionsRef.current = allActions
 
     // ── Phase C：應用最終狀態到 slot（確保 UI 正確顯示勝/敗） ──
     for (const [, bh] of heroMap) {
       if (bh.currentHP <= 0) {
+        // ★ 清除待處理的動作回呼 — Phase C 可能在 allPending race 後提前移除 slot，
+        //   元件卸載導致動畫回呼遺失，waitForAction 會超時。主動 resolve 避免 5s 假警報。
+        const pending = actionResolveRefs.current[bh.uid]
+        if (pending) {
+          pending.resolve()
+          delete actionResolveRefs.current[bh.uid]
+        }
         // 確保死亡角色從 slot 中移除
         const updater = bh.side === 'player' ? updatePlayerSlots : updateEnemySlots
         updater((prev) => {
