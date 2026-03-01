@@ -1,9 +1,9 @@
 # 戰鬥系統 Spec
 
-> 版本：v2.7 ｜ 狀態：🟢 已實作
-> 最後更新：2026-02-28
+> 版本：v2.9 ｜ 狀態：🟢 已實作
+> 最後更新：2026-03-01
 > 負責角色：🎯 GAME_DESIGN → 🔧 CODING
-> 原始碼：`src/domain/battleEngine.ts`（前端邏輯）、`gas/battleEngine.js`（後端引擎）、`src/App.tsx`（3D 演出整合）
+> 原始碼：`src/domain/battleEngine.ts`（前端邏輯）、`gas/battleEngine.js`（後端引擎）、`src/App.tsx`（3D 演出整合）、`gas/程式碼.js`（`handleCompleteBattle_` 伺服器端結算）
 
 ## 概述
 
@@ -29,7 +29,9 @@
 |------|----------|--------|------|
 | 遊戲狀態機 | 1 | `src/App.tsx` useState | ✅ |
 | 陣型系統 | 2 | `src/App.tsx` SLOT_POSITIONS | ✅ |
-| 戰鬥迴圈 | 3 | `gas/battleEngine.js` `runBattleEngine_()` + `src/domain/battleEngine.ts` `runBattleCollect()`（fallback） | ✅ |
+| 戰鬥迴圈 | 3 | `src/domain/battleEngine.ts` `runBattleCollect()`（本地優先）+ `gas/battleEngine.js` `runBattleEngine_()`（背景校驗） | ✅ |
+| 反作弊校驗 | 3.3 | `src/services/antiCheatService.ts` + `gas/battleEngine.js` `handleVerifyBattle_()` + `src/domain/seededRng.ts` | ✅ |
+| 伺服器端結算 | 3.4 | `gas/程式碼.js` `handleCompleteBattle_()` + `src/services/progressionService.ts` `completeBattle()` | ✅ |
 | 能量系統 | 4 | `src/domain/energySystem.ts` | ✅ |
 | Buff/Debuff | 5 | `src/domain/buffSystem.ts` | ✅ |
 | 被動觸發 | 6 | `src/domain/battleEngine.ts` `triggerPassives()` | ✅ |
@@ -809,3 +811,5 @@ App.tsx
 | v2.5 | 2026-02-28 | **戰鬥跳過重構**：新增 `runBattleCollect()` 同步計算模式（Phase A 計算 → Phase B 回放 → Phase C 最終同步），修復跳過後敗方英雄殘留+音效爆發；`AudioManager.stopAllSfx()` 即時靜音；所有 SFX 加 skip 守衛 |
 | v2.6 | 2026-02-28 | **後端戰鬥引擎**：將戰鬥引擎移植到 GAS（`gas/battleEngine.js` ~650 行），前端 POST `run-battle` 取得 `{ winner, actions[] }`，僅負責 3D 動畫回放；失敗時自動降級為本地 `runBattleCollect()` |
 | v2.7 | 2026-03-01 | **能量滿即施放大招**：重構 `processInterruptUltimates` 移除 `excludeUid` 改用 `alreadyActedUids` Set，每個 action 後掃描**所有**角色（含攻擊者自己、被攻擊者），能量滿即插入大招；前後端（`battleEngine.ts` + `gas/battleEngine.js`）同步修正；GAS POST @68、GET @69；**致死攻擊不阻塞**：死亡動畫推入 `backgroundAnims`（不 await），攻擊者立刻後退 |
+| v2.8 | 2026-03-01 | **反作弊校驗**：新增 Mulberry32 seeded PRNG（`src/domain/seededRng.ts`），前端 `runBattleCollect()` 接受 seed 參數暫時覆蓋 `Math.random`；GAS 新增 `verify-battle` action（`handleVerifyBattle_`），以相同 seed 重現戰鬥比對 winner；`antiCheatService.ts` 在 Phase A 後 fire-and-forget 背景驗證，結算前 await 結果，不一致時覆寫 winner 並 toast 警告；GAS 記錄可疑紀錄至 `ANTICHEAT_LOG` ScriptProperties；GAS POST @80、GET @81 |
+| v2.9 | 2026-03-01 | **伺服器端獎勵計算**：新增 `handleCompleteBattle_`（`gas/程式碼.js`），整合反作弊校驗 + 伺服器端獎勵計算（gold/exp/diamond）+ 升等（`expToNextLevel_`）+ 進度寫入；`save-progress` 封鎖 gold/diamond/exp/level/storyProgress/towerFloor；前端 `completeBattle()`（`progressionService.ts`）背景呼叫，動畫播放期間不阻塞；涵蓋 story/tower/daily/pvp/boss 五模式；GAS POST @82、GET @83 |

@@ -65,8 +65,11 @@ import type { Vector3Tuple } from 'three'
 import type { BattleHero, BattleAction, SkillTemplate, DamageResult } from './domain'
 import type { Element as DomainElement } from './domain/types'
 import { BattleFlowValidator } from './domain/battleFlowValidator'
-import { runBattleCollect, createBattleHero } from './domain'
-import { runBattleRemote } from './services/battleService'
+import { runBattleCollect, createBattleHero, generateBattleSeed } from './domain'
+// runBattleRemote 保留但不再主動呼叫（本地引擎更快，GAS 冷啟動太慢）
+// import { runBattleRemote } from './services/battleService'
+import { startBattleVerification, type VerifyResult } from './services/antiCheatService'
+import { completeBattle, type CompleteBattleResult } from './services/progressionService'
 import { loadAllGameData, getHeroSkillSet, toElement, clearGameDataCache } from './services'
 import type { RawHeroInput, HeroInstanceData } from './domain'
 import {
@@ -588,6 +591,10 @@ export default function App() {
   const moveTargetsRef = useRef<Record<string, Vector3Tuple>>({})
   /** 戰鬥流程驗證器（僅 dev 模式啟用） */
   const flowValidatorRef = useRef<BattleFlowValidator | null>(null)
+  /** 反作弊校驗結果（背景非同步取得） */
+  const antiCheatRef = useRef<{ promise: Promise<VerifyResult>; abort: () => void } | null>(null)
+  /** 戰鬥結算 Promise（complete-battle：反作弊 + 伺服器端獎勵計算） */
+  const completeBattleRef = useRef<Promise<CompleteBattleResult> | null>(null)
   const setActorState = (id: string, s: ActorState) => {
     // dev 模式：驗證狀態轉換合法性
     if (import.meta.env.DEV && flowValidatorRef.current) {
@@ -977,15 +984,7 @@ export default function App() {
   }, [showGame, gameState, menuScreen, battleResult])
 
   /* ── 重試（在同一關卡重置到選擇上陣階段） ── */
-  const retryBattle = async () => {
-    // 拉起過場幕 → 等 DOM commit → 重置狀態 → 收幕
-    setCurtainVisible(true)
-    setCurtainFading(false)
-    setCurtainText('重新準備中...')
-    curtainClosePromiseRef.current = null
-
-    await waitFrames(2) // 確保幕已不透明
-
+  const retryBattle = () => {
     // 恢復戰前玩家陣容（HP 完全回復、死亡英雄復活）
     const restored = preBattlePlayerSlotsRef.current.map(slot => {
       if (!slot) return null
@@ -1022,8 +1021,6 @@ export default function App() {
     }
 
     setGameState('IDLE')
-    // 收幕
-    closeCurtain()
   }
 
   /* ── 戰鬥回放 ── */
@@ -1073,14 +1070,7 @@ export default function App() {
   }
 
   /* ── 回大廳（戰敗後返回主選單） ── */
-  const backToLobby = async () => {
-    setCurtainVisible(true)
-    setCurtainFading(false)
-    setCurtainText('返回大廳...')
-    curtainClosePromiseRef.current = null
-
-    await waitFrames(2) // 確保幕已不透明
-
+  const backToLobby = () => {
     // 清空戰場
     updatePlayerSlots(() => Array(6).fill(null))
     updateEnemySlots(() => Array(6).fill(null))
@@ -1108,8 +1098,6 @@ export default function App() {
       delete moveResolveRefs.current[key]
     }
     setGameState('MAIN_MENU')
-
-    closeCurtain()
   }
 
   /* ── 下一關（勝利後推進） ── */
@@ -1752,15 +1740,21 @@ export default function App() {
       }
     }
 
-    // ── Phase A：由後端計算戰鬥結果 ──
+    // ── Phase A：計算戰鬥結果（本地優先，毫秒級完成） ──
     setBattleCalculating(true)
     let allActions: BattleAction[]
     let winner: 'player' | 'enemy' | 'draw'
     // needsHpSync: heroMap 的 HP 未被引擎直接修改，需在播放動畫前手動同步
-    //  - 遠端戰鬥：伺服器計算結果，本地 heroMap 未變動 → true
     //  - 回放模式：heroMap 是重新建立的物件 → true
-    //  - 本地降級：runBattleCollect 直接修改 heroMap → false
+    //  - 本地計算：runBattleCollect 直接修改 heroMap → false
     let needsHpSync = false
+
+    // ── 清除上一場的反作弊校驗 ──
+    if (antiCheatRef.current) {
+      antiCheatRef.current.abort()
+      antiCheatRef.current = null
+    }
+    completeBattleRef.current = null
 
     if (replayActions) {
       allActions = replayActions
@@ -1768,19 +1762,45 @@ export default function App() {
       winner = endAct?.winner ?? 'draw'
       needsHpSync = true
     } else {
-      // 後端引擎計算 → 失敗時降級為本地計算
-      try {
-        const result = await runBattleRemote(playerBH, enemyBH, 50)
-        allActions = result.actions
-        winner = result.winner
-        needsHpSync = true  // 伺服器計算，本地 heroMap HP 未更新
-      } catch (err) {
-        console.warn('[Battle] 後端引擎呼叫失敗，降級為本地計算:', err)
-        const result = await runBattleCollect(playerBH, enemyBH, { maxTurns: 50 })
-        allActions = result.actions
-        winner = result.winner
-        needsHpSync = false  // 本地引擎已直接修改 heroMap
-      }
+      // ── 產生確定性種子 & 快照（反作弊校驗 + 伺服器端獎勵計算用） ──
+      const battleSeed = generateBattleSeed()
+      // 深拷貝戰前的 BattleHero 快照（runBattleCollect 會修改原物件）
+      const snapshotPlayers = JSON.parse(JSON.stringify(playerBH)) as BattleHero[]
+      const snapshotEnemies = JSON.parse(JSON.stringify(enemyBH)) as BattleHero[]
+
+      // 本地引擎計算（毫秒級完成，無需等待伺服器）
+      const result = await runBattleCollect(playerBH, enemyBH, { maxTurns: 50, seed: battleSeed })
+      allActions = result.actions
+      winner = result.winner
+      needsHpSync = false  // 本地引擎已直接修改 heroMap
+
+      // ── 計算星級（需在快照被覆蓋前，用戰鬥結果計算） ──
+      const totalHeroCount = playerSlots.filter(Boolean).length
+      // 從戰鬥結果中取得存活英雄數量
+      const survivingCount = playerBH.filter(h => h.currentHP > 0).length
+      const localStars = calculateStarRating(totalHeroCount, survivingCount)
+
+      // ── 提取 daily 副本難度 ──
+      const dungeonTier = stageMode === 'daily' ? (stageId.split('_').pop() || 'normal') : undefined
+
+      // ── 背景呼叫 complete-battle：反作弊校驗 + 伺服器端獎勵計算 ──
+      // 動畫播放期間在背景執行，不阻塞 UI
+      completeBattleRef.current = completeBattle({
+        stageMode, stageId,
+        starsEarned: localStars,
+        battleSeed,
+        localWinner: winner,
+        players: snapshotPlayers,
+        enemies: snapshotEnemies,
+        maxTurns: 50,
+        dungeonTier,
+      })
+
+      // ── 保留舊版反作弊校驗（向下相容，非必要時可移除） ──
+      antiCheatRef.current = startBattleVerification(
+        snapshotPlayers, snapshotEnemies, battleSeed, winner, 50,
+      )
+
       // ★ 注意：不可在此設 battleActionsRef.current = allActions
       // 因為 onAction 的 for-of 迭代 allActions，如果兩者共用同一參考，
       // 任何 push 都會讓陣列在迭代中增長 → 無限迴圈
@@ -1957,103 +1977,126 @@ export default function App() {
     }
     setBattleStats(stats)
 
+    // ── 伺服器端結算：complete-battle 完全背景執行，不阻塞 UI ──
+    // 獎勵已由 GAS 寫入 Sheet，不需要等回傳
+    // 反作弊：若伺服器判定不一致，背景靜默記錄（下次 load-save 會讀到正確值）
+    if (!isReplay && completeBattleRef.current) {
+      const bgPromise = completeBattleRef.current
+      completeBattleRef.current = null
+      // fire-and-forget：背景處理伺服器結果
+      bgPromise.then(cbResult => {
+        if (cbResult?.success && !cbResult.verified) {
+          console.error(
+            `[AntiCheat] 伺服器判定不一致：本地=${winner} → 伺服器=${cbResult.serverWinner}`
+          )
+          // 伺服器已寫入正確獎勵到 Sheet，下次 load-save 自然修正
+        }
+      }).catch(() => { /* 網路錯誤，靜默處理 */ })
+    }
+    // 清除舊版反作弊（已整合至 complete-battle）
+    if (antiCheatRef.current) {
+      antiCheatRef.current.abort()
+      antiCheatRef.current = null
+    }
+
     // ── 結算 ──
     if (winner === 'player') {
       setBattleResult('victory')
 
       if (!isReplay) {
-        // ── 計算獎勵（僅正式戰鬥才發放） ──
-        let rewards: StageReward = { exp: 0, gold: 0, diamond: 0 }
+        // ── 獎勵計算：伺服器已經透過 complete-battle 計算並寫入，
+        //    這裡做本地計算同步 localStorage 快取 + UI 即時顯示 ──
+        let rewardGold = 0, rewardExp = 0, rewardDiamond = 0
         let first = false
+        let stars: 1 | 2 | 3 = 1
         let resourceSpeed: { goldPerHour: number; expItemsPerHour: number } | null = null
+        let leveledUp = false
+        let newLevel = saveHook.playerData?.save.level ?? 1
+
+        // ── 本地計算獎勵（與伺服器公式一致，用於即時 UI） ──
+        let rewards: StageReward = { exp: 0, gold: 0, diamond: 0 }
 
         if (stageMode === 'story') {
           const cfg = getStoryStageConfig(stageId)
           const progress = saveHook.playerData?.save.storyProgress ?? { chapter: 1, stage: 1 }
           first = isFirstClear(stageId, progress)
           rewards = first ? cfg.firstClearRewards : cfg.rewards
-
-          // 推進劇情進度到下一關
-          if (first) {
-            const nextId = getNextStageId(stageId)
-            if (nextId) {
-              const np = nextId.split('-').map(Number)
-              saveHook.doUpdateStory(np[0] || 1, np[1] || 1)
-            } else {
-              // 最後一關通關，進度設到超越最後關
-              saveHook.doUpdateStory(4, 1)
-            }
-            // 更新資源計時器綁定到最新通關
-            saveHook.doUpdateProgress({ resourceTimerStage: stageId })
-          }
-          // 計算當前關卡的資源產出速度
           const timerStage = first ? stageId : (saveHook.playerData?.save.resourceTimerStage || stageId)
           resourceSpeed = getTimerYield(timerStage)
         } else if (stageMode === 'tower') {
           const floor = Number(stageId) || 1
           const cfg = getTowerFloorConfig(floor)
           rewards = cfg.rewards
-          saveHook.doUpdateProgress({ towerFloor: floor + 1 })
         } else if (stageMode === 'pvp') {
-          // PvP — 依據劇情進度計算獎勵
           const progress = saveHook.playerData?.save.storyProgress ?? { chapter: 1, stage: 1 }
           const linearProgress = (progress.chapter - 1) * 8 + progress.stage
           rewards = getPvPReward(linearProgress)
         } else if (stageMode === 'boss') {
-          // Boss — 依據總傷害量計算獎勵等級
           const totalDamage = Object.values(stats)
             .filter((_, i) => i < playerSlots.filter(Boolean).length)
             .reduce((sum, s) => sum + s.damageDealt, 0)
           rewards = getBossReward(stageId, totalDamage)
         } else {
-          // daily — 使用副本自身的獎勵設定
           const cfg = getDailyDungeonConfig(stageId)
           rewards = cfg ? cfg.difficulty.rewards : { exp: 0, gold: 0 }
         }
 
-        // 抽取掉落物
-        const drops = mergeDrops(rollDrops(rewards))
+        rewardGold = rewards.gold
+        rewardExp = rewards.exp
+        rewardDiamond = rewards.diamond ?? 0
 
-        // 計算星級
+        // 計算星級（本地值，用於 UI 顯示）
         const totalHeroes = playerSlots.filter(Boolean).length
         const survivingHeroes = playerSlots.filter(s => s && (s.currentHP ?? 0) > 0).length
-        const stars = calculateStarRating(totalHeroes, survivingHeroes)
+        stars = calculateStarRating(totalHeroes, survivingHeroes) as 1 | 2 | 3
 
-        // 儲存關卡星級（只保留最佳）
-        if (stageMode === 'story') {
-          saveHook.doUpdateStageStars(stageId, stars)
-        }
+        // 抽取掉落物（隨機掉落目前仍由前端計算）
+        const drops = mergeDrops(rollDrops(rewards))
 
-        // 發放獎勵到存檔
-        const currentGold = saveHook.playerData?.save.gold ?? 0
-        const currentDiamond = saveHook.playerData?.save.diamond ?? 0
+        // ── 本地帶出經驗升等（用於 UI 即時顯示） ──
         const currentExp = saveHook.playerData?.save.exp ?? 0
-        let newExp = currentExp + rewards.exp
-        let newLevel = saveHook.playerData?.save.level ?? 1
-
-        // 帳號升等檢查
-        let leveledUp = false
+        let newExp = currentExp + rewardExp
+        newLevel = saveHook.playerData?.save.level ?? 1
         while (newExp >= expToNextLevel(newLevel)) {
           newExp -= expToNextLevel(newLevel)
           newLevel++
           leveledUp = true
         }
 
+        // ── 本地狀態同步（localStorage 快取，伺服器已透過 complete-battle 寫入正確值） ──
+        // save-progress 已封鎖 gold/diamond/exp/level，這裡只做 localStorage 快取更新
         const progressChanges: Record<string, number> = {
-          gold: currentGold + rewards.gold,
-          diamond: currentDiamond + (rewards.diamond ?? 0),
+          gold: (saveHook.playerData?.save.gold ?? 0) + rewardGold,
+          diamond: (saveHook.playerData?.save.diamond ?? 0) + rewardDiamond,
           exp: newExp,
         }
         if (leveledUp) progressChanges.level = newLevel
         saveHook.doUpdateProgress(progressChanges)
 
+        // 推進劇情進度（本地快取，伺服器已在 complete-battle 中寫入）
+        if (stageMode === 'story' && first) {
+          const nextId = getNextStageId(stageId)
+          if (nextId) {
+            const np = nextId.split('-').map(Number)
+            saveHook.doUpdateStory(np[0] || 1, np[1] || 1)
+          } else {
+            saveHook.doUpdateStory(4, 1)
+          }
+          saveHook.doUpdateProgress({ resourceTimerStage: stageId })
+        }
+
+        // 儲存關卡星級（本地快取）
+        if (stageMode === 'story') {
+          saveHook.doUpdateStageStars(stageId, stars)
+        }
+
         // 掉落物即時寫入本地背包
         if (drops.length > 0) addItemsLocally(drops)
 
         setVictoryRewards({
-          exp: rewards.exp,
-          gold: rewards.gold,
-          diamond: rewards.diamond ?? 0,
+          exp: rewardExp,
+          gold: rewardGold,
+          diamond: rewardDiamond,
           drops,
           stars,
           isFirst: first,
@@ -2190,26 +2233,30 @@ export default function App() {
   const handleMenuNavigate = (screen: MenuScreen) => { setMenuScreen(screen) }
   const handleBackToMenu = () => { setMenuScreen('none') }
   const handleStageSelect = async (mode: 'story' | 'tower' | 'daily' | 'pvp' | 'boss', sid: string) => {
-    // 拉起過場幕 → 等 DOM commit → 切換敵方陣型 → 收幕
-    setCurtainVisible(true)
-    setCurtainFading(false)
     const displayName = mode === 'tower' ? `第 ${sid} 層`
       : mode === 'daily' ? getDailyDungeonDisplayName(sid)
       : mode === 'pvp' ? '競技場對戰'
       : mode === 'boss' ? `Boss 挑戰`
       : `關卡 ${sid}`
-    setCurtainText(`準備${mode === 'tower' ? '挑戰' : ''}${displayName}...`)
-    curtainClosePromiseRef.current = null
 
-    await waitFrames(2) // 確保幕已不透明
+    // 場景主題不同時才拉過場幕（避免模式切換時看到閃爍）
+    const needsCurtain = mode !== stageMode
+    if (needsCurtain) {
+      setCurtainVisible(true)
+      setCurtainFading(false)
+      setCurtainText(`準備${mode === 'tower' ? '挑戰' : ''}${displayName}...`)
+      curtainClosePromiseRef.current = null
+      await waitFrames(2)
+    }
 
     setStageMode(mode)
     setStageId(sid)
     updateEnemySlots(() => buildEnemySlotsFromStage(mode, sid, heroesList))
-    restoreFormationFromSave() // 若 playerSlots 為空，從存檔恢復陣型
+    restoreFormationFromSave()
     setMenuScreen('none')
     setGameState('IDLE')
-    closeCurtain()
+
+    if (needsCurtain) closeCurtain()
     showToast(`已選擇: ${displayName}`)
   }
 

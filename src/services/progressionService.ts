@@ -1,7 +1,7 @@
 /**
  * progressionService — 養成系統前端服務
  *
- * 負責：英雄升級、突破、升星、裝備強化/鍛造等操作
+ * 負責：英雄升級、突破、升星、裝備強化/鍛造、戰鬥結算等操作
  *
  * 對應 Spec: specs/progression.md v0.2
  */
@@ -9,6 +9,7 @@
 import { getAuthState } from './authService'
 import { fireOptimisticAsync } from './optimisticQueue'
 import type { EquipmentInstance } from '../domain/progressionSystem'
+import type { BattleHero } from '../domain/types'
 
 const POST_URL =
   'https://script.google.com/macros/s/AKfycbzy3EHTCyTYjA9j1CvJGvWwDM_RrkCuzNYkMhP7T9DTJ6V6g7Sodrlo4uv3h9yx0HLdsg/exec'
@@ -166,7 +167,81 @@ export async function dismantleEquipment(
 }
 
 /* ════════════════════════════════════
-   關卡 & 抽卡
+   戰鬥結算（統一入口）
+   ════════════════════════════════════ */
+
+export interface CompleteBattleParams {
+  stageMode: 'story' | 'tower' | 'daily' | 'pvp' | 'boss'
+  stageId: string
+  starsEarned: number
+  battleSeed: number
+  localWinner: string
+  players: BattleHero[]
+  enemies: BattleHero[]
+  maxTurns?: number
+  dungeonTier?: string
+}
+
+export interface CompleteBattleResult {
+  success: boolean
+  error?: string
+  verified: boolean
+  serverWinner: string
+  rewards: {
+    gold: number
+    exp: number
+    diamond: number
+    items: { itemId: string; quantity: number }[]
+  }
+  isFirstClear: boolean
+  starsEarned: number
+  newLevel?: number
+  leveledUp?: boolean
+  newStoryProgress?: { chapter: number; stage: number }
+  newFloor?: number
+}
+
+/**
+ * 統一戰鬥結算 — 由前端在戰鬥結束後呼叫
+ * GAS 會：
+ *  1. 用相同 seed 重跑戰鬥做反作弊校驗
+ *  2. 驗證玩家進度（防止跳關）
+ *  3. 計算獎勵並寫入伺服器存檔
+ *  4. 回傳獎勵資料
+ */
+export async function completeBattle(params: CompleteBattleParams): Promise<CompleteBattleResult> {
+  const { serverResult } = fireOptimisticAsync<CompleteBattleResult>(
+    'complete-battle',
+    {
+      stageMode: params.stageMode,
+      stageId: params.stageId,
+      starsEarned: params.starsEarned,
+      battleSeed: params.battleSeed,
+      localWinner: params.localWinner,
+      players: params.players,
+      enemies: params.enemies,
+      maxTurns: params.maxTurns ?? 50,
+      dungeonTier: params.dungeonTier,
+    },
+  )
+  const res = await serverResult
+  return {
+    success: res.success,
+    error: res.error,
+    verified: res.verified ?? false,
+    serverWinner: res.serverWinner ?? params.localWinner,
+    rewards: res.rewards || { gold: 0, exp: 0, diamond: 0, items: [] },
+    isFirstClear: res.isFirstClear || false,
+    starsEarned: res.starsEarned || 1,
+    newLevel: res.newLevel,
+    leveledUp: res.leveledUp,
+    newStoryProgress: res.newStoryProgress,
+    newFloor: res.newFloor,
+  }
+}
+
+/* ════════════════════════════════════
+   關卡 & 抽卡（舊版，保留相容）
    ════════════════════════════════════ */
 
 export interface StageCompleteResult {

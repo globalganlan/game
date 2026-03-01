@@ -1,6 +1,6 @@
 # 存檔系統 Spec
 
-> 版本：v1.3 ｜ 狀態：🟢 已實作
+> 版本：v1.4 ｜ 狀態：🟢 已實作
 > 最後更新：2026-03-01
 > 負責角色：🎯 GAME_DESIGN → 🔧 CODING
 
@@ -87,9 +87,11 @@
 
 ### save-progress 白名單欄位
 
-`['displayName', 'level', 'exp', 'diamond', 'gold', 'resourceTimerStage', 'resourceTimerLastCollect', 'towerFloor', 'storyProgress', 'formation']`
+`['displayName', 'resourceTimerStage', 'resourceTimerLastCollect', 'formation']`
 
-> `storyProgress` / `formation` 若非 string 會自動 `JSON.stringify()`。
+> **v1.4 安全強化**：`gold / diamond / exp / level / storyProgress / towerFloor` 已從白名單移除。
+> 這些敏感欄位只能透過 `complete-battle`、`shop-buy`、`gacha-pull` 等受驗證的 GAS 操作修改。
+> `formation` 若非 string 會自動 `JSON.stringify()`。
 
 ---
 

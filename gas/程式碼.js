@@ -328,8 +328,15 @@ function doPost(e) {
       case 'sell-items':
         result = handleSellItems_(body);
         break;
+      case 'shop-buy':
+        result = executeWithIdempotency_(body.opId, resolvePlayerId_(body.guestToken), 'shop-buy', function() {
+          return handleShopBuy_(body);
+        });
+        break;
       case 'use-item':
-        result = handleUseItem_(body);
+        result = executeWithIdempotency_(body.opId, resolvePlayerId_(body.guestToken), 'use-item', function() {
+          return handleUseItem_(body);
+        });
         break;
       case 'equip-item':
         result = handleEquipItem_(body);
@@ -341,7 +348,9 @@ function doPost(e) {
         result = handleLockEquipment_(body);
         break;
       case 'expand-inventory':
-        result = handleExpandInventory_(body);
+        result = executeWithIdempotency_(body.opId, resolvePlayerId_(body.guestToken), 'expand-inventory', function() {
+          return handleExpandInventory_(body);
+        });
         break;
       // ── Progression ──
       case 'upgrade-hero':
@@ -360,23 +369,38 @@ function doPost(e) {
         });
         break;
       case 'enhance-equipment':
-        result = handleEnhanceEquipment_(body);
+        result = executeWithIdempotency_(body.opId, resolvePlayerId_(body.guestToken), 'enhance-equipment', function() {
+          return handleEnhanceEquipment_(body);
+        });
         break;
       case 'forge-equipment':
         result = handleForgeEquipment_(body);
         break;
       case 'dismantle-equipment':
-        result = handleDismantleEquipment_(body);
+        result = executeWithIdempotency_(body.opId, resolvePlayerId_(body.guestToken), 'dismantle-equipment', function() {
+          return handleDismantleEquipment_(body);
+        });
         break;
-      // ── Stage ──
+      // ── Stage / Battle ──
+      case 'complete-battle':
+        result = executeWithIdempotency_(body.opId, resolvePlayerId_(body.guestToken), 'complete-battle', function() {
+          return handleCompleteBattle_(body);
+        });
+        break;
       case 'complete-stage':
-        result = handleCompleteStage_(body);
+        result = executeWithIdempotency_(body.opId, resolvePlayerId_(body.guestToken), 'complete-stage', function() {
+          return handleCompleteStage_(body);
+        });
         break;
       case 'complete-tower':
-        result = handleCompleteTower_(body);
+        result = executeWithIdempotency_(body.opId, resolvePlayerId_(body.guestToken), 'complete-tower', function() {
+          return handleCompleteTower_(body);
+        });
         break;
       case 'complete-daily':
-        result = handleCompleteDaily_(body);
+        result = executeWithIdempotency_(body.opId, resolvePlayerId_(body.guestToken), 'complete-daily', function() {
+          return handleCompleteDaily_(body);
+        });
         break;
       // ── Gacha ──
       case 'gacha-pull':
@@ -434,6 +458,9 @@ function doPost(e) {
       // ── Battle ──
       case 'run-battle':
         result = handleRunBattle_(body);
+        break;
+      case 'verify-battle':
+        result = handleVerifyBattle_(body);
         break;
       // ── Cache ──
       case 'invalidate-cache':
@@ -1251,8 +1278,8 @@ function handleInitSave_(params) {
 }
 
 /**
- * 增量存檔
- * POST { action: "save-progress", guestToken, changes: { gold, diamond, exp, level, ... } }
+ * 增量存檔（敏感欄位已移除 — gold/diamond/exp/level 改由 complete-battle 伺服器端計算）
+ * POST { action: "save-progress", guestToken, changes: { displayName, formation, ... } }
  */
 function handleSaveProgress_(params) {
   var playerId = resolvePlayerId_(params.guestToken);
@@ -1264,15 +1291,17 @@ function handleSaveProgress_(params) {
   var row = findRowByColumn_(sheet, 'playerId', playerId);
   if (row === 0) return { success: false, error: 'save_not_found' };
 
-  var allowedFields = ['displayName','level','exp','diamond','gold',
-    'resourceTimerStage','resourceTimerLastCollect','towerFloor',
-    'storyProgress','formation'];
+  // ⚠ gold / diamond / exp / level / storyProgress / towerFloor 已移除 —
+  //   這些值只能透過 complete-battle、shop-buy、gacha-pull 等受驗證的操作修改
+  var allowedFields = ['displayName',
+    'resourceTimerStage','resourceTimerLastCollect',
+    'formation'];
 
   Object.keys(changes).forEach(function(key) {
     if (allowedFields.indexOf(key) === -1) return;
     var val = changes[key];
     // JSON 欄位自動序列化
-    if (key === 'storyProgress' || key === 'formation') {
+    if (key === 'formation') {
       val = typeof val === 'string' ? val : JSON.stringify(val);
     }
     writeCell_(sheet, row, key, val);
@@ -1601,6 +1630,75 @@ function handleSellItems_(params) {
   }
 
   return { success: true, goldGained: totalGold };
+}
+
+/** 商店購買（扣貨幣 + 發放道具） */
+var SHOP_CATALOG_ = {
+  // -- 每日商店 --
+  'daily_exp_s':      { price: 1000, currency: 'gold', rewards: [{ itemId: 'exp_core_s', quantity: 5 }], dailyLimit: 10 },
+  'daily_exp_m':      { price: 5000, currency: 'gold', rewards: [{ itemId: 'exp_core_m', quantity: 3 }], dailyLimit: 5 },
+  'daily_exp_l':      { price: 20,   currency: 'diamond', rewards: [{ itemId: 'exp_core_l', quantity: 1 }], dailyLimit: 3 },
+  'daily_enhance_s':  { price: 2000, currency: 'gold', rewards: [{ itemId: 'eqm_enhance_s', quantity: 5 }], dailyLimit: 10 },
+  // -- 素材商店 --
+  'mat_class_power':     { price: 10000, currency: 'gold', rewards: [{ itemId: 'asc_class_power', quantity: 1 }], dailyLimit: 0 },
+  'mat_class_agility':   { price: 10000, currency: 'gold', rewards: [{ itemId: 'asc_class_agility', quantity: 1 }], dailyLimit: 0 },
+  'mat_class_defense':   { price: 10000, currency: 'gold', rewards: [{ itemId: 'asc_class_defense', quantity: 1 }], dailyLimit: 0 },
+  'mat_class_universal': { price: 50,    currency: 'diamond', rewards: [{ itemId: 'asc_class_universal', quantity: 1 }], dailyLimit: 0 },
+  'mat_reroll':          { price: 80,    currency: 'diamond', rewards: [{ itemId: 'eqm_reroll', quantity: 1 }], dailyLimit: 0 },
+  // -- 裝備商店 --
+  'equip_chest':       { price: 100,  currency: 'diamond', rewards: [{ itemId: 'chest_equipment', quantity: 1 }], dailyLimit: 5 },
+  'forge_ore_common':  { price: 5000, currency: 'gold', rewards: [{ itemId: 'forge_ore_common', quantity: 10 }], dailyLimit: 0 },
+  'forge_ore_rare':    { price: 30,   currency: 'diamond', rewards: [{ itemId: 'forge_ore_rare', quantity: 5 }], dailyLimit: 0 },
+  // -- 特殊商店 --
+  'special_gold_pack': { price: 30,   currency: 'diamond', rewards: [{ itemId: 'gold_pack_10k', quantity: 1 }], dailyLimit: 5 },
+};
+
+function handleShopBuy_(params) {
+  var playerId = resolvePlayerId_(params.guestToken);
+  if (!playerId) return { success: false, error: 'invalid_token' };
+  var shopItemId = params.shopItemId;
+  if (!shopItemId) return { success: false, error: 'missing shopItemId' };
+
+  var catalog = SHOP_CATALOG_[shopItemId];
+  if (!catalog) return { success: false, error: 'invalid_shop_item' };
+
+  // 讀取玩家存檔
+  var saveSheet = getSaveSheet_();
+  var saveRow = findRowByColumn_(saveSheet, 'playerId', playerId);
+  if (saveRow === 0) return { success: false, error: 'save_not_found' };
+  var saveData = readRow_(saveSheet, saveRow);
+
+  // 檢查貨幣
+  var currency = catalog.currency;
+  var price = catalog.price;
+  var current = Number(saveData[currency]) || 0;
+  if (current < price) return { success: false, error: 'insufficient_' + currency };
+
+  // 檢查每日購買上限
+  if (catalog.dailyLimit > 0) {
+    var today = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd');
+    var purchaseKey = 'shop_' + shopItemId + '_' + today;
+    var bought = Number(PropertiesService.getScriptProperties().getProperty(playerId + '_' + purchaseKey)) || 0;
+    if (bought >= catalog.dailyLimit) return { success: false, error: 'daily_limit_reached' };
+    PropertiesService.getScriptProperties().setProperty(playerId + '_' + purchaseKey, String(bought + 1));
+  }
+
+  // 扣款
+  writeCell_(saveSheet, saveRow, currency, current - price);
+
+  // 發放道具
+  var rewards = catalog.rewards;
+  for (var i = 0; i < rewards.length; i++) {
+    upsertItem_(playerId, rewards[i].itemId, rewards[i].quantity);
+  }
+
+  return {
+    success: true,
+    spent: price,
+    currency: currency,
+    rewards: rewards,
+    newBalance: current - price
+  };
 }
 
 /** 使用道具 */
@@ -2068,7 +2166,221 @@ function handleDismantleEquipment_(params) {
 // Stage System
 // ═══════════════════════════════════════════════════════
 
-/** 通關主線 */
+/**
+ * 統一戰鬥結算（反作弊校驗 + 伺服器端獎勵計算）
+ *
+ * params: {
+ *   guestToken, stageMode ('story'|'tower'|'daily'|'pvp'|'boss'),
+ *   stageId, starsEarned,
+ *   battleSeed, localWinner,
+ *   players (serialized BattleHero[]), enemies (serialized BattleHero[]),
+ *   maxTurns?,
+ *   // daily extra:
+ *   dungeonTier?
+ * }
+ *
+ * 回傳: {
+ *   success, verified, serverWinner,
+ *   rewards: { gold, exp, diamond, items },
+ *   isFirstClear?, newLevel?, leveledUp?,
+ *   newStoryProgress?, newFloor?,
+ *   starsEarned
+ * }
+ */
+function handleCompleteBattle_(params) {
+  var playerId = resolvePlayerId_(params.guestToken);
+  if (!playerId) return { success: false, error: 'invalid_token' };
+
+  var stageMode = params.stageMode;
+  var stageId = params.stageId || '';
+  var starsEarned = Math.max(1, Math.min(3, Number(params.starsEarned) || 1));
+  var battleSeed = params.battleSeed;
+  var localWinner = params.localWinner;
+  var players = params.players;
+  var enemies = params.enemies;
+  var maxTurns = params.maxTurns || 50;
+
+  if (!stageMode) return { success: false, error: 'missing stageMode' };
+  if (!players || !enemies) return { success: false, error: 'missing battle data' };
+  if (battleSeed == null) return { success: false, error: 'missing battleSeed' };
+
+  // ── 1. 反作弊校驗：用相同 seed 重跑戰鬥 ──
+  var clonedPlayers = JSON.parse(JSON.stringify(players));
+  var clonedEnemies = JSON.parse(JSON.stringify(enemies));
+  var origRandom = Math.random;
+  Math.random = createSeededRng_(battleSeed);
+  var battleResult;
+  try {
+    battleResult = runBattleEngine_(clonedPlayers, clonedEnemies, maxTurns);
+  } finally {
+    Math.random = origRandom;
+  }
+
+  var serverWinner = battleResult.winner;
+  var verified = serverWinner === localWinner;
+
+  // ── 作弊偵測記錄 ──
+  if (!verified) {
+    try {
+      var props = PropertiesService.getScriptProperties();
+      var log = JSON.parse(props.getProperty('ANTICHEAT_LOG') || '[]');
+      log.push({
+        ts: new Date().toISOString(),
+        playerId: playerId,
+        seed: battleSeed,
+        localWinner: localWinner,
+        serverWinner: serverWinner,
+        stageMode: stageMode,
+        stageId: stageId,
+      });
+      if (log.length > 100) log = log.slice(-100);
+      props.setProperty('ANTICHEAT_LOG', JSON.stringify(log));
+    } catch (e) { /* 記錄失敗不影響流程 */ }
+  }
+
+  // ── 使用伺服器結果決定勝負 ──
+  var winner = serverWinner;
+
+  // ── 若伺服器判定非玩家勝利 → 不發獎勵 ──
+  if (winner !== 'player') {
+    return {
+      success: true,
+      verified: verified,
+      serverWinner: serverWinner,
+      rewards: { gold: 0, exp: 0, diamond: 0, items: [] },
+      isFirstClear: false,
+      starsEarned: 0,
+    };
+  }
+
+  // ── 2. 載入存檔 ──
+  var saveSheet = getSaveSheet_();
+  var saveRow = findRowByColumn_(saveSheet, 'playerId', playerId);
+  if (saveRow === 0) return { success: false, error: 'save_not_found' };
+  var saveData = readRow_(saveSheet, saveRow);
+
+  // ── 3. 根據模式計算獎勵 ──
+  var rewards = { gold: 0, exp: 0, diamond: 0, items: [] };
+  var isFirstClear = false;
+  var newStoryProgress = undefined;
+  var newFloor = undefined;
+
+  if (stageMode === 'story') {
+    var parts = stageId.split('-');
+    var ch = parseInt(parts[0]) || 1;
+    var st = parseInt(parts[1]) || 1;
+
+    // 讀取已有星級
+    var stageStars;
+    try { stageStars = JSON.parse(saveData.stageStars || '{}'); } catch(e) { stageStars = {}; }
+    var prevBest = stageStars[stageId] || 0;
+    if (prevBest === 0) isFirstClear = true;
+    if (starsEarned > prevBest) stageStars[stageId] = starsEarned;
+    writeCell_(saveSheet, saveRow, 'stageStars', JSON.stringify(stageStars));
+
+    // 確保 stageStars 欄位存在
+    var saveHeaders = saveSheet.getRange(1, 1, 1, saveSheet.getLastColumn()).getValues()[0];
+    if (saveHeaders.indexOf('stageStars') === -1) {
+      saveSheet.getRange(1, saveHeaders.length + 1).setValue('stageStars');
+    }
+
+    // 獎勵
+    var stageRewards = { gold: 100 + ch * 50 + st * 20, exp: 50 + ch * 30 + st * 10, diamond: 0 };
+    var firstClearBonus = { gold: 200, exp: 100, diamond: 30 };
+    rewards.gold = stageRewards.gold + (isFirstClear ? firstClearBonus.gold : 0);
+    rewards.exp = stageRewards.exp + (isFirstClear ? firstClearBonus.exp : 0);
+    rewards.diamond = isFirstClear ? firstClearBonus.diamond : 0;
+
+    // 推進劇情進度（只能前進不能後退）
+    var currentProgress;
+    try { currentProgress = JSON.parse(saveData.storyProgress); } catch(e) { currentProgress = { chapter: 1, stage: 1 }; }
+    var newProg = (ch - 1) * 8 + st;
+    var curProg = (currentProgress.chapter - 1) * 8 + currentProgress.stage;
+    if (newProg >= curProg) {
+      var nextSt2 = st + 1;
+      var nextCh2 = ch;
+      if (nextSt2 > 8) { nextCh2 = ch + 1; nextSt2 = 1; }
+      writeCell_(saveSheet, saveRow, 'storyProgress', JSON.stringify({ chapter: nextCh2, stage: nextSt2 }));
+      writeCell_(saveSheet, saveRow, 'resourceTimerStage', stageId);
+      newStoryProgress = { chapter: nextCh2, stage: nextSt2 };
+    }
+
+  } else if (stageMode === 'tower') {
+    var floor = Number(stageId) || 1;
+    var currentFloor = Number(saveData.towerFloor) || 0;
+    // 驗證玩家只能打當前樓層
+    if (floor > currentFloor + 1) {
+      return { success: false, error: 'wrong_floor: expected ' + (currentFloor + 1) + ' got ' + floor };
+    }
+    var isBoss = floor % 10 === 0;
+    rewards.gold = 100 + floor * 20;
+    rewards.exp = 50 + floor * 10;
+    rewards.diamond = isBoss ? 50 : 0;
+    writeCell_(saveSheet, saveRow, 'towerFloor', floor);
+    newFloor = floor;
+
+  } else if (stageMode === 'pvp') {
+    var pvpProgress;
+    try { pvpProgress = JSON.parse(saveData.storyProgress); } catch(e) { pvpProgress = { chapter: 1, stage: 1 }; }
+    var linear = (pvpProgress.chapter - 1) * 8 + pvpProgress.stage;
+    rewards.gold = 200 + linear * 30;
+    rewards.exp = 100 + linear * 15;
+    rewards.diamond = 10;
+
+  } else if (stageMode === 'boss') {
+    // Boss 獎勵：伺服器用固定公式（前端不再自算 totalDamage）
+    rewards.gold = 500;
+    rewards.exp = 300;
+    rewards.diamond = 20;
+
+  } else if (stageMode === 'daily') {
+    var tier = params.dungeonTier || 'normal';
+    var tierRewards = {
+      'easy':   { gold: 500, exp: 100 },
+      'normal': { gold: 1000, exp: 200 },
+      'hard':   { gold: 2000, exp: 400 }
+    };
+    var base = tierRewards[tier] || tierRewards['normal'];
+    rewards.gold = base.gold;
+    rewards.exp = base.exp;
+  }
+
+  // ── 4. 寫入獎勵 + 帳號升等 ──
+  var currentGold = Number(saveData.gold) || 0;
+  var currentDiamond = Number(saveData.diamond) || 0;
+  var currentExp = Number(saveData.exp) || 0;
+  var currentLevel = Number(saveData.level) || 1;
+
+  var newExp = currentExp + rewards.exp;
+  var newLevel = currentLevel;
+  var leveledUp = false;
+  while (newExp >= expToNextLevel_(newLevel)) {
+    newExp -= expToNextLevel_(newLevel);
+    newLevel++;
+    leveledUp = true;
+  }
+
+  writeCell_(saveSheet, saveRow, 'gold', currentGold + rewards.gold);
+  if (rewards.diamond > 0) writeCell_(saveSheet, saveRow, 'diamond', currentDiamond + rewards.diamond);
+  writeCell_(saveSheet, saveRow, 'exp', newExp);
+  if (leveledUp) writeCell_(saveSheet, saveRow, 'level', newLevel);
+  writeCell_(saveSheet, saveRow, 'lastSaved', new Date().toISOString());
+
+  return {
+    success: true,
+    verified: verified,
+    serverWinner: serverWinner,
+    rewards: rewards,
+    isFirstClear: isFirstClear,
+    starsEarned: starsEarned,
+    newLevel: newLevel,
+    leveledUp: leveledUp,
+    newStoryProgress: newStoryProgress,
+    newFloor: newFloor,
+  };
+}
+
+/** 通關主線（舊版，保留供 reconcile 相容） */
 function handleCompleteStage_(params) {
   var playerId = resolvePlayerId_(params.guestToken);
   if (!playerId) return { success: false, error: 'invalid_token' };
@@ -3042,6 +3354,9 @@ function handleReconcilePending_(params) {
         case 'gacha-pull':
           opResult = handleGachaPull_(fullParams);
           break;
+        case 'complete-battle':
+          opResult = handleCompleteBattle_(fullParams);
+          break;
         case 'complete-stage':
           opResult = handleCompleteStage_(fullParams);
           break;
@@ -3050,6 +3365,39 @@ function handleReconcilePending_(params) {
           break;
         case 'complete-daily':
           opResult = handleCompleteDaily_(fullParams);
+          break;
+        case 'upgrade-hero':
+          opResult = handleUpgradeHero_(fullParams);
+          break;
+        case 'ascend-hero':
+          opResult = handleAscendHero_(fullParams);
+          break;
+        case 'star-up-hero':
+          opResult = handleStarUpHero_(fullParams);
+          break;
+        case 'use-item':
+          opResult = handleUseItem_(fullParams);
+          break;
+        case 'enhance-equipment':
+          opResult = handleEnhanceEquipment_(fullParams);
+          break;
+        case 'dismantle-equipment':
+          opResult = handleDismantleEquipment_(fullParams);
+          break;
+        case 'expand-inventory':
+          opResult = handleExpandInventory_(fullParams);
+          break;
+        case 'shop-buy':
+          opResult = handleShopBuy_(fullParams);
+          break;
+        case 'equip-item':
+          opResult = handleEquipItem_(fullParams);
+          break;
+        case 'unequip-item':
+          opResult = handleUnequipItem_(fullParams);
+          break;
+        case 'lock-equipment':
+          opResult = handleLockEquipment_(fullParams);
           break;
         default:
           opResult = { success: false, error: 'unsupported_action: ' + op.action };

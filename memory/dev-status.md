@@ -1,6 +1,6 @@
 # 開發狀態快照 — Dev Status
 
-> 最後更新：2026-03-01（第二十八次更新 — 帳號綁定獎勵 + PWA + 安裝獎勵）
+> 最後更新：2026-03-01（第三十次更新 — 伺服器端獎勵計算 + save-progress 封鎖）
 
 ## 截至 2026-03-01 的開發狀態
 
@@ -37,6 +37,8 @@
 - [x] **🐛 修復死亡動畫視覺問題** — `playHitOrDeath` killed 分支改 HURT→DEAD 序列（4 路徑全統一）+ GAS turn_end 被動傷害致死時發射 DEATH 事件（POST @64 / GET @65）
 - [x] **🐛 修復 on_attack 被動雙倍傷害** — 新增 `damage_mult` / `damage_mult_random` effect type 取代 `damage`，被動不再獨立計算傷害改為乘算加成；新增 `PASSIVE_DAMAGE` action type；6 個被動技能效果已更新（POST @66 / GET @67）
 - [x] **✨ 被動觸發浮動文字** — 新增 `PassiveHint3D` 元件，被動觸發時在英雄頭頂顯示紫色浮動文字（☕ + 技能名）
+- [x] **🔒 反作弊校驗系統** — Mulberry32 seeded PRNG + GAS `verify-battle` 背景驗證，Phase A 完成後 fire-and-forget、結算前 await 比對 winner（POST @80 / GET @81）
+- [x] **🔒 伺服器端獎勵計算 + save-progress 封鎖** — `handleCompleteBattle_` 統一結算（反作弊 + 獎勵計算），`save-progress` 移除 gold/diamond/exp/level/storyProgress/towerFloor（POST @82 / GET @83）
 - [x] **🧪 QA 測試完成** — 594 測試全通過
   - Vitest 1.6.1 單元測試（含 battleEffectsIntegration.test.ts 42 項新增）
   - Domain 層：battleEngine、buffSystem、damageFormula、targetStrategy、stageSystem、gachaSystem、progressionSystem、elementSystem、energySystem、boundary
@@ -50,7 +52,7 @@
 
 | Spec | 版本 | 狀態 |
 |------|------|------|
-| core-combat.md | v2.6 | 🟢 後端戰鬥引擎 + 前端純回放 + 本地 fallback |
+| core-combat.md | v2.8 | 🟢 本地優先引擎 + 背景反作弊校驗（seeded PRNG） |
 | hero-schema.md | v2.1 | 🟢 4 層型別 + 14 角色完整數值表 |
 | damage-formula.md | v1.0 | 🟢 10 步完整傷害公式 |
 | skill-system.md | v1.3 | 🟢 SkillTemplate + 15 PassiveTrigger + extra_turn 機制 + on_ally_death/on_ally_skill |

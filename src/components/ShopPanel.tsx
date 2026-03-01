@@ -8,6 +8,7 @@
 import { useState, useMemo, useCallback } from 'react'
 import { getSaveState, updateProgress } from '../services/saveService'
 import { addItemsLocally } from '../services/inventoryService'
+import { fireOptimisticAsync } from '../services/optimisticQueue'
 
 /* ────────────────────────────
    商品定義
@@ -196,6 +197,9 @@ export function ShopPanel({ onBack }: ShopPanelProps) {
 
     // 樂觀發放獎勵
     addItemsLocally(item.rewards)
+
+    // 背景 API（帶冪等保護）
+    fireOptimisticAsync('shop-buy', { shopItemId: item.id }).serverResult.catch(console.warn)
 
     // 更新購買計數
     setPurchasedToday(prev => ({

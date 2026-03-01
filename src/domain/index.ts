@@ -70,6 +70,9 @@ export { selectTargets, selectNormalAttackTarget } from './targetStrategy'
 export { runBattle, runBattleCollect, createBattleHero, checkLethalPassive } from './battleEngine'
 export type { BattleEngineConfig, BattleResult, RawHeroInput } from './battleEngine'
 
+// 種子式隨機數產生器（反作弊校驗用）
+export { createSeededRng, generateBattleSeed } from './seededRng'
+
 // 養成系統
 export {
   expToNextLevel,

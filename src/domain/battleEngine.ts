@@ -22,6 +22,7 @@ import type {
 } from './types'
 import { calculateDamage, calculateHeal } from './damageFormula'
 import { getFinalStats, type HeroInstanceData, type BaseStats } from './progressionSystem'
+import { createSeededRng } from './seededRng'
 import {
   getBuffedStats,
   isControlled,
@@ -344,18 +345,33 @@ export interface BattleResult {
  * 同步（同步式 await）跑完整場戰鬥，收集所有 BattleAction。
  * 不需要表現層回調，幾 ms 內完成。
  * 前端可拿到 actions 後再決定「播放動畫」或「跳過直接結算」。
+ *
+ * @param config.seed - 可選的確定性種子。提供時將以 seeded PRNG 取代 Math.random，
+ *                      讓 GAS 端以相同種子重現一模一樣的戰鬥結果（反作弊校驗用）。
  */
 export async function runBattleCollect(
   players: BattleHero[],
   enemies: BattleHero[],
-  config: Partial<Pick<BattleEngineConfig, 'maxTurns'>> = {},
+  config: Partial<Pick<BattleEngineConfig, 'maxTurns'>> & { seed?: number } = {},
 ): Promise<BattleResult> {
   const actions: BattleAction[] = []
-  const winner = await runBattle(players, enemies, {
-    maxTurns: config.maxTurns ?? 50,
-    onAction: (action) => { actions.push(action) },
-  })
-  return { winner, actions }
+
+  // ── 種子式 PRNG：暫時覆蓋 Math.random ──
+  const origRandom = Math.random
+  if (config.seed != null) {
+    Math.random = createSeededRng(config.seed)
+  }
+
+  try {
+    const winner = await runBattle(players, enemies, {
+      maxTurns: config.maxTurns ?? 50,
+      onAction: (action) => { actions.push(action) },
+    })
+    return { winner, actions }
+  } finally {
+    // ★ 無論成功或失敗，都必須還原 Math.random
+    Math.random = origRandom
+  }
 }
 
 async function executeNormalAttack(

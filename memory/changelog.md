@@ -3,6 +3,78 @@
 > 按時間倒序排列，最新的在最上面。
 
 ---
+### [2026-03-01] 伺服器端獎勵計算 + save-progress 敏感欄位封鎖
+
+- **觸發者**：安全性審計 — 發現前端可直接竄改 gold/diamond/exp/level 透過 save-progress
+- **執行角色**：🔧 CODING + 🛡️ SECURITY
+
+#### 漏洞描述
+- `save-progress` 的 `allowedFields` 包含 `gold, diamond, exp, level, storyProgress, towerFloor`
+- 前端結算時自行計算獎勵 → 直接寫入伺服器 → 攻擊者可偽造任意值
+- `completeStage / completeTower / completeDaily` 的 GAS handler 存在但從未被前端呼叫
+
+#### 修正內容
+
+**GAS `handleCompleteBattle_`（新增）**：
+- 統一戰鬥結算入口，涵蓋 story / tower / daily / pvp / boss 五種模式
+- 整合反作弊校驗：用相同 seed 重跑戰鬥 → 比對 winner
+- 伺服器端計算獎勵（gold / exp / diamond）→ 寫入 save_data
+- 伺服器端處理升等（expToNextLevel_）
+- 驗證進度（tower 只能打 currentFloor + 1）
+- 不一致時記錄 ANTICHEAT_LOG
+
+**GAS `handleSaveProgress_`（封鎖）**：
+- `allowedFields` 移除 `gold, diamond, exp, level, storyProgress, towerFloor`
+- 只保留 `displayName, resourceTimerStage, resourceTimerLastCollect, formation`
+- 敏感欄位只能透過 `complete-battle / shop-buy / gacha-pull` 等受驗證操作修改
+
+**前端 `progressionService.ts`（新增）**：
+- `completeBattle()` 函式 — 透過 `fireOptimisticAsync` 呼叫 GAS `complete-battle`
+- 包含完整型別定義 `CompleteBattleParams` / `CompleteBattleResult`
+
+**前端 `App.tsx`（重構結算流程）**：
+- Phase A：計算完成後立即背景呼叫 `completeBattle()`（含 seed + hero 快照）
+- 結算前：await `completeBattle` 結果 → 使用伺服器判定的 winner
+- 本地獎勵計算保留作為 UI 即時顯示 + localStorage 快取
+- 伺服器為最終權威（gold/diamond/exp/level 已寫入 save_data）
+
+#### GAS 部署
+- POST endpoint @82、GET endpoint @83
+- `complete-battle` action 加入 `doPost` switch-case + reconcile switch
+
+---
+### [2026-03-01] 反作弊校驗系統（Seeded PRNG + 背景驗證）
+
+- **觸發者**：安全性強化 — 防止前端引擎被竄改偽造勝利
+- **執行角色**：🔧 CODING + 🎯 GAME_DESIGN
+
+#### 核心機制
+- **Seeded PRNG（Mulberry32）**：`src/domain/seededRng.ts` — 前端與 GAS 共用同一演算法
+  - `createSeededRng(seed)` → 回傳確定性 `[0,1)` 浮點數
+  - `generateBattleSeed()` → 產生 32-bit 隨機種子
+- **前端 `runBattleCollect()`**：新增 `seed` 參數，戰鬥期間暫時覆蓋 `Math.random`
+- **GAS `handleVerifyBattle_`**：新 POST action `verify-battle`
+  - 接收 `{players, enemies, seed, localWinner, maxTurns}`
+  - 以相同 seed 重跑戰鬥 → 比對 winner
+  - 不一致時記錄到 `ANTICHEAT_LOG`（ScriptProperties，保留最近 100 筆）
+- **`antiCheatService.ts`**：`startBattleVerification()` fire-and-forget
+  - Phase A 計算完成後立即發射（不阻塞動畫播放）
+  - 內建 15 秒超時 + AbortController 取消機制
+  - 網路失敗 / 超時 → 靜默通過（不影響正常遊戲體驗）
+
+#### 遊戲流程整合（App.tsx）
+- Phase A：`generateBattleSeed()` → 深拷貝 BattleHero 快照 → `runBattleCollect({seed})` → `startBattleVerification()`
+- Phase B：動畫照常播放（背景校驗同步進行）
+- 結算前：`await antiCheatRef.current.promise` → 如不一致 → 覆寫 winner + toast 警告
+
+#### GAS 部署
+- POST endpoint @80、GET endpoint @81
+- `verify-battle` action 加入 `doPost` switch-case
+
+#### 規格更新
+- `specs/core-combat.md` → v2.8
+
+---
 ### [2026-03-01] 帳號綁定獎勵 + PWA 支援 + 安裝獎勵
 
 - **觸發者**：鼓勵綁定帳號 + 導入 PWA 鼓勵加入主畫面

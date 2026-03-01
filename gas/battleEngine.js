@@ -15,6 +15,25 @@
  */
 
 // ═══════════════════════════════════════════════════════
+// Seeded PRNG — Mulberry32（反作弊用確定性隨機數）
+// ═══════════════════════════════════════════════════════
+
+/**
+ * 建立 Mulberry32 偽隨機數產生器（與前端 seededRng.ts 完全相同）
+ * @param {number} seed - 32-bit 整數種子
+ * @returns {function(): number} 回傳 [0, 1) 的浮點數
+ */
+function createSeededRng_(seed) {
+  var state = seed | 0;
+  return function() {
+    state = (state + 0x6D2B79F5) | 0;
+    var t = Math.imul(state ^ (state >>> 15), 1 | state);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+// ═══════════════════════════════════════════════════════
 // Element System（屬性剋制）
 // ═══════════════════════════════════════════════════════
 
@@ -1021,13 +1040,14 @@ function makeContext_(turn, actor, allHeroes, target, isKill) {
 
 /**
  * 處理 run-battle 請求
- * body: { players: BattleHero[], enemies: BattleHero[], maxTurns?: number }
+ * body: { players: BattleHero[], enemies: BattleHero[], maxTurns?: number, seed?: number }
  * 回傳: { success: true, winner: string, actions: BattleAction[] }
  */
 function handleRunBattle_(body) {
   var players = body.players;
   var enemies = body.enemies;
   var maxTurns = body.maxTurns || 50;
+  var seed = body.seed;
 
   if (!players || !enemies || !Array.isArray(players) || !Array.isArray(enemies)) {
     return { success: false, error: 'players and enemies arrays are required' };
@@ -1040,11 +1060,90 @@ function handleRunBattle_(body) {
   var clonedPlayers = JSON.parse(JSON.stringify(players));
   var clonedEnemies = JSON.parse(JSON.stringify(enemies));
 
-  var result = runBattleEngine_(clonedPlayers, clonedEnemies, maxTurns);
+  // ── 種子式 PRNG：暫時覆蓋 Math.random ──
+  var origRandom = Math.random;
+  if (seed != null) {
+    Math.random = createSeededRng_(seed);
+  }
+
+  var result;
+  try {
+    result = runBattleEngine_(clonedPlayers, clonedEnemies, maxTurns);
+  } finally {
+    Math.random = origRandom;
+  }
 
   return {
     success: true,
     winner: result.winner,
     actions: result.actions,
+  };
+}
+
+/**
+ * 處理 verify-battle 請求（反作弊校驗）
+ * body: { players, enemies, maxTurns?, seed, localWinner }
+ * 僅比對 winner，不回傳完整 actions（減少 payload）
+ * 回傳: { success: true, verified: boolean, serverWinner: string, localWinner: string }
+ */
+function handleVerifyBattle_(body) {
+  var players = body.players;
+  var enemies = body.enemies;
+  var maxTurns = body.maxTurns || 50;
+  var seed = body.seed;
+  var localWinner = body.localWinner;
+
+  if (!players || !enemies || !Array.isArray(players) || !Array.isArray(enemies)) {
+    return { success: false, error: 'players and enemies arrays are required' };
+  }
+  if (players.length === 0 || enemies.length === 0) {
+    return { success: false, error: 'players and enemies cannot be empty' };
+  }
+  if (seed == null) {
+    return { success: false, error: 'seed is required for verification' };
+  }
+
+  var clonedPlayers = JSON.parse(JSON.stringify(players));
+  var clonedEnemies = JSON.parse(JSON.stringify(enemies));
+
+  // 使用相同的 seeded PRNG
+  var origRandom = Math.random;
+  Math.random = createSeededRng_(seed);
+
+  var result;
+  try {
+    result = runBattleEngine_(clonedPlayers, clonedEnemies, maxTurns);
+  } finally {
+    Math.random = origRandom;
+  }
+
+  var verified = result.winner === localWinner;
+
+  // ── 作弊偵測記錄 ──
+  if (!verified) {
+    try {
+      var props = PropertiesService.getScriptProperties();
+      var log = JSON.parse(props.getProperty('ANTICHEAT_LOG') || '[]');
+      log.push({
+        ts: new Date().toISOString(),
+        seed: seed,
+        localWinner: localWinner,
+        serverWinner: result.winner,
+        playerCount: players.length,
+        enemyCount: enemies.length,
+      });
+      // 只保留最近 100 筆
+      if (log.length > 100) log = log.slice(-100);
+      props.setProperty('ANTICHEAT_LOG', JSON.stringify(log));
+    } catch (e) {
+      // 記錄失敗不影響回傳
+    }
+  }
+
+  return {
+    success: true,
+    verified: verified,
+    serverWinner: result.winner,
+    localWinner: localWinner || 'unknown',
   };
 }
