@@ -589,18 +589,21 @@ function runBattleEngine_(players, enemies, maxTurns) {
         }
       }
 
+      // ★ 行動前：先讓所有能量滿的英雄施放大招（包含自己）
+      var preActInterrupt = {};
+      processInterruptUltimates_(players, enemies, turn, allHeroes, emit, preActInterrupt);
+      if (players.every(function(p) { return p.currentHP <= 0; }) ||
+          enemies.every(function(e) { return e.currentHP <= 0; })) break;
+      if (actor.currentHP <= 0) continue;
+
       // 控制效果
       if (isControlled_(actor)) continue;
       if (isFeared_(actor)) continue;
 
-      // 決定行動
-      if (canCastUltimate_(actor)) {
-        executeSkill_(actor, actor.activeSkill, allies, foes, turn, allHeroes, emit);
-      } else {
-        executeNormalAttack_(actor, allies, foes, turn, allHeroes, emit);
-      }
+      // ★ 行動：一律普攻（大招由中斷機制統一處理）
+      executeNormalAttack_(actor, allies, foes, turn, allHeroes, emit);
 
-      // 中斷大招：任何角色能量滿了立即施放（含剛行動的自己、被攻擊的對手）
+      // ★ 行動後：再檢查是否有英雄能量滿了（普攻加能量可能觸發）
       var interruptActed = {};
       processInterruptUltimates_(players, enemies, turn, allHeroes, emit, interruptActed);
       if (players.every(function(p) { return p.currentHP <= 0; }) ||
@@ -928,13 +931,17 @@ function processExtraTurns_(extraTurnQueue, extraTurnUsed, players, enemies, tur
 
     emit({ type: 'EXTRA_TURN', heroUid: uid, reason: 'extra_turn' });
 
+    // ★ 額外行動前：先讓能量滿的英雄放大招
+    var preExtraInterrupt = {};
+    processInterruptUltimates_(players, enemies, turn, allHeroes, emit, preExtraInterrupt);
+    if (players.every(function(p) { return p.currentHP <= 0; }) ||
+        enemies.every(function(e) { return e.currentHP <= 0; })) return;
+    if (hero.currentHP <= 0) continue;
+
     if (isControlled_(hero) || isFeared_(hero)) continue;
 
-    if (canCastUltimate_(hero)) {
-      executeSkill_(hero, hero.activeSkill, heroAllies, heroFoes, turn, allHeroes, emit);
-    } else {
-      executeNormalAttack_(hero, heroAllies, heroFoes, turn, allHeroes, emit);
-    }
+    // ★ 額外行動：一律普攻
+    executeNormalAttack_(hero, heroAllies, heroFoes, turn, allHeroes, emit);
 
     // 中斷大招（額外行動可能觸發能量溢出）
     var interruptActed2 = {};

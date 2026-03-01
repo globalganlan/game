@@ -3,6 +3,39 @@
 > 按時間倒序排列，最新的在最上面。
 
 ---
+### [2026-03-02] Buff/Debuff Icon 改用 Html DOM overlay — 原生彩色 emoji
+
+- **觸發者**：使用者提議「用 html 原生 emoji 就好」
+- **執行角色**：🔧 CODING + 🎨 UI_DESIGN
+
+#### 重構
+
+1. **`STATUS_ICONS_3D`**：中文短代號（攻↑/防↓/燒/毒/暈）→ 原生 emoji（⚔️/🛡️/🔥/☠️/💫），與 BattleHUD 的 `STATUS_ICONS` 統一
+2. **`BuffIcons3D`**：troika `<Billboard>` + `<Text>` → `<Html center distanceFactor={8}>`
+   - 每個 icon 用 CSS flex 排列的 DOM 元素，底框用 `background` + `borderRadius`
+   - emoji 由瀏覽器原生渲染（彩色、跨平台一致）
+   - 溢出 `+N` 卡片維持灰底白字
+3. **`BuffApplyToast3D`**：troika `<Billboard>` + `<Text>` → `<Html center distanceFactor={8}>`
+   - emoji + 中文 label（如「🔥 灼燒」）用 DOM 渲染
+   - 淡出動畫改用 `useFrame` 直接操作 `ref.current.style.opacity`（無 re-render）
+   - `fontFamily: 'Noto Sans SC', sans-serif`
+- **Spec 更新**：`specs/buff-debuff-icons.md` v1.1 → v1.2
+
+---
+### [2026-03-01] pendingRetreats 等待擴展 + DOT UI 修復
+
+- **觸發者**：使用者回報「上一位英雄還沒行動完，下一位的被動文字就出現」+「白面鬼灰燒傷害無 UI 顯示」
+- **執行角色**：🔧 CODING
+
+#### 修正
+
+1. **pendingRetreats 等待擴展**：從只限 `NORMAL_ATTACK | SKILL_CAST` 前 await，擴展到所有非 `TURN_START/TURN_END/BATTLE_END` 的 action 都會先等待前一位英雄的後退動畫完成
+   - 修復被動文字提前顯示
+   - 修復 DOT 傷害數字被前一位動畫過渡蓋過
+2. **Validator DEATH 降級**：DOT/被動致死後引擎仍發 DEATH action，表現層因 `actorState===DEAD` 跳過，非真正錯誤 → error 降為 warn
+- **Spec 更新**：`specs/core-combat.md` v3.5 → v3.6
+
+---
 ### [2026-03-01] Dead-Actor Guard 修正 — 移除 `currentHP <= 0` 判斷
 
 - **觸發者**：使用者回報「我方無名活屍還有血條站在那，別的英雄被打死就跟著一起消失」

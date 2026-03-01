@@ -1462,8 +1462,9 @@ export default function App() {
         })()
         console.log(`%c[Battle] ${brief}`, action.type === 'TURN_START' || action.type === 'BATTLE_END' ? 'color:#facc15;font-weight:bold' : action.type === 'DEATH' ? 'color:#ef4444' : 'color:#94a3b8')
       }
-      // ★ 等待所有待完成的後退動畫（閃避時無受傷動畫緩衝，前一位攻擊者可能仍在回位）
-      if (action.type === 'NORMAL_ATTACK' || action.type === 'SKILL_CAST') {
+      // ★ 等待所有待完成的後退動畫 — 所有需要視覺顯示的 action 都必須等前一位英雄退回原位
+      //   避免被動文字/DOT傷害在前一位英雄還在動的時候就跳出來
+      if (action.type !== 'TURN_START' && action.type !== 'TURN_END' && action.type !== 'BATTLE_END') {
         if (pendingRetreats.size > 0) {
           await Promise.all(pendingRetreats.values())
           pendingRetreats.clear()

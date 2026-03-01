@@ -103,9 +103,10 @@ export class BattleFlowValidator {
         this.assertAlive(t.uid, `SKILL_CAST target`)
       }
     } else if (action.type === 'DEATH') {
-      // DEATH action on already removed actor = bug
+      // DEATH action on already dead actor — DOT/被動致死後引擎仍會發 DEATH action，
+      // 表現層的 onAction 會因 actorState===DEAD 跳過，降級為 warn
       if (this.deadActors.has(action.targetUid)) {
-        this.addIssue('error', `DEATH action on already dead actor ${action.targetUid}`)
+        this.addIssue('warn', `DEATH action on already dead actor ${action.targetUid} (DOT/passive killed earlier, expected)`)
       }
     } else if (action.type === 'DOT_TICK') {
       this.assertAlive(action.targetUid, 'DOT_TICK target')

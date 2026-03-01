@@ -97,7 +97,7 @@ export function DamagePopup({ value, position, textScale = 1 }: DamagePopupProps
     <Billboard position={position} ref={ref}>
       <Text
         font={LOCAL_FONT}
-        fontSize={0.8 * textScale}
+        fontSize={1.0 * textScale}
         color={textColor}
         outlineColor="white"
         outlineWidth={0.05}
@@ -461,7 +461,7 @@ export function PassiveHint3D({ skillName, position, textScale = 1 }: PassiveHin
     <Billboard position={position} ref={ref} renderOrder={29}>
       <Text
         font={LOCAL_FONT}
-        fontSize={0.36 * textScale}
+        fontSize={0.48 * textScale}
         color="#d4a0ff"
         outlineColor="#3a0066"
         outlineWidth={0.04}
@@ -498,7 +498,7 @@ const STATUS_ICONS_3D: Record<string, { icon: string; isBuff: boolean }> = {
   def_down:      { icon: '防↓', isBuff: false },
   spd_down:      { icon: '速↓', isBuff: false },
   crit_rate_down:{ icon: '暴↓', isBuff: false },
-  dot_burn:      { icon: '焚',   isBuff: false },
+  dot_burn:      { icon: '燒',   isBuff: false },
   dot_poison:    { icon: '毒',   isBuff: false },
   dot_bleed:     { icon: '血',   isBuff: false },
   stun:          { icon: '暈',   isBuff: false },
@@ -544,102 +544,93 @@ interface BuffIcons3DProps {
   textScale?: number
 }
 
-/** 在英雄頭頂橫排顯示目前身上的 Buff（綠底）/ Debuff（紅底）icon */
+/** 在英雄頭頂橫排顯示目前身上的 Buff（綠底）/ Debuff（紅底）icon（純 3D Billboard mesh + troika Text） */
 export function BuffIcons3D({ effects, textScale = 1 }: BuffIcons3DProps) {
   const MAX_VISIBLE = 8
   const overflow = effects.length > MAX_VISIBLE ? effects.length - (MAX_VISIBLE - 1) : 0
-  // 超過上限時顯示前 7 個 + 1 個「+N」卡片
   const visible = overflow > 0 ? effects.slice(0, MAX_VISIBLE - 1) : effects.slice(0, MAX_VISIBLE)
-
-  const layout = useMemo(() => {
-    const cols = visible.length + (overflow > 0 ? 1 : 0)
-    const iconW = 0.35 * textScale
-    const totalW = cols * iconW
-    return visible.map((eff, i) => {
-      const x = -totalW / 2 + iconW * (i + 0.5)
-      const cfg = STATUS_ICONS_3D[eff.type]
-      return { x, eff, cfg }
-    })
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [visible, textScale, overflow])
 
   if (visible.length === 0) return null
 
-  const boxSize = 0.28 * textScale
-  // overflow +N 卡片位置
-  const cols = visible.length + (overflow > 0 ? 1 : 0)
-  const overflowX = overflow > 0
-    ? -(cols * 0.35 * textScale) / 2 + 0.35 * textScale * (visible.length + 0.5)
-    : 0
+  const boxSize = 0.4 * textScale
+  const gap = 0.06 * textScale
+  const count = visible.length + (overflow > 0 ? 1 : 0)
+  const totalWidth = count * boxSize + (count - 1) * gap
+  const startX = -totalWidth / 2 + boxSize / 2
+
+  // 背景材質（綠 buff / 紅 debuff / 灰 overflow）
+  const buffBg = useMemo(() => new THREE.MeshBasicMaterial({ color: '#22c55e', transparent: true, opacity: 0.75, depthTest: false }), [])
+  const debuffBg = useMemo(() => new THREE.MeshBasicMaterial({ color: '#ef4444', transparent: true, opacity: 0.75, depthTest: false }), [])
+  const overflowBg = useMemo(() => new THREE.MeshBasicMaterial({ color: '#6b7280', transparent: true, opacity: 0.80, depthTest: false }), [])
+  const boxGeo = useMemo(() => new THREE.PlaneGeometry(boxSize, boxSize), [boxSize])
 
   return (
-    <Billboard position={[0, 3.2, 0]} renderOrder={16}>
-      <group>
-        {layout.map(({ x, eff, cfg }) => {
-          if (!cfg) return null
-          const bgColor = cfg.isBuff ? '#22c55e' : '#ef4444'
-          return (
-            <group key={eff.type} position={[x, 0, 0]}>
-              {/* 底框 */}
-              <mesh renderOrder={16}>
-                <planeGeometry args={[boxSize, boxSize]} />
-                <meshBasicMaterial color={bgColor} transparent opacity={0.6} depthTest={false} />
-              </mesh>
-              {/* 中文短代號 */}
-              <Text
-                font={LOCAL_FONT}
-                fontSize={0.11 * textScale}
-                color="white"
-                anchorX="center"
-                anchorY="middle"
-                renderOrder={17}
-                position={[0, 0, 0.01]}
-              >
-                {cfg.icon}
-                <meshBasicMaterial transparent depthTest={false} />
-              </Text>
-              {/* 疊層數字 */}
-              {eff.stacks > 1 && (
-                <Text
-                  font={LOCAL_FONT}
-                  fontSize={0.1 * textScale}
-                  color="white"
-                  outlineColor="#000"
-                  outlineWidth={0.02}
-                  anchorX="right"
-                  anchorY="bottom"
-                  renderOrder={18}
-                  position={[boxSize * 0.45, -boxSize * 0.35, 0.02]}
-                >
-                  {'×' + eff.stacks}
-                  <meshBasicMaterial transparent depthTest={false} />
-                </Text>
-              )}
-            </group>
-          )
-        })}
-        {/* 溢出計數卡片 */}
-        {overflow > 0 && (
-          <group position={[overflowX, 0, 0]}>
-            <mesh renderOrder={16}>
-              <planeGeometry args={[boxSize, boxSize]} />
-              <meshBasicMaterial color="#6b7280" transparent opacity={0.7} depthTest={false} />
-            </mesh>
+    <Billboard position={[0, 3.2, 0]} renderOrder={15}>
+      {visible.map((eff, i) => {
+        const cfg = STATUS_ICONS_3D[eff.type]
+        if (!cfg) return null
+        const x = startX + i * (boxSize + gap)
+        const label = cfg.icon
+        // 根據字數選擇字體大小
+        const fs = label.length <= 1
+          ? boxSize * 0.65
+          : label.length <= 2
+            ? boxSize * 0.48
+            : boxSize * 0.35
+        return (
+          <group key={eff.type} position={[x, 0, 0]}>
+            <mesh geometry={boxGeo} material={cfg.isBuff ? buffBg : debuffBg} renderOrder={15} />
             <Text
               font={LOCAL_FONT}
-              fontSize={0.12 * textScale}
+              fontSize={fs}
               color="white"
               anchorX="center"
               anchorY="middle"
-              renderOrder={17}
-              position={[0, 0, 0.01]}
+              position={[0, 0, 0.001]}
+              renderOrder={16}
+              /* @ts-expect-error troika depthTest */
+              depthTest={false}
             >
-              {'+' + overflow}
-              <meshBasicMaterial transparent depthTest={false} />
+              {label}
             </Text>
+            {eff.stacks > 1 && (
+              <Text
+                font={LOCAL_FONT}
+                fontSize={boxSize * 0.28}
+                color="white"
+                outlineColor="black"
+                outlineWidth={0.015}
+                anchorX="right"
+                anchorY="bottom"
+                position={[boxSize * 0.42, -boxSize * 0.42, 0.002]}
+                renderOrder={17}
+                /* @ts-expect-error troika depthTest */
+                depthTest={false}
+              >
+                {`×${eff.stacks}`}
+              </Text>
+            )}
           </group>
-        )}
-      </group>
+        )
+      })}
+      {overflow > 0 && (
+        <group position={[startX + visible.length * (boxSize + gap), 0, 0]}>
+          <mesh geometry={boxGeo} material={overflowBg} renderOrder={15} />
+          <Text
+            font={LOCAL_FONT}
+            fontSize={boxSize * 0.5}
+            color="white"
+            anchorX="center"
+            anchorY="middle"
+            position={[0, 0, 0.001]}
+            renderOrder={16}
+            /* @ts-expect-error troika depthTest */
+            depthTest={false}
+          >
+            {`+${overflow}`}
+          </Text>
+        </group>
+      )}
     </Billboard>
   )
 }
@@ -661,7 +652,6 @@ export function BuffApplyToast3D({ effectType, isBuff, position, textScale = 1 }
   const [opacity, setOpacity] = useState(1)
   const elapsed = useRef(0)
 
-  const cfg = STATUS_ICONS_3D[effectType]
   const label = STATUS_LABELS[effectType] || effectType
 
   useFrame((_state, delta) => {
@@ -672,7 +662,7 @@ export function BuffApplyToast3D({ effectType, isBuff, position, textScale = 1 }
       if (elapsed.current > 0.3) {
         setOpacity((prev) => Math.max(0, prev - delta * 0.7))
       }
-      // 開頭微彈（前 0.05s 放大到 1.1x 再縮回）
+      // 開頭微彈
       const t = elapsed.current
       const scale = t < 0.05 ? 1 + t / 0.05 * 0.1 : t < 0.15 ? 1.1 - (t - 0.05) / 0.1 * 0.1 : 1
       ref.current.scale.set(scale, scale, scale)
@@ -683,14 +673,12 @@ export function BuffApplyToast3D({ effectType, isBuff, position, textScale = 1 }
 
   const textColor = isBuff ? '#4ade80' : '#f87171'
   const outColor = isBuff ? '#064e3b' : '#7f1d1d'
-  const icon = cfg?.icon || '•'
-  const displayText = `${icon} ${label}`
 
   return (
     <Billboard position={position} ref={ref} renderOrder={27}>
       <Text
         font={LOCAL_FONT}
-        fontSize={0.34 * textScale}
+        fontSize={0.55 * textScale}
         color={textColor}
         outlineColor={outColor}
         outlineWidth={0.04}
@@ -698,7 +686,7 @@ export function BuffApplyToast3D({ effectType, isBuff, position, textScale = 1 }
         outlineOpacity={opacity}
         renderOrder={27}
       >
-        {displayText}
+        {label}
         <meshBasicMaterial transparent depthTest={false} />
       </Text>
     </Billboard>

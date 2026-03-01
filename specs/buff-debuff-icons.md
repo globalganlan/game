@@ -1,13 +1,16 @@
 # Buff/Debuff 3D 狀態圖示 Spec
 
-> 版本：v1.1 ｜ 狀態：🟢 已實作
-> 最後更新：2026-03-01
+> 版本：v1.2 ｜ 狀態：🟢 已實作
+> 最後更新：2026-03-02
 > 負責角色：🎯 GAME_DESIGN → 🔧 CODING → 🎨 UI_DESIGN
-> 原始碼：`src/components/SceneWidgets.tsx`（`BuffIcons3D`）、`src/components/Hero.tsx`、`src/App.tsx`
+> 原始碼：`src/components/SceneWidgets.tsx`（`BuffIcons3D` / `BuffApplyToast3D`）、`src/components/Hero.tsx`、`src/App.tsx`
 
 ## 概述
 
 戰鬥中，英雄身上的 Buff/Debuff 效果以 3D 圖示列（icon row）的形式顯示在**英雄模型上方**（名字下方）。Buff 使用**綠色底框**，Debuff 使用**紅色底框**。可疊層的效果額外顯示**當前層數**。
+
+**v1.2 重大變更**：改用 `@react-three/drei` 的 `<Html>` 元件渲染 Buff Icon 和施加 Toast，
+利用瀏覽器原生 emoji 顯示彩色圖示，不再受限於 troika-three-text 字型。
 
 ## 設計目標
 
@@ -22,20 +25,21 @@
 ### 佈局
 
 - **掛載位置**：Hero 3D group 內部，`position=[0, 3.2, 0]`（名字 3.5 下方、血條 3.0 上方之間）
-- **排列方式**：水平排列（Billboard），每個 icon 佔 `0.35 × textScale` 寬
-- **居中對齊**：icon 列整體水平居中
+- **渲染方式**：`<Html center distanceFactor={8}>` — DOM overlay 釘在 3D 座標上
+- **排列方式**：CSS flexbox 水平排列，`gap: 2px`
+- **居中對齊**：`Html center` 自動水平居中
 - **最大顯示數**：8 個（超過時顯示前 7 個 + 灰色 `+N` 溢出計數卡片）
 
 ### 單一 Icon
 
 | 屬性 | 值 |
 |------|-----|
-| 底框大小 | `0.28 × textScale` 正方形（RoundedRect，圓角 0.04） |
-| 底框顏色 | Buff: `#22c55e`（綠色 60% 透明）｜ Debuff: `#ef4444`（紅色 60% 透明）｜ 溢出: `#6b7280`（灰色 70% 透明） |
-| 文字內容 | 中文短代號（如「攻↑」「毒」「焚」），用 NotoSansSC 字型渲染（不用 emoji，因 troika-three-text 不支援） |
-| 文字大小 | `fontSize: 0.11 × textScale` |
-| 層數文字 | `fontSize: 0.1 × textScale`，白色，描邊黑色，右下角偏移 |
-| 渲染順序 | `renderOrder: 16`（在名字 renderOrder 15 之上） |
+| 底框大小 | `22 × textScale` px 正方形 |
+| 底框顏色 | Buff: `rgba(34,197,94,0.75)` 綠 ｜ Debuff: `rgba(239,68,68,0.75)` 紅 ｜ 溢出: `rgba(107,114,128,0.8)` 灰 |
+| 底框圓角 | 3px |
+| Icon 內容 | **原生彩色 emoji**（瀏覽器渲染，不需額外字型） |
+| Icon 大小 | `size * 0.65`（size = 22 × textScale） |
+| 層數文字 | `size * 0.45`，白色，text-shadow 黑色，右下角絕對定位 |
 
 ### 顏色分類
 
@@ -47,37 +51,36 @@
 **Debuff（紅色底框）**：
 `atk_down`, `def_down`, `spd_down`, `crit_rate_down`, `dot_burn`, `dot_poison`, `dot_bleed`, `stun`, `freeze`, `silence`, `fear`
 
-### Icon 映射表（中文短代號）
+### Icon 映射表（原生 emoji）
 
-3D 場景用 `STATUS_ICONS_3D`（中文短代號，保證 troika-three-text 可渲染）；
-2D HUD 用 `STATUS_ICONS`（emoji，HTML 原生渲染無問題）。
+3D 場景和 2D HUD 現在**統一使用 emoji**（`<Html>` 元件讓瀏覽器原生渲染彩色 emoji）。
 
-| StatusType | 3D 短代號 | 分類 |
-|------------|----------|------|
-| atk_up | 攻↑ | Buff |
-| def_up | 防↑ | Buff |
-| spd_up | 速↑ | Buff |
-| crit_rate_up | 暴↑ | Buff |
-| crit_dmg_up | 爆↑ | Buff |
-| dmg_reduce | 減傷 | Buff |
-| shield | 盾 | Buff |
-| regen | 回血 | Buff |
-| energy_boost | 氣↑ | Buff |
-| dodge_up | 閃↑ | Buff |
-| reflect | 彈 | Buff |
-| taunt | 嘲諷 | Buff |
-| immunity | 免疫 | Buff |
-| atk_down | 攻↓ | Debuff |
-| def_down | 防↓ | Debuff |
-| spd_down | 速↓ | Debuff |
-| crit_rate_down | 暴↓ | Debuff |
-| dot_burn | 焚 | Debuff |
-| dot_poison | 毒 | Debuff |
-| dot_bleed | 血 | Debuff |
-| stun | 暈 | Debuff |
-| freeze | 凍 | Debuff |
-| silence | 默 | Debuff |
-| fear | 懼 | Debuff |
+| StatusType | Emoji | 分類 |
+|------------|-------|------|
+| atk_up | ⚔️ | Buff |
+| def_up | 🛡️ | Buff |
+| spd_up | 💨 | Buff |
+| crit_rate_up | 🎯 | Buff |
+| crit_dmg_up | 💥 | Buff |
+| dmg_reduce | 🔰 | Buff |
+| shield | 🛡️ | Buff |
+| regen | 💚 | Buff |
+| energy_boost | ⚡ | Buff |
+| dodge_up | 👻 | Buff |
+| reflect | 🪞 | Buff |
+| taunt | 😤 | Buff |
+| immunity | ✨ | Buff |
+| atk_down | ⚔️ | Debuff |
+| def_down | 🛡️ | Debuff |
+| spd_down | 🐌 | Debuff |
+| crit_rate_down | 🎯 | Debuff |
+| dot_burn | 🔥 | Debuff |
+| dot_poison | ☠️ | Debuff |
+| dot_bleed | 🩸 | Debuff |
+| stun | 💫 | Debuff |
+| freeze | 🧊 | Debuff |
+| silence | 🤐 | Debuff |
+| fear | 😱 | Debuff |
 
 ## 資料流
 
@@ -108,8 +111,9 @@ export function BuffIcons3D({ effects, textScale = 1 }: BuffIcons3DProps): JSX.E
 
 ## 效能考量
 
-- 每個 Icon 使用 `Billboard` + `Text`（drei），數量有限（最多 8×12=96 個），效能影響微小
-- `useMemo` 計算 icon 佈局位置，避免每幀重算
+- `BuffIcons3D` 使用 `<Html>` DOM overlay（最多 8×12=96 個 DOM 元素），效能影響微小
+- `BuffApplyToast3D` 使用 `<Html>` + `useFrame` 操作 DOM style (opacity, display)，無 React re-render 開銷
+- `distanceFactor={8}` 讓 icon 大小隨相機距離自動縮放
 
 ## 變更歷史
 
@@ -117,3 +121,4 @@ export function BuffIcons3D({ effects, textScale = 1 }: BuffIcons3DProps): JSX.E
 |------|------|---------|
 | v1.0 | 2026-03-01 | 初版：3D Buff/Debuff Icon 顯示於英雄模型上方 |
 | v1.1 | 2026-03-01 | Emoji→中文短代號（troika 字型相容）；超過 8 個顯示 7+「+N」溢出卡片 |
+| v1.2 | 2026-03-02 | **改用 `<Html>` DOM overlay**：中文短代號→原生彩色 emoji（瀏覽器渲染），BuffIcons3D 和 BuffApplyToast3D 都改為 Html 元件，無需額外字型下載 |

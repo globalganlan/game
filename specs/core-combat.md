@@ -1,6 +1,6 @@
 # 戰鬥系統 Spec
 
-> 版本：v3.5 ｜ 狀態：🟢 已實作
+> 版本：v3.6 ｜ 狀態：🟢 已實作
 > 最後更新：2026-03-02
 > 負責角色：🎯 GAME_DESIGN → 🔧 CODING
 > 原始碼：`src/domain/battleEngine.ts`（前端邏輯）、`gas/battleEngine.js`（後端引擎）、`src/App.tsx`（3D 演出整合）、`gas/程式碼.js`（`handleCompleteBattle_` 伺服器端結算）
@@ -850,4 +850,4 @@ App.tsx
 | v3.2 | 2026-03-02 | **Phase B HP 狀態修復**：`runBattleCollect()` 計算完成後（Phase A），engine 會 mutate heroMap 的 BattleHero 到最終狀態（死亡英雄 currentHP=0）；先前 `needsHpSync = false` 導致 Phase B 回放時讀取已為 0 的 HP，使英雄首回合即判定死亡（retreat handler 檢查 `heroMap.get(uid).currentHP` 為 0）；修正：Phase A 完成後重置所有 BattleHero `currentHP = maxHP`、`energy = 0`，並設 `needsHpSync = true`，讓 `applyHpFromAction()` 在 Phase B 逐步更新 HP（與 replay 模式一致） |
 | v3.3 | 2026-03-02 | **Phase B 死亡角色守衛 + 致死跳過 HURT**：(1) NORMAL_ATTACK / SKILL_CAST / DEATH handler 開頭新增 dead-actor guard，檢查 `actorStatesRef` + `currentHP`，已死角色直接 `break` 不播動畫（修復 DOT/反彈致死後，後續英雄仍衝向空位置攻擊的問題）；(2) 致死傷害不再播放 HURT 動畫，直接進入 DEAD 分支（普攻/技能/反彈三處統一行為） |
 | v3.4 | 2026-03-02 | **屬性提示修復 + DOT/被動致死動畫修復**：(1) NORMAL_ATTACK 的 elementHint 加入 `setTimeout(2000)` 自動清理（先前無 cleanup 導致累積）；(2) SKILL_CAST handler 新增屬性相剋指示（取第一個非閃避目標的 `elementMult`）；(3) DOT_TICK / PASSIVE_DAMAGE handler 新增致死判定 — 若 `hero.currentHP <= 0` 直接播放死亡動畫（含音效 + `waitForAction('DEAD')` + `removeSlot`），後續 DEATH action 因 `actorState===DEAD` 自動跳過 |
-| v3.5 | 2026-03-02 | **Dead-Actor Guard 修正 — 移除 `currentHP <= 0` 判斷**：`applyHpFromAction()` 在 `onAction()` 前執行，會將**當前 action** 的傷害預扣為 0，導致擊殺 action 誤觸 early-exit → 跳過死亡動畫（角色站著不動、HP 條不更新）。修正：三處 guard（NORMAL_ATTACK×2 + SKILL_CAST×1）只保留 `actorStatesRef === 'DEAD'`，移除 `|| currentHP <= 0` 判斷 |
+| v3.5 | 2026-03-02 | **Dead-Actor Guard 修正 — 移除 `currentHP <= 0` 判斷**：`applyHpFromAction()` 在 `onAction()` 前執行，會將**當前 action** 的傷害預扣為 0，導致擊殺 action 誤觸 early-exit → 跳過死亡動畫（角色站著不動、HP 條不更新）。修正：三處 guard（NORMAL_ATTACK×2 + SKILL_CAST×1）只保留 `actorStatesRef === 'DEAD'`，移除 `|| currentHP <= 0` 判斷 || v3.6 | 2026-03-02 | **pendingRetreats 等待擴展 + Validator DEATH 降級**：(1) `pendingRetreats` 的 await 從只限 NORMAL_ATTACK/SKILL_CAST 擴展到所有非 TURN_START/TURN_END/BATTLE_END 的 action——修復被動文字/DOT 傷害在前一位英雄還在退回動畫時就提前顯示的問題，同時修復 DOT 傷害數字被前一位英雄動畫過渡後看不到的問題；(2) Validator `beforeAction` 對 DEATH action 的重複檢查從 error 降級為 warn（DOT/被動致死後引擎仍會發 DEATH action，表現層因 actorState===DEAD 正確跳過，非真正錯誤） |

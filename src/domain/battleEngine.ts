@@ -138,15 +138,17 @@ async function processExtraTurns(
     // 通知表現層：額外行動開始
     await cfg.onAction({ type: 'EXTRA_TURN', heroUid: uid, reason: 'extra_turn' })
 
+    // ★ 額外行動前：先讓能量滿的英雄放大招
+    const preExtraInterrupt = new Set<string>()
+    await processInterruptUltimates(players, enemies, turn, allHeroes, cfg, preExtraInterrupt)
+    if (players.every(p => p.currentHP <= 0) || enemies.every(e => e.currentHP <= 0)) return
+    if (hero.currentHP <= 0) continue
+
     // 控制效果仍然生效
     if (isControlled(hero) || isFeared(hero)) continue
 
-    // 決定行動：大招 or 普攻
-    if (canCastUltimate(hero)) {
-      await executeSkill(hero, hero.activeSkill!, allies, foes, turn, allHeroes, cfg)
-    } else {
-      await executeNormalAttack(hero, allies, foes, turn, allHeroes, cfg)
-    }
+    // ★ 額外行動：一律普攻
+    await executeNormalAttack(hero, allies, foes, turn, allHeroes, cfg)
 
     // 中斷大招（額外行動可能觸發能量溢出）
     const interruptActed = new Set<string>()
@@ -261,6 +263,12 @@ export async function runBattle(
         }
       }
 
+      // ★ 行動前：先讓所有能量滿的英雄施放大招（包含自己）
+      const preActInterrupt = new Set<string>()
+      await processInterruptUltimates(players, enemies, turn, allHeroes, cfg, preActInterrupt)
+      if (players.every(p => p.currentHP <= 0) || enemies.every(e => e.currentHP <= 0)) break
+      if (actor.currentHP <= 0) continue
+
       // 控制效果判定
       if (isControlled(actor)) {
         // 被暈眩/凍結，跳過行動
@@ -271,15 +279,10 @@ export async function runBattle(
         continue
       }
 
-      // ── 決定行動：大招 or 普攻 ──
-      if (canCastUltimate(actor)) {
-        await executeSkill(actor, actor.activeSkill!, allies, foes, turn, allHeroes, cfg)
-        // 能量消耗已在 executeSkill 內處理，不再發送 ENERGY_CHANGE
-      } else {
-        await executeNormalAttack(actor, allies, foes, turn, allHeroes, cfg)
-      }
+      // ★ 行動：一律普攻（大招由中斷機制統一處理）
+      await executeNormalAttack(actor, allies, foes, turn, allHeroes, cfg)
 
-      // ── 中斷大招：任何角色能量滿了立即施放（含剛行動的自己、被攻擊的對手） ──
+      // ★ 行動後：再檢查是否有英雄能量滿了（普攻加能量可能觸發）
       const interruptActed = new Set<string>()
       await processInterruptUltimates(players, enemies, turn, allHeroes, cfg, interruptActed)
       if (players.every(p => p.currentHP <= 0) || enemies.every(e => e.currentHP <= 0)) break
