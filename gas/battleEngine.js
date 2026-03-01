@@ -114,6 +114,9 @@ var BUFF_TYPES_ = [
   'dodge_up', 'reflect', 'taunt',
 ];
 
+// 額外行動佇列（同步運行中由 runBattleEngine_ 設定）
+var _currentExtraTurnQueue_ = null;
+
 function isDebuff_(type) {
   return BUFF_TYPES_.indexOf(type) < 0 && type !== 'immunity' && type !== 'cleanse';
 }
@@ -515,9 +518,10 @@ function runBattleEngine_(players, enemies, maxTurns) {
     hero.killCount = hero.killCount || 0;
   }
 
-  // ── 戰鬥開始：觸發 battle_start 被動 ──
+  // ── 戰鬥開始：觸發 always + battle_start 被動（與前端一致） ──
   for (var bi = 0; bi < allHeroes.length; bi++) {
     if (allHeroes[bi].currentHP <= 0) continue;
+    triggerPassives_(allHeroes[bi], 'always', makeContext_(0, allHeroes[bi], allHeroes), emit);
     triggerPassives_(allHeroes[bi], 'battle_start', makeContext_(0, allHeroes[bi], allHeroes), emit);
   }
 
@@ -540,6 +544,9 @@ function runBattleEngine_(players, enemies, maxTurns) {
     });
 
     // 每個角色行動
+    var extraTurnUsed = {};
+    var extraTurnQueue = [];
+    _currentExtraTurnQueue_ = extraTurnQueue;
     for (var ai = 0; ai < actors.length; ai++) {
       var actor = actors[ai];
       if (actor.currentHP <= 0) continue;
@@ -569,6 +576,19 @@ function runBattleEngine_(players, enemies, maxTurns) {
       // 觸發 turn_start 被動
       triggerPassives_(actor, 'turn_start', makeContext_(turn, actor, allHeroes), emit);
 
+      // 觸發「每 N 回合」被動（與前端一致）
+      for (var pni = 0; pni < actor.activePassives.length; pni++) {
+        var pnPassive = actor.activePassives[pni];
+        if (pnPassive.passiveTrigger !== 'every_n_turns') continue;
+        var pnN = (pnPassive.description.indexOf('每 2') >= 0 || pnPassive.description.indexOf('每2') >= 0) ? 2 : 3;
+        if (turn % pnN === 0) {
+          for (var pnj = 0; pnj < pnPassive.effects.length; pnj++) {
+            executePassiveEffect_(actor, pnPassive.effects[pnj], makeContext_(turn, actor, allHeroes), emit);
+          }
+          emit({ type: 'PASSIVE_TRIGGER', heroUid: actor.uid, skillId: pnPassive.skillId, skillName: pnPassive.name });
+        }
+      }
+
       // 控制效果
       if (isControlled_(actor)) continue;
       if (isFeared_(actor)) continue;
@@ -583,6 +603,11 @@ function runBattleEngine_(players, enemies, maxTurns) {
       // 中斷大招：任何角色能量滿了立即施放（含剛行動的自己、被攻擊的對手）
       var interruptActed = {};
       processInterruptUltimates_(players, enemies, turn, allHeroes, emit, interruptActed);
+      if (players.every(function(p) { return p.currentHP <= 0; }) ||
+          enemies.every(function(e) { return e.currentHP <= 0; })) break;
+
+      // ── 額外行動處理（extra_turn，與前端一致） ──
+      processExtraTurns_(extraTurnQueue, extraTurnUsed, players, enemies, turn, allHeroes, emit);
       if (players.every(function(p) { return p.currentHP <= 0; }) ||
           enemies.every(function(e) { return e.currentHP <= 0; })) break;
     }
@@ -609,15 +634,18 @@ function runBattleEngine_(players, enemies, maxTurns) {
     // 勝負判定
     if (players.every(function(p) { return p.currentHP <= 0; })) {
       emit({ type: 'BATTLE_END', winner: 'enemy' });
+      _currentExtraTurnQueue_ = null;
       return { winner: 'enemy', actions: actions };
     }
     if (enemies.every(function(e) { return e.currentHP <= 0; })) {
       emit({ type: 'BATTLE_END', winner: 'player' });
+      _currentExtraTurnQueue_ = null;
       return { winner: 'player', actions: actions };
     }
   }
 
   // 迴圈結束勝負判定
+  _currentExtraTurnQueue_ = null; // 清理模組級變數
   if (players.every(function(p) { return p.currentHP <= 0; })) {
     emit({ type: 'BATTLE_END', winner: 'enemy' });
     return { winner: 'enemy', actions: actions };
@@ -875,6 +903,48 @@ function processInterruptUltimates_(players, enemies, turn, allHeroes, emit, alr
   }
 }
 
+// ── 額外行動處理（extra_turn，與前端一致） ──
+
+function processExtraTurns_(extraTurnQueue, extraTurnUsed, players, enemies, turn, allHeroes, emit) {
+  var MAX_EXTRA = 10;
+  var processed = 0;
+
+  while (extraTurnQueue.length > 0 && processed < MAX_EXTRA) {
+    var uid = extraTurnQueue.shift();
+    processed++;
+
+    if (extraTurnUsed[uid]) continue;
+
+    var hero = null;
+    for (var i = 0; i < allHeroes.length; i++) {
+      if (allHeroes[i].uid === uid) { hero = allHeroes[i]; break; }
+    }
+    if (!hero || hero.currentHP <= 0) continue;
+
+    extraTurnUsed[uid] = true;
+
+    var heroAllies = hero.side === 'player' ? players : enemies;
+    var heroFoes = hero.side === 'player' ? enemies : players;
+
+    emit({ type: 'EXTRA_TURN', heroUid: uid, reason: 'extra_turn' });
+
+    if (isControlled_(hero) || isFeared_(hero)) continue;
+
+    if (canCastUltimate_(hero)) {
+      executeSkill_(hero, hero.activeSkill, heroAllies, heroFoes, turn, allHeroes, emit);
+    } else {
+      executeNormalAttack_(hero, heroAllies, heroFoes, turn, allHeroes, emit);
+    }
+
+    // 中斷大招（額外行動可能觸發能量溢出）
+    var interruptActed2 = {};
+    processInterruptUltimates_(players, enemies, turn, allHeroes, emit, interruptActed2);
+
+    if (players.every(function(p) { return p.currentHP <= 0; }) ||
+        enemies.every(function(e) { return e.currentHP <= 0; })) return;
+  }
+}
+
 // ── 被動技能觸發 ──
 
 function triggerPassives_(hero, trigger, context, emit) {
@@ -937,35 +1007,69 @@ function checkHpBelowPassives_(hero, turn, allHeroes, emit) {
   }
 }
 
+function resolvePassiveTargets_(hero, effectType, passiveTarget, context) {
+  switch (passiveTarget) {
+    case 'all_allies':
+      return context.allAllies.filter(function(h) { return h.side === hero.side && h.currentHP > 0; });
+    case 'all_enemies':
+      return context.allEnemies.filter(function(h) { return h.side !== hero.side && h.currentHP > 0; });
+    case 'self':
+    default:
+      if (effectType === 'debuff' && context.target && context.target.currentHP > 0) {
+        return [context.target];
+      }
+      return [hero];
+  }
+}
+
 function executePassiveEffect_(hero, effect, context, emit) {
   var chance = effect.statusChance != null ? effect.statusChance : 1.0;
   if (Math.random() > chance) return;
+
+  // 解析被動 target 欄位（與前端 resolvePassiveTargets 一致）
+  var ownerPassive = null;
+  for (var pi = 0; pi < hero.activePassives.length; pi++) {
+    var p = hero.activePassives[pi];
+    if (p.effects && p.effects.indexOf(effect) >= 0) { ownerPassive = p; break; }
+  }
+  var passiveTargetType = (ownerPassive && ownerPassive.target) ? ownerPassive.target : 'self';
 
   switch (effect.type) {
     case 'buff':
     case 'debuff': {
       if (!effect.status) return;
-      var target = (effect.type === 'debuff' && context.target) ? context.target : hero;
-      applyStatus_(target, {
-        type: effect.status,
-        value: effect.statusValue || 0,
-        duration: effect.statusDuration || 0,
-        maxStacks: effect.statusMaxStacks || 1,
-        sourceHeroId: hero.uid,
-      });
+      var targets = resolvePassiveTargets_(hero, effect.type, passiveTargetType, context);
+      for (var ti = 0; ti < targets.length; ti++) {
+        applyStatus_(targets[ti], {
+          type: effect.status,
+          value: effect.statusValue || 0,
+          duration: effect.statusDuration || 0,
+          maxStacks: effect.statusMaxStacks || 1,
+          sourceHeroId: hero.uid,
+        });
+      }
       break;
     }
     case 'heal': {
-      var scalingStat = effect.scalingStat || 'HP';
-      var base = hero.finalStats[scalingStat] || hero.maxHP;
-      var healAmt = Math.floor(base * (effect.multiplier || 0.1) + (effect.flatValue || 0));
-      var actual = Math.min(healAmt, hero.maxHP - hero.currentHP);
-      hero.currentHP += actual;
-      hero.totalHealingDone += actual;
+      var healTargets = resolvePassiveTargets_(hero, 'buff', passiveTargetType, context);
+      for (var hi = 0; hi < healTargets.length; hi++) {
+        var ht = healTargets[hi];
+        if (ht.currentHP <= 0) continue;
+        var scalingStat = effect.scalingStat || 'HP';
+        var base = ht.finalStats[scalingStat] || ht.maxHP;
+        var healAmt = Math.floor(base * (effect.multiplier || 0.1) + (effect.flatValue || 0));
+        var actual = Math.min(healAmt, ht.maxHP - ht.currentHP);
+        ht.currentHP += actual;
+        hero.totalHealingDone += actual;
+      }
       break;
     }
     case 'energy': {
-      addEnergy_(hero, effect.flatValue || 0);
+      var energyTargets = resolvePassiveTargets_(hero, 'buff', passiveTargetType, context);
+      for (var ei2 = 0; ei2 < energyTargets.length; ei2++) {
+        if (energyTargets[ei2].currentHP <= 0) continue;
+        addEnergy_(energyTargets[ei2], effect.flatValue || 0);
+      }
       break;
     }
     case 'damage_mult': {
@@ -1005,6 +1109,24 @@ function executePassiveEffect_(hero, effect, context, emit) {
       break;
     }
     case 'revive':
+      break;
+    case 'extra_turn':
+      // 將英雄加入額外行動佇列（與前端一致）
+      if (_currentExtraTurnQueue_) _currentExtraTurnQueue_.push(hero.uid);
+      break;
+    case 'dispel_debuff':
+      // 被動觸發淨化（與前端一致）
+      cleanse_(hero, 1);
+      break;
+    case 'reflect':
+      // 被動觸發反彈效果（與前端一致）
+      applyStatus_(hero, {
+        type: 'reflect',
+        value: effect.multiplier || 0.15,
+        duration: 0,
+        maxStacks: 1,
+        sourceHeroId: hero.uid,
+      });
       break;
     default:
       break;

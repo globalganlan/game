@@ -2238,10 +2238,10 @@ function handleCompleteBattle_(params) {
     } catch (e) { /* 記錄失敗不影響流程 */ }
   }
 
-  // ── 使用伺服器結果決定勝負 ──
+  // ── 硬驗證模式：以 serverWinner 為準發放獎勵 ──
   var winner = serverWinner;
 
-  // ── 若伺服器判定非玩家勝利 → 不發獎勵 ──
+  // ── 若玩家敗北 → 不發獎勵 ──
   if (winner !== 'player') {
     return {
       success: true,

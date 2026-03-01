@@ -1,6 +1,6 @@
 # 戰鬥系統 Spec
 
-> 版本：v2.9 ｜ 狀態：🟢 已實作
+> 版本：v3.0 ｜ 狀態：🟢 已實作
 > 最後更新：2026-03-01
 > 負責角色：🎯 GAME_DESIGN → 🔧 CODING
 > 原始碼：`src/domain/battleEngine.ts`（前端邏輯）、`gas/battleEngine.js`（後端引擎）、`src/App.tsx`（3D 演出整合）、`gas/程式碼.js`（`handleCompleteBattle_` 伺服器端結算）
@@ -813,3 +813,4 @@ App.tsx
 | v2.7 | 2026-03-01 | **能量滿即施放大招**：重構 `processInterruptUltimates` 移除 `excludeUid` 改用 `alreadyActedUids` Set，每個 action 後掃描**所有**角色（含攻擊者自己、被攻擊者），能量滿即插入大招；前後端（`battleEngine.ts` + `gas/battleEngine.js`）同步修正；GAS POST @68、GET @69；**致死攻擊不阻塞**：死亡動畫推入 `backgroundAnims`（不 await），攻擊者立刻後退 |
 | v2.8 | 2026-03-01 | **反作弊校驗**：新增 Mulberry32 seeded PRNG（`src/domain/seededRng.ts`），前端 `runBattleCollect()` 接受 seed 參數暫時覆蓋 `Math.random`；GAS 新增 `verify-battle` action（`handleVerifyBattle_`），以相同 seed 重現戰鬥比對 winner；`antiCheatService.ts` 在 Phase A 後 fire-and-forget 背景驗證，結算前 await 結果，不一致時覆寫 winner 並 toast 警告；GAS 記錄可疑紀錄至 `ANTICHEAT_LOG` ScriptProperties；GAS POST @80、GET @81 |
 | v2.9 | 2026-03-01 | **伺服器端獎勵計算**：新增 `handleCompleteBattle_`（`gas/程式碼.js`），整合反作弊校驗 + 伺服器端獎勵計算（gold/exp/diamond）+ 升等（`expToNextLevel_`）+ 進度寫入；`save-progress` 封鎖 gold/diamond/exp/level/storyProgress/towerFloor；前端 `completeBattle()`（`progressionService.ts`）背景呼叫，動畫播放期間不阻塞；涵蓋 story/tower/daily/pvp/boss 五模式；GAS POST @82、GET @83 |
+| v3.0 | 2026-03-01 | **反作弊軟驗證 + GAS 引擎同步修復**：`handleCompleteBattle_` 改為信任 `localWinner` 發放獎勵（軟驗證模式），記錄不一致供日後分析但不阻擋獎勵；GAS `battleEngine.js` 修復三大缺漏與前端同步：(1) 戰鬥開始觸發 `always` 被動、(2) `every_n_turns` 週期被動處理、(3) `processExtraTurns_` 額外行動機制 + `_currentExtraTurnQueue_` 模組變數；新增 `resolvePassiveTargets_` 支援 `all_allies`/`all_enemies` 被動目標；新增 `dispel_debuff`、`reflect`、`extra_turn` 被動效果處理；GAS POST @84、GET @85 |
