@@ -1,6 +1,6 @@
 # 戰鬥系統 Spec
 
-> 版本：v3.3 ｜ 狀態：🟢 已實作
+> 版本：v3.5 ｜ 狀態：🟢 已實作
 > 最後更新：2026-03-02
 > 負責角色：🎯 GAME_DESIGN → 🔧 CODING
 > 原始碼：`src/domain/battleEngine.ts`（前端邏輯）、`gas/battleEngine.js`（後端引擎）、`src/App.tsx`（3D 演出整合）、`gas/程式碼.js`（`handleCompleteBattle_` 伺服器端結算）
@@ -697,10 +697,11 @@ IDLE → ADVANCING → ATTACKING → RETREATING → IDLE
 
 - **問題**：Phase B 動畫回放中，如果目標已因 DOT/反彈在前一個 action 死亡，後續 NORMAL_ATTACK / SKILL_CAST action 仍嘗試對已死角色播放前進→攻擊動畫，造成英雄衝向空位置
 - **根因**：Phase A 引擎正確過濾死亡目標（`targetStrategy` 中 `filter(e => e.currentHP > 0)`），但 Phase B 動畫層未檢查 `actorStatesRef` 即盲目播放
-- **解法**（三處守衛）：
-  1. **NORMAL_ATTACK handler**：開頭檢查攻擊者與目標的 `actorStatesRef.current[uid] === 'DEAD' || hero.currentHP <= 0`，若任一已死則 `break`
+- **解法**（三處守衛）——**僅使用 `actorStatesRef` 判斷，不可用 `currentHP <= 0`**：
+  1. **NORMAL_ATTACK handler**：開頭檢查攻擊者與目標的 `actorStatesRef.current[uid] === 'DEAD'`，若任一已死則 `break`
   2. **SKILL_CAST handler**：開頭檢查攻擊者是否已死，若已死則 `break`
   3. **DEATH handler**：開頭檢查目標是否已死（狀態已為 DEAD），若已死則 `break`（防止重複播放死亡動畫）
+- **⚠ 不可使用 `currentHP <= 0` 判斷**：`applyHpFromAction()` 在 `onAction()` **之前**執行，會將**當前 action** 的傷害預先扣除；擊殺 action 的目標 HP 已被扣為 0，用 `currentHP` 判斷會誤觸 early-exit 導致跳過死亡動畫（英雄站著不動）。`playHitOrDeath()` 中 `setActorState('DEAD')` 是同步呼叫，可確保後續 action 正確偵測到已死角色。
 
 ---
 
@@ -848,3 +849,5 @@ App.tsx
 | v3.1 | 2026-03-01 | **硬驗證恢復 + Spec 全面同步**：`handleCompleteBattle_` 改回 `var winner = serverWinner` 硬驗證模式（以伺服器重跑結果為準發放獎勵）；GAS POST @86、GET @87；Spec 全面同步：BattleAction 11→13 種、PassiveTrigger 13→15 種、executePassiveEffect 6→10 種、BattleContext 新增 damageMult、damageType 新增 dot |
 | v3.2 | 2026-03-02 | **Phase B HP 狀態修復**：`runBattleCollect()` 計算完成後（Phase A），engine 會 mutate heroMap 的 BattleHero 到最終狀態（死亡英雄 currentHP=0）；先前 `needsHpSync = false` 導致 Phase B 回放時讀取已為 0 的 HP，使英雄首回合即判定死亡（retreat handler 檢查 `heroMap.get(uid).currentHP` 為 0）；修正：Phase A 完成後重置所有 BattleHero `currentHP = maxHP`、`energy = 0`，並設 `needsHpSync = true`，讓 `applyHpFromAction()` 在 Phase B 逐步更新 HP（與 replay 模式一致） |
 | v3.3 | 2026-03-02 | **Phase B 死亡角色守衛 + 致死跳過 HURT**：(1) NORMAL_ATTACK / SKILL_CAST / DEATH handler 開頭新增 dead-actor guard，檢查 `actorStatesRef` + `currentHP`，已死角色直接 `break` 不播動畫（修復 DOT/反彈致死後，後續英雄仍衝向空位置攻擊的問題）；(2) 致死傷害不再播放 HURT 動畫，直接進入 DEAD 分支（普攻/技能/反彈三處統一行為） |
+| v3.4 | 2026-03-02 | **屬性提示修復 + DOT/被動致死動畫修復**：(1) NORMAL_ATTACK 的 elementHint 加入 `setTimeout(2000)` 自動清理（先前無 cleanup 導致累積）；(2) SKILL_CAST handler 新增屬性相剋指示（取第一個非閃避目標的 `elementMult`）；(3) DOT_TICK / PASSIVE_DAMAGE handler 新增致死判定 — 若 `hero.currentHP <= 0` 直接播放死亡動畫（含音效 + `waitForAction('DEAD')` + `removeSlot`），後續 DEATH action 因 `actorState===DEAD` 自動跳過 |
+| v3.5 | 2026-03-02 | **Dead-Actor Guard 修正 — 移除 `currentHP <= 0` 判斷**：`applyHpFromAction()` 在 `onAction()` 前執行，會將**當前 action** 的傷害預扣為 0，導致擊殺 action 誤觸 early-exit → 跳過死亡動畫（角色站著不動、HP 條不更新）。修正：三處 guard（NORMAL_ATTACK×2 + SKILL_CAST×1）只保留 `actorStatesRef === 'DEAD'`，移除 `|| currentHP <= 0` 判斷 |

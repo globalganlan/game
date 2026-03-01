@@ -1,8 +1,8 @@
 # 開發狀態快照 — Dev Status
 
-> 最後更新：2026-03-02（第三十一次更新 — Phase B 死亡角色守衛 + 致死跳過 HURT + PWA 自動更新 + KOF98 SFX + 全域字型放大）
+> 最後更新：2026-03-02（第三十三次更新 — 屬性提示修復 + DOT/被動致死動畫修復）
 
-## 截至 2026-03-01 的開發狀態
+## 截至 2026-03-02 的開發狀態
 
 ### 已完成
 - [x] 3D 喪屍對戰場景（React 19 + Vite 5 + R3F 9 + Three.js 0.183 + TypeScript 5.9）
@@ -33,6 +33,8 @@
   - `runBattleLoop()` 改用 `runBattle()` + `onAction` callback
   - SlotHero → BattleHero 轉換（保留 _uid 對應）
   - 3D 演出回調完整映射（前進/攻擊/受傷/死亡/DOT/技能施放）- [x] **🐛 Phase B 死亡角色守衛** — NORMAL_ATTACK/SKILL_CAST/DEATH handler 新增 dead-actor guard，已死角色不再播放前進/攻擊動畫
+- [x] **✨ Buff/Debuff 3D 圖示** — 英雄模型上方顯示綠底(Buff)/紅底(Debuff) icon，可疊層顯示×N
+- [x] **✨ Buff/Debuff 施加漂浮文字** — BUFF_APPLY 觸發時在被施加者頭頂顯示綠/紅色中文狀態名（含 DOT）
 - [x] **✨ 致死傷害跳過 HURT** — 普攻/技能/反彈致死時不再播 HURT 動畫，直接進入 DEAD
 - [x] **✨ KOF98 大招音效** — skill_cast SFX 重設計為 6 層 KOF98 Super Flash 風格
 - [x] **✨ 未解鎖技能預覽** — 英雄列表面板顯示完整技能資訊（灰色 + 🔒 ★N 解鎖徽章）
@@ -72,6 +74,8 @@
 | inventory.md | v1.2 | 🟢 CurrencyIcon 統一 icon |
 | optimistic-queue.md | v1.0 | 🟢 3 種套用模式 |
 | local-storage-migration.md | v1.0 | 🟢 版本化遷移鏈 |
+| buff-debuff-icons.md | v1.0 | 🟢 3D 狀態圖示（綠底/紅底 + 疊層數） |
+| buff-apply-toast.md | v1.0 | 🟢 施加漂浮文字（DOT 中文名稱） |
 
 ### 現有戰鬥系統已實作功能
 - [x] GameState 5 態狀態機（PRE_BATTLE→FETCHING→IDLE→BATTLE→GAMEOVER）

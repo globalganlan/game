@@ -46,6 +46,14 @@ export interface PassiveHint {
   heroUid: string
 }
 
+export interface BuffApplyHint {
+  id: number
+  effectType: StatusType
+  isBuff: boolean
+  timestamp: number
+  heroUid: string
+}
+
 /* ════════════════════════════════════
    Buff / Debuff 圖示對應
    ════════════════════════════════════ */

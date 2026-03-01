@@ -11,9 +11,10 @@ import { Billboard, Text } from '@react-three/drei'
 import * as THREE from 'three'
 
 import { ZombieModel } from './ZombieModel'
-import { DamagePopup, HealthBar3D, EnergyBar3D, SkillToast3D, ElementHint3D, PassiveHint3D, LOCAL_FONT } from './SceneWidgets'
+import { DamagePopup, HealthBar3D, EnergyBar3D, SkillToast3D, ElementHint3D, PassiveHint3D, BuffIcons3D, BuffApplyToast3D, LOCAL_FONT } from './SceneWidgets'
 import type { SlotHero, ActorState, AnimationState, DamagePopupData } from '../types'
-import type { SkillToast, ElementHint, PassiveHint } from './BattleHUD'
+import type { SkillToast, ElementHint, PassiveHint, BuffApplyHint } from './BattleHUD'
+import type { StatusEffect } from '../domain/types'
 
 import type { Vector3Tuple } from 'three'
 
@@ -53,6 +54,10 @@ interface HeroProps {
   elementHints?: ElementHint[]
   /** 被動觸發提示（顯示在此英雄頭頂） */
   passiveHints?: PassiveHint[]
+  /** 當前身上的 Buff/Debuff 列表（顯示 3D Icon） */
+  battleBuffs?: StatusEffect[]
+  /** Buff/Debuff 施加漂浮文字 */
+  buffApplyHints?: BuffApplyHint[]
 }
 
 /* ────────────────────────────
@@ -85,6 +90,8 @@ export function Hero({
   skillToasts = [],
   elementHints = [],
   passiveHints = [],
+  battleBuffs = [],
+  buffApplyHints = [],
 }: HeroProps) {
   const meshRef = useRef<THREE.Group>(null)
   const [basePosition] = useState<Vector3Tuple>(position)
@@ -250,6 +257,14 @@ export function Hero({
         {passiveHints.map((ph) => (
           <PassiveHint3D key={ph.id} skillName={ph.skillName} position={[0, 1.0, 0]} textScale={textScale} />
         ))}
+
+        {/* Buff/Debuff 施加漂浮文字 */}
+        {buffApplyHints.map((bh) => (
+          <BuffApplyToast3D key={bh.id} effectType={bh.effectType} isBuff={bh.isBuff} position={[0, 0.8, 0]} textScale={textScale} />
+        ))}
+
+        {/* Buff/Debuff 3D 圖示列 */}
+        <BuffIcons3D effects={battleBuffs} textScale={textScale} />
 
         <Billboard position={[0, 3.5, 0]} renderOrder={15}>
           <Text font={LOCAL_FONT} fontSize={0.4 * textScale} color="white" outlineColor="black" outlineWidth={0.06}>

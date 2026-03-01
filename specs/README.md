@@ -15,7 +15,7 @@
 
 | 檔案 | 系統 | 版本 | 狀態 |
 |------|------|------|------|
-| `specs/core-combat.md` | 回合制戰鬥系統（Domain Engine + Command Pattern） | v3.1 | 🟢 已實作 |
+| `specs/core-combat.md` | 回合制戰鬥系統（Domain Engine + Command Pattern） | v3.3 | 🟢 已實作 |
 | `specs/hero-schema.md` | 英雄資料結構（三層型別：RawHeroData → RawHeroInput → BattleHero + HeroInstance.stars） | v2.4 | 🟢 已實作 |
 | `specs/damage-formula.md` | 傷害公式（10 步流程：閃避→DEF→暴擊→屬性→護盾→反彈） | v1.1 | 🟢 已實作 |
 | `specs/skill-system.md` | 技能系統（SkillTemplate + SkillEffect + Sheets 資料管線） | v1.4 | 🟢 已實作 |
@@ -32,6 +32,8 @@
 | `specs/local-storage-migration.md` | localStorage Schema 版本遷移（版本化 + 自動 migration + 安全降級） | v1.0 | 🟢 已實作 |
 | `specs/ui-flow.md` | UI 流程與畫面定義（GameState/MenuScreen 8 值/導航函式/條件式過場幕/CurrencyIcon） | v1.2 | 🟢 已實作 |
 | `specs/audio.md` | 音效與音樂系統（Web Audio API 合成 BGM 6 曲目 + SFX 9 種 + AudioManager） | v0.3 | 🟢 已實作 |
+| `specs/buff-debuff-icons.md` | Buff/Debuff 3D 狀態圖示（綠底/紅底 + 疊層數 + 模型上方顯示） | v1.0 | 🟢 已實作 |
+| `specs/buff-apply-toast.md` | Buff/Debuff 施加漂浮文字（含 DOT 中文名稱 + 綠/紅色區分） | v1.0 | 🟢 已實作 |
 | `specs/narrative.md` | 敘事與世界觀（主線章節/角色背景/劇情系統） | v0.1 | ⬜ 未實作 |
 
 > 狀態：🟢 已實作/定稿 ｜ 🟡 草案 ｜ 🔴 衝突待解 ｜ ⚪ 待建立
@@ -62,6 +64,7 @@
 | `src/constants/rarity.ts` | inventory, ui-flow | 道具 icon/名稱/稀有度共用常數 |
 | `src/components/ShopPanel.tsx` | inventory | 商店面板（4 類商品 + 購買流程） |
 | `src/components/SettingsPanel.tsx` | audio, ui-flow | 設定面板（音量滑桿 + 靜音 + 帳號） |
+| `src/components/SceneWidgets.tsx` | buff-debuff-icons, buff-apply-toast | BuffIcons3D + BuffApplyToast3D 3D 狀態圖示/漂字 |
 | `gas/程式碼.js` | auth, save, stage, progression, inventory, mailbox | GAS 全部 handler |
 
 ## Spec 檔案格式規範

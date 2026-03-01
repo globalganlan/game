@@ -138,11 +138,13 @@ export class BattleFlowValidator {
     }
 
     // 驗證：被殺的目標應該已經是 DEAD
+    // ★ 致死攻擊的死亡動畫放入 backgroundAnims 不阻塞 onAction，
+    //   afterAction 時角色可能仍在 IDLE/HURT → 降級為 warn（非真正錯誤）
     if (action.type === 'NORMAL_ATTACK' && action.killed) {
       const state = this.actorStates.get(action.targetUid)
       if (state && state !== 'DEAD') {
-        this.addIssue('error',
-          `After NORMAL_ATTACK kill, target ${action.targetUid} is ${state} instead of DEAD`,
+        this.addIssue('warn',
+          `After NORMAL_ATTACK kill, target ${action.targetUid} is ${state} (death anim in background, expected)`,
         )
       }
     }

@@ -47,7 +47,7 @@ import type { MailItem } from './services/mailService'
 import { isStandalone, claimPwaReward } from './services/pwaService'
 /* ── Phase 7: Battle HUD ── */
 import { BattleHUD } from './components/BattleHUD'
-import type { BattleBuffMap, BattleEnergyMap, SkillToast, ElementHint, PassiveHint } from './components/BattleHUD'
+import type { BattleBuffMap, BattleEnergyMap, SkillToast, ElementHint, PassiveHint, BuffApplyHint } from './components/BattleHUD'
 
 import type {
   GameState,
@@ -115,6 +115,13 @@ const SCENE_RENDER_GRACE_MS = 300   // closeCurtain delay：場景渲染餘裕
 const INITIAL_CURTAIN_GRACE_MS = 350 // 初始載入收幕前的額外等待
 const REPLAY_SCENE_SETTLE_MS = 400   // 回放：收幕後等場景更新再啟動 loop
 const ATTACK_DELAY_MS = 840   // 等待攻擊動畫的傷害觸發點（對應 Hero.tsx 中攻擊動畫的 timing）
+
+/** Buff 類型集合（用於 BuffApplyToast3D 判斷 isBuff） */
+const BUFF_TYPE_SET = new Set([
+  'atk_up', 'def_up', 'spd_up', 'crit_rate_up', 'crit_dmg_up',
+  'dmg_reduce', 'shield', 'regen', 'energy_boost',
+  'dodge_up', 'reflect', 'taunt', 'immunity',
+])
 
 /** 等待 N 個 requestAnimationFrame（確保 DOM/WebGL 已 commit） */
 const waitFrames = (n = 2): Promise<void> =>
@@ -377,9 +384,11 @@ export default function App() {
   const [skillToasts, setSkillToasts] = useState<SkillToast[]>([])
   const [elementHints, setElementHints] = useState<ElementHint[]>([])
   const [passiveHints, setPassiveHints] = useState<PassiveHint[]>([])
+  const [buffApplyHints, setBuffApplyHints] = useState<BuffApplyHint[]>([])
   const skillToastIdRef = useRef(0)
   const elementHintIdRef = useRef(0)
   const passiveHintIdRef = useRef(0)
+  const buffApplyHintIdRef = useRef(0)
   useEffect(() => { speedRef.current = speed }, [speed])
   const [battleResult, setBattleResult] = useState<'victory' | 'defeat' | null>(null)
 
@@ -474,6 +483,7 @@ export default function App() {
     setSkillToasts([])
     setElementHints([])
     setPassiveHints([])
+    setBuffApplyHints([])
     setBattleStats({})
     setShowBattleStats(false)
     setStageId('1-1')
@@ -494,6 +504,7 @@ export default function App() {
     skillToastIdRef.current = 0
     elementHintIdRef.current = 0
     passiveHintIdRef.current = 0
+    buffApplyHintIdRef.current = 0
     battleHeroesRef.current = new Map()
     battleActionsRef.current = []
     isReplayingRef.current = false
@@ -1010,6 +1021,7 @@ export default function App() {
     setSkillToasts([])
     setElementHints([])
     setPassiveHints([])
+    setBuffApplyHints([])
     // ★ 清除殘留的動畫/移動 Promise — 避免上一場的 stale timeout 漏進新戰鬥
     for (const key of Object.keys(actionResolveRefs.current)) {
       actionResolveRefs.current[key]?.resolve()
@@ -1052,6 +1064,7 @@ export default function App() {
     setSkillToasts([])
     setElementHints([])
     setPassiveHints([])
+    setBuffApplyHints([])
     // ★ 清除殘留的動畫/移動 Promise — 避免上一場的 stale timeout 漏進回放
     for (const key of Object.keys(actionResolveRefs.current)) {
       actionResolveRefs.current[key]?.resolve()
@@ -1087,6 +1100,7 @@ export default function App() {
     setSkillToasts([])
     setElementHints([])
     setPassiveHints([])
+    setBuffApplyHints([])
     setMenuScreen('none')
     // ★ 清除殘留的動畫/移動 Promise
     for (const key of Object.keys(actionResolveRefs.current)) {
@@ -1132,6 +1146,7 @@ export default function App() {
       setSkillToasts([])
       setElementHints([])
       setPassiveHints([])
+      setBuffApplyHints([])
       // ★ 清除殘留的動畫/移動 Promise
       for (const key of Object.keys(actionResolveRefs.current)) {
         actionResolveRefs.current[key]?.resolve()
@@ -1181,6 +1196,7 @@ export default function App() {
     setSkillToasts([])
     setElementHints([])
     setPassiveHints([])
+    setBuffApplyHints([])
     // ★ 清除殘留的動畫/移動 Promise
     for (const key of Object.keys(actionResolveRefs.current)) {
       actionResolveRefs.current[key]?.resolve()
@@ -1323,6 +1339,7 @@ export default function App() {
     setSkillToasts([])
     setElementHints([])
     setPassiveHints([])
+    setBuffApplyHints([])
 
     // ★ 戰鬥開始時立即同步所有英雄的 maxHP / currentHP，
     //   讓 HealthBar3D 的分母使用 progression 加成後的 maxHP
@@ -1410,6 +1427,41 @@ export default function App() {
     /** 背景動畫（死亡等長動畫）—— 不阻塞下一個 action，Phase C 前統一等待 */
     const backgroundAnims: Promise<void>[] = []
     const onAction = async (action: BattleAction) => {
+      // ── 戰鬥過程 log ──
+      if (import.meta.env.DEV) {
+        const brief = (() => {
+          const a = action
+          const name = (uid: string) => { const h = heroMap.get(uid); return h ? `[${h.side === 'player' ? '我' : '敵'}]${h.name}` : uid }
+          switch (a.type) {
+            case 'TURN_START': return `── 回合 ${a.turn} ──`
+            case 'TURN_END': return `── 回合 ${a.turn} 結束 ──`
+            case 'NORMAL_ATTACK': {
+              const r = a.result
+              const dmgStr = r.isDodge ? 'MISS' : `${r.damage}${r.isCrit ? ' 暴擊' : ''}${r.elementMult && r.elementMult !== 1 ? ` ×${r.elementMult}屬性` : ''}`
+              return `${name(a.attackerUid)} → ${name(a.targetUid)}  普攻 ${dmgStr}${a.killed ? ' 💀擊殺' : ''}${r.reflectDamage > 0 ? ` (反彈${r.reflectDamage})` : ''}`
+            }
+            case 'SKILL_CAST': {
+              const tgts = a.targets.map(t => {
+                const n = name(t.uid)
+                if ('damage' in t.result) { const d = t.result as DamageResult; return `${n}:${d.isDodge ? 'MISS' : d.damage}${t.killed ? '💀' : ''}` }
+                return `${n}:+${(t.result as { heal: number }).heal}HP`
+              }).join(', ')
+              return `${name(a.attackerUid)} 技能【${a.skillName}】→ ${tgts}`
+            }
+            case 'DOT_TICK': return `${name(a.targetUid)} ${a.dotType} -${a.damage}`
+            case 'BUFF_APPLY': return `${name(a.targetUid)} +${a.effect.type}${a.effect.stacks > 1 ? `×${a.effect.stacks}` : ''} (${a.effect.duration}t)`
+            case 'BUFF_EXPIRE': return `${name(a.targetUid)} -${a.effectType} 到期`
+            case 'DEATH': return `${name(a.targetUid)} 💀 死亡`
+            case 'PASSIVE_TRIGGER': return `${name(a.heroUid)} 被動【${a.skillName}】觸發`
+            case 'PASSIVE_DAMAGE': return `${name(a.attackerUid)} → ${name(a.targetUid)} 被動傷害 ${a.damage}${a.killed ? ' 💀' : ''}`
+            case 'ENERGY_CHANGE': return `${name(a.heroUid)} 能量 +${a.delta} → ${a.newValue}`
+            case 'EXTRA_TURN': return `${name(a.heroUid)} 額外行動（${a.reason}）`
+            case 'BATTLE_END': return `══ 戰鬥結束：${a.winner === 'player' ? '勝利' : a.winner === 'enemy' ? '失敗' : '平手'} ══`
+            default: return JSON.stringify(a)
+          }
+        })()
+        console.log(`%c[Battle] ${brief}`, action.type === 'TURN_START' || action.type === 'BATTLE_END' ? 'color:#facc15;font-weight:bold' : action.type === 'DEATH' ? 'color:#ef4444' : 'color:#94a3b8')
+      }
       // ★ 等待所有待完成的後退動畫（閃避時無受傷動畫緩衝，前一位攻擊者可能仍在回位）
       if (action.type === 'NORMAL_ATTACK' || action.type === 'SKILL_CAST') {
         if (pendingRetreats.size > 0) {
@@ -1432,22 +1484,26 @@ export default function App() {
           const atk = heroMap.get(action.attackerUid)!
           const tgt = heroMap.get(action.targetUid)!
 
-          // ★ 攻擊者已死（背景死亡動畫已完成 or HP已歸零）→ 跳過整個 action
-          if (actorStatesRef.current[action.attackerUid] === 'DEAD' || atk.currentHP <= 0) {
+          // ★ 攻擊者已死（背景死亡動畫已設定 actorState='DEAD'）→ 跳過整個 action
+          //   注意：不可用 atk.currentHP<=0 判斷，因 applyHpFromAction 已預扣本 action 傷害
+          if (actorStatesRef.current[action.attackerUid] === 'DEAD') {
             break
           }
 
-          // ★ 目標已死（被前一筆背景死亡動畫移除）→ 只顯示傷害數字，不播前進/攻擊動畫
-          if (actorStatesRef.current[action.targetUid] === 'DEAD' || tgt.currentHP <= 0) {
+          // ★ 目標已死（前一筆背景死亡動畫已同步設定 actorState='DEAD'）→ 只顯傷害數字
+          //   注意：不可用 tgt.currentHP<=0，同上理由（applyHpFromAction 已預扣）
+          if (actorStatesRef.current[action.targetUid] === 'DEAD') {
             if (!action.result.isDodge) addDamage(action.targetUid, action.result.damage)
             break
           }
 
           // Phase 7: 屬性相剋指示
           if (action.result.elementMult && action.result.elementMult !== 1.0) {
+            const ehId = ++elementHintIdRef.current
             const txt = action.result.elementMult > 1.0 ? '屬性剋制！' : '屬性抵抗'
             const clr = action.result.elementMult > 1.0 ? '#e63946' : '#4dabf7'
-            setElementHints((prev) => [...prev, { id: ++elementHintIdRef.current, text: txt, color: clr, timestamp: Date.now(), attackerUid: action.attackerUid }])
+            setElementHints((prev) => [...prev, { id: ehId, text: txt, color: clr, timestamp: Date.now(), attackerUid: action.attackerUid }])
+            setTimeout(() => setElementHints((prev) => prev.filter((h) => h.id !== ehId)), 2000)
           }
 
           // 1) 前進
@@ -1525,7 +1581,8 @@ export default function App() {
           const atk = heroMap.get(action.attackerUid)!
 
           // ★ 攻擊者已死 → 跳過整個技能 action
-          if (actorStatesRef.current[action.attackerUid] === 'DEAD' || atk.currentHP <= 0) {
+          //   注意：不可用 atk.currentHP<=0，因 applyHpFromAction 已預扣本 action 傷害
+          if (actorStatesRef.current[action.attackerUid] === 'DEAD') {
             break
           }
 
@@ -1539,6 +1596,19 @@ export default function App() {
             timestamp: Date.now(),
             attackerUid: action.attackerUid,
           }])
+
+          // Phase 7: 屬性相剋指示（技能版 — 取第一個非閃避傷害目標的 elementMult）
+          {
+            const firstDmg = action.targets.find(t => 'damage' in t.result && !(t.result as DamageResult).isDodge)
+            const em = firstDmg ? (firstDmg.result as DamageResult).elementMult : undefined
+            if (em && em !== 1.0) {
+              const ehId = ++elementHintIdRef.current
+              const txt = em > 1.0 ? '屬性剋制！' : '屬性抵抗'
+              const clr = em > 1.0 ? '#e63946' : '#4dabf7'
+              setElementHints((prev) => [...prev, { id: ehId, text: txt, color: clr, timestamp: Date.now(), attackerUid: action.attackerUid }])
+              setTimeout(() => setElementHints((prev) => prev.filter((h) => h.id !== ehId)), 2000)
+            }
+          }
 
           // 判斷是否有傷害目標（非攻擊技能如治療/buff不前進）
           const hasDamageTargets = action.targets.some(t => 'damage' in t.result)
@@ -1662,7 +1732,19 @@ export default function App() {
           if (action.damage > 0) {
             addDamage(action.targetUid, action.damage)
             const hero = heroMap.get(action.targetUid)
-            if (hero) syncHpToSlot(hero)
+            if (hero) {
+              syncHpToSlot(hero)
+              // ★ DOT 致死：直接播放死亡動畫（後續 DEATH action 會因 actorState===DEAD 跳過）
+              if (hero.currentHP <= 0 && actorStatesRef.current[action.targetUid] !== 'DEAD') {
+                await delay(200)
+                if (!skipBattleRef.current) audioManager.playSfx('death')
+                const deadDone = waitForAction(action.targetUid, 'DEAD')
+                setActorState(action.targetUid, 'DEAD')
+                await deadDone
+                removeSlot(hero)
+                break
+              }
+            }
           }
           await delay(200)
           break
@@ -1672,7 +1754,19 @@ export default function App() {
           if (action.damage > 0) {
             addDamage(action.targetUid, action.damage)
             const hero = heroMap.get(action.targetUid)
-            if (hero) syncHpToSlot(hero)
+            if (hero) {
+              syncHpToSlot(hero)
+              // ★ 被動傷害致死：直接播放死亡動畫（後續 DEATH action 會因 actorState===DEAD 跳過）
+              if (hero.currentHP <= 0 && actorStatesRef.current[action.targetUid] !== 'DEAD') {
+                await delay(200)
+                if (!skipBattleRef.current) audioManager.playSfx('death')
+                const deadDone = waitForAction(action.targetUid, 'DEAD')
+                setActorState(action.targetUid, 'DEAD')
+                await deadDone
+                removeSlot(hero)
+                break
+              }
+            }
           }
           await delay(200)
           break
@@ -1702,6 +1796,17 @@ export default function App() {
             else list.push(effect)
             return { ...prev, [targetUid]: list }
           })
+          // ★ Buff/Debuff 施加漂浮文字提示
+          const bhId = ++buffApplyHintIdRef.current
+          const isBuff = BUFF_TYPE_SET.has(effect.type)
+          setBuffApplyHints((prev) => [...prev, {
+            id: bhId,
+            effectType: effect.type,
+            isBuff,
+            timestamp: Date.now(),
+            heroUid: targetUid,
+          }])
+          setTimeout(() => setBuffApplyHints((prev) => prev.filter((h) => h.id !== bhId)), 2000)
           break
         }
 
@@ -2377,6 +2482,8 @@ export default function App() {
                 skillToasts={skillToasts.filter((t) => t.attackerUid === p._uid)}
                 elementHints={elementHints.filter((h) => h.attackerUid === p._uid)}
                 passiveHints={passiveHints.filter((ph) => ph.heroUid === p._uid)}
+                battleBuffs={battleBuffs[p._uid] || []}
+                buffApplyHints={buffApplyHints.filter((bh) => bh.heroUid === p._uid)}
               />
             ) : null,
           )}
@@ -2411,6 +2518,8 @@ export default function App() {
                 skillToasts={skillToasts.filter((t) => t.attackerUid === e._uid)}
                 elementHints={elementHints.filter((h) => h.attackerUid === e._uid)}
                 passiveHints={passiveHints.filter((ph) => ph.heroUid === e._uid)}
+                battleBuffs={battleBuffs[e._uid] || []}
+                buffApplyHints={buffApplyHints.filter((bh) => bh.heroUid === e._uid)}
               />
             ) : null,
           )}

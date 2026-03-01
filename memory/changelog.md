@@ -3,6 +3,104 @@
 > 按時間倒序排列，最新的在最上面。
 
 ---
+### [2026-03-01] Dead-Actor Guard 修正 — 移除 `currentHP <= 0` 判斷
+
+- **觸發者**：使用者回報「我方無名活屍還有血條站在那，別的英雄被打死就跟著一起消失」
+- **執行角色**：🔧 CODING
+
+#### 根因
+
+`applyHpFromAction()` 在 `onAction()` **之前**執行，對擊殺 action 的目標 HP 已被扣為 0。
+NORMAL_ATTACK / SKILL_CAST 的 dead-actor guard 原本使用 `actorStatesRef === 'DEAD' || currentHP <= 0`，
+導致**當前 action** 的擊殺目標誤觸 early-exit → 跳過死亡動畫 + HP 條不同步。
+
+#### 修正
+
+- **3 處 guard 移除 `|| currentHP <= 0`**（僅保留 `actorStatesRef === 'DEAD'`）：
+  - NORMAL_ATTACK 攻擊者 guard（L1488）
+  - NORMAL_ATTACK 目標 guard（L1493）
+  - SKILL_CAST 攻擊者 guard（L1582）
+- **安全性**：`playHitOrDeath()` 中 `setActorState('DEAD')` 是同步呼叫，backgroundAnims 的後續 action 可正確偵測
+- **Spec 更新**：`specs/core-combat.md` v3.4 → v3.5
+
+---
+### [2026-03-01] Buff/Debuff Icon 改良 — 中文短代號 + 溢出處理
+
+- **觸發者**：使用者提問（>8 個怎麼辦 + emoji 不顯示）
+- **執行角色**：🔧 CODING + 🎨 UI_DESIGN
+
+#### 修復 & 改良
+
+**1. Emoji → 中文短代號**：
+- `STATUS_ICONS_3D` 映射表全面改為中文短代號（攻↑/防↓/毒/焚/暈 等）
+- 原因：troika-three-text 使用 NotoSansSC.ttf 字型，不含 emoji glyph → 顯示方塊/空白
+- `BuffApplyToast3D` 的 emoji 前綴同步改為中文短代號
+- icon fontSize 從 0.16 調整為 0.11（中文兩字寬度需小一點才不溢出底框）
+- 2D HUD（`BattleHUD.tsx`）仍用 emoji（HTML 原生渲染無問題）
+
+**2. 超過 8 個 Buff/Debuff 溢出處理**：
+- 原：`effects.slice(0, 8)` 直接截斷，多出不顯示
+- 改：超過 8 個時顯示前 7 個 + 灰色 `+N` 溢出卡片（`#6b7280`, 70% 透明）
+
+#### 影響檔案
+- `src/components/SceneWidgets.tsx`：STATUS_ICONS_3D + BuffIcons3D + BuffApplyToast3D
+- `specs/buff-debuff-icons.md`：v1.0 → v1.1
+- `specs/buff-apply-toast.md`：v1.0 → v1.1
+
+---
+### [2026-03-02] 屬性提示修復 + DOT/被動致死動畫修復
+
+- **觸發者**：使用者回報 bug（屬性剋制/抵抗文字消失 + DOT 致死無死亡動畫）
+- **執行角色**：🔧 CODING + 🐛 QA_TESTING
+
+#### Bug 修復
+
+**1. 屬性相剋提示修復**：
+- NORMAL_ATTACK 的 `elementHint` 新增 `setTimeout(2000)` 自動清理（先前無 cleanup 導致累積）
+- SKILL_CAST handler 新增屬性相剋指示（取第一個非閃避傷害目標的 `elementMult`）
+- 修復技能攻擊時不顯示「屬性剋制！」/「屬性抵抗」的問題
+
+**2. DOT/被動傷害致死動畫修復**：
+- DOT_TICK handler：若 `hero.currentHP <= 0`，直接播放死亡動畫（音效 + `waitForAction('DEAD')` + `removeSlot`）
+- PASSIVE_DAMAGE handler：同上，被動傷害致死也直接播放死亡動畫
+- 後續 DEATH action 因 `actorStatesRef === 'DEAD'` 自動跳過（防重複）
+
+#### 影響檔案
+- `src/App.tsx`：NORMAL_ATTACK / SKILL_CAST / DOT_TICK / PASSIVE_DAMAGE handler
+- `specs/core-combat.md`：v3.3 → v3.4
+
+---
+### [2026-03-01] Buff/Debuff 3D 圖示 + 施加漂浮文字
+
+- **觸發者**：使用者需求（戰鬥中顯示 Buff/Debuff 狀態）
+- **執行角色**：🔧 CODING + 🎯 GAME_DESIGN + 🎨 UI_DESIGN
+
+#### 新增功能
+
+**1. Buff/Debuff 3D Icon 列（`src/components/SceneWidgets.tsx` — `BuffIcons3D`）**：
+- 英雄模型上方（Y=3.2）顯示當前身上的 Buff/Debuff 圖示列
+- Buff：綠色底框（`#22c55e`），Debuff：紅色底框（`#ef4444`）
+- 可疊層效果顯示 `×N` 層數數字（stacks > 1 時）
+- 最多顯示 8 個 icon，用 `Billboard` + `Text` + 矩形底框
+- Emoji icon 複用 BattleHUD.tsx `STATUS_ICONS` 映射表
+
+**2. Buff/Debuff 施加漂浮文字（`src/components/SceneWidgets.tsx` — `BuffApplyToast3D`）**：
+- BUFF_APPLY action 觸發時在被施加者頭頂顯示漂浮文字
+- 格式：`{emoji} {中文狀態名}`（如 `🔥 灼燒`、`⚔️ 攻擊提升`）
+- Buff 綠色文字（`#4ade80`），Debuff 紅色文字（`#f87171`）
+- 行為：微彈進場 → 前 0.3s 不透明 → 上浮淡出 → 2s 後自動清除
+- 完整中文狀態名映射（25 種 StatusType → 中文名稱）
+
+**3. 整合修改**：
+- `Hero.tsx`：新增 `battleBuffs`、`buffApplyHints` props，渲染 `BuffIcons3D` + `BuffApplyToast3D`
+- `BattleHUD.tsx`：新增 `BuffApplyHint` 介面
+- `App.tsx`：新增 `buffApplyHints` state + `buffApplyHintIdRef`，BUFF_APPLY handler 增加漂浮文字觸發，7 處重置點同步 `setBuffApplyHints([])`
+
+#### 新增 Spec
+- `specs/buff-debuff-icons.md` v1.0 — 3D 狀態圖示規格
+- `specs/buff-apply-toast.md` v1.0 — 施加漂浮文字規格
+
+---
 ### [2026-03-02] Phase B 死亡角色守衛 + 致死跳過 HURT + PWA 自動更新 + UI 優化
 
 - **觸發者**：使用者回報多項問題
