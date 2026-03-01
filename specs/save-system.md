@@ -1,6 +1,6 @@
 # 存檔系統 Spec
 
-> 版本：v1.4 ｜ 狀態：🟢 已實作
+> 版本：v1.5 ｜ 狀態：🟢 已實作
 > 最後更新：2026-03-01
 > 負責角色：🎯 GAME_DESIGN → 🔧 CODING
 
@@ -50,6 +50,8 @@
 | `pwaRewardClaimed` | boolean | PWA 安裝獎勵是否已領取（`true` = 已領） |
 | `lastSaved` | string | 最後存檔時間（ISO 8601） |
 
+> **注意**：`stageStars` 欄位不在 GAS `SAVE_HEADERS_` 初始定義中，由 `handleCompleteBattle_` 在首次寫入星級時動態新增。
+
 ### Sheet: `hero_instances`（玩家擁有的英雄，一人多行）
 
 | 欄位 | 型別 | 說明 |
@@ -59,7 +61,8 @@
 | `heroId` | number | 對應 heroes 表的 HeroID |
 | `level` | number | 英雄等級 |
 | `exp` | number | 當前經驗值 |
-| `ascension` | number | 突破階段 (0-6) |
+| `ascension` | number | 突破階段 (0-5)，最大 5（覺醒） |
+| `stars` | number | 星級 (0-6)，新英雄預設 0 |
 | `equippedItems` | string | 裝備 JSON `{"weapon":"equipId",...}` |
 | `obtainedAt` | string | 獲得時間 |
 
@@ -89,7 +92,7 @@
 
 `['displayName', 'resourceTimerStage', 'resourceTimerLastCollect', 'formation']`
 
-> **v1.4 安全強化**：`gold / diamond / exp / level / storyProgress / towerFloor` 已從白名單移除。
+> **v1.4 安全強化**：`gold / diamond / exp / level / storyProgress / towerFloor / stageStars` 已從白名單移除。
 > 這些敏感欄位只能透過 `complete-battle`、`shop-buy`、`gacha-pull` 等受驗證的 GAS 操作修改。
 > `formation` 若非 string 會自動 `JSON.stringify()`。
 
@@ -271,9 +274,9 @@ const INITIAL_SAVE = {
   gold: 10000,
   resourceTimerStage: '1-1',          // 通關 1-1 後啟動
   resourceTimerLastCollect: now,       // ISO 8601
-  towerFloor: 0,
+  towerFloor: 0,                          // GAS 初始值 0；前端 sanitizeSaveData 會將 <1 的值修正為 1
   storyProgress: '{"chapter":1,"stage":1}',
-  formation: '[6,1,9,null,null,null]',   // 自動上陣 3 隻初始英雄
+  formation: '[6,1,9,null,null,null]',   // 自動上陣 3 隻初始英雄（注意：此處為 heroId 數字，非 heroInstanceId 字串；前端 sanitize 時會處理）
   lastSaved: now,
 }
 
@@ -381,3 +384,4 @@ GAS handleCollectResources_:（包在 executeWithIdempotency_ 中）
 | v1.0 | 2026-03-01 | 全面同步實作：新增 gachaPity/gachaPool 欄位至 Sheet 結構、補齊 loadSave 完整流程（含 isNew/initSave/sanitize/reconcile/fallback）、enqueueSave debounce 2s + retry 3x 機制、collectResources 幂等保護 + 樂觀更新、陣型改為戰鬥開始時才保存、完整列出所有導出函式簽名、init-save 初始值詳列 |
 | v1.1 | 2026-02-28 | 初始英雄從 1 隻（無名活屍 N）改為 3 隻（+女喪屍 R、倖存者 R），formation 自動填入前 3 格，修復新帳號卡關 1-1 問題 |
 | v1.2 | 2026-02-28 | 新增完整登出狀態重置（`handleFullLogout`）：清除 8 個服務層快取 + 20+ 個 React state + 5 個 ref 守門旗標，修復登出再登入殘留舊帳號資料問題 |
+| v1.5 | 2026-03-01 | Spec 修正：hero_instances 新增 `stars` 欄位（第 9 欄，預設 0）；`ascension` 範圍修正 0-5（非 0-6）；`save-progress` 白名單阻擋加入 `stageStars`；標注 `stageStars` 非 SAVE_HEADERS_ 初始欄位（由 complete-battle 動態新增）；初始 formation 標注為 heroId 數字（非 heroInstanceId）；towerFloor 初始 0 / 前端 sanitize 修正為 1 |

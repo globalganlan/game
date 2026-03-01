@@ -415,31 +415,56 @@ const SFX_CONFIGS: Record<SfxType, SfxConfig> = {
   hit_normal: {
     volume: 0.7,
     notes: [
-      { type: 'sawtooth', freq: 150, gain: 1, attack: 0.003, decay: 0.12, filterFreq: 800 },
-      { type: 'square', freq: 80, gain: 0.6, attack: 0.001, decay: 0.08, filterFreq: 400 },
+      // 低頻衝擊 — 拳頭打進腐肉的悶響
+      { type: 'sawtooth', freq: 65, gain: 1, attack: 0.001, decay: 0.18, filterFreq: 350 },
+      // 中頻濕黏音 — 水分被擠壓的「噗啾」感
+      { type: 'square', freq: 120, gain: 0.5, attack: 0.002, decay: 0.12, filterFreq: 500 },
+      // 高頻碎裂微響 — 骨肉分離的細節
+      { type: 'sawtooth', freq: 320, gain: 0.2, attack: 0.001, decay: 0.06, filterFreq: 600, delay: 0.01 },
     ],
   },
   hit_critical: {
     volume: 0.9,
     notes: [
-      { type: 'sawtooth', freq: 200, gain: 1, attack: 0.002, decay: 0.15, filterFreq: 1200 },
-      { type: 'square', freq: 100, gain: 0.7, attack: 0.001, decay: 0.1, filterFreq: 600 },
-      { type: 'sine', freq: 600, gain: 0.4, attack: 0.005, decay: 0.2, delay: 0.03 },
+      // 重擊悶響 — 更深更大力的肉體衝擊
+      { type: 'sawtooth', freq: 50, gain: 1, attack: 0.001, decay: 0.25, filterFreq: 400 },
+      // 濕裂聲 — 爆漿般的撕裂
+      { type: 'square', freq: 95, gain: 0.7, attack: 0.001, decay: 0.15, filterFreq: 550 },
+      // 肉碎飛濺 — 高頻碎屑尾音
+      { type: 'sawtooth', freq: 250, gain: 0.35, attack: 0.003, decay: 0.1, filterFreq: 800, delay: 0.02 },
+      // 迴盪低鳴 — 暴擊特有的震動感
+      { type: 'sine', freq: 40, gain: 0.4, attack: 0.01, decay: 0.3, delay: 0.05 },
     ],
   },
   skill_cast: {
-    volume: 0.8,
+    volume: 0.9,
     notes: [
-      { type: 'sine', freq: 400, gain: 0.8, attack: 0.01, decay: 0.3 },
-      { type: 'sine', freq: 600, gain: 0.5, attack: 0.02, decay: 0.25, delay: 0.05 },
-      { type: 'sine', freq: 900, gain: 0.3, attack: 0.03, decay: 0.2, delay: 0.1 },
+      // ── KOF98 風格絕招音效 ──
+      // 1) 超閃光「ピキーン」— 金屬高音開場，格鬥天王 Super Flash 的標誌聲
+      { type: 'square', freq: 1400, gain: 0.9, attack: 0.001, decay: 0.12, filterFreq: 2000 },
+      // 2) 第二層閃光泛音 — 強化金屬質感厚度
+      { type: 'square', freq: 880, gain: 0.55, attack: 0.002, decay: 0.15, filterFreq: 1500 },
+      // 3) 斬擊氣勁波 — 中頻鋸齒波模擬能量噴發
+      { type: 'sawtooth', freq: 350, gain: 0.7, attack: 0.005, decay: 0.2, filterFreq: 800, delay: 0.03 },
+      // 4) 低頻衝擊 — 絕招釋放的重量感與壓迫力
+      { type: 'sine', freq: 70, gain: 0.8, attack: 0.01, decay: 0.3, delay: 0.02 },
+      // 5) 電弧殘響 — 能量放出後的嘶嘶餘韻
+      { type: 'sawtooth', freq: 600, gain: 0.3, attack: 0.01, decay: 0.25, filterFreq: 1000, delay: 0.08 },
+      // 6) 尾音迴盪 — 遠方雷鳴般的絕招收尾
+      { type: 'sine', freq: 150, gain: 0.4, attack: 0.02, decay: 0.35, delay: 0.15 },
     ],
   },
   death: {
-    volume: 0.7,
+    volume: 0.75,
     notes: [
-      { type: 'sine', freq: 200, gain: 1, attack: 0.01, decay: 0.4 },
-      { type: 'sine', freq: 100, gain: 0.8, attack: 0.05, decay: 0.6, delay: 0.1 },
+      // 身體倒地的沉重撞擊
+      { type: 'sawtooth', freq: 45, gain: 1, attack: 0.001, decay: 0.35, filterFreq: 250 },
+      // 骨架散落的碎裂聲
+      { type: 'square', freq: 90, gain: 0.5, attack: 0.003, decay: 0.2, filterFreq: 400, delay: 0.04 },
+      // 喉間最後的低吼氣息
+      { type: 'sawtooth', freq: 70, gain: 0.6, attack: 0.02, decay: 0.5, filterFreq: 200, delay: 0.08 },
+      // 地面震動迴盪 — 屍體重物落地的餘韻
+      { type: 'sine', freq: 30, gain: 0.4, attack: 0.05, decay: 0.6, delay: 0.15 },
     ],
   },
   gacha_pull: {

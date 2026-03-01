@@ -3,6 +3,35 @@
 > 按時間倒序排列，最新的在最上面。
 
 ---
+### [2026-03-02] 第一回合死亡 Bug 修復 + PWA Safe Area + SFX 重設計
+
+- **觸發者**：使用者回報 4 項問題
+- **執行角色**：🔧 CODING + 🎵 SOUND_MUSIC + 🎨 UI_DESIGN
+
+#### 修正內容
+
+**1. Phase B HP 狀態 Bug（`src/App.tsx`）**：
+- `runBattleCollect()` Phase A 完成後，engine 會 mutate heroMap BattleHero 到最終狀態（死亡英雄 currentHP=0）
+- 先前 `needsHpSync = false`→ Phase B 回放時 retreat handler 讀取 `heroMap.get(uid).currentHP` 已為 0 → 英雄第一回合即判定死亡
+- 修正：Phase A 後重置所有 BattleHero `currentHP = maxHP`、`energy = 0`，設 `needsHpSync = true`，讓 `applyHpFromAction()` 逐步更新
+
+**2. PWA Safe Area 適配（`src/App.css`）**：
+- `.main-menu-overlay`：新增 `padding-top: max(Npx, env(safe-area-inset-top, 0px))`
+- `.panel-overlay`：新增 `padding-top: max(Npx, env(safe-area-inset-top, 0px))`
+- `.login-screen`：新增 `padding-top: env(safe-area-inset-top, 0px)`
+- 補充既有 `.game-hud` safe-area padding，確保 iOS PWA 劉海/動態島不遮蔽 UI
+
+**3. SFX 殭屍主題重設計（`src/services/audioService.ts`）**：
+- `hit_normal`：2 層→3 層合成（sawtooth 65Hz + square 120Hz + sawtooth 320Hz + low-pass 濾波），模擬腐肉撞擊
+- `hit_critical`：3 層→4 層合成（深沉濕裂聲 + 地面震動）
+- `death`：2 層→4 層合成（sawtooth 45Hz + square 90Hz + sawtooth 70Hz + sine 30Hz），模擬殭屍倒地
+
+#### 影響 Spec
+- `specs/core-combat.md` v3.1 → v3.2
+- `specs/audio.md` v0.3 → v0.4
+- `specs/ui-flow.md` v1.2 → v1.3
+
+---
 ### [2026-03-01] 伺服器端獎勵計算 + save-progress 敏感欄位封鎖
 
 - **觸發者**：安全性審計 — 發現前端可直接竄改 gold/diamond/exp/level 透過 save-progress

@@ -1,7 +1,7 @@
 # 戰鬥系統 Spec
 
-> 版本：v3.0 ｜ 狀態：🟢 已實作
-> 最後更新：2026-03-01
+> 版本：v3.2 ｜ 狀態：🟢 已實作
+> 最後更新：2026-03-02
 > 負責角色：🎯 GAME_DESIGN → 🔧 CODING
 > 原始碼：`src/domain/battleEngine.ts`（前端邏輯）、`gas/battleEngine.js`（後端引擎）、`src/App.tsx`（3D 演出整合）、`gas/程式碼.js`（`handleCompleteBattle_` 伺服器端結算）
 
@@ -177,15 +177,17 @@ fetchData() 觸發：
 
 ```
 
-### BattleAction 型別（11 種指令）
+### BattleAction 型別（13 種指令）
 
 ```typescript
 type BattleAction =
   | { type: 'NORMAL_ATTACK'; attackerUid: string; targetUid: string;
-      result: DamageResult; killed: boolean }
+      result: DamageResult; killed: boolean;
+      _atkEnergyNew?: number; _tgtEnergyNew?: number }
   | { type: 'SKILL_CAST'; attackerUid: string; skillId: string; skillName: string;
-      targets: Array<{ uid: string; result: DamageResult | HealResult; killed?: boolean }> }
-  | { type: 'DOT_TICK'; targetUid: string; dotType: StatusType; damage: number }
+      targets: Array<{ uid: string; result: DamageResult | HealResult; killed?: boolean }>;
+      _atkEnergyNew?: number; _tgtEnergyMap?: Record<string, number> }
+  | { type: 'DOT_TICK'; targetUid: string; dotType: StatusType; damage: number; sourceUid?: string }
   | { type: 'BUFF_APPLY'; targetUid: string; effect: StatusEffect }
   | { type: 'BUFF_EXPIRE'; targetUid: string; effectType: StatusType }
   | { type: 'DEATH'; targetUid: string }
@@ -193,6 +195,9 @@ type BattleAction =
   | { type: 'ENERGY_CHANGE'; heroUid: string; delta: number; newValue: number }
   | { type: 'TURN_START'; turn: number }
   | { type: 'TURN_END'; turn: number }
+  | { type: 'PASSIVE_DAMAGE'; attackerUid: string; targetUid: string;
+      result: DamageResult; killed: boolean; skillId: string }
+  | { type: 'EXTRA_TURN'; heroUid: string }
   | { type: 'BATTLE_END'; winner: 'player' | 'enemy' | 'draw' }
 ```
 
@@ -205,7 +210,7 @@ type BattleAction =
    a. SlotHero  BattleHero 轉換（slotToInput  createBattleHero）
    b. 從 heroSkillsRef + skillsRef 查詢每個英雄的 activeSkill + passives
    c. energy = 0, passiveUsage = {}
-   d. 觸發所有角色 battle_start 被動
+   d. 觸發所有角色 battle_start + always 被動
 
 1. 回合迴圈 (turn = 1..50)
     TURN_START action
@@ -216,6 +221,7 @@ type BattleAction =
           DOT 致死 → DEATH action  continue
        Regen 結算
        觸發 turn_start 被動
+       觸發 every_n_turns 被動（turn % N === 0 的週期性被動）
        控制效果判定（stun/freeze  跳過，fear  跳過）
        判斷：energy >= 1000 且有 activeSkill 且未被 silence？
           是  executeSkill() → SKILL_CAST action → consumeEnergy
@@ -224,6 +230,7 @@ type BattleAction =
     回合結束 buff duration 倒數  BUFF_EXPIRE actions
     tickShieldDurations 結算
     觸發 turn_end 被動
+    turn_end 被動致死檢查 → DEATH action（若被動傷害殺死角色）
     TURN_END action
     勝負判定  BATTLE_END action（若一方全滅）
 
@@ -430,7 +437,7 @@ absorbDamageByShields(hero, damage) // 護盾吸收，回傳 [actualDmg, absorbe
 
 ## 六、被動技能觸發 
 
-### 觸發時機（13 種）
+### 觸發時機（15 種）
 
 ```typescript
 type PassiveTrigger =
@@ -445,6 +452,8 @@ type PassiveTrigger =
   | 'on_dodge'        // 閃避成功時
   | 'on_crit'         // 暴擊觸發時
   | 'hp_below_pct'    // HP 低於 X% 時（首次觸發）
+  | 'on_ally_death'   // 隊友死亡時（存活隊友觸發）
+  | 'on_ally_skill'   // 隊友施放技能時
   | 'every_n_turns'   // 每 N 回合觸發
   | 'always'          // 永久被動（battle_start 即生效，duration=0）
 ```
@@ -481,8 +490,12 @@ function triggerPassives(
 | `heal` | 自回復（scalingStat × multiplier + flatValue） |
 | `energy` | 自身加能量（flatValue） |
 | `damage` | 被動反擊（對 context.target 計算傷害） |
-| `revive` | 由 `checkLethalPassive()` 特殊處理 |
-| `extra_turn` |  TODO |
+| `damage_mult` | 倍率增傷（觸發時 context.damageMult = multiplier，引擎在傷害計算中套用） |
+| `damage_mult_random` | 隨機倍率增傷（min~max 區間隨機，同上） |
+| `revive` | 由 `checkLethalPassive()` 特殊處理（heal 效果也可保命） |
+| `dispel_debuff` | 清除目標身上指定數量的 debuff |
+| `reflect` | 對自身施加反彈狀態（value = multiplier） |
+| `extra_turn` | 額外行動：將英雄 uid 加入 extraTurnQueue，本回合結束後插隊行動 |
 
 ### on_lethal 特殊處理
 
@@ -578,6 +591,7 @@ const result = calculateHeal(attacker, target, effect)
 | `crit` | 橙色 + 加大 | 暴擊 |
 | `miss` | 灰色 | 閃避 |
 | `weakness` | 紅色 | 屬性剋制 |
+| `dot` | 紫色 | DOT 持續傷害（burn/poison/bleed） |
 | `shield` | 藍色 | 完全被護盾吸收 |
 
 ---
@@ -744,6 +758,7 @@ interface RawHeroInput {
 interface BattleEngineConfig {
   maxTurns: number          // 預設 50
   onAction: (action: BattleAction) => void | Promise<void>
+  _extraTurnQueue?: string[]  // @internal 額外行動佇列
 }
 ```
 
@@ -754,6 +769,7 @@ interface BattleContext {
   turn: number; attacker: BattleHero; target: BattleHero | null
   targets: BattleHero[]; allAllies: BattleHero[]; allEnemies: BattleHero[]
   damageDealt: number; isKill: boolean; isCrit: boolean; isDodge: boolean
+  damageMult?: number   // on_attack 被動的傷害倍率修正
 }
 ```
 
@@ -796,7 +812,7 @@ App.tsx
 - [ ] 能量條 UI
 - [ ] 傷害飄字多色分類
 - [ ] CASTING 專屬動畫
-- [ ] extra_turn 額外行動
+- [x] ~~extra_turn 額外行動~~（已實作 `processExtraTurns()`）
 
 ## 變更歷史
 
@@ -813,4 +829,6 @@ App.tsx
 | v2.7 | 2026-03-01 | **能量滿即施放大招**：重構 `processInterruptUltimates` 移除 `excludeUid` 改用 `alreadyActedUids` Set，每個 action 後掃描**所有**角色（含攻擊者自己、被攻擊者），能量滿即插入大招；前後端（`battleEngine.ts` + `gas/battleEngine.js`）同步修正；GAS POST @68、GET @69；**致死攻擊不阻塞**：死亡動畫推入 `backgroundAnims`（不 await），攻擊者立刻後退 |
 | v2.8 | 2026-03-01 | **反作弊校驗**：新增 Mulberry32 seeded PRNG（`src/domain/seededRng.ts`），前端 `runBattleCollect()` 接受 seed 參數暫時覆蓋 `Math.random`；GAS 新增 `verify-battle` action（`handleVerifyBattle_`），以相同 seed 重現戰鬥比對 winner；`antiCheatService.ts` 在 Phase A 後 fire-and-forget 背景驗證，結算前 await 結果，不一致時覆寫 winner 並 toast 警告；GAS 記錄可疑紀錄至 `ANTICHEAT_LOG` ScriptProperties；GAS POST @80、GET @81 |
 | v2.9 | 2026-03-01 | **伺服器端獎勵計算**：新增 `handleCompleteBattle_`（`gas/程式碼.js`），整合反作弊校驗 + 伺服器端獎勵計算（gold/exp/diamond）+ 升等（`expToNextLevel_`）+ 進度寫入；`save-progress` 封鎖 gold/diamond/exp/level/storyProgress/towerFloor；前端 `completeBattle()`（`progressionService.ts`）背景呼叫，動畫播放期間不阻塞；涵蓋 story/tower/daily/pvp/boss 五模式；GAS POST @82、GET @83 |
-| v3.0 | 2026-03-01 | **反作弊軟驗證 + GAS 引擎同步修復**：`handleCompleteBattle_` 改為信任 `localWinner` 發放獎勵（軟驗證模式），記錄不一致供日後分析但不阻擋獎勵；GAS `battleEngine.js` 修復三大缺漏與前端同步：(1) 戰鬥開始觸發 `always` 被動、(2) `every_n_turns` 週期被動處理、(3) `processExtraTurns_` 額外行動機制 + `_currentExtraTurnQueue_` 模組變數；新增 `resolvePassiveTargets_` 支援 `all_allies`/`all_enemies` 被動目標；新增 `dispel_debuff`、`reflect`、`extra_turn` 被動效果處理；GAS POST @84、GET @85 |
+| v3.0 | 2026-03-01 | **GAS 引擎同步修復**：GAS `battleEngine.js` 修復五大缺漏與前端同步：(1) 戰鬥開始觸發 `always` 被動、(2) `every_n_turns` 週期被動處理、(3) `processExtraTurns_` 額外行動機制 + `_currentExtraTurnQueue_` 模組變數、(4) `resolvePassiveTargets_` 支援 `all_allies`/`all_enemies`/`self` 被動目標、(5) 新增 `dispel_debuff`/`reflect`/`extra_turn` 被動效果處理 |
+| v3.1 | 2026-03-01 | **硬驗證恢復 + Spec 全面同步**：`handleCompleteBattle_` 改回 `var winner = serverWinner` 硬驗證模式（以伺服器重跑結果為準發放獎勵）；GAS POST @86、GET @87；Spec 全面同步：BattleAction 11→13 種、PassiveTrigger 13→15 種、executePassiveEffect 6→10 種、BattleContext 新增 damageMult、damageType 新增 dot |
+| v3.2 | 2026-03-02 | **Phase B HP 狀態修復**：`runBattleCollect()` 計算完成後（Phase A），engine 會 mutate heroMap 的 BattleHero 到最終狀態（死亡英雄 currentHP=0）；先前 `needsHpSync = false` 導致 Phase B 回放時讀取已為 0 的 HP，使英雄首回合即判定死亡（retreat handler 檢查 `heroMap.get(uid).currentHP` 為 0）；修正：Phase A 完成後重置所有 BattleHero `currentHP = maxHP`、`energy = 0`，並設 `needsHpSync = true`，讓 `applyHpFromAction()` 在 Phase B 逐步更新 HP（與 replay 模式一致） |

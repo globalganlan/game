@@ -1,6 +1,6 @@
 # 帳號系統 Spec
 
-> 版本：v1.3 ｜ 狀態：🟢 已實作
+> 版本：v1.4 ｜ 狀態：🟢 已實作
 > 最後更新：2026-03-01
 > 負責角色：🎯 GAME_DESIGN → 🔧 CODING
 
@@ -19,7 +19,7 @@
 | 原始碼 | 說明 |
 |--------|------|
 | `src/hooks/useAuth.ts` | React Hook — 封裝 authService，提供 `doAutoLogin / doLogin / doBind / doChangeName / doLogout` |
-| `src/services/authService.ts` | 核心服務 — `autoLogin / loginWithEmail / bindAccount / changeName / changePassword / logout / getAuthState` |
+| `src/services/authService.ts` | 核心服務 — `autoLogin / registerGuest / loginWithEmail / bindAccount / changeName / changePassword / logout / getAuthState / onAuthChange` |
 | `src/components/LoginScreen.tsx` | 登入畫面 — 自動登入 + 帳密登入 + 離線模式 |
 | `src/components/SettingsPanel.tsx` | 設定面板 — 綁定帳號 / 修改暱稱 / 修改密碼 / 登出 |
 | `gas/程式碼.js` | GAS 後端 Handler — `handleRegisterGuest_  / handleLoginGuest_ / handleLogin_ / handleBindAccount_ / handleChangeName_ / handleChangePassword_` |
@@ -63,18 +63,16 @@
 LoginScreen useEffect → doAutoLogin()
     ↓
 authService.autoLogin():
+  ├── localStorage 有 globalganlan_logged_out === '1'?
+  │   └── ✅ → 直接回傳 isLoggedIn = false（不嘗試登入）
   ├── localStorage 有 guestToken?
   │   ├── ✅ → POST login-guest { guestToken }
   │   │       ├── 成功 → AuthState.isLoggedIn = true
-  │   │       └── 失敗 → 走「首次訪客註冊」流程
-  │   └── ❌ → 走「首次訪客註冊」流程
-  │
-  首次訪客註冊:
-      生成 UUID v4 → POST register-guest { guestToken }
-      ├── 成功 → localStorage 寫入 token → isLoggedIn = true
-      └── 全部失敗 → 顯示錯誤 + 離線模式選項
+  │   │       └── 失敗 → isLoggedIn = false（不自動註冊）
+  │   └── ❌ → isLoggedIn = false（不自動註冊）
     ↓
 isLoggedIn === true → setTimeout(onEnterGame, 600) 自動進場
+isLoggedIn === false → 顯示登入畫面（訪客模式進入 / 離線體驗 / 帳號登入）
 ```
 
 > **冪等保護**：`register-guest` 若 token 已存在 Sheet，直接回傳 `alreadyExists: true` 而非報錯。
@@ -83,7 +81,7 @@ isLoggedIn === true → setTimeout(onEnterGame, 600) 自動進場
 
 | 按鈕 | 動作 |
 |------|------|
-| 「訪客模式進入」 | 重試 `doAutoLogin()` |
+| 「訪客模式進入」 | 呼叫 `doRegisterGuest()`（`registerGuest()` — 優先複用本地 token，無則生成新 UUID） |
 | 「離線體驗」 | 直接 `onEnterGame()`（無伺服器存檔） |
 | 「帳號登入」 | 切換至 `mode='login'` 帳密登入表單 |
 
@@ -137,7 +135,7 @@ authService.bindAccount(email, password)
 
 ### 7. 登出
 
-`authService.logout()` → 清除 `localStorage.globalganlan_guest_token` → 重設 AuthState → 回呼 `onLogout()`
+`authService.logout()` → 設定 `localStorage.globalganlan_logged_out = '1'`（保留 guestToken 不刪除）→ 重設 AuthState → 回呼 `onLogout()`
 
 ---
 
@@ -212,6 +210,7 @@ interface AuthState {
 
 // localStorage key
 const STORAGE_KEY_TOKEN = 'globalganlan_guest_token'
+const STORAGE_KEY_LOGGED_OUT = 'globalganlan_logged_out'  // '1' = 使用者已登出，阻止自動登入
 ```
 
 ### useAuth Hook（`src/hooks/useAuth.ts`）
@@ -222,6 +221,7 @@ interface UseAuthReturn {
   loading: boolean
   error: string | null
   doAutoLogin: () => Promise<void>
+  doRegisterGuest: () => Promise<void>
   doLogin: (email: string, password: string) => Promise<boolean>
   doBind: (email: string, password: string) => Promise<boolean>
   doChangeName: (name: string) => Promise<boolean>
@@ -237,9 +237,9 @@ interface UseAuthReturn {
 LoginScreen（mount 時自動執行 doAutoLogin）
     │
     ├── 有 token → login-guest 成功 → 自動進場（600ms 延遲）
-    ├── 無 token → register-guest → 自動進場
+    ├── 無 token → isLoggedIn = false → 顯示按鈕
     └── 失敗 → 錯誤畫面
-            ├── 「訪客模式進入」→ 重試 doAutoLogin
+            ├── 「訪客模式進入」→ doRegisterGuest（registerGuest()）
             ├── 「離線體驗」→ 直接進場（無伺服器存檔）
             └── 「帳號登入」→ 帳密表單 → login → 成功進場
 
@@ -268,4 +268,8 @@ LoginScreen（mount 時自動執行 doAutoLogin）
 | 版本 | 日期 | 變更內容 |
 |------|------|---------|
 | v0.1 | 2026-02-26 | 初版：訪客 token + 綁定帳密流程 |
-| v1.0 | 2026-03-01 | 全面同步實作：自動登入冪等保護、LoginScreen UI 三模式（auto/login/離線）、SettingsPanel 綁定/改名/改密/登出、預設暱稱「倖存者#XXXX」、resolvePlayerId_ ScriptCache 6h TTL、詳列 6 個 GAS Handler 邏輯、useAuth Hook 介面、前端驗證規則對照 || v1.1 | 2026-02-28 | **Bug Fix**：`autoLogin()` 無 token 時不再自動 `register-guest`，改為回傳未登入狀態；新增 `registerGuest()` 給 UI 按鈕觸發，優先複用本地 token；useAuth 新增 `doRegisterGuest` 方法；LoginScreen 「訪客模式進入」按鈕改用 `doRegisterGuest` |
+| v1.0 | 2026-03-01 | 全面同步實作：自動登入冪等保護、LoginScreen UI 三模式（auto/login/離線）、SettingsPanel 綁定/改名/改密/登出、預設暱稱「倖存者#XXXX」、resolvePlayerId_ ScriptCache 6h TTL、詳列 6 個 GAS Handler 邏輯、useAuth Hook 介面、前端驗證規則對照 |
+| v1.1 | 2026-02-28 | **Bug Fix**：`autoLogin()` 無 token 時不再自動 `register-guest`，改為回傳未登入狀態；新增 `registerGuest()` 給 UI 按鈕觸發，優先複用本地 token；useAuth 新增 `doRegisterGuest` 方法；LoginScreen 「訪客模式進入」按鈕改用 `doRegisterGuest` |
+| v1.2 | 2026-03-01 | 新用戶歡迎禮包：`handleRegisterGuest_` 註冊後自動寄送歡迎信件（鑽石 300 / 金幣 10,000 / 中經驗石 5 / 大經驗石 2） |
+| v1.3 | 2026-03-01 | 帳號綁定獎勵：`handleBindAccount_` 首次綁定成功寄送獎勵信件（鑽石 200 / 金幣 5,000） |
+| v1.4 | 2026-03-01 | Spec 修正：自動登入流程修正為 no-token/login-fail 回傳 `isLoggedIn:false`（不自動註冊）；「訪客模式進入」改呼叫 `registerGuest()`；`logout()` 保留 guestToken 改設 `globalganlan_logged_out` flag；新增 `registerGuest()` / `onAuthChange()` 至導出函式；新增 `globalganlan_logged_out` localStorage key 文件 |

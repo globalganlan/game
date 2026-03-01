@@ -1,7 +1,7 @@
 # 樂觀更新佇列 (Optimistic Update Queue) Spec
 
-> 版本：v1.0 ｜ 狀態：🟢 已實作
-> 最後更新：2026-02-27
+> 版本：v1.1 ｜ 狀態：🟢 已實作
+> 最後更新：2026-03-01
 > 負責角色：🔧 CODING
 
 ## 概述
@@ -118,7 +118,7 @@ function executeWithIdempotency_(opId, playerId, action, handler) {
 
 - 接受 `{ ops: [{ opId, action, params }] }` 批次請求
 - 逐筆：檢查 op_log → 已處理回傳快取 / 未處理則執行
-- 支援的 action：`collect-resources`、`claim-mail-reward`、`claim-all-mail`、`gacha-pull`、`complete-stage`、`complete-tower`、`complete-daily`
+- 支援的 action（19 種）：`collect-resources`、`claim-mail-reward`、`claim-all-mail`、`gacha-pull`、`complete-battle`、`complete-stage`、`complete-tower`、`complete-daily`、`upgrade-hero`、`ascend-hero`、`star-up-hero`、`use-item`、`enhance-equipment`、`dismantle-equipment`、`expand-inventory`、`shop-buy`、`equip-item`、`unequip-item`、`lock-equipment`
 
 ### 4. localStorage 備份格式
 
@@ -138,13 +138,35 @@ interface PendingOp {
 
 | 操作 | API Action | 前端服務 | 樂觀策略 |
 |------|-----------|---------|----------|
+| **saveService**（2 項） | | | |
+| 儲存陣容 | `save-formation` | `saveService.saveFormation()` | 本地 localStorage + 背景 API |
 | 領取計時器資源 | `collect-resources` | `saveService.collectResources()` | 本地公式計算金幣/經驗 → 伺服器校正 |
+| **gachaLocalPool**（1 項） | | | |
+| 抽卡（本地池） | `gacha-pull` | `gachaLocalPool.localPull()` | 預生成池 0ms 本地消耗 → 背景通知伺服器 |
+| **mailService**（4 項） | | | |
 | 領取單封信件 | `claim-mail-reward` | `mailService.claimMailReward()` | 已知 rewards 立即顯示 → 標記 claimed |
 | 一鍵領取信件 | `claim-all-mail` | `mailService.claimAllMail()` | 本地匯總所有 unclaimed rewards |
-| 抽卡 | `gacha-pull` | `progressionService.gachaPull()` | 帶 opId，預載池機制處理速度 |
-| 通關結算（主線） | `complete-stage` | `progressionService.completeStage()` | 帶 opId 防重複提交 |
-| 通關結算（爬塔） | `complete-tower` | `progressionService.completeTower()` | 帶 opId 防重複提交 |
-| 副本結算 | `complete-daily` | `progressionService.completeDaily()` | 帶 opId 防重複提交 |
+| 刪除信件 | `delete-mail` | `mailService.deleteMail()` | 背景同步 + localStorage 備份 |
+| 刪除所有已讀 | `delete-all-read` | `mailService.deleteAllRead()` | 背景同步 + localStorage 備份 |
+| **inventoryService**（5 項） | | | |
+| 裝備穿戴 | `equip-item` | `inventoryService.equipItem()` | 本地更新 equippedBy → 背景同步 |
+| 卸下裝備 | `unequip-item` | `inventoryService.unequipItem()` | 本地清空 equippedBy → 背景同步 |
+| 使用道具 | `use-item` | `inventoryService.useItem()` | 本地扣減數量 → 背景同步 |
+| 鎖定裝備 | `lock-equipment` | `inventoryService.lockEquipment()` | 本地更新 locked → 背景同步 |
+| 擴容背包 | `expand-inventory` | `inventoryService.expandInventory()` | 本地 +50 容量 → 背景扣鑽同步 |
+| **progressionService**（9 項） | | | |
+| 英雄升級 | `upgrade-hero` | `progressionService.upgradeHero()` | 帶 opId，await 伺服器結果 |
+| 英雄突破 | `ascend-hero` | `progressionService.ascendHero()` | 帶 opId，await 伺服器結果 |
+| 英雄升星 | `star-up-hero` | `progressionService.starUpHero()` | 帶 opId，await 伺服器結果 |
+| 裝備強化 | `enhance-equipment` | `progressionService.enhanceEquipment()` | 帶 opId，await 伺服器結果 |
+| 裝備拆解 | `dismantle-equipment` | `progressionService.dismantleEquipment()` | 帶 opId，await 伺服器結果 |
+| 裝備鍛造 | `forge-equipment` | `progressionService.forgeEquipment()` | 帶 opId，await 伺服器結果 |
+| 戰鬥結算 | `complete-battle` | `progressionService.completeBattle()` | 帶 opId + seed 反作弊校驗 |
+| 通關結算（主線） | `complete-stage` | `progressionService.completeStage()` | 帶 opId 防重複提交（legacy） |
+| 通關結算（爬塔） | `complete-tower` | `progressionService.completeTower()` | 帶 opId 防重複提交（legacy） |
+| 副本結算 | `complete-daily` | `progressionService.completeDaily()` | 帶 opId 防重複提交（legacy） |
+| **ShopPanel**（1 項） | | | |
+| 商店購買 | `shop-buy` | `ShopPanel.tsx` (直接呼叫) | 本地扣幣+入帳道具 → 背景同步 |
 
 ## 套用新操作的步驟指南
 
@@ -259,10 +281,13 @@ Invoke-RestMethod -Uri $url -Method Post -ContentType "text/plain; charset=utf-8
 | 原始碼 | 角色 | 說明 |
 |--------|------|------|
 | `src/services/optimisticQueue.ts` | 前端佇列核心 | `fireOptimistic` / `fireOptimisticAsync` / `reconcilePendingOps` |
-| `src/services/saveService.ts` | 領取資源 | `collectResources()` — 模式 A（零等待 + 伺服器校正） |
-| `src/services/mailService.ts` | 信件領取 | `claimMailReward()` / `claimAllMail()` — 模式 B |
-| `src/services/progressionService.ts` | 抽卡/通關 | `gachaPull()` / `completeStage()` 等 — 模式 C |
-| `gas/程式碼.js` | 伺服器冪等 | `executeWithIdempotency_()` + `op_log` sheet + `handleReconcilePending_()` |
+| `src/services/saveService.ts` | 陣容/資源 | `saveFormation()` — 模式 A ｜ `collectResources()` — 模式 A |
+| `src/services/gachaLocalPool.ts` | 抽卡 | `localPull()` → `fireOptimistic('gacha-pull')` — 模式 A |
+| `src/services/mailService.ts` | 信件 | `claimMailReward()` / `claimAllMail()` / `deleteMail()` / `deleteAllRead()` — 模式 B |
+| `src/services/inventoryService.ts` | 裝備/道具 | `equipItem()` / `unequipItem()` / `useItem()` / `lockEquipment()` / `expandInventory()` — 模式 B |
+| `src/services/progressionService.ts` | 養成/戰鬥 | `upgradeHero()` / `enhanceEquipment()` / `completeBattle()` 等 9 操作 — 模式 B |
+| `src/components/ShopPanel.tsx` | 商店 | `fireOptimisticAsync('shop-buy')` — 模式 B |
+| `gas/程式碼.js` | 伺服器冪等 | `executeWithIdempotency_()` + `op_log` sheet + `handleReconcilePending_()`（19 種 action） |
 
 ## 邊界條件 & 注意事項
 
@@ -278,3 +303,4 @@ Invoke-RestMethod -Uri $url -Method Post -ContentType "text/plain; charset=utf-8
 | 版本 | 日期 | 變更 |
 |------|------|------|
 | v1.0 | 2026-02-27 | 初版 — 含前端佇列 + GAS 冪等 + reconcile + 7 個已套用操作 |
+| v1.1 | 2026-03-01 | **Spec 同步**：reconcile 支援 action 7→19（新增 complete-battle / upgrade-hero / ascend-hero / star-up-hero / use-item / enhance-equipment / dismantle-equipment / expand-inventory / shop-buy / equip-item / unequip-item / lock-equipment）；已套用操作表擴充至 22 項（含 saveService / gachaLocalPool / mailService / inventoryService / progressionService / ShopPanel）；實作對照表新增 inventoryService / gachaLocalPool / ShopPanel |

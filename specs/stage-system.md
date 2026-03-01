@@ -1,6 +1,6 @@
 # 關卡系統 Spec
 
-> 版本：v1.2 ｜ 狀態：🟢 已實作
+> 版本：v1.3 ｜ 狀態：🟢 已實作
 > 最後更新：2026-03-01
 > 負責角色：🎯 GAME_DESIGN → 🔧 CODING
 
@@ -24,7 +24,7 @@
 | `src/domain/stageSystem.ts` | 核心邏輯 — 配置生成 / PRNG / 星級計算 / 副本定義 / 掉落擲骰 |
 | `src/components/StageSelect.tsx` | 關卡選擇 UI — 5 個分頁（主線/爬塔/每日/競技場/Boss） |
 | `src/App.tsx` | 遊戲流程整合 — handleStageSelect / buildEnemySlots / 勝利結算 / goNextStage |
-| `gas/程式碼.js` | GAS Handler — `handleCompleteStage_ / handleCompleteTower_ / handleCompleteDaily_` |
+| `gas/程式碼.js` | GAS Handler — `handleCompleteBattle_`（統一結算）/ `handleCompleteStage_ / handleCompleteTower_ / handleCompleteDaily_`（向下相容） |
 
 ---
 
@@ -394,28 +394,86 @@ mergeDrops(items: InventoryItem[]): InventoryItem[]   // 合併同 itemId
 
 ## GAS 後端結算 Handler
 
-### handleCompleteStage_
+### handleCompleteBattle_（統一結算，主路徑）
+
+`gas/程式碼.js` 中的**統一伺服器端結算 handler**，處理所有模式（story / tower / daily / pvp / boss）。
+前端 POST `complete-battle` 時附帶 `{ guestToken, seed, snapshot, localWinner, stageMode, stageId, starsEarned }`。
+
+| 參數 | 說明 |
+|------|------|
+| `seed` | 戰鬥種子（可重播驗證） |
+| `snapshot` | 戰鬥快照 |
+| `localWinner` | 前端判定的勝負 |
+| `stageMode` | `'story' \| 'tower' \| 'daily' \| 'pvp' \| 'boss'` |
+| `stageId` | 關卡 ID（格式依模式不同） |
+| `starsEarned` | 星級（僅 story 模式使用） |
+
+> 舊有 `handleCompleteStage_` / `handleCompleteTower_` / `handleCompleteDaily_` 保留供 reconcile 向下相容。
+
+### GAS 端獎勵公式（實際發放）
+
+> ⚠️ **前端與 GAS 獎勵公式不同！** 前端公式（`stageSystem.ts`）為顯示用預估值，GAS 公式為實際發放數值。以 GAS 回傳為準。
+
+#### Story 模式
+
+| 類型 | gold | exp | diamond |
+|------|------|-----|---------|
+| 普通通關 | `100 + ch×50 + st×20` | `50 + ch×30 + st×10` | 0 |
+| 首通加碼 | +200 | +100 | 30（固定，非線性） |
+
+- 首通判定：`stageStars[stageId]` 無值 = 首通
+
+#### Tower 模式
+
+| gold | exp | diamond |
+|------|-----|---------|
+| `100 + floor×20` | `50 + floor×10` | Boss 層 (floor%10=0): 50，其餘: 0 |
+
+- 驗證 `floor === currentFloor + 1`
+
+#### Daily 模式
+
+| 難度 | gold | exp |
+|------|------|-----|
+| easy | 500 | 100 |
+| normal | 1000 | 200 |
+| hard | 2000 | 400 |
+
+#### PvP 模式
+
+| gold | exp |
+|------|-----|
+| `200 + linear×30` | `100 + linear×15` |
+
+- `linear` = `(chapter-1)×8 + stage`（玩家主線進度）
+
+#### Boss 模式
+
+| gold | exp | diamond |
+|------|-----|---------|
+| 500（固定） | 300（固定） | 20（固定） |
+
+- GAS 端無段位分級系統，發放固定獎勵（與前端的 S/A/B/C 段位顯示不同）
+
+### 舊 Handler（向下相容）
+
+#### handleCompleteStage_
 
 | 參數 | `{ guestToken, stageId, starsEarned }` |
 |------|-------|
-| 首通判定 | `stageStars[stageId]` 無值 = 首通 |
-| 獎勵公式 | `gold: 100 + ch×50 + st×20`, `exp: 50 + ch×30 + st×10` |
-| 首通加碼 | `gold: +200`, `exp: +100`, `diamond: +30` |
+| 獎勵公式 | 同上 Story 模式 |
 
-### handleCompleteTower_
+#### handleCompleteTower_
 
 | 參數 | `{ guestToken, floor }` |
 |------|-------|
-| 驗證 | `floor === currentFloor + 1` |
-| 獎勵公式 | `gold: 100 + floor×20`, `exp: 50 + floor×10`，Boss 層 `diamond: 50` |
+| 獎勵公式 | 同上 Tower 模式 |
 
-### handleCompleteDaily_
+#### handleCompleteDaily_
 
 | 參數 | `{ guestToken, dungeonId, tier }` |
 |------|-------|
-| 獎勵 | 硬編碼：easy(500g/100e), normal(1000g/200e), hard(2000g/400e) |
-
-> 注意：前端獎勵公式與 GAS 公式**不完全一致**（前端更細緻），最終以 GAS 回傳為準。
+| 獎勵 | 同上 Daily 模式 |
 
 ---
 
@@ -439,3 +497,4 @@ mergeDrops(items: InventoryItem[]): InventoryItem[]   // 合併同 itemId
 | v0.4 | 2026-02-28 | 每日副本 stageId 中文名、副本專用 config、副本獎勵 |
 | v1.0 | 2026-03-01 | 全面同步實作：補齊 stageSystem.ts 所有公式（seeded PRNG / 敵方配置 / 獎勵 / 星級 / 掉落 / 解鎖條件）、3 副本完整數據表、GAS 3 個結算 Handler、標記 PvP + Boss 為未實作、前端勝利結算完整流程、goNextStage 機制 |
 | v1.1 | 2026-02-28 | PvP 競技場完整實作：PvPOpponent 型別 + getPvPOpponents()（seeded daily 3 梯隊）+ getPvPReward() + StageSelect 競技場分頁 + Arena pvpTheme；Boss 挑戰完整實作：3 Boss（腐化巨獸/暗夜領主/末日審判者）+ BossConfig + BOSS_CONFIGS + getBossConfig/getBossEnemies/getBossReward + 傷害段位(S/A/B/C)獎勵 + Arena bossTheme；SceneMode 擴展為 5 種 |
+| v1.3 | 2026-03-01 | 統一結算：新增 `handleCompleteBattle_` 為所有模式的統一 GAS 結算 handler（story/tower/daily/pvp/boss）；完整記載 GAS 端獎勵公式（含 PvP / Boss）；標注前端與 GAS 獎勵公式差異（前端為顯示預估值，GAS 為實際發放）；舊 per-mode handler 保留向下相容 |

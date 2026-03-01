@@ -1,6 +1,7 @@
 # 屬性系統 Spec
 
-> 版本：v1.0 ｜ 狀態：🟢 已實作
+> 版本：v1.1 ｜ 狀態：🟢 已實作
+> 最後更新：2026-03-01
 > 最後更新：2025-02-26
 > 負責角色：🎯 GAME_DESIGN → 🔧 CODING
 > 原始碼：`src/domain/elementSystem.ts`（核心）、`src/services/dataService.ts`（中英對照 + 載入）
@@ -147,7 +148,7 @@ export async function loadElements(): Promise<void> {
 
 ```typescript
 // 取得倍率
-getElementMultiplier(attacker: Element | '', defender: Element | ''): number
+getElementMultiplier(attacker: Element | '' | undefined, defender: Element | '' | undefined): number
 // 無屬性 → 1.0、查不到  1.0
 
 // 是否為弱點（剋制）
@@ -184,3 +185,4 @@ isResist(attacker: Element | '', defender: Element | ''): boolean
 |------|------|---------|
 | v0.1 | 2025-02-26 | 草案：基礎 7 屬性設計 |
 | v1.0 | 2025-02-26 | **已實作**：完整矩陣 + Sheets 動態載入 + 中英對照 + 3 個查詢 API |
+| v1.1 | 2026-03-01 | Spec 同步：`getElementMultiplier` 參數型別新增 `undefined` 支援 |

@@ -1,6 +1,6 @@
 # 技術架構 Spec
 
-> 版本：v1.6 ｜ 狀態：🟢 定稿（含 Domain Engine + Services 層 + Optimistic Queue + GAS CacheService + Audio Engine + CurrencyIcon 統一 icon + PWA）
+> 版本：v1.7 ｜ 狀態：🟢 定稿（含 Domain Engine + Services 層 + Optimistic Queue + GAS CacheService + Audio Engine + CurrencyIcon 統一 icon + PWA）
 > 最後更新：2026-03-01
 > 負責角色：🔧 CODING → 🏗️ ARCHITECT
 
@@ -46,26 +46,49 @@ src/
     buffSystem.ts           Buff/Debuff 施加 / 結算 / 查詢
     energySystem.ts         能量獲取 / 消耗 / 大招判定
     targetStrategy.ts       目標選擇策略
-    elementSystem.ts        屬性剋制矩陣
-
+    elementSystem.ts        屬性剋制矩陣    gachaSystem.ts          抽卡系統（機率/保底/費用計算）
+    progressionSystem.ts    英雄養成系統（升級/突破/升星）
+    seededRng.ts            確定性隨機數產生器
+    stageSystem.ts          關卡/爬塔/副本設定與解鎖判定
+    battleFlowValidator.ts  戰鬥流程驗證器
  services/                    資料服務層（無 React 依賴）
     index.ts                統一匯出
     sheetApi.ts             Google Sheets API 封裝 + 快取
     dataService.ts          Sheet  domain 型別轉換 + 中英對照
-    audioService.ts         音效與背景音樂管理器（Web Audio API 合成）
-
+    audioService.ts         音效與背景音樂管理器（Web Audio API 合成）    authService.ts          認證服務（訪客/帳號登入、綁定、改密碼）
+    battleService.ts        戰鬥流程服務（開戰/結算/通關處理）
+    gachaLocalPool.ts       本地抽卡池管理（初始化/抽取/同步）
+    gachaPreloadService.ts  抽卡池預載服務
+    inventoryService.ts     背包服務（裝備/解除/鎖定/擴容/使用）
+    localStorageMigration.ts 本地儲存版本遷移
+    mailService.ts          信箱服務（領取/全領/刪除/刪除已讀）
+    optimisticQueue.ts      樂觀更新佇列（帶 opId 冊等性 + 重試）
+    progressionService.ts   英雄養成服務（升級/突破/升星/強化/鍛造/拆解/通關/爬塔/副本）
+    pwaService.ts           PWA 服務（安裝偵測/平台指引/獎勵領取）
+    saveService.ts          存檔服務（儲存陣型/收集資源）
+    antiCheatService.ts     反作弊服務（戰鬥驗證）
  components/
     Arena.tsx               場景（地面/碎片/雨/天空/霧）
     Hero.tsx                英雄容器（移動/動畫狀態機）
     ZombieModel.tsx         GLB 模型 + 受擊閃光
     SceneWidgets.tsx        血條/飄字/鏡頭/控制/SkillToast3D/ElementHint3D
-    UIOverlay.tsx           HUD 元件
+    UIOverlay.tsx           HUD 元件（TransitionOverlay、ThumbnailList、useToast）
+    LoginScreen.tsx         登入畫面
+    MainMenu.tsx            主選單導航中心（7 功能卡片）
+    HeroListPanel.tsx       英雄列表與詳情面板
+    InventoryPanel.tsx      背包面板（9 分類 Tab）
+    GachaScreen.tsx         召喚（抽卡）畫面
+    StageSelect.tsx         關卡選擇面板（主線/爬塔/副本）
+    BattleHUD.tsx           戰鬥增強 HUD（血條/能量/Buff/技能彈幕）
     ShopPanel.tsx           商店面板（4 類每日/素材/裝備/特殊 + 購買流程）
-    CurrencyIcon.tsx        統一貨幣 icon 元件（CSS badge: gold/diamond/exp/stardust）
     SettingsPanel.tsx       設定面板（音量滑桿 + 靜音 + 帳號 + 清除快取）
+    MailboxPanel.tsx        信箱面板（信件/獎勵/刪除/批量操作）
+    CurrencyIcon.tsx        統一貨幣 icon 元件（CSS badge: gold/diamond/exp/stardust）
 
  hooks/
     useResponsive.ts        RWD 偵測 hook
+    useAuth.ts              認證 hook（登入/登出/綁定/改密碼）
+    useSave.ts              存檔 hook（載入/儲存/同步）
 
  loaders/
      glbLoader.ts            GLB 載入器（全域快取 + Suspense）
@@ -282,9 +305,10 @@ fireOptimistic / fireOptimisticAsync
 | 服務 | 操作數 |
 |------|--------|
 | `inventoryService` | 5（equip/unequip/lock/expand/useItem） |
-| `progressionService` | 8（upgrade/ascend/starUp/enhance/forge/dismantle/completeStage/tower/daily） |
-| `mailService` | 2（deleteMail/deleteAllRead） |
-| `saveService` | 1（saveFormation） |
+| `progressionService` | 8+（upgrade/ascend/starUp/enhance/forge/dismantle/completeStage/tower/daily） |
+| `mailService` | 4（claimMailReward/claimAllMail/deleteMail/deleteAllRead） |
+| `saveService` | 2（saveFormation/collectResources） |
+| `gachaLocalPool` | 1（syncPool） |
 
 ### 資料流圖
 
@@ -430,7 +454,7 @@ export default defineConfig({
 | Debris 浮空 | Y 座標要 `scale.y * 0.5` |
 | CSS 必載 | `import './App.css'` 不可省略 |
 | 閉包陷阱 | async 函數中用 `useRef` 讀即時值 |
-| orientationchange | 需 `setTimeout(100~150ms)` |
+| orientationchange | 需 `setTimeout(100ms)` |
 
 ---
 
@@ -511,3 +535,4 @@ POST { "action": "invalidate-cache" }
 | v1.4 | 2026-02-28 | 新增 audioService.ts（Web Audio API 合成 BGM 6 曲目 + SFX 9 種）、ShopPanel.tsx、SettingsPanel.tsx 音效控制 UI、標記音效引擎為已實作 |
 | v1.5 | 2026-02-28 | 新增 `constants/rarity.ts` 共用常數層 + `CurrencyIcon.tsx` 統一貨幣 icon 元件，替代各元件散落的 CSS inline icon 和 emoji |
 | v1.6 | 2026-03-01 | PWA 支援：manifest.json + service worker（Network/Cache First 策略）+ `pwaService.ts`（安裝偵測/平台指引/獎勵領取）+ 帳號綁定獎勵（💎200+🪙5000）+ PWA 安裝獎勵（💎100+🪙3000） |
+| v1.7 | 2026-03-01 | 同步實際程式碼：完整更新 services/（16 檔）、domain/（13 檔）、components/（16 檔）、hooks/（3 檔）目錄列表；Optimistic Queue 操作數更新（mailService 4 ops、saveService 2 ops、新增 gachaLocalPool）；orientationchange timeout 修正為 100ms |

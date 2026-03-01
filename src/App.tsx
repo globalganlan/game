@@ -1772,13 +1772,22 @@ export default function App() {
       const result = await runBattleCollect(playerBH, enemyBH, { maxTurns: 50, seed: battleSeed })
       allActions = result.actions
       winner = result.winner
-      needsHpSync = false  // 本地引擎已直接修改 heroMap
 
-      // ── 計算星級（需在快照被覆蓋前，用戰鬥結果計算） ──
+      // ── 計算星級（需在 heroMap 被重置前，用最終狀態計算） ──
       const totalHeroCount = playerSlots.filter(Boolean).length
-      // 從戰鬥結果中取得存活英雄數量
+      // 從戰鬥結果中取得存活英雄數量（此時 heroMap 是最終狀態）
       const survivingCount = playerBH.filter(h => h.currentHP > 0).length
       const localStars = calculateStarRating(totalHeroCount, survivingCount)
+
+      // ★ 引擎已將 heroMap 修改為戰鬥結束狀態（currentHP 可能為 0），
+      //   必須重置為初始值，否則 Phase B 播放期間讀到最終 HP
+      //   → 攻擊者後退檢查 currentHP===0 以為被反彈致死 → 第一回合即播死亡動畫
+      //   改用 applyHpFromAction 在每筆 action 時漸進更新（與回放模式相同）
+      for (const bh of [...playerBH, ...enemyBH]) {
+        bh.currentHP = bh.maxHP
+        bh.energy = 0
+      }
+      needsHpSync = true
 
       // ── 提取 daily 副本難度 ──
       const dungeonTier = stageMode === 'daily' ? (stageId.split('_').pop() || 'normal') : undefined

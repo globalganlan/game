@@ -1,7 +1,7 @@
 # 養成系統 Spec
 
-> 版本：v1.3 ｜ 狀態：🟢 已實作
-> 最後更新：2026-06-14
+> 版本：v1.4 ｜ 狀態：🟢 已實作
+> 最後更新：2026-03-01
 > 負賬角色：🎯 GAME_DESIGN → 🔧 CODING
 
 ## 概述
@@ -24,7 +24,7 @@
 | `src/domain/progressionSystem.ts` | Domain 層 — 所有公式、常數、數值計算（478 行） |
 | `src/services/progressionService.ts` | Service 層 — 11 個 API 操作（全部走 Optimistic Queue） |
 | `src/components/HeroListPanel.tsx` | UI — 英雄列表 + 詳情（養成按鈕目前 disabled） |
-| `gas/程式碼.js` | GAS Handler — upgrade/ascend/starUp/enhance/forge/dismantle/completeStage/Tower/Daily |
+| `gas/程式碼.js` | GAS Handler — upgrade/ascend/starUp/enhance/forge/dismantle/completeStage/Tower/Daily/completeBattle（統一結算） |
 
 ---
 
@@ -148,14 +148,16 @@ function canAscend(level: number, ascension: number): boolean {
 | ★3 | 0.90 | 1.00 | 1.05 | 1.10 | 1.15 | 1.20 | 1.30 |
 | ★4 | 0.90 | 1.00 | 1.07 | 1.14 | 1.22 | 1.30 | 1.42 |
 
-**星級被動解鎖：**
+**星級被動解鎖（STAR_PASSIVE_SLOTS）：**
 
 | 星級 | 被動槽數 |
 |------|--------|
-| ★0 | 0 |
+| ★0 | 1 |
 | ★1 | 1 |
 | ★2 | 2 |
+| ★3 | 2 |
 | ★4 | 3 |
+| ★5 | 3 |
 | ★6 | 4 |
 
 ### 升星碎片消耗（STAR_UP_COST）
@@ -319,6 +321,7 @@ function getFinalStats(base: BaseStats, hero: HeroInstanceData): FinalStats {
 | `completeStage(stageId, stars)` | `complete-stage` | 主線通關結算 |
 | `completeTower(floor)` | `complete-tower` | 爬塔通關結算 |
 | `completeDaily(dungeonId, tier)` | `complete-daily` | 副本通關結算 |
+| `completeBattle(resultData)` | `complete-battle` | **統一戰鬥結算**（POST seed/snapshot/localWinner/stageMode/stageId/starsEarned），為主結算路徑；舊 completeStage/completeTower/completeDaily 保留向下相容 |
 | `gachaPull(bannerId, count)` | `gacha-pull` | 抽卡 |
 | `getGachaPoolStatus()` | `gacha-pool-status` | 查詢池剩餘（直接 callApi） |
 
@@ -360,3 +363,4 @@ function getFinalStats(base: BaseStats, hero: HeroInstanceData): FinalStats {
 | v1.1 | 2026-02-28 | 養成 UI 全面實作：升級（素材選擇 exp_core S/M/L + 預覽 + optimistic update）、突破（canAscend 驗證 + 費用顯示）、升星（canStarUp 驗證 + 碎片費用）、裝備穿脫（4 槽 weapon/armor/ring/boots + 選擇彈窗 + 卸下）、全部走 Optimistic Queue |
 | v1.2 | 2026-02-28 | **Bug Fix**：升級/突破/升星操作新增本地樂觀扣除素材（`removeItemsLocally`）；戰鬥 HP 條改讀實際 `battleHero.maxHP`；存檔星級改讀 `inst.stars` |
 | v1.3 | 2026-06-14 | **稀有度差異化成長**：新增 RARITY_LEVEL_GROWTH / RARITY_ASC_MULT / RARITY_STAR_MULT 三張查找表，等級/突破/星級成長係數依稀有度差異化（★1=3%/lv, ★2=3.5%, ★3=4%不變, ★4=5%）；getStatAtLevel / getAscensionMultiplier / getStarMultiplier / getFinalStats 新增可選 rarity 參數（預設=3 向下相容） |
+| v1.4 | 2026-03-01 | 新增 `completeBattle()` 統一結算 API（POST `complete-battle`），對應 GAS `handleCompleteBattle_`；STAR_PASSIVE_SLOTS 補齊全 7 級（★0~★6 → 1/1/2/2/3/3/4）；舊 completeStage/completeTower/completeDaily 保留向下相容 |

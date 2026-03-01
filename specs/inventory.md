@@ -1,7 +1,7 @@
 # 背包與道具系統 Spec
 
-> 版本：v1.2 ｜ 狀態：🟢 已實作
-> 最後更新：2026-02-28
+> 版本：v1.3 ｜ 狀態：🟢 已實作
+> 最後更新：2026-03-01
 > 負賬角色：🎯 GAME_DESIGN → 🔧 CODING
 
 ## 概述
@@ -23,7 +23,7 @@ UI 已全面實作：9 個分類 Tab、排序功能、4 種排序模式、使用
 
 | 原始碼 | 說明 |
 |--------|------|
-| `src/services/inventoryService.ts` | Service 層 — 18 個匯出函式 |
+| `src/services/inventoryService.ts` | Service 層 — 20 個匯出函式 |
 | `src/components/InventoryPanel.tsx` | UI — 6 分頁背包 + ItemDetail 彈窗 |
 | `src/domain/progressionSystem.ts` | EquipmentInstance / EquipmentSlot / SubStat 型別定義 |
 | `src/services/saveService.ts` | InventoryItem 型別定義 |
@@ -283,7 +283,7 @@ InventoryPanel mount
 
 ## 七、Service 層（inventoryService）
 
-### 18 個匯出函式
+### 20 個匯出函式
 
 | # | 函式 | 說明 | API/Queue |
 |---|------|------|-----------|
@@ -305,6 +305,8 @@ InventoryPanel mount
 | 16 | `onInventoryChange(fn): () => void` | 訂閱背包變化，回傳 unsubscribe | 純前端 |
 | 17 | `getInventoryState(): InventoryState \| null` | 取得當前記憶體中的背包狀態 | 純前端 |
 | 18 | `addItemsLocally(items): void` | **不呼叫 API**，純前端樂觀新增（戰鬥掉落/抽卡碎片/信件獎勵） | 純前端 |
+| 19 | `removeItemsLocally(items): void` | **不呼叫 API**，純前端樂觀扣除（升級/突破/升星素材扣除） | 純前端 |
+| 20 | `clearInventoryCache(): void` | 清除記憶體 + localStorage 快取（登出時呼叫） | 純前端 |
 
 ### addItemsLocally 細節
 
@@ -344,7 +346,15 @@ function addItemsLocally(items: { itemId: string; quantity: number }[]): void
 |--------|------|
 | `add-equipment` | 新增裝備實例 — 目前由鍛造/掉落/抽卡等 handler 內部建立 |
 | `remove-equipment` | 拆解裝備 — 由 `dismantle-equipment`（progressionService）處理 |
-| 商店系列 | `get-shop` / `buy-shop-item` / `refresh-shop` — 完全未實作 |
+
+### ✅ 已實作的商店端點
+
+| action | handler | 說明 |
+|--------|---------|------|
+| `shop-buy` | `handleShopBuy_()` | 購買商品：扣貨幣 + 發放道具（GAS 驗證+冪等保護） |
+
+> 商品定義目前由前端 `ShopPanel.tsx` 硬編碼（`SHOP_ITEMS` 常數），無需 `get-shop` API。
+> `refresh-shop` 待每日刷新需求時再實作。
 
 ---
 
@@ -448,7 +458,7 @@ type SortMode = 'default' | 'rarity-desc' | 'quantity-desc' | 'name-asc'
 
 ---
 
-## 十一、商店系統（設計中 ⚠️ 未實作）
+## 十一、商店系統（✅ 購買已實作）
 
 ### 商店分類（規劃）
 
@@ -469,7 +479,8 @@ type SortMode = 'default' | 'rarity-desc' | 'quantity-desc' | 'name-asc'
 - [x] **缺少的分頁**：forge_material / general_material / currency Tab（✅ 已完成）
 - [x] **裝備詳情面板**：獨立於一般道具的裝備資訊（✅ 已完成）
 - [x] **金幣/鉇石 Header 顯示**（✅ 已完成）
-- [ ] **商店系統**：5 種商店 + 3 個 API
+- [x] **商店系統 — 購買**：`shop-buy` API + `ShopPanel.tsx` UI（4 分類商品）
+- [ ] **商店系統 — 動態刷新**：伺服器端商品定義 + 每日/每週刷新 API
 - [ ] **批量出售**：長按多選
 - [ ] **批量使用**：素材批量使用
 - [ ] **道具合成**：低級素材合成高級（如 3×小型強化石 → 1×中型強化石）
@@ -490,3 +501,4 @@ type SortMode = 'default' | 'rarity-desc' | 'quantity-desc' | 'name-asc'
 | v1.0 | 2026-03-01 | 全面同步實作：修正 InventoryState 型別（含 equipmentCapacity/definitions）、補齊 18 個 Service 匯出函式簽名、10 個 GAS handler、UI 6 分頁對照（缺 forge/general/currency）、未實作操作完整列表、addItemsLocally 用途場景（戰鬥/抽卡/信件）、背包獨立載入流程、裝備同 slot 自動卸下行為、商店系統標示為未實作 |
 | v1.1 | 2026-02-28 | UI 全面強化：分類 Tab 擴充至 9 個、排序功能 4 種模式、使用/出售/鎖定按鈕、裝備詳情彈窗、金幣鑽石 Header 顯示 |
 | v1.2 | 2026-02-28 | 統一 icon 系統：Header 金幣/鑽石改用 `CurrencyIcon` CSS badge、出售按鈕金幣 icon 統一、貨幣分類 Tab icon 改用 CSS badge、移除散落 emoji |
+| v1.3 | 2026-03-01 | **Spec 同步**：匯出函式 18→20（新增 `removeItemsLocally` + `clearInventoryCache`）；商店狀態更新為已實作（GAS `handleShopBuy_()` + 前端 `ShopPanel.tsx`） |

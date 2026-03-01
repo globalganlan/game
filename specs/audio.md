@@ -1,7 +1,7 @@
 # 音效與音樂系統 Spec
 
-> 版本：v0.2 ｜ 狀態：🟢 已實作
-> 最後更新：2026-02-28
+> 版本：v0.4 ｜ 狀態：🟢 已實作
+> 最後更新：2026-03-02
 > 負責角色：🎵 SOUND_MUSIC → 🔧 CODING
 
 ## 概述
@@ -47,8 +47,11 @@
 // BATTLE → battle
 // MAIN_MENU + gacha → gacha
 // MAIN_MENU + 其他 → lobby
-// 其他 → lobby
+// IDLE → lobby
+// PRE_BATTLE / FETCHING → 不觸發任何 BGM 變更（維持當前曲目）
 ```
+
+> **註意**：`IDLE` 狀態會明確切換到 `lobby`，但 `PRE_BATTLE` 和 `FETCHING` 狀態不在 useEffect 的條件分支中，因此不會觸發 BGM 變更。只有當 `showGame=false` 時才會切到 `login`。
 
 ## 二、SFX（音效）
 
@@ -57,10 +60,10 @@
 | SfxType | 事件 | 觸發位置 |
 |---------|------|---------|
 | `click` | UI 按鈕點擊 | 所有按鈕 |
-| `hit_normal` | 普通攻擊命中 | App.tsx onAction（ATTACK） |
-| `hit_critical` | 暴擊命中 | App.tsx onAction（isCrit） |
+| `hit_normal` | 普通攻擊命中（3 層合成：sawtooth 65Hz + square 120Hz + sawtooth 320Hz，模擬腐肉撞擊） | App.tsx onAction（ATTACK） |
+| `hit_critical` | 暴擊命中（4 層合成：深沉濕裂聲 + 地面震動，比 hit_normal 更厚重） | App.tsx onAction（isCrit） |
 | `skill_cast` | 技能施放 | App.tsx onAction（ACTIVE_SKILL） |
-| `death` | 角色死亡 | App.tsx onAction（HP ≤ 0） |
+| `death` | 角色死亡（4 層合成：sawtooth 45Hz + square 90Hz + sawtooth 70Hz + sine 30Hz，模擬殭屍倒地） | App.tsx onAction（HP ≤ 0） |
 | `gacha_pull` | 抽卡動畫 | GachaScreen |
 | `gacha_ssr` | SSR 出現 | GachaScreen |
 | `reward_claim` | 領取獎勵 | MailboxPanel / 結算 |
@@ -103,7 +106,7 @@ interface AudioSettings {
 | `setSfxVolume(v)` | 設定 SFX 音量 0~1 |
 | `toggleMute()` | 切換靜音 |
 | `getSettings()` | 回傳當前 AudioSettings |
-| `onSettingsChange(fn)` | 訂閱設定變化 |
+| `subscribe(fn: () => void)` | 訂閱設定變化 |
 
 ---
 
@@ -134,3 +137,5 @@ interface AudioSettings {
 |------|------|---------|
 | v0.1 | 2026-03-01 | 初版規劃：BGM/SFX 清單、技術方案、資源目錄結構 |
 | v0.2 | 2026-02-28 | ✅ 全面實作：Web Audio API 合成 BGM（6 曲目）+ SFX（9 種）、AudioManager 單例、SettingsPanel 三條音量滑桿 + 靜音開關、localStorage 持久化、App.tsx BGM 自動切換、ensureContext 使用者互動處理、移除外部音檔依賴 |
+| v0.3 | 2026-03-01 | 同步實際程式碼：`onSettingsChange` → `subscribe`、釘清 BGM 自動切換邏輯（IDLE → lobby、PRE_BATTLE/FETCHING 不觸發變更） |
+| v0.4 | 2026-03-02 | **SFX 殭屍主題重設計**：`hit_normal` 改為 3 層合成（sawtooth 65Hz + square 120Hz + sawtooth 320Hz + low-pass 濾波），模擬腐肉撞擊；`hit_critical` 改為 4 層合成（深沉濕裂 + 地面震動）；`death` 改為 4 層合成（sawtooth 45Hz + square 90Hz + sawtooth 70Hz + sine 30Hz），模擬殭屍倒地 |

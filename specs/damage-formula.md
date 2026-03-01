@@ -1,7 +1,7 @@
 # 傷害公式 Spec
 
-> 版本：v1.0 ｜ 狀態：🟢 已實作
-> 最後更新：2025-02-26
+> 版本：v1.1 ｜ 狀態：🟢 已實作
+> 最後更新：2026-03-01
 > 負責角色：🎯 GAME_DESIGN → 🔧 CODING
 > 原始碼：`src/domain/damageFormula.ts`
 
@@ -119,10 +119,9 @@ dmg *= 0.95 + Math.random() * 0.10   // 5%
 
 ```typescript
 function getAttackerDamageModifier(attacker): number {
-  let mult = 1.0
-  mult += getStatusValue(attacker, 'atk_up')
-  mult -= getStatusValue(attacker, 'atk_down')
-  return Math.max(0.1, mult) // 下限 10%
+  // atk_up / atk_down 已在 getBuffedStats() 中套用至 ATK 基礎值
+  // 此處固定回傳 1.0，不再重複計算
+  return 1.0
 }
 ```
 
@@ -132,7 +131,7 @@ function getAttackerDamageModifier(attacker): number {
 function getTargetDamageModifier(target): number {
   let mult = 1.0
   mult -= getStatusValue(target, 'dmg_reduce')
-  mult += getStatusValue(target, 'def_down') * 0.5
+  // def_down 已在 getBuffedStats() 中降低 DEF 值（影響步驟 2 的 DEF 減傷公式）
   if (hasStatus(target, 'fear')) mult *= 1.2  // 恐懼增傷 20%
   return Math.max(0.1, mult) // 下限 10%
 }
@@ -180,13 +179,14 @@ interface DamageResult {
 
 ### damageType 飄字分類
 
-| 條件 | damageType | 優先順序 |
-|------|-----------|---------|
-| 閃避成功 | `miss` | 最高（步驟 0） |
-| 暴擊 | `crit` | 高 |
-| 屬性剋制 | `weakness` | 中 |
-| 護盾完全吸收（actualDmg=0） | `shield` | 中 |
-| 以上皆非 | `normal` | 低 |
+| 條件 | damageType | 優先順序 | 說明 |
+|------|-----------|---------|------|
+| 閃避成功 | `miss` | 最高（步驟 0） | 傷害為 0 |
+| 護盾完全吸收（actualDmg=0） | `shield` | 高 | 後覆蓋前 |
+| 屬性剋制 | `weakness` | 中 | 後覆蓋 crit |
+| 暴擊 | `crit` | 中低 | 先設定 |
+| DOT 持續傷害 | `dot` | — | 獨立判定 |
+| 以上皆非 | `normal` | 低 | 預設 |
 
 ---
 
@@ -230,7 +230,7 @@ calculateDot(dotType: string, source: BattleHero | undefined, target: BattleHero
 
 | DOT 類型 | 公式 | DEF 關係 |
 |---------|------|---------|
-| `dot_burn` | `source.ATK × 0.3` | 無視 DEF |
+| `dot_burn` | `source.finalStats.ATK × 0.3` | 無視 DEF |
 | `dot_poison` | `target.maxHP × 0.03` | 無視 DEF |
 | `dot_bleed` | `source.ATK × 0.25 × (100/(100 + DEF×0.5))` | 50% DEF |
 
@@ -261,17 +261,17 @@ calculateReflect(target: BattleHero, damageReceived: number): number
 
 ### 攻擊方
 
-| 狀態 | 效果 |
-|------|------|
-| `atk_up` | +damage |
-| `atk_down` | -damage |
+| 狀態 | 效果 | 處理位置 |
+|------|------|--------|
+| `atk_up` | +ATK% | `getBuffedStats()`（已在基礎值反映，不在 damageFormula 中重複計算） |
+| `atk_down` | -ATK% | `getBuffedStats()`（同上） |
 
 ### 防守方
 
-| 狀態 | 效果 |
-|------|------|
-| `dmg_reduce` | -damage |
-| `def_down` | +damage (×0.5) |
+| 狀態 | 效果 | 處理位置 |
+|------|------|--------|
+| `dmg_reduce` | -damage | `getTargetDamageModifier()`（步驟 7） |
+| `def_down` | -DEF% | `getBuffedStats()`（影響步驟 2 的 DEF 減傷） |
 | `fear` | +20% damage |
 | `dodge_up` | 閃避機率 |
 | `shield` | 護盾吸收 |
@@ -293,3 +293,4 @@ calculateReflect(target: BattleHero, damageReceived: number): number
 |------|------|---------|
 | v0.1 | 2025-02-26 | 草案：設計公式流程 |
 | v1.0 | 2025-02-26 | **已實作**：完整 10 步公式 + 護盾 + 反彈 + 治療 + DOT |
+| v1.1 | 2026-03-01 | Spec 同步：步驟 6 攻擊方修正改為 return 1.0（atk_up/down 已移至 getBuffedStats）、步驟 7 移除 def_down（同理）、damageType 優先順序修正、DOT 公式使用 finalStats.ATK、Buff 摘要表更新處理位置 |

@@ -1,6 +1,6 @@
 # 技能系統 Spec
 
-> 版本：v1.3 ｜ 狀態：🟢 已實作
+> 版本：v1.4 ｜ 狀態：🟢 已實作
 > 最後更新：2026-03-01
 > 負責角色：🎯 GAME_DESIGN → 🔧 CODING
 > 原始碼：`src/domain/types.ts`（型別）、`src/domain/battleEngine.ts`（執行）、`src/services/dataService.ts`（資料載入）
@@ -46,10 +46,13 @@ interface SkillTemplate {
 interface SkillEffect {
   type: 'damage' | 'heal' | 'buff' | 'debuff' | 'energy'
       | 'revive' | 'dispel_debuff' | 'extra_turn' | 'reflect'
+      | 'damage_mult' | 'damage_mult_random'
   scalingStat?: keyof FinalStats  // 基於哪個數值（ATK / HP / DEF）
   multiplier?: number             // 倍率（1.8 = 180%）
   flatValue?: number              // 固定值加成
-  hitCount?: number               // 多段攻擊次數（⬜ 未實作）
+  hitCount?: number               // 多段攻擊次數（✅ 已使用）
+  min?: number                    // damage_mult_random 最小倍率
+  max?: number                    // damage_mult_random 最大倍率
   status?: StatusType             // Buff/Debuff 類型
   statusChance?: number           // 觸發機率 0~1（預設 1.0）
   statusValue?: number            // 效果數值
@@ -103,6 +106,8 @@ type TargetType =
 | `revive` | ✅ 已實作 | 由 `checkLethalPassive()` 特殊處理 |
 | `dispel_debuff` | ✅ 已實作 | `cleanse(target, 1)` |
 | `reflect` | ✅ 被動中實作 | 施加 reflect buff |
+| `damage_mult` | ✅ 已實作 | 下次攻擊倍率加成（施加 `damage_mult` buff） |
+| `damage_mult_random` | ✅ 已實作 | 隨機倍率加成（min~max 範圍） |
 | `extra_turn` | ✅ 已實作 | 額外行動機制（推入 `_extraTurnQueue`，每回合每位英雄最多 1 次） |
 
 ### Buff/Debuff 施加流程
@@ -322,7 +327,7 @@ getHeroSkillSet(heroId, skillsMap, heroSkillsMap)
 
 ## 擴展點
 
-- [ ] `hitCount` 多段攻擊（每段獨立暴擊 / 閃避）
+- [x] ~~`hitCount` 多段攻擊~~ ✅ v1.4 已使用（每段獨立暴擊 / 閃避）
 - [x] ~~`extra_turn` 額外行動~~ ✅ v1.3 已實作（`_extraTurnQueue` + `processExtraTurns()`）
 - [ ] `shield` 效果類型（直接產生護盾而非走 buff）
 - [ ] `execute` 斬殺（HP 低於閾值直接擊殺）
@@ -366,3 +371,4 @@ getHeroSkillSet(heroId, skillsMap, heroSkillsMap)
 | v1.1 | 2026-06-14 | **平衡重設計**：主動技倍率依目標數反比（single 350% > all 120%）；被動技依稀有度分層（★4=強力自 buff, ★1=全光環支援）；#6 無名活屍改為全光環專家；#1/#9/#14 新增光環被動 |
 | v1.2 | 2026-03-01 | **被動系統 6 項 Bug 修復**：`always`/`every_n_turns` 觸發修復；新增 `resolvePassiveTargets()` 多目標被動；`on_dodge` 反擊目標修正；被動效果新增 `dispel_debuff`/`reflect` 處理；JSON 修正 5 筆（`damage_reduce`→`dmg_reduce`、`crit_up`→`crit_rate_up`）；~15+ 個被動技能從無效變為正確運作 |
 | v1.3 | 2026-03-01 | **extra_turn 機制實作**：新增 `_extraTurnQueue` + `processExtraTurns()`（每回合每位英雄最多 1 次，安全上限 MAX_EXTRA=10）；新增 `on_ally_death` / `on_ally_skill` 觸發點；`PassiveTrigger` 型別更新；`BattleAction` 新增 `EXTRA_TURN` 類型；App.tsx 表現層處理；5 項新增測試（47→594 全通過） |
+| v1.4 | 2026-03-01 | Spec 同步：SkillEffect.type 新增 `damage_mult` / `damage_mult_random`、新增 `min`/`max` 欄位、`hitCount` 標記為已使用、效果實作狀態表更新 |

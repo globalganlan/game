@@ -1,13 +1,13 @@
 # 抽卡系統 Spec
 
-> 版本：v1.2 ｜ 狀態：🟢 已實作
-> 最後更新：2026-02-28
+> 版本：v1.3 ｜ 狀態：🟢 已實作
+> 最後更新：2026-03-01
 > 負責角色：🎯 GAME_DESIGN → 🔧 CODING
 
 ## 概述
 
 定義英雄招募（抽卡/Gacha）的機率、保底機制、卡池類型與經濟成本。  
-核心架構：**伺服器預生成 200 組結果 → 登入時下載到前端 → 抽卡 0ms 本地消耗 → 背景同步伺服器**。
+核心架構：**伺服器預生成 400 組結果 → 登入時下載到前端 → 抽卡 0ms 本地消耗 → 背景同步伺服器**。
 
 ## 依賴
 
@@ -113,7 +113,7 @@ interface PityState {
 ### 設計目標
 
 Google Apps Script 每次 API 呼叫需 10-17 秒，直接即時抽卡 UX 極差。  
-解決方案：**伺服器預先生成未來 200 次抽卡的完整結果，登入時一次下載到前端。  
+解決方案：**伺服器預先生成未來 400 次抽卡的完整結果，登入時一次下載到前端。  
 抽卡時 100% 本地消耗，零網路等待，背景非同步通知伺服器。**
 
 ### 架構流程圖
@@ -121,7 +121,7 @@ Google Apps Script 每次 API 呼叫需 10-17 秒，直接即時抽卡 UX 極差
 ```
 ┌─────────────┐    login (load-save)    ┌──────────────┐
 │  GAS 後端   │ ─────────────────────→  │  前端記憶體   │
-│  gachaPool  │   200 entries (~12KB)   │  _pool[]     │
+│  gachaPool  │   400 entries (~24KB)   │  _pool[]     │
 │  (Sheets)   │   + ownedHeroIds[]      │  _ownedIds   │
 └──────┬──────┘   + pityState           └──────┬───────┘
        │                                       │
@@ -143,7 +143,7 @@ Google Apps Script 每次 API 呼叫需 10-17 秒，直接即時抽卡 UX 極差
 
 | 欄位 | 型別 | 說明 |
 |------|------|------|
-| `gachaPool` | JSON text | `PoolEntry[]`（最多 200 筆） |
+| `gachaPool` | JSON text | `PoolEntry[]`（最多 400 筆） |
 | `gachaPoolEndPity` | JSON text | 生成最後一筆 entry 時的保底狀態（用來續生） |
 | `gachaPity` | JSON text | 玩家 UI 顯示用的保底狀態 |
 
@@ -152,13 +152,13 @@ Google Apps Script 每次 API 呼叫需 10-17 秒，直接即時抽卡 UX 極差
 | 函數 | 說明 |
 |------|------|
 | `generateGachaPoolEntries_(heroPool, startPity, count)` | 根據機率表 + 保底狀態生成 N 筆 `PoolEntry[]`，回傳 `{entries, endPity}` |
-| `ensureGachaPool_(playerId, saveData, sheet, row)` | 讀取現有池，不足則呼叫 `generateGachaPoolEntries_` 補滿到 200，寫回 Sheets |
+| `ensureGachaPool_(playerId, saveData, sheet, row)` | 讀取現有池，不足則呼叫 `generateGachaPoolEntries_` 補滿到 400，寫回 Sheets |
 
 #### `gachaPoolEndPity` vs `gachaPity` 區別
 
 - `gachaPoolEndPity`：生成池最後一筆 entry 後的保底狀態 → 用來**續生新 entries**
 - `gachaPity`：玩家**實際消耗到哪一筆**的保底狀態 → 用於 **UI 顯示**  
-  （兩者分離是因為池是預先生成的，玩家可能才抽了 10 筆但池已經算到第 200 筆的保底）
+  （兩者分離是因為池是預先生成的，玩家可能才抽了 10 筆但池已經算到第 400 筆的保底）
 
 ### 3.2 GAS API 端點
 
@@ -167,7 +167,7 @@ Google Apps Script 每次 API 呼叫需 10-17 秒，直接即時抽卡 UX 極差
 回傳值新增：
 ```json
 {
-  "gachaPool": [{"h":3,"r":"N","f":false}, ...],   // 完整 200 筆
+  "gachaPool": [{"h":3,"r":"N","f":false}, ...],   // 完整 400 筆
   "ownedHeroIds": [1, 3, 6],                        // 已擁有英雄 ID（供 isNew 判斷）
   "saveData": { "gachaPity": {...}, ... }            // 含保底狀態
 }
@@ -189,7 +189,7 @@ POST { "action": "refill-pool", "guestToken": "..." }
     "success": true,
     "newEntries": [...],          // ⚠️ 只有新生成的 entries（非全池）
     "newEntriesCount": 10,        // 新增數量
-    "serverPoolTotal": 200,       // 伺服器端池總量
+    "serverPoolTotal": 400,       // 伺服器端池總量
     "ownedHeroIds": [...],        // 最新 owned（可能有新英雄）
     "diamond": 1234               // 最新鑽石
   }
@@ -205,7 +205,7 @@ POST { "action": "refill-pool", "guestToken": "..." }
 
 | 變數 | 型別 | 說明 |
 |------|------|------|
-| `_pool` | `PoolEntry[]` | 預生成池（登入載入 200 筆，消耗後減少） |
+| `_pool` | `PoolEntry[]` | 預生成池（登入載入 400 筆，消耗後減少） |
 | `_pityState` | `PityState` | 保底計數（本地即時更新） |
 | `_ownedHeroIds` | `Set<number>` | 已擁有英雄（用於判斷 isNew） |
 
@@ -264,7 +264,7 @@ POST { "action": "refill-pool", "guestToken": "..." }
 |------|---------|
 | `saveService.ts` `loadSave()` | 登入時呼叫 `initLocalPool(res.gachaPool, res.saveData.gachaPity, res.ownedHeroIds)` |
 | `GachaScreen.tsx` | `doPull()` 呼叫 `localPull()` — 同步回傳，無 async/loading 狀態 |
-| `useSave.ts` `doClearCache()` | 登出時呼叫 `clearLocalPool()` 清理 |
+| `App.tsx` `handleFullLogout()` | 登出時呼叫 `clearLocalPool()` 清理 |
 
 ---
 
@@ -293,12 +293,12 @@ POST { "action": "refill-pool", "guestToken": "..." }
 
 | 指標 | 數值 |
 |------|------|
-| 池大小 | 200 筆 |
-| 池資料大小 | ~12 KB（JSON） |
+| 池大小 | 400 筆 |
+| 池資料大小 | ~24 KB（JSON） |
 | 登入載入時間增量 | 包含在 `load-save` 回應，幾乎無額外延遲 |
 | 抽卡回應時間 | **0ms**（同步本地操作） |
 | 背景同步延遲 | `gacha-pull` ~10s + `refill-pool` ~10s（不影響 UX） |
-| 連續抽卡上限 | 200 次（極端情況：比背景補池更快抽完 → 顯示「請稍後再試」） |
+| 連續抽卡上限 | 400 次（極端情況：比背景補池更快抽完 → 顯示「請稍後再試」） |
 
 ---
 
@@ -309,7 +309,7 @@ POST { "action": "refill-pool", "guestToken": "..." }
 - [ ] **選擇券**：週年慶自選 SSR
 - [ ] **碎片系統**：累積碎片合成特定角色
 - [ ] **限定 banner**：獨立保底計數器 + 專屬池生成
-- [ ] **池容量動態調整**：根據玩家活躍度調整（高活躍 → 300 筆）
+- [ ] **池容量動態調整**：根據玩家活躍度調整（高活躍 → 600 筆）
 
 ---
 
@@ -318,7 +318,7 @@ POST { "action": "refill-pool", "guestToken": "..." }
 | 檔案 | 職責 |
 |------|------|
 | `gas/程式碼.js` → `generateGachaPoolEntries_()` | 伺服器端：根據機率+保底生成池 entries |
-| `gas/程式碼.js` → `ensureGachaPool_()` | 確保池補滿到 200 |
+| `gas/程式碼.js` → `ensureGachaPool_()` | 確保池補滿到 400 |
 | `gas/程式碼.js` → `handleGachaPull_()` | 伺服器端消耗池、扣鑽石、入帳英雄 |
 | `gas/程式碼.js` → `handleRefillPool_()` | 背景補池 API |
 | `gas/程式碼.js` → `handleLoadSave_()` | 登入時回傳完整池+ownedHeroIds |
@@ -326,6 +326,7 @@ POST { "action": "refill-pool", "guestToken": "..." }
 | `src/services/gachaLocalPool.ts` | 前端核心：本地池管理、同步抽卡、背景補池 |
 | `src/components/GachaScreen.tsx` | UI：呼叫 `localPull()` 顯示結果 |
 | `src/services/saveService.ts` | 登入時 `initLocalPool()` |
+| `src/services/gachaPreloadService.ts` | 前端：預載池管理、剩餘追蹤、`clearGachaPreload()` |
 
 ---
 
@@ -334,6 +335,7 @@ POST { "action": "refill-pool", "guestToken": "..." }
 | 版本 | 日期 | 變更內容 |
 |------|------|---------|
 | v0.1 | 2026-02-26 | 初版草案：機率表、保底機制、成本、重複處理 |
-| v1.0 | 2026-02-27 | **重大改版**：新增本地池架構（§3-§5），伺服器預生成 200 組 → 前端 0ms 同步抽卡 → 背景同步。新增 GAS `refill-pool` API、前端 `gachaLocalPool.ts`。升級為已實作狀態 🟢 |
+| v1.0 | 2026-02-27 | **重大改版**：新增本地池架構（§3-§5），伺服器預生成 400 組 → 前端 0ms 同步抽卡 → 背景同步。新增 GAS `refill-pool` API、前端 `gachaLocalPool.ts`。升級為已實作狀態 🟢 |
 | v1.1 | 2026-02-28 | 新增重複角色獎勵（`stardust` + `fragments` 欄位）、抽卡 UI 顯示「重複」badge + 星塵/碎片數量、重複獎勵透過 `addItemsLocally()` 入帳背包 |
 | v1.2 | 2026-02-28 | **Bug Fix**：N卡重複星塵從 0.2（小數）改為 1（整數） |
+| v1.3 | 2026-03-01 | **Spec 同步**：池大小 200→400（同步 GAS `GACHA_REFILL_COUNT_=400` + 前端 `REFILL_THRESHOLD=400`）；池資料大小 ~12KB→~24KB；`clearLocalPool()` 呼叫者修正為 `App.tsx handleFullLogout()`；新增 `gachaPreloadService.ts` 到檔案索引 |

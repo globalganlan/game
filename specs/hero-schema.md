@@ -1,7 +1,7 @@
 # 英雄資料結構 Spec
 
-> 版本：v2.3 ｜ 狀態：🟢 已實作
-> 最後更新：2026-02-28
+> 版本：v2.4 ｜ 狀態：🟢 已實作
+> 最後更新：2026-03-01
 > 負賬角色：🎯 GAME_DESIGN → 🔧 CODING
 > 原始碼：`src/types.ts`（表現層）、`src/domain/types.ts`（domain 層）、`src/services/dataService.ts`（資料轉換）、`src/services/saveService.ts`（HeroInstance）
 
@@ -18,7 +18,7 @@
 ## 依賴
 
 - `specs/skill-system.md` → 技能模板 + 英雄技能對照表
-- `specs/progression.md` → 等級 / 突破 / 裝備提供的數值加成（⬜ 未實作）
+- `specs/progression.md` → 等級 / 突破 / 裝備提供的數值加成（✅ 已實作）
 - `specs/element-system.md` → 屬性定義 + 中英對照
 - `specs/damage-formula.md` → 戰鬥數值計算
 - Google Sheets `heroes` 表 → 資料來源
@@ -116,7 +116,7 @@ interface RawHeroInput {
 ### 層級 4：BattleHero（戰鬥中完整角色）
 
 ```typescript
-// src/domain/types.ts  23 個欄位
+// src/domain/types.ts  21 個欄位
 interface BattleHero {
   // 身份
   uid: string             // 唯一 ID（由 createBattleHero 產生或傳入）
@@ -273,7 +273,8 @@ function getHeroSpeed(h: RawHeroData): number {
 
 | 星級 | 解鎖被動 | 升星碎片 |
 |------|---------|---------|
-| ★1 | 被動 1 | 初始 |
+| ★0 | 被動 1 | 初始（新英雄預設） |
+| ★1 | 被動 1 | 10 |
 | ★2 | 被動 2 | 30 |
 | ★3 | — | 60 |
 | ★4 | 被動 3 | 120 |
@@ -281,7 +282,8 @@ function getHeroSpeed(h: RawHeroData): number {
 | ★6 | 被動 4 | 300 |
 
 ```typescript
-// createBattleHero()
+// createBattleHero(input, side, slot, activeSkill, passives, starLevel=1, uid?, heroInstance?, rarity=3)
+// heroInstance + rarity → getFinalStats(rawStats, heroInstance, rarity) 計算養成數值
 const passiveSlots = starLevel >= 6 ? 4 : starLevel >= 4 ? 3 : starLevel >= 2 ? 2 : 1
 ```
 
@@ -345,4 +347,5 @@ public/models/zombie_N/
 | v2.0 | 2025-02-26 | 新增 DEF/CritRate/CritDmg/Element、星級系統、14 隻角色數值 |
 | v2.1 | 2025-02-26 | **已實作**：Domain 三層型別（RawHeroInput → BattleHero）、dataService 轉換流程 |
 | v2.2 | 2026-02-28 | HeroInstance 新增 `stars: number` 欄位，舊存檔自動遷移 |
-| v2.3 | 2026-03-01 | 所有英雄從 ★0 開始培養：初始星級統一 0、加乘數 0.90、被動欄 0、GAS appendRow 寫入 stars=0 |
+| v2.3 | 2026-03-01 | 所有英雄從 ★0 開始培養：初始星級統一 0、加乘數 0.90、GAS appendRow 寫入 stars=0（注意：code 中 ★0 仍有 1 個被動欄位） |
+| v2.4 | 2026-03-01 | Spec 同步：BattleHero 欄位數修正 23→21、createBattleHero 加入 heroInstance/rarity 參數、★0 被動欄修正為 1（非 0）、養成依賴標記為已實作 |

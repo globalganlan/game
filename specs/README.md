@@ -2,7 +2,7 @@
 
 > **本檔案是遊戲所有系統規格的單一入口。每次新對話必須讀取此檔案以取得最新規格狀態。**
 > 
-> 最後更新：2026-02-28
+> 最後更新：2026-03-01
 
 ## 規格架構原則
 
@@ -15,23 +15,23 @@
 
 | 檔案 | 系統 | 版本 | 狀態 |
 |------|------|------|------|
-| `specs/core-combat.md` | 回合制戰鬥系統（Domain Engine + Command Pattern） | v2.1 | 🟢 已實作 |
-| `specs/hero-schema.md` | 英雄資料結構（三層型別：RawHeroData → RawHeroInput → BattleHero + HeroInstance.stars） | v2.2 | 🟢 已實作 |
-| `specs/damage-formula.md` | 傷害公式（10 步流程：閃避→DEF→暴擊→屬性→護盾→反彈） | v1.0 | 🟢 已實作 |
-| `specs/skill-system.md` | 技能系統（SkillTemplate + SkillEffect + Sheets 資料管線） | v1.0 | 🟢 已實作 |
-| `specs/element-system.md` | 屬性剋制系統（7 屬性矩陣 + 動態載入 + 中英對照） | v1.0 | 🟢 已實作 |
-| `specs/tech-architecture.md` | 技術架構（含 Domain + Services 分層 + Audio Engine + CurrencyIcon） | v1.5 | 🟢 定稿 |
-| `specs/progression.md` | 養成系統（等級/突破/星級/裝備/套裝 + UI 全面實作） | v1.1 | 🟢 已實作 |
-| `specs/auth-system.md` | 帳號系統（訪客 + 綁定帳密） | v1.0 | 🟢 已實作 |
-| `specs/save-system.md` | 存檔系統（Google Sheets 存進度 + 資源計時器 + 初始 3 英雄自動陣型 + 登出重置） | v1.2 | 🟢 已實作 |
-| `specs/stage-system.md` | 關卡系統（主線/爬塔/每日副本/PvP 競技場/Boss 挑戰） | v1.1 | 🟢 已實作 |
-| `specs/gacha.md` | 抽卡系統（本地池架構：伺服器預生成 200 組 → 登入下載 → 0ms 本地抽卡） | v1.0 | 🟢 已實作 |
-| `specs/inventory.md` | 背包與道具系統（9 類道具、18 個 service 函式 + UI 全面實作 + CurrencyIcon） | v1.2 | 🟢 已實作 |
+| `specs/core-combat.md` | 回合制戰鬥系統（Domain Engine + Command Pattern） | v3.1 | 🟢 已實作 |
+| `specs/hero-schema.md` | 英雄資料結構（三層型別：RawHeroData → RawHeroInput → BattleHero + HeroInstance.stars） | v2.4 | 🟢 已實作 |
+| `specs/damage-formula.md` | 傷害公式（10 步流程：閃避→DEF→暴擊→屬性→護盾→反彈） | v1.1 | 🟢 已實作 |
+| `specs/skill-system.md` | 技能系統（SkillTemplate + SkillEffect + Sheets 資料管線） | v1.4 | 🟢 已實作 |
+| `specs/element-system.md` | 屬性剋制系統（7 屬性矩陣 + 動態載入 + 中英對照） | v1.1 | 🟢 已實作 |
+| `specs/tech-architecture.md` | 技術架構（含 Domain + Services 分層 + Audio Engine + CurrencyIcon） | v1.7 | 🟢 定稿 |
+| `specs/progression.md` | 養成系統（等級/突破/星級/裝備/套裝 + UI 全面實作） | v1.4 | 🟢 已實作 |
+| `specs/auth-system.md` | 帳號系統（訪客 + 綁定帳密 + 登出保留 token） | v1.4 | 🟢 已實作 |
+| `specs/save-system.md` | 存檔系統（Google Sheets 存進度 + 資源計時器 + 初始 3 英雄自動陣型 + 登出重置） | v1.5 | 🟢 已實作 |
+| `specs/stage-system.md` | 關卡系統（主線/爬塔/每日副本/PvP/Boss + handleCompleteBattle_ 統一結算） | v1.3 | 🟢 已實作 |
+| `specs/gacha.md` | 抽卡系統（本地池架構：伺服器預生成 400 組 → 登入下載 → 0ms 本地抽卡） | v1.3 | 🟢 已實作 |
+| `specs/inventory.md` | 背包與道具系統（9 類道具、20 個 service 函式 + UI 全面實作 + CurrencyIcon） | v1.3 | 🟢 已實作 |
 | `specs/mailbox.md` | 信箱系統（預載/樂觀領取/幂等保護/離線補償） | v1.0 | 🟢 已實作 |
-| `specs/optimistic-queue.md` | 樂觀更新佇列（冪等 + localStorage 備份 + reconcile） | v1.0 | 🟢 已實作 |
+| `specs/optimistic-queue.md` | 樂觀更新佇列（冪等 + localStorage 備份 + reconcile 19 種 action） | v1.1 | 🟢 已實作 |
 | `specs/local-storage-migration.md` | localStorage Schema 版本遷移（版本化 + 自動 migration + 安全降級） | v1.0 | 🟢 已實作 |
-| `specs/ui-flow.md` | UI 流程與畫面定義（GameState/MenuScreen/導航函式/過場幕/CurrencyIcon） | v1.1 | 🟢 已實作 |
-| `specs/audio.md` | 音效與音樂系統（Web Audio API 合成 BGM 6 曲目 + SFX 9 種 + AudioManager） | v0.2 | 🟢 已實作 |
+| `specs/ui-flow.md` | UI 流程與畫面定義（GameState/MenuScreen 8 值/導航函式/條件式過場幕/CurrencyIcon） | v1.2 | 🟢 已實作 |
+| `specs/audio.md` | 音效與音樂系統（Web Audio API 合成 BGM 6 曲目 + SFX 9 種 + AudioManager） | v0.3 | 🟢 已實作 |
 | `specs/narrative.md` | 敘事與世界觀（主線章節/角色背景/劇情系統） | v0.1 | ⬜ 未實作 |
 
 > 狀態：🟢 已實作/定稿 ｜ 🟡 草案 ｜ 🔴 衝突待解 ｜ ⚪ 待建立
