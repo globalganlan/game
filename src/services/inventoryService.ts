@@ -9,6 +9,7 @@
 import { getAuthState } from './authService'
 import type { InventoryItem } from './saveService'
 import type { EquipmentInstance, EquipmentSlot, Rarity, SubStat } from '../domain/progressionSystem'
+import { getEnhanceCost, getMaxEnhanceLevel, enhancedMainStat } from '../domain/progressionSystem'
 import { fireOptimisticAsync, hasPendingOps } from './optimisticQueue'
 
 const POST_URL =
@@ -223,6 +224,7 @@ export async function useItem(
   itemId: string,
   quantity: number,
   targetId?: string,
+  extra?: Record<string, unknown>,
 ): Promise<{ success: boolean; result?: unknown }> {
   // 樂觀扣減本地數量
   if (inventoryState) {
@@ -234,7 +236,7 @@ export async function useItem(
     }
   }
   const { serverResult } = fireOptimisticAsync<{ result: unknown }>(
-    'use-item', { itemId, quantity, ...(targetId ? { targetId } : {}) },
+    'use-item', { itemId, quantity, ...(targetId ? { targetId } : {}), ...(extra || {}) },
   )
   const res = await serverResult
   return { success: res.success, result: res.result }
@@ -292,6 +294,54 @@ export async function expandInventory(): Promise<number> {
     notify()
   }
   return res.newCapacity || inventoryState?.equipmentCapacity || 200
+}
+
+/** 強化裝備（僅消耗金幣，v2 無素材需求） */
+export async function enhanceEquipment(equipId: string): Promise<{
+  success: boolean
+  newLevel?: number
+  newMainStatValue?: number
+  goldConsumed?: number
+  error?: string
+}> {
+  if (!inventoryState) return { success: false, error: 'inventory_not_loaded' }
+  const eq = inventoryState.equipment.find(e => e.equipId === equipId)
+  if (!eq) return { success: false, error: 'equip_not_found' }
+
+  const maxLvl = getMaxEnhanceLevel(eq.rarity)
+  if (eq.enhanceLevel >= maxLvl) return { success: false, error: 'max_enhance_level' }
+
+  const cost = getEnhanceCost(eq.enhanceLevel, eq.rarity)
+
+  // 樂觀更新：先升級本地裝備
+  const oldLevel = eq.enhanceLevel
+  eq.enhanceLevel = Math.min(maxLvl, oldLevel + 1)
+  notify()
+
+  const { serverResult } = fireOptimisticAsync<{
+    newLevel: number
+    newMainStatValue: number
+    goldConsumed: number
+    error?: string
+  }>('enhance-equipment', { equipId })
+  const res = await serverResult
+
+  if (res.success) {
+    // 伺服器回傳的等級以伺服器為準
+    eq.enhanceLevel = res.newLevel ?? eq.enhanceLevel
+    notify()
+    return {
+      success: true,
+      newLevel: res.newLevel,
+      newMainStatValue: res.newMainStatValue,
+      goldConsumed: res.goldConsumed,
+    }
+  } else {
+    // 回滾
+    eq.enhanceLevel = oldLevel
+    notify()
+    return { success: false, error: res.error ?? 'enhance_failed' }
+  }
 }
 
 /* ════════════════════════════════════
@@ -409,6 +459,30 @@ export function removeItemsLocally(items: { itemId: string; quantity: number }[]
     saveInventoryToLocal()
     notify()
   }
+}
+
+/**
+ * 樂觀新增裝備到本地背包（不呼叫 API）
+ * 用於裝備抽卡、寶箱開啟等即時更新場景。
+ * Server 入帳由背景 equip-gacha-pull API 處理。
+ */
+export function addEquipmentLocally(equipment: EquipmentInstance[]): void {
+  if (!inventoryState) {
+    const localItems = loadInventoryFromLocal() ?? []
+    inventoryState = {
+      items: localItems,
+      equipment: [],
+      equipmentCapacity: 200,
+      definitions: cachedDefinitions ?? new Map(),
+    }
+  }
+  if (equipment.length === 0) return
+  inventoryState.equipment.push(...equipment)
+  // 同時存到 localStorage（equipment 也要快取）
+  try {
+    localStorage.setItem('gg_equipment_cache', JSON.stringify(inventoryState.equipment))
+  } catch { /* 容量不足忽略 */ }
+  notify()
 }
 
 /* ════════════════════════════════════

@@ -1,7 +1,7 @@
 # 關卡系統 Spec
 
-> 版本：v1.3 ｜ 狀態：🟢 已實作
-> 最後更新：2026-03-01
+> 版本：v1.4 ｜ 狀態：🟢 已實作
+> 最後更新：2026-06-15
 > 負責角色：🎯 GAME_DESIGN → 🔧 CODING
 
 ## 概述
@@ -163,7 +163,7 @@ enemies = randomFormation(enemyCount, hpMult, atkMult, speedMult)
 
 | 條件 | exp | gold | diamond | items |
 |------|-----|------|---------|-------|
-| Boss 層 (floor%10=0) | `50 + floor×10` | `100 + floor×20` | 50 | `chest_equipment ×1` (100%) |
+| Boss 層 (floor%10=0) | `50 + floor×10` | `100 + floor×20` | 50 | `exp_core_l ×1` (100%) |
 | 每5層 (floor%5=0) | `50 + floor×10` | `100 + floor×20` | 0 | `exp_core_m ×1` (50%) |
 | 其他 | `50 + floor×10` | `100 + floor×20` | 0 | 無 |
 
@@ -203,9 +203,9 @@ enemies = randomFormation(enemyCount, hpMult, atkMult, speedMult)
 
 | 難度 | exp | gold | 專屬掉落 |
 |------|-----|------|---------|
-| easy | 100 | 500 | `asc_class_power ×2`, `eqm_enhance_s ×3` |
-| normal | 200 | 1000 | `asc_class_power ×4`, `eqm_enhance_m ×2`, `exp_core_m ×1` (50%) |
-| hard | 400 | 2000 | `asc_class_power ×8`, `eqm_enhance_l ×1`, `exp_core_l ×1` (30%) |
+| easy | 100 | 500 | `asc_class_power ×2`, `exp_core_s ×3` |
+| normal | 200 | 1000 | `asc_class_power ×4`, `exp_core_m ×2`, `exp_core_m ×1` (50%) |
+| hard | 400 | 2000 | `asc_class_power ×8`, `exp_core_l ×1`, `exp_core_l ×1` (30%) |
 
 > Daily 模式勝利後無「下一關」按鈕。
 
@@ -313,8 +313,8 @@ interface BossConfig {
 
 | 段位 | 傷害門檻 | exp | gold | diamond | items |
 |------|---------|-----|------|---------|-------|
-| S | `≥ damageThresholds.S` | 600 | 3000 | 100 | `chest_equipment ×2` |
-| A | `≥ damageThresholds.A` | 400 | 2000 | 50 | `chest_equipment ×1` |
+| S | `≥ damageThresholds.S` | 600 | 3000 | 100 | `exp_core_l ×3` |
+| A | `≥ damageThresholds.A` | 400 | 2000 | 50 | `exp_core_l ×2` |
 | B | `≥ damageThresholds.B` | 200 | 1000 | 20 | `exp_core_l ×1` |
 | C | 其他 | 100 | 500 | 0 | `exp_core_m ×1` |
 
@@ -498,3 +498,4 @@ mergeDrops(items: InventoryItem[]): InventoryItem[]   // 合併同 itemId
 | v1.0 | 2026-03-01 | 全面同步實作：補齊 stageSystem.ts 所有公式（seeded PRNG / 敵方配置 / 獎勵 / 星級 / 掉落 / 解鎖條件）、3 副本完整數據表、GAS 3 個結算 Handler、標記 PvP + Boss 為未實作、前端勝利結算完整流程、goNextStage 機制 |
 | v1.1 | 2026-02-28 | PvP 競技場完整實作：PvPOpponent 型別 + getPvPOpponents()（seeded daily 3 梯隊）+ getPvPReward() + StageSelect 競技場分頁 + Arena pvpTheme；Boss 挑戰完整實作：3 Boss（腐化巨獸/暗夜領主/末日審判者）+ BossConfig + BOSS_CONFIGS + getBossConfig/getBossEnemies/getBossReward + 傷害段位(S/A/B/C)獎勵 + Arena bossTheme；SceneMode 擴展為 5 種 |
 | v1.3 | 2026-03-01 | 統一結算：新增 `handleCompleteBattle_` 為所有模式的統一 GAS 結算 handler（story/tower/daily/pvp/boss）；完整記載 GAS 端獎勵公式（含 PvP / Boss）；標注前端與 GAS 獎勵公式差異（前端為顯示預估值，GAS 為實際發放）；舊 per-mode handler 保留向下相容 |
+| v1.4 | 2026-06-15 | **配合裝備模板制 v2**：移除所有 `chest_equipment` 獎勵（Boss 層/Boss 戰 S/A 段位）改為 `exp_core_l`；每日副本掉落移除強化石（`eqm_enhance_*`）改為經驗核心 |

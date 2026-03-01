@@ -415,6 +415,11 @@ function doPost(e) {
       case 'reset-gacha-pool':
         result = handleResetGachaPool_(body);
         break;
+      case 'equip-gacha-pull':
+        result = executeWithIdempotency_(body.opId, resolvePlayerId_(body.guestToken), 'equip-gacha-pull', function() {
+          return handleEquipGachaPull_(body);
+        });
+        break;
       // ── Mailbox ──
       case 'load-mail':
         result = handleLoadMail_(body);
@@ -461,6 +466,24 @@ function doPost(e) {
         break;
       case 'verify-battle':
         result = handleVerifyBattle_(body);
+        break;
+      // ── Arena ──
+      case 'arena-get-rankings':
+        result = handleArenaGetRankings_(body);
+        break;
+      case 'arena-challenge-start':
+        result = handleArenaChallengeStart_(body);
+        break;
+      case 'arena-challenge-complete':
+        result = executeWithIdempotency_(body.opId || ('arena_' + Date.now()), resolvePlayerId_(body.guestToken), 'arena-challenge-complete', function() {
+          return handleArenaChallengeComplete_(body);
+        });
+        break;
+      case 'arena-set-defense':
+        result = handleArenaSetDefense_(body);
+        break;
+      case 'arena-get-defense':
+        result = handleArenaGetDefense_(body);
         break;
       // ── Cache ──
       case 'invalidate-cache':
@@ -1710,7 +1733,29 @@ function handleUseItem_(params) {
   var have = getItemQty_(playerId, itemId);
   if (have < qty) return { success: false, error: 'insufficient_item' };
   upsertItem_(playerId, itemId, -qty);
-  // 使用效果（簡化版：具體效果未來擴展）
+
+  // ── 裝備寶箱開啟 ──
+  if (itemId === 'chest_equipment') {
+    var equipment = params.equipment;
+    if (equipment) {
+      // client 本地生成的裝備，persist 到 server
+      var equipArr = [];
+      var saveSheet = getSaveSheet_();
+      var saveRow = findRowByColumn_(saveSheet, 'playerId', playerId);
+      if (saveRow > 0) {
+        var saveData = readRow_(saveSheet, saveRow);
+        try { equipArr = JSON.parse(saveData.equipment || '[]'); } catch(e) { equipArr = []; }
+        if (!Array.isArray(equipArr)) equipArr = [];
+        var newEquips = Array.isArray(equipment) ? equipment : [equipment];
+        for (var e = 0; e < newEquips.length; e++) equipArr.push(newEquips[e]);
+        ensureColumn_(saveSheet, 'equipment');
+        writeCell_(saveSheet, saveRow, 'equipment', JSON.stringify(equipArr));
+      }
+    }
+    return { success: true, result: { used: itemId, quantity: qty, type: 'equipment', equipment: equipment } };
+  }
+
+  // 使用效果（一般道具）
   return { success: true, result: { used: itemId, quantity: qty } };
 }
 
@@ -2025,8 +2070,7 @@ function handleEnhanceEquipment_(params) {
   var playerId = resolvePlayerId_(params.guestToken);
   if (!playerId) return { success: false, error: 'invalid_token' };
   var equipId = params.equipId;
-  var materials = params.materials;
-  if (!equipId || !materials) return { success: false, error: 'missing params' };
+  if (!equipId) return { success: false, error: 'missing params' };
 
   var eqSheet = getEquipInstSheet_();
   if (eqSheet.getLastRow() <= 1) return { success: false, error: 'equip_not_found' };
@@ -2054,25 +2098,8 @@ function handleEnhanceEquipment_(params) {
   var currentLvl = Number(eqData[eLvlIdx]) || 0;
   if (currentLvl >= maxLvl) return { success: false, error: 'max_enhance_level' };
 
-  var ENHANCE_EXP = { 'eqm_enhance_s': 50, 'eqm_enhance_m': 200, 'eqm_enhance_l': 800 };
-  var totalEnhanceExp = 0;
-  var consumed = [];
-  for (var j = 0; j < materials.length; j++) {
-    var mat = materials[j];
-    var eVal = ENHANCE_EXP[mat.itemId];
-    if (!eVal) continue;
-    var qty = Number(mat.quantity) || 0;
-    var have = getItemQty_(playerId, mat.itemId);
-    var use = Math.min(qty, have);
-    if (use > 0) {
-      totalEnhanceExp += eVal * use;
-      consumed.push({ itemId: mat.itemId, quantity: use });
-    }
-  }
-  if (totalEnhanceExp <= 0) return { success: false, error: 'no_valid_materials' };
-
-  // 計算金幣消耗
-  var baseCost = { 'N': 100, 'R': 200, 'SR': 500, 'SSR': 1000 }[rarity] || 100;
+  // v2: 僅消耗金幣，不需要強化素材
+  var baseCost = { 'N': 200, 'R': 500, 'SR': 1000, 'SSR': 2000 }[rarity] || 200;
   var goldCost = Math.floor(baseCost * (1 + currentLvl * 0.5));
 
   var saveSheet = getSaveSheet_();
@@ -2081,24 +2108,22 @@ function handleEnhanceEquipment_(params) {
   var gold = Number(readRow_(saveSheet, saveRow).gold) || 0;
   if (gold < goldCost) return { success: false, error: 'insufficient_gold' };
 
-  // 扣素材和金幣
-  for (var k = 0; k < consumed.length; k++) {
-    upsertItem_(playerId, consumed[k].itemId, -consumed[k].quantity);
-  }
+  // 扣金幣
   writeCell_(saveSheet, saveRow, 'gold', gold - goldCost);
 
-  // 簡化：每次強化 +1 級
+  // 強化 +1 級
   var newLvl = Math.min(maxLvl, currentLvl + 1);
   eqSheet.getRange(eqRow, eLvlIdx + 1).setValue(newLvl);
 
+  // v2: 依稀有度差異化主屬性成長率
+  var growthRate = { 'N': 0.06, 'R': 0.08, 'SR': 0.10, 'SSR': 0.12 }[rarity] || 0.10;
   var baseMainVal = Number(eqData[mainValIdx]) || 0;
-  var newMainVal = Math.floor(baseMainVal * (1 + newLvl * 0.1));
+  var newMainVal = Math.floor(baseMainVal * (1 + newLvl * growthRate));
 
   return {
     success: true,
     newLevel: newLvl,
     newMainStatValue: newMainVal,
-    materialsConsumed: consumed,
     goldConsumed: goldCost
   };
 }
@@ -2920,6 +2945,58 @@ function handleResetGachaPool_(params) {
   };
 }
 
+/**
+ * 裝備抽卡 — client 本地生成裝備，這邊只做貨幣扣除與裝備持久化
+ * params: { guestToken, opId, poolType: 'gold'|'diamond', count: 1|10, equipment: EquipmentInstance[] }
+ */
+function handleEquipGachaPull_(params) {
+  var playerId = resolvePlayerId_(params.guestToken);
+  if (!playerId) return { success: false, error: 'invalid_token' };
+  var count = Number(params.count) || 1;
+  if (count !== 1 && count !== 10) return { success: false, error: 'invalid_count' };
+  var poolType = params.poolType;
+  if (poolType !== 'gold' && poolType !== 'diamond') return { success: false, error: 'invalid_pool_type' };
+
+  var saveSheet = getSaveSheet_();
+  var saveRow = findRowByColumn_(saveSheet, 'playerId', playerId);
+  if (saveRow === 0) return { success: false, error: 'save_not_found' };
+  var saveData = readRow_(saveSheet, saveRow);
+
+  // 計算費用
+  var cost;
+  if (poolType === 'gold') {
+    cost = count === 10 ? 90000 : 10000;
+    var gold = Number(saveData.gold) || 0;
+    if (gold < cost) return { success: false, error: 'insufficient_gold' };
+    writeCell_(saveSheet, saveRow, 'gold', gold - cost);
+  } else {
+    cost = count === 10 ? 1800 : 200;
+    var diamond = Number(saveData.diamond) || 0;
+    if (diamond < cost) return { success: false, error: 'insufficient_diamond' };
+    writeCell_(saveSheet, saveRow, 'diamond', diamond - cost);
+  }
+
+  // 持久化裝備到 equipment 欄位
+  var equipArr = [];
+  try { equipArr = JSON.parse(saveData.equipment || '[]'); } catch(e) { equipArr = []; }
+  if (!Array.isArray(equipArr)) equipArr = [];
+  var newEquipment = params.equipment || [];
+  for (var i = 0; i < newEquipment.length; i++) {
+    equipArr.push(newEquipment[i]);
+  }
+  ensureColumn_(saveSheet, 'equipment');
+  writeCell_(saveSheet, saveRow, 'equipment', JSON.stringify(equipArr));
+  writeCell_(saveSheet, saveRow, 'lastSaved', new Date().toISOString());
+
+  return {
+    success: true,
+    poolType: poolType,
+    count: newEquipment.length,
+    currencyCost: cost,
+    totalEquipment: equipArr.length
+  };
+}
+
 // ═══════════════════════════════════════════════════════
 // Mailbox System
 // ═══════════════════════════════════════════════════════
@@ -3413,4 +3490,407 @@ function handleReconcilePending_(params) {
   }
 
   return { success: true, results: results };
+}
+
+// ═══════════════════════════════════════════════════════
+// Arena — 競技場排名系統
+// ═══════════════════════════════════════════════════════
+
+var ARENA_SHEET_NAME_ = 'arena_rankings';
+var ARENA_MAX_RANK_ = 500;
+
+/**
+ * 確保 arena_rankings Sheet 存在；不存在則建立並填滿 NPC
+ */
+function ensureArenaSheet_() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(ARENA_SHEET_NAME_);
+  if (sheet) return sheet;
+
+  // 建立表 + 表頭
+  sheet = ss.insertSheet(ARENA_SHEET_NAME_);
+  sheet.appendRow(['rank', 'playerId', 'displayName', 'isNPC', 'power', 'defenseFormation', 'lastUpdated']);
+
+  // 填入 500 列 NPC
+  var NPC_PREFIXES = ['暗影', '末日', '鐵血', '荒野', '幽靈', '狂暴', '冰霜', '烈焰', '鏽蝕', '黎明', '血月', '迷霧'];
+  var NPC_SUFFIXES = ['獵人', '倖存者', '戰士', '指揮官', '護衛', '遊蕩者', '潛伏者', '收割者', '守望者', '流浪者'];
+
+  var rows = [];
+  for (var r = 1; r <= ARENA_MAX_RANK_; r++) {
+    var seed = r * 31337;
+    var pi = seed % NPC_PREFIXES.length;
+    var si = (seed * 7 + 13) % NPC_SUFFIXES.length;
+    var name = NPC_PREFIXES[pi] + NPC_SUFFIXES[si];
+    var power = Math.floor(500 + (ARENA_MAX_RANK_ - r) * 20);
+    rows.push([r, 'npc_' + r, name, true, power, '[]', new Date().toISOString()]);
+  }
+  sheet.getRange(2, 1, rows.length, 7).setValues(rows);
+  return sheet;
+}
+
+/**
+ * 讀取排行榜
+ */
+function handleArenaGetRankings_(body) {
+  var playerId = resolvePlayerId_(body.guestToken);
+  if (!playerId) return { success: false, error: 'not_logged_in' };
+
+  var sheet = ensureArenaSheet_();
+  var data = sheet.getDataRange().getValues();
+  var headers = data[0];
+  var rankCol = headers.indexOf('rank');
+  var pidCol = headers.indexOf('playerId');
+  var nameCol = headers.indexOf('displayName');
+  var npcCol = headers.indexOf('isNPC');
+  var powerCol = headers.indexOf('power');
+
+  var myRank = ARENA_MAX_RANK_;
+  var rankings = [];
+
+  // 找我的排名
+  for (var i = 1; i < data.length; i++) {
+    if (String(data[i][pidCol]) === playerId) {
+      myRank = Number(data[i][rankCol]);
+      break;
+    }
+  }
+
+  // 取 top 20 + 自己前後 5 名
+  for (var i = 1; i < data.length; i++) {
+    var rank = Number(data[i][rankCol]);
+    if (rank <= 20 || (rank >= myRank - 5 && rank <= myRank + 5)) {
+      rankings.push({
+        rank: rank,
+        playerId: String(data[i][pidCol]),
+        displayName: String(data[i][nameCol]),
+        isNPC: data[i][npcCol] === true || data[i][npcCol] === 'true' || data[i][npcCol] === 'TRUE',
+        power: Number(data[i][powerCol]) || 0,
+      });
+    }
+  }
+
+  // 讀取 save_data 的挑戰次數和最高排名
+  var saveSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('save_data');
+  var challengesLeft = 5;
+  var highestRank = ARENA_MAX_RANK_;
+  if (saveSheet) {
+    var saveData = saveSheet.getDataRange().getValues();
+    var saveHeaders = saveData[0];
+    var savePidCol = saveHeaders.indexOf('playerId');
+    var arenaChalCol = saveHeaders.indexOf('arenaChallengesLeft');
+    var arenaHighCol = saveHeaders.indexOf('arenaHighestRank');
+    var arenaLastResetCol = saveHeaders.indexOf('arenaLastReset');
+
+    for (var i = 1; i < saveData.length; i++) {
+      if (String(saveData[i][savePidCol]) === playerId) {
+        // 檢查是否需要重置每日次數
+        var today = new Date().toISOString().split('T')[0];
+        var lastReset = arenaLastResetCol >= 0 ? String(saveData[i][arenaLastResetCol]).split('T')[0] : '';
+        if (lastReset !== today) {
+          challengesLeft = 5;
+          if (arenaLastResetCol >= 0) {
+            saveSheet.getRange(i + 1, arenaLastResetCol + 1).setValue(new Date().toISOString());
+          }
+          if (arenaChalCol >= 0) {
+            saveSheet.getRange(i + 1, arenaChalCol + 1).setValue(5);
+          }
+        } else {
+          challengesLeft = arenaChalCol >= 0 ? (Number(saveData[i][arenaChalCol]) || 0) : 5;
+        }
+        highestRank = arenaHighCol >= 0 ? (Number(saveData[i][arenaHighCol]) || ARENA_MAX_RANK_) : ARENA_MAX_RANK_;
+        break;
+      }
+    }
+  }
+
+  return {
+    success: true,
+    rankings: rankings,
+    myRank: myRank,
+    challengesLeft: challengesLeft,
+    highestRank: highestRank,
+  };
+}
+
+/**
+ * 開始挑戰 — 回傳防守方英雄資料
+ */
+function handleArenaChallengeStart_(body) {
+  var playerId = resolvePlayerId_(body.guestToken);
+  if (!playerId) return { success: false, error: 'not_logged_in' };
+
+  var targetRank = Number(body.targetRank);
+  if (!targetRank || targetRank < 1) return { success: false, error: 'invalid_rank' };
+
+  var sheet = ensureArenaSheet_();
+  var data = sheet.getDataRange().getValues();
+  var headers = data[0];
+  var rankCol = headers.indexOf('rank');
+  var pidCol = headers.indexOf('playerId');
+  var nameCol = headers.indexOf('displayName');
+  var npcCol = headers.indexOf('isNPC');
+  var powerCol = headers.indexOf('power');
+  var defCol = headers.indexOf('defenseFormation');
+
+  // 找防守方
+  var defender = null;
+  for (var i = 1; i < data.length; i++) {
+    if (Number(data[i][rankCol]) === targetRank) {
+      defender = {
+        displayName: String(data[i][nameCol]),
+        isNPC: data[i][npcCol] === true || data[i][npcCol] === 'true' || data[i][npcCol] === 'TRUE',
+        power: Number(data[i][powerCol]) || 0,
+        defenseFormation: String(data[i][defCol] || '[]'),
+        playerId: String(data[i][pidCol]),
+      };
+      break;
+    }
+  }
+
+  if (!defender) return { success: false, error: 'rank_not_found' };
+
+  return {
+    success: true,
+    defenderData: {
+      displayName: defender.displayName,
+      power: defender.power,
+      isNPC: defender.isNPC,
+      heroes: [],
+    },
+  };
+}
+
+/**
+ * 完成挑戰 — 排名交換 + 發放獎勵
+ */
+function handleArenaChallengeComplete_(body) {
+  var playerId = resolvePlayerId_(body.guestToken);
+  if (!playerId) return { success: false, error: 'not_logged_in' };
+
+  var targetRank = Number(body.targetRank);
+  var won = body.won === true || body.won === 'true';
+
+  var sheet = ensureArenaSheet_();
+  var data = sheet.getDataRange().getValues();
+  var headers = data[0];
+  var rankCol = headers.indexOf('rank');
+  var pidCol = headers.indexOf('playerId');
+  var nameCol = headers.indexOf('displayName');
+  var npcCol = headers.indexOf('isNPC');
+  var powerCol = headers.indexOf('power');
+  var defCol = headers.indexOf('defenseFormation');
+  var updCol = headers.indexOf('lastUpdated');
+
+  // 找挑戰者和防守者的行
+  var challengerRow = -1, defenderRow = -1;
+  var challengerRank = ARENA_MAX_RANK_;
+  for (var i = 1; i < data.length; i++) {
+    if (String(data[i][pidCol]) === playerId) {
+      challengerRow = i;
+      challengerRank = Number(data[i][rankCol]);
+    }
+    if (Number(data[i][rankCol]) === targetRank) {
+      defenderRow = i;
+    }
+  }
+
+  // 玩家尚未在排行榜 → 佔據末位 NPC
+  if (challengerRow === -1) {
+    // 找最後一個 NPC
+    for (var i = data.length - 1; i >= 1; i--) {
+      if (data[i][npcCol] === true || data[i][npcCol] === 'true' || data[i][npcCol] === 'TRUE') {
+        challengerRow = i;
+        challengerRank = Number(data[i][rankCol]);
+        // 替換 NPC 為玩家
+        sheet.getRange(i + 1, pidCol + 1).setValue(playerId);
+        sheet.getRange(i + 1, nameCol + 1).setValue(body.displayName || '倖存者');
+        sheet.getRange(i + 1, npcCol + 1).setValue(false);
+        sheet.getRange(i + 1, updCol + 1).setValue(new Date().toISOString());
+        break;
+      }
+    }
+  }
+
+  // 扣挑戰次數
+  var saveSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('save_data');
+  var challengesLeft = 5;
+  if (saveSheet) {
+    var saveData = saveSheet.getDataRange().getValues();
+    var saveHeaders = saveData[0];
+    var savePidCol = saveHeaders.indexOf('playerId');
+    var arenaChalCol = saveHeaders.indexOf('arenaChallengesLeft');
+    var arenaHighCol = saveHeaders.indexOf('arenaHighestRank');
+
+    // 確保欄位存在
+    if (arenaChalCol < 0) {
+      arenaChalCol = saveHeaders.length;
+      saveSheet.getRange(1, arenaChalCol + 1).setValue('arenaChallengesLeft');
+    }
+    if (arenaHighCol < 0) {
+      arenaHighCol = saveHeaders.length + (arenaChalCol === saveHeaders.length ? 1 : 0);
+      saveSheet.getRange(1, arenaHighCol + 1).setValue('arenaHighestRank');
+    }
+
+    var arenaLastResetCol = saveHeaders.indexOf('arenaLastReset');
+    if (arenaLastResetCol < 0) {
+      arenaLastResetCol = saveSheet.getLastColumn();
+      saveSheet.getRange(1, arenaLastResetCol + 1).setValue('arenaLastReset');
+      arenaLastResetCol = arenaLastResetCol; // 0-based in header, but we need to re-read
+    }
+
+    // 重新讀取 headers（可能有新欄位）
+    var freshHeaders = saveSheet.getRange(1, 1, 1, saveSheet.getLastColumn()).getValues()[0];
+    arenaChalCol = freshHeaders.indexOf('arenaChallengesLeft');
+    arenaHighCol = freshHeaders.indexOf('arenaHighestRank');
+    arenaLastResetCol = freshHeaders.indexOf('arenaLastReset');
+
+    for (var i = 1; i < saveData.length; i++) {
+      if (String(saveData[i][savePidCol]) === playerId) {
+        var curChal = arenaChalCol >= 0 && i < saveData.length ? (Number(saveData[i][arenaChalCol]) || 5) : 5;
+        challengesLeft = Math.max(0, curChal - 1);
+        saveSheet.getRange(i + 1, arenaChalCol + 1).setValue(challengesLeft);
+
+        if (won) {
+          var curHighest = arenaHighCol >= 0 ? (Number(saveData[i][arenaHighCol]) || ARENA_MAX_RANK_) : ARENA_MAX_RANK_;
+          var newRankIfWon = targetRank;
+          if (newRankIfWon < curHighest) {
+            saveSheet.getRange(i + 1, arenaHighCol + 1).setValue(newRankIfWon);
+          }
+        }
+        break;
+      }
+    }
+  }
+
+  var rewards = won
+    ? { diamond: 0, gold: 2000, pvpCoin: 5 }
+    : { diamond: 0, gold: 500, pvpCoin: 1 };
+
+  var milestoneReward = null;
+  var newRank = challengerRank;
+
+  // 勝利 → 交換排名
+  if (won && defenderRow >= 0 && challengerRow >= 0) {
+    newRank = targetRank;
+    // 交換排名
+    var now = new Date().toISOString();
+    sheet.getRange(challengerRow + 1, rankCol + 1).setValue(targetRank);
+    sheet.getRange(defenderRow + 1, rankCol + 1).setValue(challengerRank);
+    sheet.getRange(challengerRow + 1, updCol + 1).setValue(now);
+    sheet.getRange(defenderRow + 1, updCol + 1).setValue(now);
+
+    // 重新排序表格（按 rank 欄升序）
+    var range = sheet.getRange(2, 1, sheet.getLastRow() - 1, sheet.getLastColumn());
+    range.sort({ column: rankCol + 1, ascending: true });
+
+    // 檢查排名里程碑
+    var MILESTONES = [
+      { rank: 400, diamond: 20, gold: 5000, pvpCoin: 10 },
+      { rank: 300, diamond: 30, gold: 10000, pvpCoin: 20 },
+      { rank: 200, diamond: 50, gold: 20000, pvpCoin: 30 },
+      { rank: 100, diamond: 100, gold: 50000, pvpCoin: 50 },
+      { rank: 50, diamond: 150, gold: 80000, pvpCoin: 80 },
+      { rank: 20, diamond: 200, gold: 100000, pvpCoin: 100 },
+      { rank: 10, diamond: 300, gold: 150000, pvpCoin: 150 },
+      { rank: 1, diamond: 500, gold: 300000, pvpCoin: 300 },
+    ];
+    // 從 save_data 讀最高排名
+    if (saveSheet) {
+      var freshSaveData = saveSheet.getDataRange().getValues();
+      var freshHeaders2 = freshSaveData[0];
+      var hCol = freshHeaders2.indexOf('arenaHighestRank');
+      var pidC = freshHeaders2.indexOf('playerId');
+      for (var i = 1; i < freshSaveData.length; i++) {
+        if (String(freshSaveData[i][pidC]) === playerId) {
+          var prevHighest = hCol >= 0 ? (Number(freshSaveData[i][hCol]) || ARENA_MAX_RANK_) : ARENA_MAX_RANK_;
+          for (var m = 0; m < MILESTONES.length; m++) {
+            if (newRank <= MILESTONES[m].rank && prevHighest > MILESTONES[m].rank) {
+              milestoneReward = { diamond: MILESTONES[m].diamond, gold: MILESTONES[m].gold, pvpCoin: MILESTONES[m].pvpCoin };
+              break;
+            }
+          }
+          break;
+        }
+      }
+    }
+  }
+
+  // 發放金幣獎勵到 save_data
+  if (saveSheet && rewards.gold > 0) {
+    var sd = saveSheet.getDataRange().getValues();
+    var sh = sd[0];
+    var pidIdx = sh.indexOf('playerId');
+    var goldIdx = sh.indexOf('gold');
+    for (var i = 1; i < sd.length; i++) {
+      if (String(sd[i][pidIdx]) === playerId && goldIdx >= 0) {
+        var curGold = Number(sd[i][goldIdx]) || 0;
+        saveSheet.getRange(i + 1, goldIdx + 1).setValue(curGold + rewards.gold);
+        if (milestoneReward) {
+          var diamondIdx = sh.indexOf('diamond');
+          if (diamondIdx >= 0) {
+            var curDiamond = Number(sd[i][diamondIdx]) || 0;
+            saveSheet.getRange(i + 1, diamondIdx + 1).setValue(curDiamond + milestoneReward.diamond);
+          }
+          saveSheet.getRange(i + 1, goldIdx + 1).setValue(curGold + rewards.gold + milestoneReward.gold);
+        }
+        break;
+      }
+    }
+  }
+
+  return {
+    success: true,
+    won: won,
+    newRank: newRank,
+    challengesLeft: challengesLeft,
+    rewards: rewards,
+    milestoneReward: milestoneReward,
+  };
+}
+
+/**
+ * 設定防守陣型
+ */
+function handleArenaSetDefense_(body) {
+  var playerId = resolvePlayerId_(body.guestToken);
+  if (!playerId) return { success: false, error: 'not_logged_in' };
+
+  var defenseFormation = body.defenseFormation || '[]';
+
+  var sheet = ensureArenaSheet_();
+  var data = sheet.getDataRange().getValues();
+  var headers = data[0];
+  var pidCol = headers.indexOf('playerId');
+  var defCol = headers.indexOf('defenseFormation');
+
+  for (var i = 1; i < data.length; i++) {
+    if (String(data[i][pidCol]) === playerId) {
+      sheet.getRange(i + 1, defCol + 1).setValue(defenseFormation);
+      return { success: true };
+    }
+  }
+
+  return { success: false, error: 'player_not_in_arena' };
+}
+
+/**
+ * 取得防守陣型
+ */
+function handleArenaGetDefense_(body) {
+  var playerId = resolvePlayerId_(body.guestToken);
+  if (!playerId) return { success: false, error: 'not_logged_in' };
+
+  var sheet = ensureArenaSheet_();
+  var data = sheet.getDataRange().getValues();
+  var headers = data[0];
+  var pidCol = headers.indexOf('playerId');
+  var defCol = headers.indexOf('defenseFormation');
+
+  for (var i = 1; i < data.length; i++) {
+    if (String(data[i][pidCol]) === playerId) {
+      return { success: true, defenseFormation: String(data[i][defCol] || '[]') };
+    }
+  }
+
+  return { success: true, defenseFormation: '[]' };
 }

@@ -173,3 +173,49 @@ export type {
   GachaPullResult,
   DuplicateReward,
 } from './gachaSystem'
+
+// 戰力系統
+export {
+  CP_WEIGHTS,
+  ULTIMATE_POWER_BASE,
+  PASSIVE_POWER_EACH,
+  SET_2PC_POWER,
+  SET_4PC_POWER,
+  getSkillPowerBonus,
+  getSetBonusPower,
+  getHeroCombatPower,
+  getTeamCombatPower,
+  getEnemyTeamPower,
+  getComparisonLevel,
+  COMPARISON_TEXT,
+  COMPARISON_COLOR,
+} from './combatPower'
+
+export type {
+  CombatPowerHeroInput,
+  EnemyStats,
+  ComparisonLevel,
+} from './combatPower'
+
+// 競技場系統
+export {
+  ARENA_MAX_RANK,
+  ARENA_DAILY_CHALLENGES,
+  ARENA_CHALLENGE_RANGE,
+  generateNPCForRank,
+  getChallengeable,
+  processArenaResult,
+  getChallengeReward,
+  checkRankMilestone,
+  getDailyReward,
+  getSeasonReward,
+  RANK_MILESTONES,
+  DAILY_REWARD_TIERS,
+  SEASON_REWARD_TIERS,
+} from './arenaSystem'
+
+export type {
+  ArenaEntry,
+  ArenaReward,
+  ArenaChallengeResult,
+} from './arenaSystem'

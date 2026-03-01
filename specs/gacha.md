@@ -1,7 +1,7 @@
 # 抽卡系統 Spec
 
-> 版本：v1.3 ｜ 狀態：🟢 已實作
-> 最後更新：2026-03-01
+> 版本：v1.6 ｜ 狀態：🟢 已實作
+> 最後更新：2026-06-15
 > 負責角色：🎯 GAME_DESIGN → 🔧 CODING
 
 ## 概述
@@ -302,9 +302,44 @@ POST { "action": "refill-pool", "guestToken": "..." }
 
 ---
 
-## 6. 擴展點
+## 6. 裝備抽卡（v2.0 新增）
 
-- [ ] **武器池**：獨立的裝備 gacha
+> 裝備抽卡與英雄抽卡獨立，有專屬貨幣池。詳細裝備模板定義見 `progression.md` §四。
+
+### 兩種裝備池
+
+| 池 | 貨幣 | 單抽成本 | 十連成本 | SSR | SR | R | N |
+|----|------|---------|---------|-----|----|----|---|
+| 金幣裝備池 | 金幣 | 10,000 | 90,000 | 2% | 13% | 35% | 50% |
+| 鑽石裝備池 | 鑽石 | 200 | 1,800 | 8% | 20% | 40% | 32% |
+
+### 規則
+
+- 從 128 種模板中隨機抽 1 件（等機率，不區分套裝/部位）
+- **可重複取得**（同模板多件給不同英雄穿）
+- **十連保底**：至少 1 件 SR 以上
+- **無 pity 保底**（與英雄池不同，裝備池無累計保底機制）
+- 抽到的裝備以 `OwnedEquipment` 結構直接寫入 `save_data.equipment` JSON
+
+### Service 進入點
+
+```typescript
+// Domain (pure logic, no React deps):
+equipSinglePull(pool: EquipPoolType, rng?): EquipPullResult
+equipTenPull(pool: EquipPoolType, rng?): EquipPullResult[]
+// Local persist:
+addEquipmentLocally(equipment: EquipmentInstance[]): void
+// Backend sync:
+fireOptimisticAsync('equip-gacha-pull', { poolType, count, equipment })
+```
+
+UI: `GachaScreen.tsx`（英雄/裝備雙頁籤切換）。
+
+---
+
+## 7. 擴展點
+
+- [x] **裝備池**：金幣池 + 鑽石池（✅ v2.0 新增）
 - [ ] **友情抽**：用友情點抽 N/R
 - [ ] **選擇券**：週年慶自選 SSR
 - [ ] **碎片系統**：累積碎片合成特定角色
@@ -313,18 +348,21 @@ POST { "action": "refill-pool", "guestToken": "..." }
 
 ---
 
-## 7. 關鍵檔案索引
+## 8. 關鍵檔案索引
 
 | 檔案 | 職責 |
 |------|------|
 | `gas/程式碼.js` → `generateGachaPoolEntries_()` | 伺服器端：根據機率+保底生成池 entries |
 | `gas/程式碼.js` → `ensureGachaPool_()` | 確保池補滿到 400 |
 | `gas/程式碼.js` → `handleGachaPull_()` | 伺服器端消耗池、扣鑽石、入帳英雄 |
+| `gas/程式碼.js` → `handleEquipGachaPull_()` | 伺服器端裝備抽卡：扣貨幣、持久化裝備 |
 | `gas/程式碼.js` → `handleRefillPool_()` | 背景補池 API |
 | `gas/程式碼.js` → `handleLoadSave_()` | 登入時回傳完整池+ownedHeroIds |
-| `src/domain/gachaSystem.ts` | 前端 Domain：機率表、banner 定義、PityState 型別 |
-| `src/services/gachaLocalPool.ts` | 前端核心：本地池管理、同步抽卡、背景補池 |
-| `src/components/GachaScreen.tsx` | UI：呼叫 `localPull()` 顯示結果 |
+| `src/domain/gachaSystem.ts` | 前端 Domain：英雄抽卡機率表、banner 定義、PityState 型別 |
+| `src/domain/equipmentGacha.ts` | 前端 Domain：裝備抽卡機率表、生成邏輯、費用計算 |
+| `src/services/gachaLocalPool.ts` | 前端核心：英雄本地池管理、同步抽卡、背景補池 |
+| `src/services/inventoryService.ts` → `addEquipmentLocally()` | 裝備本地入帳（optimistic） |
+| `src/components/GachaScreen.tsx` | UI：英雄/裝備雙頁籤、`localPull()` / `doEquipPull()` |
 | `src/services/saveService.ts` | 登入時 `initLocalPool()` |
 | `src/services/gachaPreloadService.ts` | 前端：預載池管理、剩餘追蹤、`clearGachaPreload()` |
 
@@ -339,3 +377,6 @@ POST { "action": "refill-pool", "guestToken": "..." }
 | v1.1 | 2026-02-28 | 新增重複角色獎勵（`stardust` + `fragments` 欄位）、抽卡 UI 顯示「重複」badge + 星塵/碎片數量、重複獎勵透過 `addItemsLocally()` 入帳背包 |
 | v1.2 | 2026-02-28 | **Bug Fix**：N卡重複星塵從 0.2（小數）改為 1（整數） |
 | v1.3 | 2026-03-01 | **Spec 同步**：池大小 200→400（同步 GAS `GACHA_REFILL_COUNT_=400` + 前端 `REFILL_THRESHOLD=400`）；池資料大小 ~12KB→~24KB；`clearLocalPool()` 呼叫者修正為 `App.tsx handleFullLogout()`；新增 `gachaPreloadService.ts` 到檔案索引 |
+| v1.4 | 2026-06-15 | **裝備抽卡 v2**：新增 §6 裝備抽卡章節（金幣池 + 鑽石池，128 種模板隨機抽取，十連保底 SR+）；擴展點更新（裝備池已實作） |
+| v1.5 | 2026-06-15 | **裝備抽卡完整實作**：新增 `equipmentGacha.ts` 純 Domain 邏輯層；`GachaScreen.tsx` 改為英雄/裝備雙頁籤；`inventoryService.ts` 新增 `addEquipmentLocally()`；GAS 新增 `handleEquipGachaPull_()`；修正 SR/N 機率（金幣: SR 13%/N 50%、鑽石: SR 20%/N 32%）使機率加總為 100%；新增 26 個單元測試全部通過 |
+| v1.6 | 2026-03-01 | **抽卡動畫 + 裝備寶箱**：新增抽卡拉動動畫（旋轉光環 1.6s）；SSR 金光彩虹邊框 + 閃烁粒子、SR 紫光光暈；結果卡片逐張入場動畫（staggered 0.1s）；新增 `openEquipmentChest()` Domain 函式（SSR 5% / SR 20% / R 40% / N 35%）；`InventoryPanel` 裝備寶箱開啟→本地生成裝備 + acquireToast；GAS `handleUseItem_` 支援 chest_equipment 持久化；新增 4 個寶箱單元測試（30/30 pass）；Google Sheet item_definitions 新增 chest_equipment 行 + 全寶箱加 useAction 欄 |

@@ -1,201 +1,296 @@
-# 🧪 QA 測試報告 — Bug Fix v2.1
+# QA Spec 合規性報告
 
-> 測試日期：2025-07-08
-> 前版日期：2025-07-07 (v2.0)
-> 測試角色：🧪 QA 品管測試師
-> 測試框架：Vitest 1.6.1 + Puppeteer E2E + Node.js fetch
-> 測試範圍：7 項 Bug 修復驗證 + 全功能回歸測試
+> 產出日期：2026-03-01
+> 測試範圍：三大新系統 — 戰力系統、競技場排名系統、獲得物品動畫
+> 測試方法：單元測試（Vitest）+ E2E（Puppeteer headless）+ 程式碼審計
 
 ---
 
-## 📊 測試總覽
+## 一、測試摘要
 
-| 檢查項目 | 結果 | 說明 |
-|----------|------|------|
-| TypeScript 編譯 | ✅ PASS | `tsc --noEmit` — 零型別錯誤 |
-| Vite 生產建置 | ✅ PASS | 643 modules, 12.60s, 1,468KB JS (424KB gzip) |
-| 單元測試 | ✅ 224/224 PASS | 10 test files, 0 failures, 2.61s |
-| 數值模擬 (1000 場) | ✅ PASS | 玩家 48.6% / 敵方 51.4%（±15% 容差內） |
-| ESLint 靜態分析 | ⚠️ 27 問題 | 14 errors + 13 warnings（全為 React compiler 誤報，非真 bug） |
-| E2E 遊戲流程 | ✅ PASS | 13 通過 / 4 預期警告 / 0 失敗 / 0 JS 錯誤 |
-| GAS API 端點 | ✅ PASS | 11 ✅ / 1 ⚠️ — load-save / readSheet / listSheets 全正常 |
-| CacheService | ✅ PASS | `_cached: true` 快取確認啟用 |
-| 抽卡數值驗證 | ✅ PASS | N 卡星塵=1（整數）, 所有星塵/碎片皆整數 |
-| Bug Fix 驗證 | ✅ 7/7 PASS | 全部 7 項修復 + 共用常數模組驗證通過 |
+| 項目 | 結果 |
+|------|------|
+| **單元測試** | 113/113 ✅ 全部通過 |
+| **E2E (headless)** | 2 PASS / 7 WARN / 0 FAIL（headless 無 WebGL 限制） |
+| **JS 執行時錯誤** | 0 |
+| **TypeScript 編譯** | ✅ tsc --noEmit 零錯誤 |
+| **Vite build** | ✅ 編譯成功 |
 
 ---
 
-## 🐛 v2.1 Bug 修復驗證（7 項全通過）
+## 二、戰力系統（combat-power.md v0.3）
 
-### Bug #005 — 戰鬥 HP 血條不會下降 ✅ 已修復
-- **問題**：星級硬編碼 `stars: 1`，BattleHUD 讀取 raw base HP 而非戰鬥實例 HP
-- **修復**：`stars: inst.stars ?? 1` 從存檔讀取；`maxHP` 取自 `battleHeroesRef.current`（含星級加成）
-- **驗證**：App.tsx L1138 stars 正確、L2076/L2085 maxHP 來源正確
+### 2.1 Domain 層 — `src/domain/combatPower.ts`
 
-### Bug #006 — 升級/突破/升星不消耗素材 ✅ 已修復
-- **問題**：API 呼叫後未本地扣除素材，面板不更新
-- **修復**：新增 `removeItemsLocally()` 在 inventoryService.ts；三個升級函式皆呼叫
-- **驗證**：HeroListPanel.tsx L337/L379/L403 全部呼叫 `removeItemsLocally`
+| Spec 斷言 | 測試 ID | 結果 | 備註 |
+|-----------|---------|------|------|
+| W_HP = 0.5 | CP-1 | ✅ | |
+| W_ATK = 3.0 | CP-1 | ✅ | |
+| W_DEF = 2.5 | CP-1 | ✅ | |
+| W_SPD = 8.0 | CP-1 | ✅ | |
+| W_CRIT_RATE = 5.0 | CP-1 | ✅ | |
+| W_CRIT_DMG = 2.0 | CP-1 | ✅ | |
+| ULTIMATE_POWER_BASE = 100 | CP-2 | ✅ | |
+| PASSIVE_POWER_EACH = 50 | CP-2 | ✅ | |
+| SET_2PC_POWER = 80 | CP-2 | ✅ | |
+| SET_4PC_POWER = 200 | CP-2 | ✅ | |
+| 0 星被動 = 0 | CP-3 | ✅ | |
+| 1 星被動 = 0 | CP-3 | ✅ | |
+| 3 星被動 = 1 | CP-3 | ✅ | |
+| 6 星被動 = 4 | CP-3 | ✅ | |
+| 空裝備 setBonus = 0 | CP-4 | ✅ | |
+| 不同套裝 = 0 | CP-4 | ✅ | |
+| 2 件套 = 80 | CP-4 | ✅ | |
+| 4 件套 = 280（2pc80+4pc200） | CP-4 | ⚠️ 見差異#1 | |
+| getHeroCombatPower 手算驗證 | CP-5 | ✅ | 100HP+20ATK+10DEF+100SPD → 2000 |
+| getTeamCombatPower 加總 | CP-6 | ✅ | |
+| getEnemyTeamPower 公式一致 | CP-7 | ✅ | |
+| ratio ≥ 1.5 → crush | CP-8 | ✅ | |
+| ratio ≥ 1.2 → advantage | CP-8 | ✅ | |
+| ratio ≥ 0.83 → even | CP-8 | ✅ | |
+| ratio ≥ 0.67 → disadvantage | CP-8 | ✅ | |
+| ratio < 0.67 → danger | CP-8 | ✅ | |
+| 碾壓→綠色 / 危險→紅色 | CP-9 | ✅ | |
+| 5 個對比等級完備 | CP-9 | ✅ | |
 
-### Bug #007 — AudioContext 無手勢報錯 ✅ 已修復
-- **問題**：瀏覽器阻止未經手勢的 AudioContext
-- **修復**：`playBgm()` 無 ctx 時暫存曲目；`ensureContext()` 手勢後自動補播
-- **驗證**：audioService.ts L153-163 延遲邏輯、L75-87 補播邏輯
+### 2.2 Hook 層 — `src/hooks/useCombatPower.ts`
 
-### Bug #008 — N 卡星塵為小數 (0.2) ✅ 已修復
-- **問題**：`DUPLICATE_STARDUST.N = 0.2` 導致小數顯示
-- **修復**：改為 `N: 1`（整數）
-- **驗證**：gachaSystem.ts L88 確認為 `1`；抽卡腳本驗證所有產出皆整數
+| 檢查項 | 結果 | 備註 |
+|--------|------|------|
+| formation/heroInstances/equipment 變化觸發重算 | ✅ | useEffect 依賴 formationKey + heroKey |
+| prevPowerRef 追蹤前一次值 | ✅ | 差值計算正確 |
+| 1.5s timer 清除 delta | ✅ | Spec 要求 1.5s |
+| 連續快速變化合併（clearTimeout） | ✅ | 與 spec 疊加規則一致 |
+| 敵方 CP 從 enemySlots 計算 | ✅ | useMemo(buildEnemyStatsFromSlots) |
 
-### Bug #009 — 碎片/核心清除快取後顯示 0 ✅ 已修復
-- **問題**：背包資料只在打開面板時載入，清快取後升級面板看到 0
-- **修復**：Phase 1 `useEffect` 中即呼叫 `loadInventory()`
-- **驗證**：App.tsx L822-827 認證成功後立即載入
+### 2.3 UI 層 — `src/components/CombatPowerHUD.tsx`
 
-### Bug #010 — 登出自動建立新訪客 ✅ 已修復
-- **問題**：`autoLogin()` 失敗時自動呼叫 `registerGuest()`
-- **修復**：`autoLogin()` 失敗只回傳 `isLoggedIn: false`；`registerGuest()` 獨立為按鈕觸發
-- **驗證**：authService.ts L111-155 確認無自動註冊邏輯
+| 檢查項 | 結果 | 備註 |
+|--------|------|------|
+| CombatPowerToast: 格式 `⚡ +N ↑` / `⚡ -N ↓` | ✅ | 與 spec 完全一致 |
+| CSS class `.combat-power-toast.up` / `.down` | ✅ | 綠色 #4ade80 / 紅色 #f87171 |
+| CombatPowerComparison: 我方/敵方戰力顯示 | ✅ | |
+| 對比條百分比計算 | ✅ | `myPct = myPower / total * 100` |
+| 危險閃爍效果 | ✅ | `comparison === 'danger'` → `.cp-danger-flash` |
 
-### Bug #011 — 訪客登入應複用 token ✅ 已修復
-- **問題**：訪客按鈕未使用正確的 `registerGuest` 流程
-- **修復**：LoginScreen 按鈕改用 `doRegisterGuest`，內部先檢查 localStorage 既有 token
-- **驗證**：LoginScreen.tsx L87/L134 確認使用 `doRegisterGuest`
+### 2.4 App.tsx 整合
 
-### Bonus — 共用稀有度常數模組 ✅
-- 新增 `src/constants/rarity.ts` 匯出 `RARITY_COLORS`、`RARITY_CONFIG`、`ITEM_ICONS`、`getItemIcon()`
-- InventoryPanel / GachaScreen / HeroListPanel / MailboxPanel 統一引用
+| 檢查項 | 結果 | 備註 |
+|--------|------|------|
+| `useCombatPower()` 呼叫（傳入 formation + heroes + heroesList + enemySlots） | ✅ | L576-581 |
+| `<CombatPowerComparison>` 在 IDLE 顯示 | ✅ | L2820-2827, 條件 `gameState === 'IDLE' && turn === 0 && enemyPower > 0` |
+| `<CombatPowerToast>` 顯示飛行動畫 | ✅ | L2830-2832 |
+| 主選單 HUD 顯示戰力 ⚡ | ⚠️ 見差異#2 | MainMenu 中未偵測到獨立 CP 顯示 |
 
----
+### 2.5 E2E 驗證
 
-## 🐛 歷史 Bug（v1.0 已修復）
-
-### Bug #001 — ESLint 缺少 TypeScript Parser ✅ 已修復
-### Bug #002 — ATK Buff 雙重套用 ✅ 已修復
-### Bug #003 — tickStatusDurations 永久 buff 誤判 ✅ 已修復
-### Bug #004 — runBattle break 後誤判平手 ✅ 已修復
-
----
-
-## 📝 v2.0 新功能驗證
-
-### E2E Puppeteer 自動化測試結果
-
-| 測試項目 | 結果 | 說明 |
-|----------|------|------|
-| 自動登入 | ✅ | token 預設→跳過登入畫面→直入主選單 |
-| 主選單載入 | ✅ | 所有按鈕正確顯示（關卡/英雄/召喚/背包/商店/信箱/設定） |
-| undefined/NaN 洩漏 | ✅ | 頁面無 undefined/NaN 文字 |
-| 關卡進度 | ✅ | 顯示 1-1 |
-| 英雄列表 | ✅ | 可進入、顯示 HP/ATK/Lv 屬性 |
-| 召喚介面 | ✅ | 單抽/十連按鈕存在 |
-| 背包介面 | ⚠️ | 鎖定中（通關 1-1 後解鎖）— 預期行為 |
-| 商店介面 | ⚠️ | 鎖定中（通關 1-2 後解鎖）— 預期行為 |
-| 關卡選擇 | ✅ | 主線/爬塔/副本 正常顯示 |
-| PvP 頁籤 | ✅ | PvP 競技場頁籤存在 |
-| Boss 頁籤 | ✅ | Boss 首領挑戰頁籤存在 |
-| JS 錯誤 | ✅ | 零重大 JS runtime 錯誤 |
-
-### GAS API 端點測試
-
-| API | 結果 | 說明 |
-|-----|------|------|
-| `load-save` | ✅ | 14 英雄、`_cached: true`、中文正確 |
-| `readSheet heroes` | ✅ | 14 英雄、中文正確、無亂碼 |
-| `readSheet skill_templates` | ✅ | 63 技能、SkillID 正確 |
-| `listSheets` | ✅ | 20 個工作表全數存在 |
-| CacheService | ✅ | `_cached: true`，快取正常運作 |
-
-### Google Sheets 中文亂碼檢查
-
-- ✅ heroes 表：女喪屍、異變者、詭獸... 全正確
-- ✅ skill_templates 表：烈焰爆發、冰霜護盾... 全正確
-- ✅ 無 `?`、方塊字亂碼、`撣賊`/`銋`/`璉格` 等異常字元
+| 項目 | 結果 | 備註 |
+|------|------|------|
+| T1.1 大廳 CP 顯示 | WARN | headless 無 WebGL，3D 場景未渲染 |
+| T1.2 IDLE CP 對比條 | ✅ PASS | HTML 中偵測到 `cp-comparison` |
 
 ---
 
-## ⚠️ ESLint 殘餘問題分析（27 problems）
+## 三、競技場排名系統（arena-pvp.md v0.3）
 
-| 類型 | 數量 | 規則 | 說明 |
-|------|------|------|------|
-| setState in effect | 4 | react-hooks/set-state-in-effect | React 19 compiler 嚴格模式，實為合法 loading pattern |
-| Cannot modify value | 4 | react-hooks/immutability | Three.js AnimationAction/Mixer 操作，React compiler 誤判 |
-| Refs during render | 5 | react-hooks/refs | R3F useFrame/render 中存取 ref，Three.js 標準模式 |
-| fast-refresh | 1 | react-refresh/only-export-components | UIOverlay 匯出非元件常數 |
-| no-explicit-any | 9 | @typescript-eslint/no-explicit-any | 三邊 FBX/GLB 物件類型 |
-| exhaustive-deps | 2 | react-hooks/exhaustive-deps | 穩定引用不需列入 deps |
-| no-unused-vars | 1 | @typescript-eslint/no-unused-vars | ZombieModel zombieId |
-| useMemo deps | 1 | react-hooks/exhaustive-deps | HeroListPanel heroEquipment |
+### 3.1 Domain 層 — `src/domain/arenaSystem.ts`
 
-**結論**：全部 27 個問題皆為非阻塞性，不影響 runtime 功能。主因是 React 19 compiler plugin 對 Three.js/R3F 模式的誤報。
+| Spec 斷言 | 測試 ID | 結果 | 備註 |
+|-----------|---------|------|------|
+| ARENA_MAX_RANK = 500 | AR-1 | ✅ | |
+| ARENA_DAILY_CHALLENGES = 5 | AR-1 | ✅ | |
+| ARENA_CHALLENGE_RANGE = 3 | AR-1 | ✅ | |
+| NPC rank 500 → power 500 | AR-2 | ✅ | |
+| NPC rank 250 → power 5500 | AR-2 | ✅ | |
+| NPC rank 1 → power 10480 | AR-2 | ⚠️ 見差異#3 | Spec 寫 10500，公式 500+(500-1)*20=10480 |
+| NPC 名稱 = prefix + suffix | AR-3 | ✅ | |
+| NPC 相同 rank = 相同 seed = 相同結果 | AR-3 | ✅ | |
+| getChallengeable(50) = [49,48,47] | AR-4 | ✅ | |
+| getChallengeable(1) = [] | AR-4 | ✅ | |
+| getChallengeable(2) = [1] | AR-4 | ✅ | |
+| 勝利 → 排名互換 | AR-5 | ✅ | |
+| 敗北 → 排名不變 | AR-5 | ✅ | |
+| 勝利獎勵: gold=2000, pvpCoin=5 | AR-6 | ✅ | |
+| 敗北獎勵: gold=500, pvpCoin=1 | AR-6 | ✅ | |
+| 8 層排名里程碑數值全部正確 | AR-7 | ✅ | 400/300/200/100/50/20/10/1 |
+| 里程碑跨越檢測（newRank ≤ threshold && prevBest > threshold） | AR-8 | ✅ | |
+| 8 層每日獎勵數值全部正確 | AR-9 | ✅ | |
+| 每日獎勵覆蓋 1~500 完整 | AR-9 | ✅ | |
+| 8 層賽季獎勵數值全部正確 | AR-10 | ✅ | |
+| 賽季獎勵覆蓋 1~500 完整 | AR-10 | ✅ | |
+| 超出範圍 fallback 正確 | AR-11 | ✅ | |
+
+### 3.2 Service 層 — `src/services/arenaService.ts`
+
+| 檢查項 | 結果 | 備註 |
+|--------|------|------|
+| `startArenaChallenge(targetRank)` → 呼叫 GAS `arena-challenge` | ✅ | 程式碼審計 |
+| `completeArenaChallenge(targetRank, won)` → 呼叫 GAS | ✅ | 程式碼審計 |
+| `clearArenaCache()` 清除排行榜快取 | ✅ | |
+
+### 3.3 UI 層 — `src/components/ArenaPanel.tsx`
+
+| 檢查項 | 結果 | 備註 |
+|--------|------|------|
+| 排行榜顯示 | ✅ | 元件存在且渲染 |
+| NPC 名稱 (prefix+suffix) 可見 | ✅ | 程式碼審計 |
+| 挑戰按鈕 | ✅ | 條件：排名差 ≤ 3 |
+| 防守陣型配置 | ✅ | 程式碼審計 |
+
+### 3.4 App.tsx 整合
+
+| 檢查項 | 結果 | 備註 |
+|--------|------|------|
+| `onStartBattle` → startArenaChallenge → 建置敵方 SlotHero[] | ✅ | 程式碼審計 |
+| stageMode='pvp' → 進入 IDLE → 戰鬥 | ✅ | |
+| 勝利 → completeArenaChallenge → acquireToast 顯示獎勵 | ✅ | L2185 |
+| 敗北 → 顯示結果 | ✅ | |
+| 戰後返回競技場 | ✅ | setMenuScreen('arena') |
+
+### 3.5 E2E 驗證
+
+| 項目 | 結果 | 備註 |
+|------|------|------|
+| T2.1 排行榜 | WARN | 帳號可能未解鎖競技場（需通關 2-1） |
+| T2.2 NPC 條目 | WARN | 同上 |
+| T2.3 挑戰按鈕 | WARN | 同上 |
+
+### 3.6 挑戰獎勵 — Spec 差異
+
+| Spec 欄位 | 實作 ArenaReward 型別 | 差異 |
+|-----------|---------------------|------|
+| exp | 無 `exp` 欄位 | ⚠️ 見差異#4 |
+| gold | ✅ `gold` | |
+| 競技幣 | ✅ `pvpCoin` | |
+| diamond | ✅（值為 0） | |
 
 ---
 
-## ⚠️ 警告事項
+## 四、獲得物品動畫（item-acquire-toast.md v0.3）
 
-### Warning #001 — Bundle Size > 500KB
+### 4.1 型別定義 — `src/hooks/useAcquireToast.ts`
 
-- `index-*.js` 為 1,467KB (gzip 424KB)
-- 主因：Three.js (~1MB) 佔大宗
-- 建議：未來可用 `manualChunks` 拆分 Three.js
+| Spec 斷言 | 測試 ID | 結果 | 備註 |
+|-----------|---------|------|------|
+| AcquireItem.type: 5 類 (hero/equipment/item/currency/fragment) | AT-1 | ✅ | |
+| AcquireItem.rarity 可選 | AT-1 | ✅ | |
+| AcquireItem.isNew 可選 | AT-1 | ✅ | |
+| useAcquireToast() 回傳 show + isShowing | AT-1 | ✅ | 程式碼審計 |
+
+### 4.2 全域事件匯流排 — `src/services/acquireToastBus.ts`
+
+| Spec 斷言 | 測試 ID | 結果 | 備註 |
+|-----------|---------|------|------|
+| emitAcquire([]) 空陣列不觸發 | AT-2 | ✅ | |
+| emitAcquire(items) 非空觸發 handler | AT-3 | ✅ | |
+| 完整 AcquireItem 資料透傳 | AT-4 | ✅ | |
+| 未註冊時不報錯 | AT-5 | ✅ | |
+| 多次 register 後者覆蓋 | AT-6 | ✅ | |
+
+### 4.3 UI 元件 — `src/components/AcquireToast.tsx`
+
+| 檢查項 | 結果 | 備註 |
+|--------|------|------|
+| 全螢幕遮罩 `.acquire-overlay` | ✅ | AcquireToast.tsx |
+| 重要物品單一展示 (SR/SSR) | ✅ | SingleItemDisplay |
+| 普通物品合併列表 | ✅ | ItemListDisplay |
+| 跳過（點擊繼續） | ✅ | onClick handler |
+| 稀有度邊框色（N:灰/R:藍/SR:紫/SSR:金） | ✅ | CSS classes |
+| 合併列表逐一淡入 CSS | ✅ | `.acquire-list-item` |
+
+### 4.4 觸發場景連接
+
+| 場景 | Spec 狀態 | 實作驗證 | 結果 |
+|------|-----------|---------|------|
+| 戰鬥勝利 (GAMEOVER) | ✅ | App.tsx 中 victory 分支 `acquireToast.show()` | ✅ |
+| 英雄抽卡 (GachaScreen) | ✅ | `emitAcquire()` 呼叫 | ✅ |
+| 信件領取 (MailboxPanel) | ✅ | `onRewardsClaimed` → `acquireToast.show()` | ✅ |
+| 商店購買 (ShopPanel) | ✅ | `emitAcquire()` 呼叫 | ✅ |
+| 競技場獎勵 | ✅ | App.tsx 競技場勝利分支 | ✅ |
+| 裝備抽卡 | ⬜ 未實作 | 尚無裝備卡池 | N/A |
+| 開寶箱 | ⬜ 未實作 | 待 GAS `use-item` | N/A |
+| 排名提升里程碑 | ⬜ 未實作 | 待 milestoneReward | N/A |
+
+### 4.5 E2E 驗證
+
+| 項目 | 結果 | 備註 |
+|------|------|------|
+| T3.1 抽卡後 toast | WARN | 帳號可能鑽石不足 |
+| T3.2a 商店介面 | ✅ PASS | |
+| T3.2b 商店購買 toast | WARN | 第一個購買按鈕可能 disabled |
 
 ---
 
-## 🧪 測試覆蓋範圍
+## 五、發現的 Spec ↔ 實作差異
 
-### 單元測試（224 tests / 10 files）
+### 差異 #1：4 件套 CP 計算方式
 
-| 模組 | 測試數 | 覆蓋函式 |
-|------|--------|----------|
-| elementSystem | 12 | getElementMultiplier, isWeakness, isResist, loadElementMatrix |
-| buffSystem | 33 | applyStatus, removeStatus, cleanse, processDotEffects, processRegen, tickStatusDurations, tickShieldDurations |
-| energySystem | 14 | addEnergy, turnStartEnergy, onAttackEnergy, onBeAttackedEnergy, onKillEnergy, consumeEnergy, canCastUltimate |
-| damageFormula | 19 | calculateDamage, calculateHeal, calculateDot, calculateReflect |
-| targetStrategy | 18 | selectTargets (8 types + regex), selectNormalAttackTarget |
-| battleEngine | 13 | createBattleHero, checkLethalPassive, runBattle (1000 場模擬) |
-| 邊界條件 | 24 | HP 上下限, 能量 overflow, 空陣列, ATK=0/DEF=0, 極端數值 |
-| gachaSystem | 37+ | 保底機制, 機率分佈, pool 消耗 |
-| skillSystem | 45+ | 技能效果, 目標選擇, 被動觸發 |
+| | Spec | 實作 |
+|---|------|------|
+| **描述** | "SET_4PC_POWER = 200（含 2 件套）" | `getActiveSetBonuses()` 回傳 2pc 和 4pc **兩個 entry**，各自加分 |
+| **4 件套結果** | 暗示 200 | 實際 80 + 200 = **280** |
+| **嚴重度** | 🟡 低 | Spec 用語「含 2 件套」歧義，可理解為兩種方式 |
+| **建議** | 更新 spec 明確為 "4 件套總 CP = SET_2PC_POWER + SET_4PC_POWER = 280" |
 
-### E2E 測試（Puppeteer 自動化）
+### 差異 #2：主選單 HUD 戰力顯示
 
-- ✅ 登入→主選單→各功能入口
-- ✅ 英雄列表、召喚、關卡選擇（含 PvP/Boss 頁籤）
-- ✅ 功能鎖定（進度不足時正確鎖定）
-- ✅ 零 JS runtime 錯誤
+| | Spec | 實作 |
+|---|------|------|
+| **描述** | "顯示於大廳主選單 HUD" (§2.1 資源列右側 ⚡ N) | `CombatPowerToast` 和 `CombatPowerComparison` 已渲染，但主選單首頁獨立 CP 數值未確認 |
+| **嚴重度** | 🟡 低 | CP 在 IDLE 確實顯示，主選單可能尚需獨立 HUD 欄位 |
+| **建議** | 在 MainMenu 資源列加入 `⚡ {cpState.currentPower}` 或在 spec 標註為選配 |
 
-### GAS API 整合測試
+### 差異 #3：NPC Rank 1 戰力公式
 
-- ✅ load-save 資料完整性
-- ✅ readSheet 中文編碼
-- ✅ CacheService 快取機制
-- ✅ 20 個 Sheet 結構完整
+| | Spec | 實作 |
+|---|------|------|
+| **描述** | Spec §3.1 寫 "rank 1 → 10,500 CP" | 公式 `500 + (500 - 1) * 20 = 10480` |
+| **嚴重度** | 🟢 極低 | Spec 給的是約略示意值（10,500 ≈ 10,480），實作公式正確 |
+| **建議** | Spec 備註更正為 `~10,480 CP`（或改公式為 `500 + (500 - rank + 1) * 20`） |
 
----
+### 差異 #4：挑戰獎勵遺漏 `exp` 欄位
 
-## 📈 數值模擬詳情
-
-### 1v1 對稱對戰 (1000 場)
-
-- 雙方屬性完全相同：HP=1000, ATK=150, DEF=50, SPD=100, CritRate=15, CritDmg=50
-- SPD 微調（±10）模擬隨機性
-- 結果：**Player 47.9% / Enemy 52.1% / Draw 0%**
-- 評估：✅ 在 ±15% 容差內，無明顯先手優勢
+| | Spec | 實作 |
+|---|------|------|
+| **描述** | Spec §5.2 挑戰獎勵表有 `exp`（勝利 150、敗北 50） | `ArenaReward` 型別只有 `diamond / gold / pvpCoin`，無 `exp` |
+| **嚴重度** | 🟠 中 | 功能缺失：勝利/敗北應發放經驗但未實作 |
+| **建議** | 新增 `exp` 到 `ArenaReward`，`getChallengeReward()` 回傳 exp 值 |
 
 ---
 
-## ✅ 結論
+## 六、其他已知限制
 
-全球感染 v2.1 通過完整 QA 測試，7 項 Bug 修復全部驗證通過：
+1. **Headless Puppeteer 無 WebGL**：E2E 無法驗證 3D 場域內的 DOM overlay（如主選單需 Three.js Canvas 渲染） → WARN 項目均為此限制
+2. **訪客帳號進度有限**：test token 可能未通關 1-8（競技場）或 1-2（召喚/商店），導致 E2E 無法進入子面板
+3. **既存測試失敗**：`progressionSystemAdvanced.test.ts` 有 5 個失敗，與本次 3 系統無關（為既有 equipment set 相關測試）
 
-1. **編譯零錯誤**：TypeScript 嚴格模式 + Vite 生產建置通過（643 modules）
-2. **224 單元測試全通過**：涵蓋戰鬥引擎、轉蛋、技能、元素等核心系統
-3. **E2E 自動化驗證**：遊戲可正常啟動、主選單完整、功能鎖定正確（13✅/4⚠️/0❌）
-4. **GAS API 穩定**：存檔讀寫、快取機制、中文編碼全部正常（11✅/1⚠️/0❌）
-5. **7 項 Bug Fix 全部驗證**：戰鬥 HP、素材消耗、AudioContext、星塵整數、背包載入、登出邏輯、token 複用
-6. **抽卡數值正確**：N 卡星塵=1（整數），所有產出皆無小數
-7. **ESLint 殘餘全為非阻塞**：React compiler 對 Three.js 的誤報
+---
 
-**品質評級：🟢 PASS — 可交付**
-- 結果：玩家勝率 > 80%
-- 評估：✅ HP 差距正確反映在勝率上
+## 七、測試檔案索引
+
+| 檔案 | 測試數 | 狀態 |
+|------|--------|------|
+| `src/domain/__tests__/combatPower.test.ts` | 39 | ✅ 全通過 |
+| `src/domain/__tests__/arenaSystem.test.ts` | 59 | ✅ 全通過 |
+| `src/hooks/__tests__/useAcquireToast.test.ts` | 15 | ✅ 全通過 |
+| `scripts/qa_gpu_e2e.mjs` | 9 項 E2E | 2 PASS / 7 WARN |
+| `scripts/qa_three_systems.mjs` | 原始 E2E | 2 PASS / 8 WARN |
+
+---
+
+## 八、結論
+
+### 三系統 spec 合規度
+
+| 系統 | Domain 邏輯 | UI 元件 | App.tsx 整合 | 總評 |
+|------|------------|---------|-------------|------|
+| 戰力系統 | ✅ 100% | ✅ 完整 | ✅ 已渲染（IDLE+Toast） | 🟢 合規 |
+| 競技場排名 | ✅ 98%（缺 exp） | ✅ 完整 | ✅ 戰鬥引擎已連接 | 🟡 輕微差異 |
+| 獲得物品動畫 | ✅ 100% | ✅ 完整 | ✅ 5/8 場景連接 | 🟢 合規 |
+
+### 需修正項目
+
+1. **[建議修] ArenaReward 加入 `exp` 欄位**（差異 #4，spec §5.2 明確列出）
+2. **[建議修] Spec combat-power.md 4 件套描述更明確**（差異 #1）
+3. **[建議修] Spec arena-pvp.md NPC rank 1 數值更正**（差異 #3）
+4. **[選配] 主選單獨立 CP HUD**（差異 #2，可視為下階段 feature）

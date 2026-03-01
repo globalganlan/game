@@ -1,0 +1,27 @@
+{
+  "pass": 2,
+  "warn": 7,
+  "fail": 0,
+  "jsErrors": [],
+  "details": [
+    "[NAV] Opening game...",
+    "[LOGIN] Clicked: false",
+    "[MENU] Main menu reached",
+    "\n== T1: Combat Power ==",
+    "[T1.1] WARN: CP not visible in lobby (may need WebGL)",
+    "[T1.2] PASS: CP comparison bar in IDLE",
+    "\n== T2: Arena ==",
+    "[T2.1] WARN: Ranking text not found",
+    "[T2.2] WARN: NPC names not found",
+    "[T2.3] WARN: Challenge button not found",
+    "\n== T3: Acquire Toast ==",
+    "[T3.1a] WARN: Gacha UI not detected",
+    "[T3.1b] WARN: Could not click gacha pull",
+    "[T3.2a] PASS: Shop UI visible",
+    "[T3.2b] WARN: Could not click purchase button",
+    "\n============================",
+    "PASS: 2  WARN: 7  FAIL: 0",
+    "JS Errors: 0",
+    "============================"
+  ]
+}

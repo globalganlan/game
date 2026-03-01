@@ -20,7 +20,7 @@ import {
   getStarPassiveSlots, getAscensionMultiplier, getStarMultiplier,
   getStatAtLevel, getLevelCap, consumeExpMaterials,
   canAscend, canStarUp, getAscensionCost, getStarUpCost,
-  getInitialStars, enhancedMainStat,
+  getInitialStars, enhancedMainStat, getEnhanceCost, getMaxEnhanceLevel,
 } from '../domain/progressionSystem'
 import type { EquipmentInstance } from '../domain/progressionSystem'
 import {
@@ -32,7 +32,7 @@ import {
   getItemQuantity, onInventoryChange,
   getHeroEquipment, getUnequippedEquipment,
   equipItem, unequipItem,
-  removeItemsLocally,
+  removeItemsLocally, enhanceEquipment,
 } from '../services/inventoryService'
 import { getGlbForSuspense } from '../loaders/glbLoader'
 // 3D idle animation is the hero detail showcase; Thumbnail3D kept for grid cards only
@@ -282,7 +282,7 @@ function HeroDetail({ hero, instance, onClose, skills, heroSkills }: HeroDetailP
   ]
 
   // ── 養成 Modal 狀態 ──
-  const [modalMode, setModalMode] = useState<'none' | 'upgrade' | 'ascend' | 'starUp' | 'equip'>('none')
+  const [modalMode, setModalMode] = useState<'none' | 'upgrade' | 'ascend' | 'starUp' | 'equip' | 'enhance'>('none')
   const [isProcessing, setIsProcessing] = useState(false)
   const [resultMsg, setResultMsg] = useState('')
   const [useQty, setUseQty] = useState<Record<string, number>>({})
@@ -452,6 +452,34 @@ function HeroDetail({ hero, instance, onClose, skills, heroSkills }: HeroDetailP
     setModalMode('none')
   }, [instance])
 
+  // ── 強化裝備 ──
+  const [enhanceTarget, setEnhanceTarget] = useState<EquipmentInstance | null>(null)
+
+  const handleOpenEnhance = useCallback((eq: EquipmentInstance) => {
+    setEnhanceTarget(eq)
+    setResultMsg('')
+    setModalMode('enhance')
+  }, [])
+
+  const handleConfirmEnhance = useCallback(async () => {
+    if (!enhanceTarget || isProcessing) return
+    setIsProcessing(true)
+    try {
+      const res = await enhanceEquipment(enhanceTarget.equipId)
+      if (res.success) {
+        setResultMsg(`強化成功！+${res.newLevel}`)
+        // 更新本地 target 以便 modal 顯示新數值
+        setEnhanceTarget(prev => prev ? { ...prev, enhanceLevel: res.newLevel ?? prev.enhanceLevel + 1 } : null)
+      } else {
+        setResultMsg(`強化失敗：${res.error === 'insufficient_gold' ? '金幣不足' : res.error === 'max_enhance_level' ? '已達最高等級' : res.error}`)
+      }
+    } catch (e) {
+      setResultMsg('強化失敗：' + String(e))
+    } finally {
+      setIsProcessing(false)
+    }
+  }, [enhanceTarget, isProcessing])
+
   return (
     <div className="hero-detail-backdrop" onClick={onClose}>
       <div className="hd2-card" onClick={(e) => e.stopPropagation()}>
@@ -560,9 +588,16 @@ function HeroDetail({ hero, instance, onClose, skills, heroSkills }: HeroDetailP
                   <div className="hd2-equip-detail">
                     <span className="hd2-equip-name">{eq.templateId}</span>
                     <span className="hd2-equip-stats">
-                      {eq.mainStat} +{enhancedMainStat(eq.mainStatValue, eq.enhanceLevel)}
+                      {eq.mainStat} +{enhancedMainStat(eq.mainStatValue, eq.enhanceLevel, eq.rarity)}
                       {eq.enhanceLevel > 0 && <span className="hd2-equip-lv">+{eq.enhanceLevel}</span>}
                     </span>
+                    {isOwned && eq.enhanceLevel < getMaxEnhanceLevel(eq.rarity) && (
+                      <button
+                        className="hd2-equip-enhance-btn"
+                        onClick={(e) => { e.stopPropagation(); handleOpenEnhance(eq) }}
+                        title="強化裝備"
+                      >⚒️</button>
+                    )}
                   </div>
                 ) : (
                   <span className="hd2-equip-text">{label}：空</span>
@@ -756,8 +791,8 @@ function HeroDetail({ hero, instance, onClose, skills, heroSkills }: HeroDetailP
                         {eq.enhanceLevel > 0 && <span className="hd2-equip-lv">+{eq.enhanceLevel}</span>}
                       </div>
                       <div className="hd2-equip-option-stats">
-                        <span>{eq.mainStat} +{enhancedMainStat(eq.mainStatValue, eq.enhanceLevel)}</span>
-                        {eq.subStats.map((sub, i) => (
+                        <span>{eq.mainStat} +{enhancedMainStat(eq.mainStatValue, eq.enhanceLevel, eq.rarity)}</span>
+                        {(eq.subStats ?? []).map((sub, i) => (
                           <span key={i} className="hd2-sub-stat">
                             {sub.stat} +{sub.value}{sub.isPercent ? '%' : ''}
                           </span>
@@ -774,6 +809,51 @@ function HeroDetail({ hero, instance, onClose, skills, heroSkills }: HeroDetailP
             </div>
           </div>
         )}
+
+        {/* ═══════ 強化裝備 Modal ═══════ */}
+        {modalMode === 'enhance' && enhanceTarget && (() => {
+          const maxLvl = getMaxEnhanceLevel(enhanceTarget.rarity)
+          const cost = getEnhanceCost(enhanceTarget.enhanceLevel, enhanceTarget.rarity)
+          const isMax = enhanceTarget.enhanceLevel >= maxLvl
+          const currentMain = enhancedMainStat(enhanceTarget.mainStatValue, enhanceTarget.enhanceLevel, enhanceTarget.rarity)
+          const nextMain = isMax ? currentMain : enhancedMainStat(enhanceTarget.mainStatValue, enhanceTarget.enhanceLevel + 1, enhanceTarget.rarity)
+          return (
+            <div className="hd2-modal-backdrop" onClick={() => setModalMode('none')}>
+              <div className="hd2-modal" onClick={e => e.stopPropagation()}>
+                <h4 className="hd2-modal-title">⚒️ 裝備強化</h4>
+                <div className="hd2-modal-info">
+                  <div><strong>{enhanceTarget.templateId}</strong> <span className={`hd2-equip-rarity rarity-${enhanceTarget.rarity.toLowerCase()}`}>{enhanceTarget.rarity}</span></div>
+                  <div>+{enhanceTarget.enhanceLevel} / {maxLvl}</div>
+                  <div style={{ marginTop: 6 }}>
+                    {enhanceTarget.mainStat}: {currentMain}
+                    {!isMax && <span style={{ color: '#4ade80' }}> → {nextMain}</span>}
+                  </div>
+                </div>
+                {isMax ? (
+                  <div className="hd2-modal-info" style={{ color: '#facc15' }}>已達最高強化等級</div>
+                ) : (
+                  <div className="hd2-modal-info">
+                    費用：<span style={{ color: '#fbbf24' }}>{cost.toLocaleString()}</span> 金幣
+                    {currentGold < cost && <span style={{ color: '#f87171', marginLeft: 8 }}>（不足）</span>}
+                  </div>
+                )}
+                {resultMsg && <div className="hd2-result">{resultMsg}</div>}
+                <div className="hd2-modal-btns">
+                  {!isMax && (
+                    <button
+                      className="hd2-modal-confirm"
+                      disabled={isProcessing || currentGold < cost}
+                      onClick={handleConfirmEnhance}
+                    >
+                      {isProcessing ? '強化中…' : '確認強化'}
+                    </button>
+                  )}
+                  <button className="hd2-modal-cancel" onClick={() => setModalMode('none')}>關閉</button>
+                </div>
+              </div>
+            </div>
+          )
+        })()}
       </div>
     </div>
   )

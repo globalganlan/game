@@ -1,7 +1,7 @@
 # 存檔系統 Spec
 
-> 版本：v1.5 ｜ 狀態：🟢 已實作
-> 最後更新：2026-03-01
+> 版本：v1.6 ｜ 狀態：🟢 已實作
+> 最後更新：2026-06-15
 > 負責角色：🎯 GAME_DESIGN → 🔧 CODING
 
 ## 概述
@@ -48,6 +48,7 @@
 | `gachaPity` | string | 保底計數 JSON `{"pullsSinceLastSSR":0,"guaranteedFeatured":false}` |
 | `gachaPool` | string | 預生成抽卡池 JSON（200 組 pull results） |
 | `pwaRewardClaimed` | boolean | PWA 安裝獎勵是否已領取（`true` = 已領） |
+| `equipment` | string | **v2.0 新增** — 裝備 JSON `OwnedEquipment[]`（見 `progression.md` §四） |
 | `lastSaved` | string | 最後存檔時間（ISO 8601） |
 
 > **注意**：`stageStars` 欄位不在 GAS `SAVE_HEADERS_` 初始定義中，由 `handleCompleteBattle_` 在首次寫入星級時動態新增。
@@ -63,7 +64,7 @@
 | `exp` | number | 當前經驗值 |
 | `ascension` | number | 突破階段 (0-5)，最大 5（覺醒） |
 | `stars` | number | 星級 (0-6)，新英雄預設 0 |
-| `equippedItems` | string | 裝備 JSON `{"weapon":"equipId",...}` |
+| `equippedItems` | string | 裝備 JSON `{"weapon":"equipId",...}`（equipId 對應 `save_data.equipment` 中的 `OwnedEquipment.id`） |
 | `obtainedAt` | string | 獲得時間 |
 
 ### Sheet: `inventory`（玩家道具，一人多行）
@@ -218,6 +219,15 @@ interface SaveData {
   stageStars: Record<string, number> // stageId → best star (1-3)
   lastSaved: string
   gachaPity?: { pullsSinceLastSSR: number; guaranteedFeatured: boolean }
+  equipment?: OwnedEquipment[]   // v2.0 新增：裝備模板制
+}
+
+/** v2.0 裝備模板制（詳見 progression.md §四） */
+interface OwnedEquipment {
+  id: string            // "EQ_{timestamp}_{random}"
+  templateId: string    // "eq_{setId}_{slot}_{rarity}"
+  enhanceLevel: number  // 0 ~ maxLevel
+  equippedBy: string    // heroInstanceId 或 ''
 }
 
 interface HeroInstance {
@@ -385,3 +395,4 @@ GAS handleCollectResources_:（包在 executeWithIdempotency_ 中）
 | v1.1 | 2026-02-28 | 初始英雄從 1 隻（無名活屍 N）改為 3 隻（+女喪屍 R、倖存者 R），formation 自動填入前 3 格，修復新帳號卡關 1-1 問題 |
 | v1.2 | 2026-02-28 | 新增完整登出狀態重置（`handleFullLogout`）：清除 8 個服務層快取 + 20+ 個 React state + 5 個 ref 守門旗標，修復登出再登入殘留舊帳號資料問題 |
 | v1.5 | 2026-03-01 | Spec 修正：hero_instances 新增 `stars` 欄位（第 9 欄，預設 0）；`ascension` 範圍修正 0-5（非 0-6）；`save-progress` 白名單阻擋加入 `stageStars`；標注 `stageStars` 非 SAVE_HEADERS_ 初始欄位（由 complete-battle 動態新增）；初始 formation 標注為 heroId 數字（非 heroInstanceId）；towerFloor 初始 0 / 前端 sanitize 修正為 1 |
+| v1.6 | 2026-06-15 | **配合裝備模板制 v2**：`save_data` 新增 `equipment` JSON 欄位（`OwnedEquipment[]`）；`hero_instances.equippedItems` 說明更新（equipId 對應 save_data.equipment 中的 OwnedEquipment.id）；前端 SaveData 介面新增 `equipment?: OwnedEquipment[]` |

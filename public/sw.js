@@ -11,7 +11,7 @@
  *   前端 main.tsx 偵測到新 SW 等待中 → 彈出「有新版本」提示 → 使用者點擊時 skipWaiting
  */
 
-const CACHE_VERSION = 'v3'
+const CACHE_VERSION = 'v4'
 const CACHE_NAME = `globalganlan-${CACHE_VERSION}`
 const STATIC_CACHE = `globalganlan-static-${CACHE_VERSION}`
 
@@ -26,10 +26,13 @@ const STATIC_EXTENSIONS = ['.glb', '.png', '.jpg', '.jpeg', '.svg', '.wasm', '.w
 
 /* ── Install ── */
 self.addEventListener('install', (event) => {
+  // 不在這裡呼叫 self.skipWaiting()。
+  // 讓新 SW 進入 waiting 狀態，由前端顯示更新提示後
+  // 再透過 message('SKIP_WAITING') 觸發接管。
+  // 這避免 iOS standalone 冷啟動時觸發 controllerchange → 整頁 reload。
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then((cache) => cache.addAll(PRECACHE_URLS))
-      .then(() => self.skipWaiting())
   )
 })
 

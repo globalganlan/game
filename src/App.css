@@ -1246,6 +1246,7 @@
 
 .menu-gold { color: #ffd43b; }
 .menu-diamond { color: #4dabf7; }
+.menu-cp { color: #ffa94d; }
 
 .menu-story-progress {
   color: #aaa;
@@ -2234,6 +2235,30 @@
   margin-left: 3px;
 }
 
+.hd2-equip-enhance-btn {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: rgba(255, 180, 0, 0.25);
+  cursor: pointer;
+  font-size: 0.7rem;
+  line-height: 22px;
+  text-align: center;
+  z-index: 2;
+  transition: background 0.2s;
+}
+.hd2-equip-enhance-btn:hover {
+  background: rgba(255, 180, 0, 0.55);
+}
+.hd2-equip-slot {
+  position: relative;
+}
+
 .hd2-equip-list {
   display: flex;
   flex-direction: column;
@@ -2979,6 +3004,137 @@
 }
 .gacha-results-close:active { transform: scale(0.95); }
 
+/* ── Gacha Pull Animation Overlay ── */
+.gacha-pull-anim-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 68;
+  background: radial-gradient(ellipse at center, rgba(30, 10, 50, 0.92) 0%, rgba(5, 2, 15, 0.98) 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: gachaPullFadeIn 0.3s ease-out;
+}
+
+@keyframes gachaPullFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.gacha-pull-anim-ring {
+  position: absolute;
+  width: 120px;
+  height: 120px;
+  border: 3px solid transparent;
+  border-top-color: #be4bdb;
+  border-right-color: #ffd43b;
+  border-radius: 50%;
+  animation: gachaPullSpin 1.2s linear infinite;
+}
+
+.gacha-pull-anim-ring2 {
+  width: 80px;
+  height: 80px;
+  border-top-color: #ffd43b;
+  border-right-color: #be4bdb;
+  animation-direction: reverse;
+  animation-duration: 0.9s;
+}
+
+@keyframes gachaPullSpin {
+  to { transform: rotate(360deg); }
+}
+
+.gacha-pull-anim-text {
+  position: absolute;
+  bottom: 35%;
+  color: #e4c1f9;
+  font-size: 1.1rem;
+  font-weight: bold;
+  letter-spacing: 4px;
+  animation: gachaPullTextPulse 0.8s ease-in-out infinite alternate;
+}
+
+@keyframes gachaPullTextPulse {
+  from { opacity: 0.5; text-shadow: 0 0 6px rgba(190, 75, 219, 0.3); }
+  to   { opacity: 1;   text-shadow: 0 0 20px rgba(190, 75, 219, 0.7); }
+}
+
+/* ── Card Reveal — staggered entry ── */
+.gacha-card-reveal {
+  opacity: 0;
+  transform: scale(0.6) translateY(20px);
+  animation: gachaCardReveal 0.4s ease-out forwards;
+}
+
+@keyframes gachaCardReveal {
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+/* ── SSR Shimmer — golden glow + rainbow border pulse ── */
+.gacha-card-ssr {
+  position: relative;
+}
+
+.gacha-card-ssr .gacha-result-card,
+.gacha-card-ssr .gacha-equip-card {
+  animation: gachaSSRGlow 1.5s ease-in-out infinite alternate;
+  border-image: linear-gradient(135deg, #ffd700, #ff6b35, #ff2d95, #be4bdb, #4dabf7, #51cf66, #ffd700) 1;
+  border-width: 2px;
+  border-style: solid;
+}
+
+.gacha-card-ssr::after {
+  content: '';
+  position: absolute;
+  inset: -4px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, rgba(255, 215, 0, 0.25), rgba(255, 45, 149, 0.15), rgba(77, 171, 247, 0.2), rgba(255, 215, 0, 0.25));
+  background-size: 300% 300%;
+  animation: gachaSSRRainbow 2s ease infinite;
+  z-index: -1;
+  filter: blur(6px);
+}
+
+@keyframes gachaSSRGlow {
+  from { box-shadow: 0 0 8px rgba(255, 215, 0, 0.4), 0 0 20px rgba(255, 215, 0, 0.2); }
+  to   { box-shadow: 0 0 16px rgba(255, 215, 0, 0.7), 0 0 40px rgba(255, 215, 0, 0.3), 0 0 60px rgba(255, 107, 53, 0.15); }
+}
+
+@keyframes gachaSSRRainbow {
+  0%   { background-position: 0% 50%; }
+  50%  { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+/* Sparkle particles for SSR */
+.gacha-card-ssr::before {
+  content: '✦';
+  position: absolute;
+  top: -6px;
+  right: -2px;
+  font-size: 0.8rem;
+  color: #ffd700;
+  animation: gachaSSRSparkle 1s ease-in-out infinite;
+  z-index: 2;
+}
+
+@keyframes gachaSSRSparkle {
+  0%, 100% { opacity: 0.3; transform: scale(0.7) rotate(0deg); }
+  50%      { opacity: 1;   transform: scale(1.2) rotate(180deg); }
+}
+
+/* ── SR Shimmer — purple glow ── */
+.gacha-card-sr .gacha-result-card,
+.gacha-card-sr .gacha-equip-card {
+  animation: gachaSRGlow 2s ease-in-out infinite alternate;
+}
+
+@keyframes gachaSRGlow {
+  from { box-shadow: 0 0 6px rgba(190, 75, 219, 0.3); }
+  to   { box-shadow: 0 0 14px rgba(190, 75, 219, 0.6), 0 0 28px rgba(190, 75, 219, 0.2); }
+}
+
 /* Gacha Loading Overlay */
 .gacha-loading-overlay {
   position: absolute;
@@ -3016,6 +3172,127 @@
 @keyframes gachaLoadingPulse {
   0%, 100% { opacity: 0.5; }
   50% { opacity: 1; }
+}
+
+/* ── Gacha Tabs (hero/equipment switch) ── */
+.gacha-tabs {
+  display: flex;
+  gap: 4px;
+  margin: 8px 0;
+  background: rgba(255,255,255,0.05);
+  border-radius: 8px;
+  padding: 3px;
+}
+.gacha-tab {
+  flex: 1;
+  padding: 8px 0;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: #aaa;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.gacha-tab:hover { color: #ddd; }
+.gacha-tab-active {
+  background: rgba(190, 75, 219, 0.25);
+  color: #e4c1f9;
+  box-shadow: 0 0 8px rgba(190, 75, 219, 0.3);
+}
+
+/* ── Gacha Currencies display ── */
+.gacha-currencies {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+.gacha-gold-display {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: #ffd43b;
+  font-size: 0.85rem;
+  font-weight: bold;
+}
+
+/* ── Equipment Pool Selector ── */
+.gacha-pool-selector {
+  display: flex;
+  gap: 8px;
+  margin: 8px 0;
+  justify-content: center;
+}
+.gacha-pool-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 16px;
+  border: 1px solid rgba(255,255,255,0.15);
+  border-radius: 8px;
+  background: rgba(255,255,255,0.04);
+  color: #aaa;
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.gacha-pool-btn:hover { border-color: rgba(255,255,255,0.3); color: #ddd; }
+.gacha-pool-active {
+  background: rgba(255, 212, 59, 0.15);
+  border-color: rgba(255, 212, 59, 0.4);
+  color: #ffd43b;
+  box-shadow: 0 0 8px rgba(255, 212, 59, 0.15);
+}
+
+/* ── Equipment Banner Art ── */
+.gacha-equip-banner {
+  background: linear-gradient(135deg, rgba(30, 50, 80, 0.7) 0%, rgba(60, 30, 60, 0.7) 100%) !important;
+}
+
+/* ── Equipment Set Tags ── */
+.gacha-equip-sets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  justify-content: center;
+  margin-top: 6px;
+}
+.gacha-set-tag {
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: rgba(255,255,255,0.08);
+  color: #ccc;
+  font-size: 0.65rem;
+}
+
+/* ── Equipment Result Card ── */
+.gacha-equip-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+.gacha-equip-icon {
+  font-size: 1.8rem;
+  line-height: 1;
+  margin: 4px 0;
+}
+.gacha-equip-stat {
+  color: #8ce99a;
+  font-size: 0.65rem;
+  font-weight: bold;
+}
+.gacha-equip-sub {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  margin-top: 2px;
+}
+.gacha-equip-sub-item {
+  color: #aaa;
+  font-size: 0.55rem;
 }
 
 /* ══════════════════════════════════════════════════
@@ -4156,4 +4433,594 @@
 }
 @keyframes bco-spin {
   to { transform: rotate(360deg); }
+}
+
+/* ═══════════════════════════════════════════════════════
+   Combat Power HUD — 戰力顯示 + 變化提示
+   ═══════════════════════════════════════════════════════ */
+
+.combat-power-toast {
+  position: fixed;
+  top: 7%;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 6px 18px;
+  border-radius: 20px;
+  font-size: 1rem;
+  font-weight: 700;
+  z-index: 7000;
+  pointer-events: none;
+  animation: cp-fly 1.5s ease-out forwards;
+  backdrop-filter: blur(4px);
+  white-space: nowrap;
+}
+.combat-power-toast.up {
+  background: rgba(0, 200, 80, 0.25);
+  color: #4cff8a;
+  text-shadow: 0 0 8px rgba(0, 200, 80, 0.6);
+  border: 1px solid rgba(0, 200, 80, 0.3);
+}
+.combat-power-toast.down {
+  background: rgba(220, 50, 50, 0.25);
+  color: #ff6b6b;
+  text-shadow: 0 0 8px rgba(220, 50, 50, 0.6);
+  border: 1px solid rgba(220, 50, 50, 0.3);
+}
+@keyframes cp-fly {
+  0%   { opacity: 0; transform: translateX(-50%) translateY(10px) scale(0.8); }
+  15%  { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
+  80%  { opacity: 1; transform: translateX(-50%) translateY(-20px); }
+  100% { opacity: 0; transform: translateX(-50%) translateY(-35px); }
+}
+
+/* ── CP 比較條（IDLE 畫面底部） ── */
+.cp-comparison {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 12px;
+  background: rgba(0,0,0,0.5);
+  border-radius: 8px;
+  backdrop-filter: blur(4px);
+}
+.cp-comparison-label {
+  font-size: 0.75rem;
+  opacity: 0.8;
+  letter-spacing: 1px;
+}
+.cp-comparison-bar {
+  width: 200px;
+  height: 10px;
+  border-radius: 5px;
+  background: #333;
+  overflow: hidden;
+  display: flex;
+  position: relative;
+}
+.cp-bar-my {
+  background: linear-gradient(90deg, #4cff8a, #2adb6a);
+  height: 100%;
+  transition: width 0.4s ease;
+}
+.cp-bar-enemy {
+  background: linear-gradient(90deg, #ff4c4c, #cc2222);
+  height: 100%;
+  transition: width 0.4s ease;
+}
+.cp-comparison-text {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+.cp-comparison.danger {
+  animation: cp-danger-flash 0.6s ease-in-out infinite;
+}
+@keyframes cp-danger-flash {
+  0%, 100% { box-shadow: 0 0 8px rgba(255,50,50,0.2); }
+  50% { box-shadow: 0 0 16px rgba(255,50,50,0.6); }
+}
+
+/* ── 主選單戰力區塊 ── */
+.menu-combat-power {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.85rem;
+  color: #ffc83c;
+  font-weight: 600;
+  text-shadow: 0 0 6px rgba(255,200,60,0.4);
+}
+.menu-combat-power .cp-icon {
+  font-size: 1rem;
+}
+
+/* ═══════════════════════════════════════════════════════
+   Acquire Toast — 獲得物品動畫提示
+   ═══════════════════════════════════════════════════════ */
+
+.acquire-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: auto;
+}
+.acquire-overlay-bg {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(6px);
+}
+
+/* ── 單品展示（重要物品） ── */
+.acquire-single {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+}
+.acquire-single-icon {
+  width: 120px;
+  height: 120px;
+  border-radius: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 4rem;
+  position: relative;
+}
+.acquire-single-icon.enter {
+  animation: acquire-pop 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+}
+.acquire-single-icon.show {
+  transform: scale(1);
+  opacity: 1;
+}
+.acquire-single-icon.exit {
+  animation: acquire-fly-out 0.3s ease-in forwards;
+}
+@keyframes acquire-pop {
+  0%   { opacity: 0; transform: scale(0.2) rotate(-15deg); }
+  60%  { opacity: 1; transform: scale(1.15) rotate(3deg); }
+  100% { opacity: 1; transform: scale(1) rotate(0deg); }
+}
+@keyframes acquire-fly-out {
+  to { opacity: 0; transform: scale(0.5) translateY(-40px); }
+}
+
+.acquire-item-name {
+  font-size: 1.3rem;
+  font-weight: 700;
+  text-shadow: 0 2px 8px rgba(0,0,0,0.8);
+}
+.acquire-item-qty {
+  font-size: 0.9rem;
+  opacity: 0.8;
+}
+.acquire-skip-hint {
+  position: absolute;
+  bottom: 15%;
+  font-size: 0.75rem;
+  color: rgba(255,255,255,0.5);
+  animation: acquire-blink 1.5s ease-in-out infinite;
+}
+@keyframes acquire-blink {
+  0%, 100% { opacity: 0.3; }
+  50% { opacity: 0.8; }
+}
+
+/* ── 稀有度光暈 ── */
+.acquire-glow-ssr {
+  box-shadow: 0 0 30px rgba(255, 200, 60, 0.7), 0 0 60px rgba(255, 180, 0, 0.4);
+  border: 2px solid rgba(255, 200, 60, 0.6);
+  animation: acquire-glow-pulse 1.2s ease-in-out infinite;
+}
+.acquire-glow-sr {
+  box-shadow: 0 0 20px rgba(180, 120, 255, 0.6), 0 0 40px rgba(150, 80, 220, 0.3);
+  border: 2px solid rgba(180, 120, 255, 0.5);
+  animation: acquire-glow-pulse 1.5s ease-in-out infinite;
+}
+.acquire-glow-r {
+  box-shadow: 0 0 12px rgba(100, 180, 255, 0.4);
+  border: 1px solid rgba(100, 180, 255, 0.3);
+}
+@keyframes acquire-glow-pulse {
+  0%, 100% { filter: brightness(1); }
+  50% { filter: brightness(1.3); }
+}
+
+/* ── rarity 名稱色 ── */
+.acquire-rarity-ssr { color: #ffc83c; }
+.acquire-rarity-sr  { color: #c07aff; }
+.acquire-rarity-r   { color: #6bb5ff; }
+.acquire-rarity-n   { color: #ccc; }
+
+/* ── 列表展示（一般物品） ── */
+.acquire-list-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(4px);
+  pointer-events: auto;
+}
+.acquire-list-panel {
+  position: relative;
+  z-index: 1;
+  background: rgba(30, 30, 40, 0.95);
+  border: 1px solid rgba(255,255,255,0.15);
+  border-radius: 12px;
+  padding: 20px 16px;
+  max-width: 360px;
+  width: 90%;
+  max-height: 70vh;
+  overflow-y: auto;
+}
+.acquire-list-title {
+  text-align: center;
+  font-size: 1.1rem;
+  font-weight: 700;
+  margin-bottom: 12px;
+  color: #ffc83c;
+}
+.acquire-list-items {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.acquire-list-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: rgba(255,255,255,0.06);
+  animation: acquire-list-fade 0.3s ease forwards;
+  opacity: 0;
+}
+.acquire-list-row:nth-child(1) { animation-delay: 0.05s; }
+.acquire-list-row:nth-child(2) { animation-delay: 0.1s; }
+.acquire-list-row:nth-child(3) { animation-delay: 0.15s; }
+.acquire-list-row:nth-child(4) { animation-delay: 0.2s; }
+.acquire-list-row:nth-child(5) { animation-delay: 0.25s; }
+.acquire-list-row:nth-child(6) { animation-delay: 0.3s; }
+.acquire-list-row:nth-child(7) { animation-delay: 0.35s; }
+.acquire-list-row:nth-child(8) { animation-delay: 0.4s; }
+@keyframes acquire-list-fade {
+  from { opacity: 0; transform: translateX(-10px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+.acquire-list-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.3rem;
+  flex-shrink: 0;
+}
+.acquire-list-info {
+  flex: 1;
+  min-width: 0;
+}
+.acquire-list-name {
+  font-size: 0.85rem;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.acquire-list-qty {
+  font-size: 0.7rem;
+  opacity: 0.7;
+}
+.acquire-list-new {
+  font-size: 0.6rem;
+  color: #ffc83c;
+  font-weight: 700;
+  background: rgba(255,200,60,0.2);
+  padding: 1px 6px;
+  border-radius: 4px;
+}
+
+/* ═══════════════════════════════════════════════════════
+   Arena Panel — 競技場排名
+   ═══════════════════════════════════════════════════════ */
+
+.arena-panel {
+  position: fixed;
+  inset: 0;
+  z-index: 5000;
+  background: linear-gradient(135deg, #0d0d1a 0%, #1a0e2e 100%);
+  display: flex;
+  flex-direction: column;
+  color: #eee;
+  overflow: hidden;
+}
+
+/* 競技場頂部 */
+.arena-header {
+  display: flex;
+  align-items: center;
+  padding: 12px 16px;
+  background: rgba(0,0,0,0.3);
+  gap: 12px;
+  flex-shrink: 0;
+}
+.arena-back-btn {
+  background: none;
+  border: 1px solid rgba(255,255,255,0.2);
+  color: #ccc;
+  padding: 6px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.85rem;
+}
+.arena-back-btn:hover { background: rgba(255,255,255,0.1); }
+.arena-title {
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: #ffc83c;
+  flex: 1;
+}
+.arena-my-rank {
+  font-size: 0.85rem;
+  color: #aaa;
+}
+.arena-challenges {
+  font-size: 0.8rem;
+  color: #8af;
+}
+
+/* 分頁標籤 */
+.arena-tabs {
+  display: flex;
+  border-bottom: 1px solid rgba(255,255,255,0.1);
+  flex-shrink: 0;
+}
+.arena-tab {
+  flex: 1;
+  text-align: center;
+  padding: 10px 0;
+  cursor: pointer;
+  font-size: 0.9rem;
+  color: #888;
+  border-bottom: 2px solid transparent;
+  transition: all 0.2s;
+  background: none;
+  border-top: none;
+  border-left: none;
+  border-right: none;
+}
+.arena-tab.active {
+  color: #ffc83c;
+  border-bottom-color: #ffc83c;
+}
+.arena-tab:hover:not(.active) {
+  color: #ccc;
+}
+
+/* 排行榜 */
+.arena-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px;
+}
+.arena-rank-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.arena-rank-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: rgba(255,255,255,0.04);
+  transition: background 0.2s;
+}
+.arena-rank-row:hover {
+  background: rgba(255,255,255,0.08);
+}
+.arena-rank-row.arena-me {
+  background: rgba(100, 180, 255, 0.12);
+  border: 1px solid rgba(100, 180, 255, 0.25);
+}
+.arena-rank-num {
+  width: 36px;
+  text-align: center;
+  font-weight: 700;
+  font-size: 0.95rem;
+  flex-shrink: 0;
+}
+.arena-rank-1 { color: #ffd700; font-size: 1.1rem; }
+.arena-rank-2 { color: #c0c0c0; font-size: 1.05rem; }
+.arena-rank-3 { color: #cd7f32; font-size: 1rem; }
+
+.arena-rank-name {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 0.9rem;
+}
+.arena-npc-tag {
+  font-size: 0.6rem;
+  color: #999;
+  background: rgba(255,255,255,0.08);
+  padding: 1px 5px;
+  border-radius: 3px;
+  margin-left: 4px;
+}
+.arena-me-tag {
+  font-size: 0.65rem;
+  color: #8af;
+  font-weight: 700;
+  margin-left: 4px;
+}
+.arena-rank-power {
+  font-size: 0.75rem;
+  color: #aaa;
+  width: 60px;
+  text-align: right;
+  flex-shrink: 0;
+}
+.arena-challenge-btn {
+  padding: 4px 12px;
+  border-radius: 6px;
+  border: 1px solid rgba(255,200,60,0.4);
+  background: rgba(255,200,60,0.15);
+  color: #ffc83c;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all 0.2s;
+}
+.arena-challenge-btn:hover {
+  background: rgba(255,200,60,0.3);
+}
+.arena-challenge-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* 防守陣型 */
+.arena-defense-section {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  align-items: center;
+  padding: 20px;
+}
+.arena-defense-title {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #ccc;
+}
+.arena-defense-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  max-width: 280px;
+}
+.arena-defense-slot {
+  width: 80px;
+  height: 80px;
+  border-radius: 10px;
+  border: 1px dashed rgba(255,255,255,0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  color: #666;
+  background: rgba(255,255,255,0.03);
+}
+.arena-defense-slot.filled {
+  border-style: solid;
+  border-color: rgba(100,180,255,0.3);
+  color: #aaf;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+.arena-defense-actions {
+  display: flex;
+  gap: 10px;
+}
+.arena-def-btn {
+  padding: 8px 20px;
+  border-radius: 8px;
+  border: 1px solid rgba(255,255,255,0.2);
+  background: rgba(255,255,255,0.08);
+  color: #ccc;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.arena-def-btn:hover {
+  background: rgba(255,255,255,0.15);
+}
+.arena-def-btn.primary {
+  border-color: rgba(255,200,60,0.4);
+  background: rgba(255,200,60,0.15);
+  color: #ffc83c;
+}
+.arena-def-btn.primary:hover {
+  background: rgba(255,200,60,0.3);
+}
+
+/* 獎勵分頁 */
+.arena-rewards-section {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 12px;
+}
+.arena-reward-group {
+  background: rgba(255,255,255,0.04);
+  border-radius: 10px;
+  padding: 12px;
+}
+.arena-reward-group-title {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: #ffc83c;
+  margin-bottom: 8px;
+}
+.arena-reward-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+  font-size: 0.8rem;
+}
+.arena-reward-rank {
+  width: 70px;
+  color: #aaa;
+  flex-shrink: 0;
+}
+.arena-reward-items {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.arena-reward-item {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+.arena-reward-reached {
+  font-size: 0.65rem;
+  color: #4cff8a;
+  margin-left: auto;
+}
+
+/* ── 排行榜分隔線 ── */
+.arena-separator {
+  text-align: center;
+  font-size: 0.7rem;
+  color: #555;
+  padding: 4px 0;
+  letter-spacing: 2px;
+}
+
+/* ── 空狀態 ── */
+.arena-loading {
+  text-align: center;
+  padding: 40px;
+  color: #888;
+  font-size: 0.9rem;
 }

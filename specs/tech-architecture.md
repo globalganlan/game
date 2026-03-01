@@ -304,8 +304,8 @@ fireOptimistic / fireOptimisticAsync
 **已採用 Optimistic Queue 的服務**：
 | 服務 | 操作數 |
 |------|--------|
-| `inventoryService` | 5（equip/unequip/lock/expand/useItem） |
-| `progressionService` | 8+（upgrade/ascend/starUp/enhance/forge/dismantle/completeStage/tower/daily） |
+| `inventoryService` | 1（useItem） |
+| `progressionService` | 7+（upgrade/ascend/starUp/enhanceEquipment/equipGachaPull/completeStage/tower/daily） |
 | `mailService` | 4（claimMailReward/claimAllMail/deleteMail/deleteAllRead） |
 | `saveService` | 2（saveFormation/collectResources） |
 | `gachaLocalPool` | 1（syncPool） |
@@ -499,7 +499,7 @@ export default defineConfig({
 |------|------|
 | save_data (load-save) | 含 gachaPool JSON，可超過 100KB；且頻繁變動 |
 | hero_instances | 抽卡/升級隨時新增修改 |
-| inventory / equipment | 交易型資料，每次操作都會變 |
+| inventory | 交易型資料，每次操作都會變 |
 | mailbox | 每位玩家不同且隨時有新郵件 |
 | 所有寫入操作 | save-progress, gacha-pull, complete-stage 等純寫入 |
 
@@ -536,3 +536,4 @@ POST { "action": "invalidate-cache" }
 | v1.5 | 2026-02-28 | 新增 `constants/rarity.ts` 共用常數層 + `CurrencyIcon.tsx` 統一貨幣 icon 元件，替代各元件散落的 CSS inline icon 和 emoji |
 | v1.6 | 2026-03-01 | PWA 支援：manifest.json + service worker（Network/Cache First 策略）+ `pwaService.ts`（安裝偵測/平台指引/獎勵領取）+ 帳號綁定獎勵（💎200+🪙5000）+ PWA 安裝獎勵（💎100+🪙3000） |
 | v1.7 | 2026-03-01 | 同步實際程式碼：完整更新 services/（16 檔）、domain/（13 檔）、components/（16 檔）、hooks/（3 檔）目錄列表；Optimistic Queue 操作數更新（mailService 4 ops、saveService 2 ops、新增 gachaLocalPool）；orientationchange timeout 修正為 100ms |
+| v1.8 | 2026-06-15 | **配合裝備模板制 v2**：inventoryService Optimistic Queue 操作數 5→1（移除 equip/unequip/lock/expand）；progressionService 操作數 8+→7+（移除 forge/dismantle，新增 enhanceEquipment/equipGachaPull）；不快取資料表移除 equipment |

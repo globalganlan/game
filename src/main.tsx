@@ -72,9 +72,16 @@ if ('serviceWorker' in navigator) {
   })
 
   // 新 SW activate 後自動重新載入頁面
+  // hadController: 頁面載入時是否已有 controller（＝舊版 SW 正在控制頁面）
+  // 若為 false 代表首次安裝或 iOS 冷啟動後首次接管，不需 reload
   let refreshing = false
+  const hadController = !!navigator.serviceWorker.controller
   navigator.serviceWorker.addEventListener('controllerchange', () => {
     if (refreshing) return
+    if (!hadController) {
+      // 首次 SW 接管（或 iOS PWA 冷啟動），頁面已是最新，不需 reload
+      return
+    }
     refreshing = true
     window.location.reload()
   })

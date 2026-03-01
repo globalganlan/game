@@ -89,11 +89,20 @@ import {
 } from './domain/stageSystem'
 import type { StageReward } from './domain/stageSystem'
 import { getTimerYield, addHeroesLocally, getSaveState, clearLocalSaveCache } from './services/saveService'
-import { addItemsLocally, loadInventory, clearInventoryCache } from './services/inventoryService'
+import { addItemsLocally, loadInventory, clearInventoryCache, getHeroEquipment } from './services/inventoryService'
 import { expToNextLevel } from './domain/progressionSystem'
 import { audioManager } from './services/audioService'
 import { getItemName } from './constants/rarity'
 import { CurrencyIcon, ItemIcon } from './components/CurrencyIcon'
+/* ── Phase 10: Combat Power + Acquire Toast + Arena ── */
+import { CombatPowerToast, CombatPowerComparison } from './components/CombatPowerHUD'
+import { AcquireToast } from './components/AcquireToast'
+import { ArenaPanel } from './components/ArenaPanel'
+import { useCombatPower } from './hooks/useCombatPower'
+import { useAcquireToast } from './hooks/useAcquireToast'
+import type { AcquireItem } from './hooks/useAcquireToast'
+import { registerAcquireHandler } from './services/acquireToastBus'
+import { clearArenaCache, startArenaChallenge, completeArenaChallenge } from './services/arenaService'
 
 /* ────────────────────────────
    常數
@@ -354,6 +363,8 @@ export default function App() {
   /** 目前選定的關卡模式（影響場景外觀） */
   const [stageMode, setStageMode] = useState<'story' | 'tower' | 'daily' | 'pvp' | 'boss'>('story')
   const [stageId, setStageId] = useState<string>('1-1')
+  /** 競技場挑戰目標排名（用於結算上報） */
+  const arenaTargetRankRef = useRef<number>(0)
   const ownedHeroesList = useMemo(() => {
     const ownedIds = new Set(
       (saveHook.playerData?.heroes ?? []).map(h => Number(h.heroId)),
@@ -367,6 +378,11 @@ export default function App() {
       })
   }, [heroesList, saveHook.playerData?.heroes])
   const { showToast, toastElements } = useToast()
+
+  /* ── Phase 10: 戰力 + 獲得物品提示 ── */
+  const acquireToast = useAcquireToast()
+  // 註冊全域 bus，讓子元件也能觸發 acquireToast
+  useEffect(() => { registerAcquireHandler(acquireToast.show) }, [acquireToast.show])
   const [turn, setTurn] = useState(0)
   const turnRef = useRef(0)
   const [battleCalculating, setBattleCalculating] = useState(false)
@@ -463,6 +479,7 @@ export default function App() {
     invalidateMailCache()          // mail preload memory cache
     clearInventoryCache()          // inventory state + localStorage
     clearPendingOps()              // optimistic queue localStorage
+    clearArenaCache()              // arena rankings memory cache
 
     // 3. React state 重設
     setGameState('PRE_BATTLE')
@@ -554,6 +571,14 @@ export default function App() {
       return next
     })
   }, [])
+
+  /* ── 戰力追蹤（裝備/陣型/養成變動即時反映） ── */
+  const cpState = useCombatPower(
+    saveHook.playerData?.save?.formation ?? [null, null, null, null, null, null],
+    saveHook.playerData?.heroes ?? [],
+    heroesList,
+    enemySlots,
+  )
 
   /** 從存檔恢復上陣陣型到 playerSlots（若目前為空） */
   const restoreFormationFromSave = useCallback(() => {
@@ -1111,6 +1136,11 @@ export default function App() {
       moveResolveRefs.current[key]?.()
       delete moveResolveRefs.current[key]
     }
+    // 競技場戰後自動回到排行榜
+    if (stageMode === 'pvp' && arenaTargetRankRef.current > 0) {
+      arenaTargetRankRef.current = 0
+      setMenuScreen('arena')
+    }
     setGameState('MAIN_MENU')
   }
 
@@ -1298,7 +1328,7 @@ export default function App() {
         exp: inst.exp,
         ascension: inst.ascension,
         stars: inst.stars ?? 0,
-        equipment: [],     // TODO: load equipped EquipmentInstance[]
+        equipment: getHeroEquipment(inst.instanceId),
       } : undefined
       const starLevel = heroInstanceData?.stars ?? 0
       const heroRarity = Number((p as Record<string, unknown>).Rarity ?? 3)
@@ -2150,6 +2180,45 @@ export default function App() {
           const progress = saveHook.playerData?.save.storyProgress ?? { chapter: 1, stage: 1 }
           const linearProgress = (progress.chapter - 1) * 8 + progress.stage
           rewards = getPvPReward(linearProgress)
+          // 競技場結算上報
+          if (arenaTargetRankRef.current > 0) {
+            completeArenaChallenge(arenaTargetRankRef.current, true).then(arenaRes => {
+              if (arenaRes.success) {
+                const r = arenaRes.rewards
+                if (r) {
+                  showToast(`🏆 排名提升至 #${arenaRes.newRank ?? '?'}！獲得 ${r.diamond} 鑽石 + ${r.gold} 金幣`)
+                  // 競技場獎勵動畫
+                  const arenaItems: AcquireItem[] = []
+                  if (r.diamond > 0) arenaItems.push({ type: 'currency', id: 'diamond', name: '鑽石', quantity: r.diamond, rarity: 'SR' })
+                  if (r.gold > 0) arenaItems.push({ type: 'currency', id: 'gold', name: '金幣', quantity: r.gold })
+                  if (r.pvpCoin > 0) arenaItems.push({ type: 'item', id: 'pvp_coin', name: '競技幣', quantity: r.pvpCoin })
+                  if (r.exp > 0) arenaItems.push({ type: 'currency', id: 'exp', name: '經驗', quantity: r.exp })
+                  if (arenaItems.length > 0) acquireToast.show(arenaItems)
+                  if (r.diamond > 0 || r.gold > 0) {
+                    addItemsLocally([])  // trigger refresh
+                    saveHook.doUpdateProgress({
+                      diamond: (saveHook.playerData?.save.diamond ?? 0) + r.diamond,
+                      gold: (saveHook.playerData?.save.gold ?? 0) + r.gold,
+                    })
+                  }
+                }
+                // 排名里程碑獎勵動畫
+                const mr = arenaRes.milestoneReward
+                if (mr) {
+                  const milestoneItems: AcquireItem[] = []
+                  if (mr.diamond > 0) milestoneItems.push({ type: 'currency', id: 'diamond', name: '鑽石（里程碑）', quantity: mr.diamond, rarity: 'SR' })
+                  if (mr.gold > 0) milestoneItems.push({ type: 'currency', id: 'gold', name: '金幣（里程碑）', quantity: mr.gold })
+                  if (mr.pvpCoin > 0) milestoneItems.push({ type: 'item', id: 'pvp_coin', name: '競技幣（里程碑）', quantity: mr.pvpCoin })
+                  if (mr.exp > 0) milestoneItems.push({ type: 'currency', id: 'exp', name: '經驗（里程碑）', quantity: mr.exp })
+                  if (milestoneItems.length > 0) {
+                    showToast(`🎯 排名里程碑獎勵！`)
+                    // 延遲顯示以避免與挑戰獎勵重疊
+                    setTimeout(() => acquireToast.show(milestoneItems), 1500)
+                  }
+                }
+              }
+            }).catch(console.warn)
+          }
         } else if (stageMode === 'boss') {
           const totalDamage = Object.values(stats)
             .filter((_, i) => i < playerSlots.filter(Boolean).length)
@@ -2221,11 +2290,26 @@ export default function App() {
           isFirst: first,
           resourceSpeed,
         })
+
+        // 觸發獲得物品動畫
+        const acquireItems: AcquireItem[] = []
+        if (rewardGold > 0) acquireItems.push({ type: 'currency', id: 'gold', name: '金幣', quantity: rewardGold })
+        if (rewardDiamond > 0) acquireItems.push({ type: 'currency', id: 'diamond', name: '鑽石', quantity: rewardDiamond, rarity: 'SR' })
+        if (rewardExp > 0) acquireItems.push({ type: 'currency', id: 'exp', name: '經驗', quantity: rewardExp })
+        for (const d of drops) {
+          acquireItems.push({ type: 'equipment', id: d.itemId, name: getItemName(d.itemId), quantity: d.quantity })
+        }
+        if (acquireItems.length > 0) acquireToast.show(acquireItems)
+
         if (leveledUp) showToast(`🎉 帳號升級！Lv.${newLevel}`)
       }
     } else if (winner === 'enemy') {
       setBattleResult('defeat')
       if (!isReplay) setVictoryRewards(null)
+      // 競技場敗北上報
+      if (!isReplay && stageMode === 'pvp' && arenaTargetRankRef.current > 0) {
+        completeArenaChallenge(arenaTargetRankRef.current, false).catch(console.warn)
+      }
     } else {
       setBattleResult('defeat')
       if (!isReplay) setVictoryRewards(null)
@@ -2542,6 +2626,7 @@ export default function App() {
           onNavigate={handleMenuNavigate}
           getResourcePreview={saveHook.getResourcePreview}
           mailUnclaimedCount={mailUnclaimedCount}
+          combatPower={cpState.currentPower}
           onCollectResources={async () => {
             const result = await saveHook.doCollectResources()
             if (result && (result.gold > 0 || result.expItems > 0)) {
@@ -2569,10 +2654,14 @@ export default function App() {
       {gameState === 'MAIN_MENU' && menuScreen === 'gacha' && (
         <GachaScreen
           diamond={saveHook.playerData?.save.diamond ?? 0}
+          gold={saveHook.playerData?.save.gold ?? 0}
           heroesList={heroesList}
           onBack={handleBackToMenu}
           onDiamondChange={(delta) => {
             saveHook.doUpdateProgress({ diamond: (saveHook.playerData?.save.diamond ?? 0) + delta })
+          }}
+          onGoldChange={(delta) => {
+            saveHook.doUpdateProgress({ gold: (saveHook.playerData?.save.gold ?? 0) + delta })
           }}
           onPullSuccess={(newHeroIds) => {
             // 樂觀插入新英雄到本地存檔，英雄列表即時更新
@@ -2622,6 +2711,14 @@ export default function App() {
             if (Object.keys(changes).length > 0) saveHook.doUpdateProgress(changes)
             // 非貨幣獎勵即時寫入本地背包
             if (inventoryItems.length > 0) addItemsLocally(inventoryItems)
+            // 獲得物品動畫
+            const toastItems: AcquireItem[] = rewards.map(r => ({
+              type: r.itemId === 'diamond' || r.itemId === 'gold' ? 'currency' as const : 'item' as const,
+              id: r.itemId,
+              name: getItemName(r.itemId),
+              quantity: r.quantity,
+            }))
+            if (toastItems.length > 0) acquireToast.show(toastItems)
           }}
           mailItems={mailItems}
           mailLoaded={mailLoaded}
@@ -2631,6 +2728,78 @@ export default function App() {
       )}
       {gameState === 'MAIN_MENU' && menuScreen === 'shop' && (
         <ShopPanel onBack={handleBackToMenu} />
+      )}
+      {gameState === 'MAIN_MENU' && menuScreen === 'arena' && (
+        <ArenaPanel
+          onBack={handleBackToMenu}
+          onStartBattle={async (targetRank, defender) => {
+            showToast(`正在載入排名 #${targetRank} ${defender.displayName} 的陣型…`)
+            try {
+              // 1. 向 GAS 取得對手防守資料
+              const res = await startArenaChallenge(targetRank)
+              if (!res.success) {
+                showToast(`挑戰失敗：${res.error === 'no_challenges_left' ? '今日挑戰次數已用完' : res.error}`)
+                return
+              }
+              // 2. 建立敵方 SlotHero[]（NPC 或真人）
+              const defHeroes: unknown[] = res.defenderData?.heroes ?? []
+              const enemySlotsArr: (SlotHero | null)[] = [null, null, null, null, null, null]
+              defHeroes.forEach((dh: unknown, i: number) => {
+                if (i >= 6 || !dh) return
+                const d = dh as Record<string, unknown>
+                const heroId = Number(d.heroId ?? d.HeroID ?? 0)
+                const base = heroesList.find(h => Number(h.HeroID ?? 0) === heroId)
+                if (!base) return
+                const modelId = Number(base.ModelID ?? base.HeroID ?? heroId)
+                const hp = Number(d.HP ?? base.HP ?? 100)
+                const atk = Number(d.ATK ?? base.ATK ?? 10)
+                const spd = Number(d.Speed ?? base.Speed ?? 100)
+                enemySlotsArr[i] = {
+                  ...base,
+                  HP: hp,
+                  ATK: atk,
+                  Speed: spd,
+                  slot: i,
+                  currentHP: hp,
+                  _uid: `arena_${heroId}_${i}`,
+                  _modelId: String(modelId),
+                  ModelID: String(modelId),
+                } as SlotHero
+              })
+              // 如果 NPC 沒有帶 heroes，用 power 產生基本敵人
+              if (!enemySlotsArr.some(Boolean) && defender.isNPC) {
+                const npcPower = defender.power
+                const npcBase = heroesList[Math.floor(Math.random() * heroesList.length)]
+                if (npcBase) {
+                  const mid = Number(npcBase.ModelID ?? npcBase.HeroID ?? 1)
+                  const scale = Math.max(1, npcPower / 500)
+                  const hp = Math.floor(Number(npcBase.HP ?? 100) * scale)
+                  const atk = Math.floor(Number(npcBase.ATK ?? 10) * scale)
+                  enemySlotsArr[0] = {
+                    ...npcBase,
+                    HP: hp, ATK: atk, Speed: Number(npcBase.Speed ?? 100),
+                    slot: 0, currentHP: hp,
+                    _uid: `arena_npc_0`, _modelId: String(mid), ModelID: String(mid),
+                  } as SlotHero
+                }
+              }
+              // 3. 設定戰鬥狀態
+              arenaTargetRankRef.current = targetRank
+              setStageMode('pvp')
+              setStageId(`arena-${targetRank}`)
+              updateEnemySlots(() => enemySlotsArr)
+              restoreFormationFromSave()
+              setMenuScreen('none')
+              setGameState('IDLE')
+            } catch (e) {
+              showToast('挑戰載入失敗：' + String(e))
+            }
+          }}
+          saveData={saveHook.playerData?.save ?? null}
+          heroesList={heroesList}
+          heroInstances={saveHook.playerData?.heroes ?? []}
+          formation={saveHook.playerData?.save?.formation ?? [null, null, null, null, null, null]}
+        />
       )}
 
       {/* ── 戰鬥 HUD（Phase 7） ── */}
@@ -2665,11 +2834,29 @@ export default function App() {
       {/* ── HUD ── */}
       <div className="game-hud">
         {turn > 0 && gameState !== 'GAMEOVER' && <div className="hud-round">ROUND {turn}</div>}
-
       </div>
+
+      {/* ── 戰力對比（IDLE 且有敵人時顯示） ── */}
+      {gameState === 'IDLE' && turn === 0 && cpState.enemyPower > 0 && (
+        <CombatPowerComparison
+          myPower={cpState.currentPower}
+          enemyPower={cpState.enemyPower}
+          comparison={cpState.comparison}
+        />
+      )}
+
+      {/* ── 戰力變動飛行動畫 ── */}
+      {cpState.powerDelta !== null && cpState.powerDelta !== 0 && (
+        <CombatPowerToast delta={cpState.powerDelta} />
+      )}
 
       {/* ── 浮動提示 ── */}
       {toastElements}
+
+      {/* ── 獲得物品動畫 ── */}
+      {acquireToast.isShowing && (
+        <AcquireToast items={acquireToast.items} onComplete={acquireToast.dismiss} />
+      )}
 
       {/* ── 勝負標語 + 獎勵面板 ── */}
       {gameState === 'GAMEOVER' && battleResult && (

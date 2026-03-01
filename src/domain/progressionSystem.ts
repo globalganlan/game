@@ -67,7 +67,7 @@ export interface StarUpCost {
 export interface EquipmentSetBonus {
   setId: string
   name: string
-  requiredCount: number  // 2
+  requiredCount: number  // 2 or 4
   bonusType: string      // 'ATK_percent' | 'DEF_percent' | 'HP_percent' | 'SPD_flat' | 'CritRate_percent' | 'CritDmg_percent' | 'lifesteal' | 'counter'
   bonusValue: number
 }
@@ -194,16 +194,26 @@ export const RARITY_INITIAL_STARS: Record<number, number> = {
   4: 0,  // ★4 rarity → 初始 ★0
 }
 
-/** 套裝效果定義 */
+/** 套裝效果定義（2pc + 4pc） */
 export const EQUIPMENT_SETS: EquipmentSetBonus[] = [
-  { setId: 'berserker',  name: '狂戰士', requiredCount: 2, bonusType: 'ATK_percent',     bonusValue: 15 },
-  { setId: 'ironwall',   name: '鐵壁',   requiredCount: 2, bonusType: 'DEF_percent',     bonusValue: 20 },
-  { setId: 'gale',       name: '疾風',   requiredCount: 2, bonusType: 'SPD_flat',        bonusValue: 15 },
-  { setId: 'vampire',    name: '吸血',   requiredCount: 2, bonusType: 'lifesteal',       bonusValue: 12 },
-  { setId: 'critical',   name: '暴擊',   requiredCount: 2, bonusType: 'CritRate_percent', bonusValue: 12 },
-  { setId: 'lethal',     name: '致命',   requiredCount: 2, bonusType: 'CritDmg_percent',  bonusValue: 25 },
-  { setId: 'vitality',   name: '生命',   requiredCount: 2, bonusType: 'HP_percent',       bonusValue: 20 },
-  { setId: 'counter',    name: '反擊',   requiredCount: 2, bonusType: 'counter',          bonusValue: 20 },
+  // 2pc 效果
+  { setId: 'berserker',  name: '狂戰士', requiredCount: 2, bonusType: 'ATK_percent',      bonusValue: 15 },
+  { setId: 'ironwall',   name: '鐵壁',   requiredCount: 2, bonusType: 'DEF_percent',      bonusValue: 20 },
+  { setId: 'gale',       name: '疾風',   requiredCount: 2, bonusType: 'SPD_flat',         bonusValue: 15 },
+  { setId: 'vampire',    name: '吸血',   requiredCount: 2, bonusType: 'lifesteal',        bonusValue: 12 },
+  { setId: 'critical',   name: '暴擊',   requiredCount: 2, bonusType: 'CritRate_percent',  bonusValue: 12 },
+  { setId: 'lethal',     name: '致命',   requiredCount: 2, bonusType: 'CritDmg_percent',   bonusValue: 25 },
+  { setId: 'vitality',   name: '生命',   requiredCount: 2, bonusType: 'HP_percent',        bonusValue: 20 },
+  { setId: 'counter',    name: '反擊',   requiredCount: 2, bonusType: 'counter',           bonusValue: 20 },
+  // 4pc 效果
+  { setId: 'berserker',  name: '狂戰士', requiredCount: 4, bonusType: 'CritDmg_percent',   bonusValue: 20 },
+  { setId: 'ironwall',   name: '鐵壁',   requiredCount: 4, bonusType: 'HP_percent',        bonusValue: 15 },
+  { setId: 'gale',       name: '疾風',   requiredCount: 4, bonusType: 'ATK_percent',       bonusValue: 10 },
+  { setId: 'vampire',    name: '吸血',   requiredCount: 4, bonusType: 'lifesteal',         bonusValue: 8 },
+  { setId: 'critical',   name: '暴擊',   requiredCount: 4, bonusType: 'CritDmg_percent',   bonusValue: 20 },
+  { setId: 'lethal',     name: '致命',   requiredCount: 4, bonusType: 'ATK_percent',       bonusValue: 15 },
+  { setId: 'vitality',   name: '生命',   requiredCount: 4, bonusType: 'DEF_percent',       bonusValue: 15 },
+  { setId: 'counter',    name: '反擊',   requiredCount: 4, bonusType: 'counter',            bonusValue: 15 },
 ]
 
 /** 副屬性隨機池 */
@@ -340,9 +350,10 @@ export function getInitialStars(rarity: number): number {
    裝備系統
    ════════════════════════════════════ */
 
-/** 強化後主屬性值（每等級 +10% of base） */
-export function enhancedMainStat(baseValue: number, enhanceLevel: number): number {
-  return Math.floor(baseValue * (1 + enhanceLevel * 0.1))
+/** 強化後主屬性值（依稀有度差異化成長：N:6%/lv, R:8%, SR:10%, SSR:12%） */
+export function enhancedMainStat(baseValue: number, enhanceLevel: number, rarity: Rarity = 'SR'): number {
+  const growthRate: Record<Rarity, number> = { N: 0.06, R: 0.08, SR: 0.10, SSR: 0.12 }
+  return Math.floor(baseValue * (1 + enhanceLevel * (growthRate[rarity] ?? 0.10)))
 }
 
 /** 裝備強化最大等級 */
@@ -350,9 +361,9 @@ export function getMaxEnhanceLevel(rarity: Rarity): number {
   return EQUIPMENT_MAX_ENHANCE[rarity]
 }
 
-/** 強化費用（金幣） */
+/** 強化費用（僅金幣，v2） */
 export function getEnhanceCost(currentLevel: number, rarity: Rarity): number {
-  const baseCost: Record<Rarity, number> = { N: 100, R: 200, SR: 500, SSR: 1000 }
+  const baseCost: Record<Rarity, number> = { N: 200, R: 500, SR: 1000, SSR: 2000 }
   return Math.floor(baseCost[rarity] * (1 + currentLevel * 0.5))
 }
 
@@ -399,19 +410,25 @@ export function getSetBonus(setId: string): EquipmentSetBonus | undefined {
   return EQUIPMENT_SETS.find(s => s.setId === setId)
 }
 
-/** 計算已激活的套裝效果 */
+/** 計算已激活的套裝效果（同 setId + 同 rarity 才算一組） */
 export function getActiveSetBonuses(equipment: EquipmentInstance[]): EquipmentSetBonus[] {
+  // 依 setId + rarity 分組計數
   const setCounts: Record<string, number> = {}
   for (const eq of equipment) {
     if (eq.setId) {
-      setCounts[eq.setId] = (setCounts[eq.setId] || 0) + 1
+      const key = `${eq.setId}:${eq.rarity}`
+      setCounts[key] = (setCounts[key] || 0) + 1
     }
   }
   const active: EquipmentSetBonus[] = []
-  for (const [setId, count] of Object.entries(setCounts)) {
-    const bonus = getSetBonus(setId)
-    if (bonus && count >= bonus.requiredCount) {
-      active.push(bonus)
+  for (const [compositeKey, count] of Object.entries(setCounts)) {
+    const setId = compositeKey.split(':')[0]
+    // 查找所有符合該 setId 的 bonus（2pc 和 4pc）
+    const bonuses = EQUIPMENT_SETS.filter(s => s.setId === setId)
+    for (const bonus of bonuses) {
+      if (count >= bonus.requiredCount) {
+        active.push(bonus)
+      }
     }
   }
   return active
@@ -438,12 +455,12 @@ export function getFinalStats(base: BaseStats, hero: HeroInstanceData, rarity: n
     CritDmg:  base.CritDmg,
   }
 
-  // Step 2: Equipment flat stats
+  // Step 2: Equipment flat stats (mainStat + 副屬性 flat)
   for (const eq of hero.equipment) {
-    const mainVal = enhancedMainStat(eq.mainStatValue, eq.enhanceLevel)
+    const mainVal = enhancedMainStat(eq.mainStatValue, eq.enhanceLevel, eq.rarity)
     addStatFlat(stats, eq.mainStat, mainVal)
 
-    for (const sub of eq.subStats) {
+    for (const sub of (eq.subStats ?? [])) {
       if (!sub.isPercent) {
         addStatFlat(stats, sub.stat, sub.value)
       }
@@ -453,7 +470,7 @@ export function getFinalStats(base: BaseStats, hero: HeroInstanceData, rarity: n
   // Step 3: Equipment percent stats
   const pctBonuses: Record<string, number> = {}
   for (const eq of hero.equipment) {
-    for (const sub of eq.subStats) {
+    for (const sub of (eq.subStats ?? [])) {
       if (sub.isPercent) {
         pctBonuses[sub.stat] = (pctBonuses[sub.stat] || 0) + sub.value
       }

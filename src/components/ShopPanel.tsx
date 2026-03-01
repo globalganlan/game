@@ -9,6 +9,7 @@ import { useState, useMemo, useCallback } from 'react'
 import { getSaveState, updateProgress } from '../services/saveService'
 import { addItemsLocally } from '../services/inventoryService'
 import { fireOptimisticAsync } from '../services/optimisticQueue'
+import { emitAcquire } from '../services/acquireToastBus'
 
 /* ────────────────────────────
    商品定義
@@ -197,6 +198,14 @@ export function ShopPanel({ onBack }: ShopPanelProps) {
 
     // 樂觀發放獎勵
     addItemsLocally(item.rewards)
+
+    // 獲得物品動畫
+    emitAcquire(item.rewards.map(r => ({
+      type: r.itemId.startsWith('currency_') || r.itemId === 'gold' || r.itemId === 'diamond' ? 'currency' as const : 'item' as const,
+      id: r.itemId,
+      name: getItemName(r.itemId),
+      quantity: r.quantity,
+    })))
 
     // 背景 API（帶冪等保護）
     fireOptimisticAsync('shop-buy', { shopItemId: item.id }).serverResult.catch(console.warn)

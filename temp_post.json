@@ -1,0 +1,1 @@
+﻿{"action":"updateSheet","sheet":"item_definitions","keyColumn":"itemId","newColumns":["useAction"],"data":[{"itemId":"chest_bronze","useAction":"open"},{"itemId":"chest_silver","useAction":"open"},{"itemId":"chest_gold","useAction":"open"}]}

@@ -27,6 +27,8 @@ interface MainMenuProps {
   getResourcePreview?: () => { gold: number; expItems: number; hoursElapsed: number } | null
   /** 信箱未領取獎勵數量（>0 顯示紅點） */
   mailUnclaimedCount?: number
+  /** 隊伍總戰力 */
+  combatPower?: number
 }
 
 /* ────────────────────────────
@@ -48,6 +50,7 @@ const MENU_ITEMS: MenuItem[] = [
   { key: 'heroes',    icon: '🧟', label: '英雄',  sub: '養成·突破·升星',   color: '#2a9d8f', unlock: { chapter: 1, stage: 2, hint: '通關 1-1 後解鎖' } },
   { key: 'gacha',     icon: '🎰', label: '召喚',  sub: '招募新同伴',       color: '#e9c46a', unlock: { chapter: 1, stage: 3, hint: '通關 1-2 後解鎖' } },
   { key: 'inventory', icon: '🎒', label: '背包',  sub: '道具·裝備',        color: '#f4a261', unlock: { chapter: 1, stage: 2, hint: '通關 1-1 後解鎖' } },
+  { key: 'arena',     icon: '⚔️', label: '競技場', sub: '排名·對戰·獎勵',  color: '#e74c3c', unlock: { chapter: 2, stage: 1, hint: '通關 1-8 後解鎖' } },
   { key: 'shop',      icon: '🏪', label: '商店',  sub: '購買素材·禮包',    color: '#72b01d', unlock: { chapter: 1, stage: 3, hint: '通關 1-2 後解鎖' } },
   { key: 'mailbox',   icon: '📬', label: '信箱',  sub: '信件·獎勵',        color: '#7ec8e3' },
   { key: 'settings',  icon: '⚙️', label: '設定',  sub: '帳號·綁定',        color: '#888' },
@@ -63,6 +66,7 @@ export function MainMenu({
   onCollectResources,
   getResourcePreview,
   mailUnclaimedCount = 0,
+  combatPower = 0,
 }: MainMenuProps) {
   // 每 30 秒刷新離線獎勵預覽
   const [resourcePreview, setResourcePreview] = useState(
@@ -130,6 +134,7 @@ export function MainMenu({
         <div className="menu-resources">
           <span className="menu-res-item menu-gold" title="金幣 — 升級、購買、強化"><CurrencyIcon type="gold" />{gold.toLocaleString()}</span>
           <span className="menu-res-item menu-diamond" title="鑽石 — 召喚、加速、購買稀有道具"><CurrencyIcon type="diamond" />{diamond.toLocaleString()}</span>
+          <span className="menu-res-item menu-cp" title="隊伍戰力">⚡{combatPower.toLocaleString()}</span>
         </div>
       </div>
 

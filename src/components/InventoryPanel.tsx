@@ -23,6 +23,9 @@ import {
 } from '../services/inventoryService'
 import type { EquipmentInstance } from '../domain/progressionSystem'
 import { enhancedMainStat } from '../domain/progressionSystem'
+import { emitAcquire } from '../services/acquireToastBus'
+import { openEquipmentChest, getEquipDisplayName } from '../domain/equipmentGacha'
+import { addEquipmentLocally } from '../services/inventoryService'
 
 /* ────────────────────────────
    Props
@@ -74,10 +77,7 @@ const TABS: CategoryTab[] = [
   { key: 'all',                icon: '📦', label: '全部' },
   { key: 'exp_material',       icon: '📗', label: '經驗' },
   { key: 'ascension_material', icon: '🔥', label: '突破' },
-  { key: 'equipment_material', icon: '🔧', label: '裝備素材' },
-  { key: 'forge_material',     icon: '⚒️', label: '鍛造' },
   { key: 'general_material',   icon: '🧪', label: '通用' },
-  { key: 'equipment',          icon: '🗡️', label: '裝備' },
   { key: 'chest',              icon: '🎁', label: '寶箱' },
   { key: 'currency',           icon: <CurrencyIcon type="gold" />, label: '貨幣' },
 ]
@@ -166,10 +166,46 @@ function ItemDetail({ item, definition, onClose, heroMap }: ItemDetailProps & { 
   const handleUse = useCallback(async () => {
     if (!canUse) return
     try {
+      // 裝備寶箱 — 本地生成裝備
+      if (item.itemId === 'chest_equipment') {
+        const eq = openEquipmentChest()
+        addEquipmentLocally([eq])
+        // 扣減寶箱（本地 + 背景同步，帶 equipment 讓 server 持久化）
+        const result = await useItem(item.itemId, 1, undefined, { equipment: [eq] })
+        if (!result.success) {
+          setActionMsg('使用失敗')
+          return
+        }
+        const eqName = getEquipDisplayName(eq)
+        setActionMsg(`開啟獲得：${eq.rarity} ${eqName}`)
+        emitAcquire([{
+          type: 'equipment' as const,
+          id: eq.equipId,
+          name: eqName,
+          quantity: 1,
+          rarity: eq.rarity,
+        }])
+        return
+      }
+      // 一般道具
       // eslint-disable-next-line react-hooks/rules-of-hooks
       const result = await useItem(item.itemId, 1)
       if (result.success) {
         setActionMsg('使用成功！')
+        // 寶箱/道具結果觸發獲得物品動畫
+        if (result.result && typeof result.result === 'object') {
+          const r = result.result as Record<string, unknown>
+          const items: { type: 'currency' | 'item'; id: string; name: string; quantity: number; rarity?: 'N' | 'R' | 'SR' | 'SSR' }[] = []
+          if (typeof r.gold === 'number' && r.gold > 0) items.push({ type: 'currency', id: 'gold', name: '金幣', quantity: r.gold })
+          if (typeof r.diamond === 'number' && r.diamond > 0) items.push({ type: 'currency', id: 'diamond', name: '鑽石', quantity: r.diamond, rarity: 'SR' })
+          if (typeof r.exp === 'number' && r.exp > 0) items.push({ type: 'currency', id: 'exp', name: '經驗', quantity: r.exp })
+          if (Array.isArray(r.items)) {
+            for (const ri of r.items as { itemId?: string; name?: string; quantity?: number }[]) {
+              if (ri.itemId && ri.quantity) items.push({ type: 'item', id: ri.itemId, name: ri.name || ri.itemId, quantity: ri.quantity })
+            }
+          }
+          if (items.length > 0) emitAcquire(items)
+        }
       } else {
         setActionMsg('使用失敗')
       }
