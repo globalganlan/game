@@ -1887,8 +1887,15 @@
 }
 
 .hd2-skill-locked {
-  opacity: 0.45;
+  opacity: 0.75;
   border-style: dashed;
+  border-color: rgba(255,255,255,0.15);
+}
+.hd2-skill-locked .hd2-skill-desc {
+  color: #999;
+}
+.hd2-skill-locked .hd2-skill-name {
+  color: #bbb;
 }
 
 .hd2-skill-icon {
@@ -1906,7 +1913,7 @@
 
 .hd2-skill-name {
   color: #ddd;
-  font-size: 0.78rem;
+  font-size: 0.88rem;
   font-weight: 600;
   display: flex;
   align-items: center;
@@ -1919,8 +1926,8 @@
 }
 
 .hd2-skill-badge {
-  font-size: 0.6rem;
-  padding: 0px 4px;
+  font-size: 0.68rem;
+  padding: 1px 5px;
   border-radius: 3px;
   color: #fff;
   white-space: nowrap;
@@ -1931,11 +1938,16 @@
 .hd2-skill-badge.passive {
   background: #5c7cfa;
 }
+.hd2-skill-badge.locked {
+  background: #555;
+  color: #ccc;
+  font-size: 0.63rem;
+}
 
 .hd2-skill-desc {
   color: #aaa;
-  font-size: 0.68rem;
-  line-height: 1.35;
+  font-size: 0.78rem;
+  line-height: 1.4;
   margin-top: 2px;
 }
 

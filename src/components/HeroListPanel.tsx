@@ -522,15 +522,20 @@ function HeroDetail({ hero, instance, onClose, skills, heroSkills }: HeroDetailP
             const unlocked = i < passiveSlots
             return (
               <div key={i} className={`hd2-skill ${unlocked ? '' : 'hd2-skill-locked'}`}>
-                <div className="hd2-skill-icon">{unlocked && passive ? resolveSkillIcon(passive.icon, 'passive') : '🔒'}</div>
+                <div className="hd2-skill-icon">{passive ? resolveSkillIcon(passive.icon, 'passive') : '🔒'}</div>
                 <div className="hd2-skill-body">
-                  {unlocked && passive ? (
+                  {passive ? (
                     <>
-                      <div className="hd2-skill-name"><span className="hd2-skill-badge passive">被動{i + 1}</span> {passive.name}</div>
+                      <div className="hd2-skill-name">
+                        <span className={`hd2-skill-badge ${unlocked ? 'passive' : 'locked'}`}>
+                          {unlocked ? `被動${i + 1}` : `🔒 ★${reqStars} 解鎖`}
+                        </span>
+                        {passive.name}
+                      </div>
                       <div className="hd2-skill-desc">{passive.description || '—'}</div>
                     </>
                   ) : (
-                    <div className="hd2-skill-name hd2-skill-na">★{reqStars} 解鎖</div>
+                    <div className="hd2-skill-name hd2-skill-na">🔒 ★{reqStars} 解鎖</div>
                   )}
                 </div>
               </div>

@@ -3,6 +3,43 @@
 > 按時間倒序排列，最新的在最上面。
 
 ---
+### [2026-03-02] Phase B 死亡角色守衛 + 致死跳過 HURT + PWA 自動更新 + UI 優化
+
+- **觸發者**：使用者回報多項問題
+- **執行角色**：🔧 CODING + 🎨 UI_DESIGN + 🌵 SOUND_MUSIC
+
+#### 修正內容
+
+**1. Phase B 死亡角色守衛（`src/App.tsx`）**：
+- 問題：DOT/反彈致死後，後續英雄仍衝向已死角色的空位置播放前進→攻擊動畫
+- 根因：Phase A 引擎正確過濾死亡目標，但 Phase B 動畫層 `onAction` 未檢查 `actorStatesRef`
+- 解法：NORMAL_ATTACK、SKILL_CAST、DEATH handler 開頭新增 dead-actor guard（檢查 `actorStatesRef` + `currentHP`）
+
+**2. 致死傷害跳過 HURT（`src/App.tsx`）**：
+- 普攻/技能/反彈致死時不再播 HURT 動畫，直接進入 DEAD 分支（三處統一）
+
+**3. KOF98 大招音效（`src/services/audioService.ts`）**：
+- `skill_cast` SFX 從 3 層重設計為 6 層 KOF98 Super Flash 風格
+
+**4. 未解鎖技能預覽（`src/components/HeroListPanel.tsx` + `src/App.css`）**：
+- 英雄列表對未解鎖被動顯示完整技能資訊（icon/名稱/描述）+ 灰色 🔒 ★N 解鎖徽章
+
+**5. 全域字型放大（`src/index.css`）**：
+- html root font-size: 18px（12.5% 增大）
+
+**6. PWA 自動更新（`public/sw.js` + `src/main.tsx`）**：
+- SW v3：JS/CSS 改 Network First（防止強制快取），GLB/圖片仍 Cache First
+- 新增更新偵測 + 橙色提示框 + auto-reload
+
+**7. ADR-008（`memory/decisions.md`）**：
+- 強制全專案 grep 描換規則 — 每次修改必須先搜索同模式之所有出現處
+
+#### 影響 Spec
+- `specs/core-combat.md` v3.2 → v3.3
+- `specs/audio.md` v0.4（已更新）
+- `specs/ui-flow.md` v1.3（已更新）
+
+---
 ### [2026-03-02] 第一回合死亡 Bug 修復 + PWA Safe Area + SFX 重設計
 
 - **觸發者**：使用者回報 4 項問題

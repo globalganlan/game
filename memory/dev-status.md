@@ -1,6 +1,6 @@
 # 開發狀態快照 — Dev Status
 
-> 最後更新：2026-03-01（第三十次更新 — 伺服器端獎勵計算 + save-progress 封鎖）
+> 最後更新：2026-03-02（第三十一次更新 — Phase B 死亡角色守衛 + 致死跳過 HURT + PWA 自動更新 + KOF98 SFX + 全域字型放大）
 
 ## 截至 2026-03-01 的開發狀態
 
@@ -32,8 +32,14 @@
 - [x] **App.tsx 整合** — 戰鬥迴圈已切換至 Domain Engine 驅動
   - `runBattleLoop()` 改用 `runBattle()` + `onAction` callback
   - SlotHero → BattleHero 轉換（保留 _uid 對應）
-  - 3D 演出回調完整映射（前進/攻擊/受傷/死亡/DOT/技能施放）
-- [x] **🐛 修復遠端戰鬥動畫卡住** — for-of 無限迴圈（allActions 共用參考）+ `needsHpSync` 旗標 + 反彈傷害 HP 條同步
+  - 3D 演出回調完整映射（前進/攻擊/受傷/死亡/DOT/技能施放）- [x] **🐛 Phase B 死亡角色守衛** — NORMAL_ATTACK/SKILL_CAST/DEATH handler 新增 dead-actor guard，已死角色不再播放前進/攻擊動畫
+- [x] **✨ 致死傷害跳過 HURT** — 普攻/技能/反彈致死時不再播 HURT 動畫，直接進入 DEAD
+- [x] **✨ KOF98 大招音效** — skill_cast SFX 重設計為 6 層 KOF98 Super Flash 風格
+- [x] **✨ 未解鎖技能預覽** — 英雄列表面板顯示完整技能資訊（灰色 + 🔒 ★N 解鎖徽章）
+- [x] **✨ 全域字型放大** — html root font-size: 18px（12.5% 增大）
+- [x] **✨ PWA 自動更新** — SW v3 Network First for JS/CSS + 更新提示 UI + auto-reload
+- [x] **📝 ADR-008** — 強制全專案 grep 描換規則
+- [x] **✨ PWA Safe Area 適配** — iOS 劇海/動態島 padding 修正- [x] **🐛 修復遠端戰鬥動畫卡住** — for-of 無限迴圈（allActions 共用參考）+ `needsHpSync` 旗標 + 反彈傷害 HP 條同步
 - [x] **🐛 修復死亡動畫視覺問題** — `playHitOrDeath` killed 分支改 HURT→DEAD 序列（4 路徑全統一）+ GAS turn_end 被動傷害致死時發射 DEATH 事件（POST @64 / GET @65）
 - [x] **🐛 修復 on_attack 被動雙倍傷害** — 新增 `damage_mult` / `damage_mult_random` effect type 取代 `damage`，被動不再獨立計算傷害改為乘算加成；新增 `PASSIVE_DAMAGE` action type；6 個被動技能效果已更新（POST @66 / GET @67）
 - [x] **✨ 被動觸發浮動文字** — 新增 `PassiveHint3D` 元件，被動觸發時在英雄頭頂顯示紫色浮動文字（☕ + 技能名）
@@ -52,7 +58,7 @@
 
 | Spec | 版本 | 狀態 |
 |------|------|------|
-| core-combat.md | v2.8 | 🟢 本地優先引擎 + 背景反作弊校驗（seeded PRNG） |
+| core-combat.md | v3.3 | 🟢 Phase B 死亡角色守衛 + 致死跳過 HURT |
 | hero-schema.md | v2.1 | 🟢 4 層型別 + 14 角色完整數值表 |
 | damage-formula.md | v1.0 | 🟢 10 步完整傷害公式 |
 | skill-system.md | v1.3 | 🟢 SkillTemplate + 15 PassiveTrigger + extra_turn 機制 + on_ally_death/on_ally_skill |

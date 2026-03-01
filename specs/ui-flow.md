@@ -615,3 +615,4 @@ GAMEOVER
 | v1.1 | 2026-02-28 | 新增 §6.14 CurrencyIcon 統一貨幣 icon 元件規格（4 種 CSS badge + ItemIcon 通用元件），實作對照新增 CurrencyIcon.tsx + rarity.ts |
 | v1.2 | 2026-03-01 | 同步實際程式碼：MenuScreen 新增 `'shop'`（8 值）、MainMenu 7 卡片（加商店）、InventoryPanel 9 個分類 Tab、GachaScreen 費用 160/1440 鑽、retryBattle/replayBattle/backToLobby 移除過場幕描述（實際不使用）、handleStageSelect 改為條件式過場幕（僅場景主題變更時） |
 | v1.3 | 2026-03-02 | **PWA Safe Area 適配**：`.main-menu-overlay`、`.panel-overlay`、`.login-screen` 新增 `padding-top: max(Npx, env(safe-area-inset-top, 0px))`，確保 iOS PWA 劉海/動態島不遮蔽 UI 內容（補充既有 `.game-hud` safe-area padding） |
+| v1.4 | 2026-03-02 | **英雄資訊技能預覽**：未解鎖被動技能改為顯示完整技能名稱、圖標、說明，並以 `🔒 ★N 解鎖` 灰色 badge + 虛線邊框 + 降低透明度提示未解鎖狀態 |

@@ -1432,6 +1432,17 @@ export default function App() {
           const atk = heroMap.get(action.attackerUid)!
           const tgt = heroMap.get(action.targetUid)!
 
+          // ★ 攻擊者已死（背景死亡動畫已完成 or HP已歸零）→ 跳過整個 action
+          if (actorStatesRef.current[action.attackerUid] === 'DEAD' || atk.currentHP <= 0) {
+            break
+          }
+
+          // ★ 目標已死（被前一筆背景死亡動畫移除）→ 只顯示傷害數字，不播前進/攻擊動畫
+          if (actorStatesRef.current[action.targetUid] === 'DEAD' || tgt.currentHP <= 0) {
+            if (!action.result.isDodge) addDamage(action.targetUid, action.result.damage)
+            break
+          }
+
           // Phase 7: 屬性相剋指示
           if (action.result.elementMult && action.result.elementMult !== 1.0) {
             const txt = action.result.elementMult > 1.0 ? '屬性剋制！' : '屬性抵抗'
@@ -1484,16 +1495,11 @@ export default function App() {
               await waitForMove(action.attackerUid)
               setActorState(action.attackerUid, 'IDLE')
             } else {
-              // ★ 攻擊者被反彈傷害致死 — 播放受擊 → 死亡動畫並移除
+              // ★ 攻擊者被反彈傷害致死 — 直接播死亡動畫（跳過受傷）
               const atkHero = heroMap.get(action.attackerUid)
               if (atkHero) {
                 if (action.result.reflectDamage > 0) addDamage(action.attackerUid, action.result.reflectDamage)
-                // 先播受擊 + HP 條下降
-                const hurtDone = waitForAction(action.attackerUid, 'HURT')
-                setActorState(action.attackerUid, 'HURT')
                 syncHpToSlot(atkHero)
-                await hurtDone
-                // 再播死亡
                 if (!skipBattleRef.current) audioManager.playSfx('death')
                 const deadDone = waitForAction(action.attackerUid, 'DEAD')
                 setActorState(action.attackerUid, 'DEAD')
@@ -1517,6 +1523,12 @@ export default function App() {
 
         case 'SKILL_CAST': {
           const atk = heroMap.get(action.attackerUid)!
+
+          // ★ 攻擊者已死 → 跳過整個技能 action
+          if (actorStatesRef.current[action.attackerUid] === 'DEAD' || atk.currentHP <= 0) {
+            break
+          }
+
           if (!skipBattleRef.current) audioManager.playSfx('skill_cast')
 
           // Phase 7: 技能名稱彈幕
@@ -1628,13 +1640,10 @@ export default function App() {
               }
               setActorState(action.attackerUid, 'IDLE')
             } else {
-              // ★ 攻擊者被反彈傷害致死
+              // ★ 攻擊者被反彈傷害致死 — 直接播死亡動畫（跳過受傷）
               const atkHero = heroMap.get(action.attackerUid)
               if (atkHero) {
-                const hurtDone2 = waitForAction(action.attackerUid, 'HURT')
-                setActorState(action.attackerUid, 'HURT')
                 syncHpToSlot(atkHero)
-                await hurtDone2
                 if (!skipBattleRef.current) audioManager.playSfx('death')
                 const deadDone2 = waitForAction(action.attackerUid, 'DEAD')
                 setActorState(action.attackerUid, 'DEAD')
@@ -1670,21 +1679,16 @@ export default function App() {
         }
 
         case 'DEATH': {
-          // DOT / 被動傷害 / 反彈等非攻擊致死
+          // DOT / 被動傷害 / 反彈等非攻擊致死 — 直接播死亡動畫（跳過受傷）
           const hero = heroMap.get(action.targetUid)
-          if (hero) {
-            // 先播受擊動畫 + HP 條下降
-            const hurtDone = waitForAction(action.targetUid, 'HURT')
-            setActorState(action.targetUid, 'HURT')
-            syncHpToSlot(hero)
-            await hurtDone
-            // 再播死亡動畫
-            if (!skipBattleRef.current) audioManager.playSfx('death')
-            const deadDone = waitForAction(action.targetUid, 'DEAD')
-            setActorState(action.targetUid, 'DEAD')
-            await deadDone
-            removeSlot(hero)
-          }
+          // ★ 已經在 DEAD 狀態（背景動畫已處理）→ 跳過
+          if (!hero || actorStatesRef.current[action.targetUid] === 'DEAD') break
+          syncHpToSlot(hero)
+          if (!skipBattleRef.current) audioManager.playSfx('death')
+          const deadDone = waitForAction(action.targetUid, 'DEAD')
+          setActorState(action.targetUid, 'DEAD')
+          await deadDone
+          removeSlot(hero)
           break
         }
 

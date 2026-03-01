@@ -1,6 +1,6 @@
 # 戰鬥系統 Spec
 
-> 版本：v3.2 ｜ 狀態：🟢 已實作
+> 版本：v3.3 ｜ 狀態：🟢 已實作
 > 最後更新：2026-03-02
 > 負責角色：🎯 GAME_DESIGN → 🔧 CODING
 > 原始碼：`src/domain/battleEngine.ts`（前端邏輯）、`gas/battleEngine.js`（後端引擎）、`src/App.tsx`（3D 演出整合）、`gas/程式碼.js`（`handleCompleteBattle_` 伺服器端結算）
@@ -687,6 +687,21 @@ IDLE → ADVANCING → ATTACKING → RETREATING → IDLE
 - **問題**：反彈傷害（`reflectDamage`）可能在攻擊期間殺死攻擊者，但 UI 層只跳過後退、仍設 IDLE → 屍體殘留場上
 - **解法**：NORMAL_ATTACK / SKILL_CAST 的「後退」階段檢查攻擊者 HP，若 ≤ 0 改播 DEAD 動畫、`syncHpToSlot` + `removeSlot`
 
+### 10.7 致死傷害跳過 HURT 直接 DEAD
+
+- **問題**：致死傷害（普攻/反彈/技能）先播 HURT 再播 DEAD，動畫卡頓不自然
+- **解法**：`playHitOrDeath()` 中若 `killed === true`，直接走 DEAD 分支（背景執行），不播 HURT 動畫
+- 適用場景：NORMAL_ATTACK 擊殺、SKILL_CAST 擊殺、反彈致死
+
+### 10.8 死亡角色演出守衛（Dead-Actor Guard）
+
+- **問題**：Phase B 動畫回放中，如果目標已因 DOT/反彈在前一個 action 死亡，後續 NORMAL_ATTACK / SKILL_CAST action 仍嘗試對已死角色播放前進→攻擊動畫，造成英雄衝向空位置
+- **根因**：Phase A 引擎正確過濾死亡目標（`targetStrategy` 中 `filter(e => e.currentHP > 0)`），但 Phase B 動畫層未檢查 `actorStatesRef` 即盲目播放
+- **解法**（三處守衛）：
+  1. **NORMAL_ATTACK handler**：開頭檢查攻擊者與目標的 `actorStatesRef.current[uid] === 'DEAD' || hero.currentHP <= 0`，若任一已死則 `break`
+  2. **SKILL_CAST handler**：開頭檢查攻擊者是否已死，若已死則 `break`
+  3. **DEATH handler**：開頭檢查目標是否已死（狀態已為 DEAD），若已死則 `break`（防止重複播放死亡動畫）
+
 ---
 
 ## 十一、速度控制 
@@ -832,3 +847,4 @@ App.tsx
 | v3.0 | 2026-03-01 | **GAS 引擎同步修復**：GAS `battleEngine.js` 修復五大缺漏與前端同步：(1) 戰鬥開始觸發 `always` 被動、(2) `every_n_turns` 週期被動處理、(3) `processExtraTurns_` 額外行動機制 + `_currentExtraTurnQueue_` 模組變數、(4) `resolvePassiveTargets_` 支援 `all_allies`/`all_enemies`/`self` 被動目標、(5) 新增 `dispel_debuff`/`reflect`/`extra_turn` 被動效果處理 |
 | v3.1 | 2026-03-01 | **硬驗證恢復 + Spec 全面同步**：`handleCompleteBattle_` 改回 `var winner = serverWinner` 硬驗證模式（以伺服器重跑結果為準發放獎勵）；GAS POST @86、GET @87；Spec 全面同步：BattleAction 11→13 種、PassiveTrigger 13→15 種、executePassiveEffect 6→10 種、BattleContext 新增 damageMult、damageType 新增 dot |
 | v3.2 | 2026-03-02 | **Phase B HP 狀態修復**：`runBattleCollect()` 計算完成後（Phase A），engine 會 mutate heroMap 的 BattleHero 到最終狀態（死亡英雄 currentHP=0）；先前 `needsHpSync = false` 導致 Phase B 回放時讀取已為 0 的 HP，使英雄首回合即判定死亡（retreat handler 檢查 `heroMap.get(uid).currentHP` 為 0）；修正：Phase A 完成後重置所有 BattleHero `currentHP = maxHP`、`energy = 0`，並設 `needsHpSync = true`，讓 `applyHpFromAction()` 在 Phase B 逐步更新 HP（與 replay 模式一致） |
+| v3.3 | 2026-03-02 | **Phase B 死亡角色守衛 + 致死跳過 HURT**：(1) NORMAL_ATTACK / SKILL_CAST / DEATH handler 開頭新增 dead-actor guard，檢查 `actorStatesRef` + `currentHP`，已死角色直接 `break` 不播動畫（修復 DOT/反彈致死後，後續英雄仍衝向空位置攻擊的問題）；(2) 致死傷害不再播放 HURT 動畫，直接進入 DEAD 分支（普攻/技能/反彈三處統一行為） |
