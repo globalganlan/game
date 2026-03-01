@@ -11,7 +11,7 @@
  *   前端 main.tsx 偵測到新 SW 等待中 → 彈出「有新版本」提示 → 使用者點擊時 skipWaiting
  */
 
-const CACHE_VERSION = 'v4'
+const CACHE_VERSION = 'v5'
 const CACHE_NAME = `globalganlan-${CACHE_VERSION}`
 const STATIC_CACHE = `globalganlan-static-${CACHE_VERSION}`
 
@@ -38,6 +38,8 @@ self.addEventListener('install', (event) => {
 
 /* ── Activate ── */
 self.addEventListener('activate', (event) => {
+  // 只清除舊版快取，不呼叫 clients.claim()。
+  // 讓 SW 在下一次導航時自然接管（避免 iOS standalone 觸發 controllerchange → reload 迴圈）。
   event.waitUntil(
     caches.keys().then((names) =>
       Promise.all(
@@ -45,7 +47,7 @@ self.addEventListener('activate', (event) => {
           .filter((name) => name !== CACHE_NAME && name !== STATIC_CACHE)
           .map((name) => caches.delete(name))
       )
-    ).then(() => self.clients.claim())
+    )
   )
 })
 

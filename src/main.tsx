@@ -48,6 +48,8 @@ if ('serviceWorker' in navigator) {
           bar.onclick = () => {
             sw.postMessage('SKIP_WAITING')
             bar.textContent = '更新中...'
+            // 等 SW 接管後直接 reload（不依賴 controllerchange 事件）
+            setTimeout(() => window.location.reload(), 600)
           }
           document.body.appendChild(bar)
         }
@@ -71,18 +73,8 @@ if ('serviceWorker' in navigator) {
       .catch((err) => console.warn('[SW] registration failed:', err))
   })
 
-  // 新 SW activate 後自動重新載入頁面
-  // hadController: 頁面載入時是否已有 controller（＝舊版 SW 正在控制頁面）
-  // 若為 false 代表首次安裝或 iOS 冷啟動後首次接管，不需 reload
-  let refreshing = false
-  const hadController = !!navigator.serviceWorker.controller
-  navigator.serviceWorker.addEventListener('controllerchange', () => {
-    if (refreshing) return
-    if (!hadController) {
-      // 首次 SW 接管（或 iOS PWA 冷啟動），頁面已是最新，不需 reload
-      return
-    }
-    refreshing = true
-    window.location.reload()
-  })
+  // 不再監聽 controllerchange 自動 reload。
+  // iOS standalone（PWA 從主畫面開啟）的 SW 生命週期會在冷啟動時
+  // 重複觸發 controllerchange，造成 reload 無限迴圈 → 白屏「重複發生問題」。
+  // 改為：使用者點擊更新 banner 時直接 reload（見上方 bar.onclick）。
 }
