@@ -1,19 +1,21 @@
 /**
- * Service Worker — 全球感染 PWA
+ * Service Worker — 全球感染 PWA (v7)
  *
  * 快取策略：
- *   ★ Navigation（HTML）→ 不攔截，讓瀏覽器原生處理（避免 iOS standalone reload 迴圈）
+ *   ★ Navigation（HTML）→ 不攔截，讓瀏覽器原生處理
  *   JS / CSS → Network First（Vite hash 檔名確保更新）
  *   GLB / 圖片 / WASM → Cache First（大檔案優先快取）
  *
  * 重要：
- *   - 跨域請求一律不攔截（避免快取 API 回應）
- *   - 不預快取 HTML（防止版本不一致造成資源 404）
- *   - install 不呼叫 skipWaiting、activate 不呼叫 clients.claim
- *     （避免 iOS standalone 冷啟動 controllerchange → reload 迴圈）
+ *   - 導航請求（mode:'navigate'）不攔截
+ *   - 跨域請求一律不攔截
+ *   - Standalone 模式由 main.tsx 負責 unregister，此 SW 不會被註冊
+ *   - install 呼叫 skipWaiting() 確保新版本立即接管（取代有 bug 的舊版 SW）
+ *   - activate 不呼叫 clients.claim()（避免 iOS controllerchange 觸發）
+ *   - main.tsx 已移除 controllerchange 監聽器，所以 skipWaiting 不會造成 reload 迴圈
  */
 
-const CACHE_VERSION = 'v6'
+const CACHE_VERSION = 'v7'
 const CACHE_NAME = `globalganlan-${CACHE_VERSION}`
 const STATIC_CACHE = `globalganlan-static-${CACHE_VERSION}`
 
@@ -22,18 +24,18 @@ const STATIC_EXTENSIONS = ['.glb', '.png', '.jpg', '.jpeg', '.svg', '.wasm', '.w
 
 /* ── Install ── */
 self.addEventListener('install', (event) => {
-  // 不呼叫 skipWaiting()。
-  // 讓新 SW 進入 waiting 狀態，由前端顯示更新提示後
-  // 再透過 message('SKIP_WAITING') 觸發接管。
-  // 不預快取 HTML — 避免陳舊 HTML 引用錯誤 hash 的資源。
+  // 立即接管：確保有 bug 的舊版 SW (v5/v6) 被替換。
+  // 安全性：main.tsx 已移除 controllerchange → reload 監聽器，
+  // 且 standalone 模式根本不會註冊 SW，所以不會造成 reload 迴圈。
+  self.skipWaiting()
   event.waitUntil(
-    caches.open(CACHE_NAME) // 只建立快取桶，不預載任何檔案
+    caches.open(CACHE_NAME)
   )
 })
 
 /* ── Activate ── */
 self.addEventListener('activate', (event) => {
-  // 只清除舊版快取，不呼叫 clients.claim()。
+  // 清除所有舊版快取，不呼叫 clients.claim()。
   event.waitUntil(
     caches.keys().then((names) =>
       Promise.all(
