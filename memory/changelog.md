@@ -3,6 +3,26 @@
 > 按時間倒序排列，最新的在最上面。
 
 ---
+### [2026-03-03] 裝備圖鑑系統（Codex）
+
+- **觸發者**：使用者
+- **執行角色**：🔧 CODING + 🎨 UI_DESIGN
+- **變更摘要**：
+  1. **新增圖鑑面板** — 背包新增「📖 圖鑑」tab，展示 8 套裝 × 4 部位 × 4 稀有度 = 128 種裝備百科
+  2. **可擴展架構** — `CodexCategory` 聯合型別設計，未來可加英雄圖鑑、怪物圖鑑、成就圖鑑等
+  3. **收集進度** — 頂部進度條顯示「已擁有 / 128」收集率
+  4. **套裝瀏覽** — 8 個套裝 tab 按鈕 + 套裝效果卡（2 件 / 4 件套裝獎勵展示）
+  5. **稀有度篩選** — 全部 / N / R / SR / SSR 一鍵切換
+  6. **裝備卡片** — 每張卡片顯示：部位 emoji、中文名稱、稀有度標籤、主屬性數值、副屬性數 × 強化上限
+  7. **擁有/未擁有** — 已擁有卡片亮色 + 金光 hover；未擁有灰階 + 🔒 遮罩
+  8. **RWD 適配** — 手機端格子自動縮小（min 100px）
+- **影響檔案**：
+  - `src/components/CodexPanel.tsx`（新增）— 圖鑑主元件 + EquipmentCodex 子元件
+  - `src/components/InventoryPanel.tsx` — 新增 codex tab + 條件渲染 + ownedEquipTemplateIds memo
+  - `src/domain/equipmentGacha.ts` — 匯出 SET_IDS / SLOTS / SLOT_MAIN_STAT / MAIN_STAT_BASE
+  - `src/App.css` — 新增 `.codex-*` 全套樣式（~200 行）
+
+---
 ### [2026-03-03] UI 全面中文化 + 背包 UI 改善 + 裝備稀有度強化
 
 - **觸發者**：使用者

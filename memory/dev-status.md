@@ -1,6 +1,6 @@
 # 開發狀態快照 — Dev Status
 
-> 最後更新：2026-03-03（第四十九次更新 — UI 全面中文化：~61 處英文翻譯為繁中 + 共用 statZh/statusZh 映射）
+> 最後更新：2026-03-03（第五十次更新 — 裝備圖鑑系統：128 種裝備百科 + 可擴展 Codex 架構）
 
 ## 截至 2026-03-03 的開發狀態
 
@@ -13,6 +13,9 @@
 - [x] 提示詞模板集（`agents/prompt-playbook.md`，P-01~P-07）
 - [x] 模組化規格系統（specs/）
 - [x] 記憶持久化系統（memory/）
+- [x] **裝備圖鑑系統** — 背包「📖 圖鑑」tab，128 種裝備百科（8 套裝 × 4 部位 × 4 稀有度）
+  - `src/components/CodexPanel.tsx` — 可擴展 CodexCategory 架構
+  - 收集進度條 + 套裝效果展示 + 稀有度篩選 + 擁有/鎖定視覺狀態
 - [x] **Cloudflare Workers + D1 後端** — Hono 路由 + D1 SQLite，取代 GAS + Google Sheets
   - `workers/src/index.ts` — 主入口 + CORS + Cron Triggers
   - `workers/src/routes/` — 11 個路由模組（auth / save / battle / inventory / progression / gacha / mail / arena / sheet / checkin / **stage**）

@@ -28,6 +28,7 @@ import { emitToast } from '../services/acquireToastBus'
 import { openEquipmentChest, getEquipDisplayName, SET_NAMES } from '../domain/equipmentGacha'
 import { addEquipmentLocally, equipItem, unequipItem, getHeroEquipment } from '../services/inventoryService'
 import { statZh } from '../constants/statNames'
+import { CodexPanel } from './CodexPanel'
 
 /* ────────────────────────────
    Props
@@ -71,7 +72,7 @@ function resolveFallbackName(
    ──────────────────────────── */
 
 interface CategoryTab {
-  key: ItemCategory | 'all'
+  key: ItemCategory | 'all' | 'codex'
   icon: React.ReactNode
   label: string
 }
@@ -83,6 +84,7 @@ const TABS: CategoryTab[] = [
   { key: 'general_material',   icon: '🧪', label: '素材' },
   { key: 'chest',              icon: '🎁', label: '寶箱' },
   { key: 'currency',           icon: <CurrencyIcon type="gold" />, label: '貨幣' },
+  { key: 'codex',              icon: '📖', label: '圖鑑' },
 ]
 
 type SortMode = 'default' | 'rarity-desc' | 'quantity-desc' | 'name-asc'
@@ -482,7 +484,7 @@ export function InventoryPanel({ onBack, heroesList, heroInstances }: InventoryP
     return m
   }, [heroesList])
   const [invState, setInvState] = useState<InventoryState | null>(getInventoryState)
-  const [activeTab, setActiveTab] = useState<ItemCategory | 'all'>('all')
+  const [activeTab, setActiveTab] = useState<ItemCategory | 'all' | 'codex'>('all')
   const [selectedItem, setSelectedItem] = useState<InventoryItem | null>(null)
   const [selectedEquip, setSelectedEquip] = useState<EquipmentInstance | null>(null)
   const [isLoading, setIsLoading] = useState(false)
@@ -512,6 +514,8 @@ export function InventoryPanel({ onBack, heroesList, heroInstances }: InventoryP
       items = invState.items.filter((i) => i.quantity > 0)
     } else if (activeTab === 'equipment') {
       // 裝備分頁由 equipment 清單處理，這裡回傳空
+      items = []
+    } else if (activeTab === 'codex') {
       items = []
     } else {
       items = filterItemsByCategory(activeTab)
@@ -551,6 +555,17 @@ export function InventoryPanel({ onBack, heroesList, heroInstances }: InventoryP
 
   const showEquipment = activeTab === 'all' || activeTab === 'equipment'
 
+  /** 圖鑑：已擁有的裝備 templateId 集合 */
+  const ownedEquipTemplateIds = useMemo(() => {
+    const s = new Set<string>()
+    if (invState) {
+      for (const eq of invState.equipment) {
+        if (eq.templateId) s.add(eq.templateId)
+      }
+    }
+    return s
+  }, [invState])
+
   const getDef = useCallback(
     (itemId: string): ItemDefinition | undefined => invState?.definitions.get(itemId),
     [invState],
@@ -588,7 +603,8 @@ export function InventoryPanel({ onBack, heroesList, heroInstances }: InventoryP
           ))}
         </div>
 
-        {/* Sort bar */}
+        {/* Sort bar （圖鑑 tab 不顯示） */}
+        {activeTab !== 'codex' && (<>
         <div className="inv-sort-bar">
           <select
             className="inv-sort-select"
@@ -640,6 +656,12 @@ export function InventoryPanel({ onBack, heroesList, heroInstances }: InventoryP
             </button>
           ))}
         </div>
+      </>)}
+
+      {/* 圖鑑面板 */}
+      {activeTab === 'codex' && (
+        <CodexPanel ownedEquipTemplateIds={ownedEquipTemplateIds} />
+      )}
       </div>
 
       {/* Item Detail */}

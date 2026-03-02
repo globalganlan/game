@@ -1,6 +1,6 @@
 # 背包與道具系統 Spec
 
-> 版本：v2.5 ｜ 狀態：🟢 已實作
+> 版本：v2.6 ｜ 狀態：🟢 已實作
 > 最後更新：2026-03-03
 > 負賬角色：🎯 GAME_DESIGN → 🔧 CODING
 
@@ -448,3 +448,4 @@ type SortMode = 'default' | 'rarity-desc' | 'quantity-desc' | 'name-asc'
 | v2.3 | 2026-03-02 | **商店/寶箱/道具詳情優化**：①移除裝備商店分頁（與裝備銻造重複），商店從 4 分頁縮為 3 分頁（每日/素材/特殊）；後端同步移除 `equip_chest` 商品 ②修復寶箱無法開啟問題：`load-item-definitions` API 解析 `extra` JSON 合併 `useAction`/`category` 等欄位到回傳結果，寶箱等道具現在正確顯示「開啟」按鈕 ③新增 `ItemInfoPopup` 共用元件，簽到預覽和商店道具支援點擊查看詳細資訊（名稱/稀有度/說明） |
 | v2.4 | 2026-03-02 | **EXP 資源重構 + 星塵兌換商店**：①移除 exp_core_s/m/l 道具（EXP 改為頂層資源 save_data.exp）；移除 exp_material 分類 ②移除重洗石 eqm_reroll（ShopPanel / Workers SHOP_CATALOG / ItemInfoPopup / constants/rarity.ts） ③新增星塵兌換商店（§十一補充）：6 種商品以 currency_stardust 兌換（exp×5000/gold×50k/通用職業石×2/大型強化石×3/金寶箱/diamond×100） ④InventoryPanel TABS 補回 equipment 分頁 |
 | v2.5 | 2026-03-03 | **背包 UI 改善**：①「全部」分頁同時顯示道具+裝備（原只顯示道具） ②英雄碎片名稱修復：`asc_fragment_X` 一律用 `resolveFallbackName()`（英雄名+碎片），不被 DB 定義的原始 key 覆蓋 ③裝備「使用中」稀有度視覺：外框光暈+徽章顏色跟隨稀有度色 ④分頁更新為 6 個（全部/裝備/突破/素材/寶箱/貨幣），「通用」改名「素材」 |
+| v2.6 | 2026-03-03 | **裝備圖鑑系統**：①背包新增「📖 圖鑑」tab（第 7 個分頁）②新建 `CodexPanel.tsx`，可擴展 `CodexCategory` 聯合型別（目前 'equipment'，預留 hero/monster/achievement）③EquipmentCodex 子元件：128 種裝備百科（8 套裝 × 4 部位 × 4 稀有度）、收集進度條、套裝效果卡（2pc/4pc）、稀有度篩選、擁有/鎖定卡片視覺 ④匯出 equipmentGacha 常數（SET_IDS/SLOTS/SLOT_MAIN_STAT/MAIN_STAT_BASE）⑤App.css 新增 `.codex-*` 全套樣式 ~200 行含 RWD |

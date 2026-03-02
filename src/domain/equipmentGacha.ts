@@ -23,16 +23,16 @@ export const EQUIP_DIAMOND_SINGLE = 200
 export const EQUIP_DIAMOND_TEN = 1_800
 
 /** 8 套裝 */
-const SET_IDS = [
+export const SET_IDS = [
   'berserker', 'ironwall', 'gale', 'vampire',
   'critical', 'lethal', 'vitality', 'counter',
 ] as const
 
 /** 4 部位 */
-const SLOTS: EquipmentSlot[] = ['weapon', 'armor', 'ring', 'boots']
+export const SLOTS: EquipmentSlot[] = ['weapon', 'armor', 'ring', 'boots']
 
 /** 部位 → 主屬性 */
-const SLOT_MAIN_STAT: Record<EquipmentSlot, string> = {
+export const SLOT_MAIN_STAT: Record<EquipmentSlot, string> = {
   weapon: 'ATK',
   armor: 'HP',
   ring: 'DEF',
@@ -40,7 +40,7 @@ const SLOT_MAIN_STAT: Record<EquipmentSlot, string> = {
 }
 
 /** 部位 × 稀有度 → 主屬性基礎值 */
-const MAIN_STAT_BASE: Record<EquipmentSlot, Record<Rarity, number>> = {
+export const MAIN_STAT_BASE: Record<EquipmentSlot, Record<Rarity, number>> = {
   weapon: { N: 30, R: 50, SR: 80, SSR: 120 },
   armor:  { N: 200, R: 350, SR: 550, SSR: 800 },
   ring:   { N: 15, R: 25, SR: 40, SSR: 60 },
