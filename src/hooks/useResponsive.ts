@@ -45,7 +45,9 @@ export function useResponsive(): ResponsiveInfo {
 
   return useMemo((): ResponsiveInfo => {
     const { device, isLandscape } = info
-    const dpr: [number, number] = device === 'mobile' ? [1, 1.5] : [1, 2]
+    // iOS WKWebView（尤其 Chrome）記憶體有限，DPR 壓到 1 減少 GPU 記憶體
+    const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent)
+    const dpr: [number, number] = isIOS ? [1, 1] : device === 'mobile' ? [1, 1.5] : [1, 2]
     const textScale = device === 'mobile' ? 0.55 : device === 'tablet' ? 0.7 : 0.8
 
     return {

@@ -19,6 +19,9 @@ import { isStandalone, claimPwaReward } from '../services/pwaService'
 import { normalizeModelId, clamp01 } from '../game/helpers'
 import { API_URL, INITIAL_CURTAIN_GRACE_MS } from '../game/constants'
 
+/** iOS 裝置偵測 — WKWebView 記憶體上限較低，不可激進預載所有模型 */
+const _isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent)
+
 export interface GameInitDeps {
   /* ── 外部 hooks ── */
   authIsLoggedIn: boolean
@@ -206,10 +209,12 @@ export function useGameInit(deps: GameInitDeps) {
         }
       } catch (e) { console.warn('[speed restore]', e) }
 
-      // 背景非同步預載模型 & 縮圖
-      const preloadIds = Array.from(new Set(data.map((h, i) => normalizeModelId(h, i))))
-      preloadModelAnimations(preloadIds).catch(() => { })
-      preloadThumbnails(preloadIds).catch(() => { })
+      // 背景非同步預載模型 & 縮圖（iOS 跳過：WKWebView 記憶體有限，改用 Suspense 懶載入）
+      if (!_isIOS) {
+        const preloadIds = Array.from(new Set(data.map((h, i) => normalizeModelId(h, i))))
+        preloadModelAnimations(preloadIds).catch(() => { })
+        preloadThumbnails(preloadIds).catch(() => { })
+      }
 
       stageProgress.finalize = 0.5; refresh()
       setCurtainText('初始化戰場...')
@@ -236,20 +241,24 @@ export function useGameInit(deps: GameInitDeps) {
       })
       .catch(e => { console.warn('[early] heroes fetch failed:', e); return [] as RawHeroData[] })
     loadAllGameData().catch(() => { })
-    earlyHeroesRef.current.then(data => {
-      if (!data.length) return
-      const ids = Array.from(new Set(data.map((h, i) => normalizeModelId(h, i))))
-      const animNames = ['idle', 'attack', 'hurt', 'dying', 'run']
-      for (const mid of ids) {
-        const base = `${import.meta.env.BASE_URL}models/${mid}`
-        loadGlbShared(`${base}/${mid}.glb`).catch(() => { })
-        for (const anim of animNames) {
-          loadGlbShared(`${base}/${mid}_${anim}.glb`).catch(() => { })
+    // ★ iOS 跳過全部預載（WKWebView 記憶體上限低，84 個 GLB 並行載入會被 iOS 殺掉）
+    // 改用 Suspense 懶載入：模型在實際上陣時才載入，縮圖在顯示時才請求
+    if (!_isIOS) {
+      earlyHeroesRef.current.then(data => {
+        if (!data.length) return
+        const ids = Array.from(new Set(data.map((h, i) => normalizeModelId(h, i))))
+        const animNames = ['idle', 'attack', 'hurt', 'dying', 'run']
+        for (const mid of ids) {
+          const base = `${import.meta.env.BASE_URL}models/${mid}`
+          loadGlbShared(`${base}/${mid}.glb`).catch(() => { })
+          for (const anim of animNames) {
+            loadGlbShared(`${base}/${mid}_${anim}.glb`).catch(() => { })
+          }
+          const img = new Image()
+          img.src = `${base}/thumbnail.png`
         }
-        const img = new Image()
-        img.src = `${base}/thumbnail.png`
-      }
-    })
+      })
+    }
   }, [])
 
   // ── Phase 1: 認證成功 → 背景載入存檔 & 信箱 & 背包 ──

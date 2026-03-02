@@ -368,7 +368,7 @@ export default function App() {
             shadows
             frameloop="always"
             dpr={responsive.dpr}
-            gl={{ powerPreference: 'default', antialias: true }}
+            gl={{ powerPreference: 'default', antialias: !/iPhone|iPad|iPod/.test(navigator.userAgent) }}
             onCreated={({ gl }) => {
               gl.shadowMap.enabled = true
               gl.shadowMap.type = THREE.PCFShadowMap
