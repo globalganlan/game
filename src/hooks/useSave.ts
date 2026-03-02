@@ -26,7 +26,6 @@ import {
   type HeroInstance,
   type AccumulatedResources,
 } from '../services/saveService'
-import { clearLocalPool } from '../services/gachaLocalPool'
 import { translateError } from '../utils/errorMessages'
 
 export interface UseSaveReturn {
@@ -38,9 +37,9 @@ export interface UseSaveReturn {
   error: string | null
   /** 載入存檔（登入後呼叫一次） */
   doLoadSave: () => Promise<PlayerData | null>
-  /** 更新進度（金幣、鑽石、等級、經驗等） */
+  /** 更新進度（金幣、鑽石等） */
   doUpdateProgress: (changes: Partial<Pick<SaveData,
-    'gold' | 'diamond' | 'level' | 'exp' | 'displayName' |
+    'gold' | 'diamond' | 'displayName' |
     'towerFloor' | 'resourceTimerStage'
   >>) => void
   /** 更新劇情進度 */
@@ -104,7 +103,7 @@ export function useSave(): UseSaveReturn {
   }, [])
 
   const doUpdateProgress = useCallback((changes: Partial<Pick<SaveData,
-    'gold' | 'diamond' | 'level' | 'exp' | 'displayName' |
+    'gold' | 'diamond' | 'displayName' |
     'towerFloor' | 'resourceTimerStage'
   >>) => {
     updateProgress(changes)
@@ -144,7 +143,6 @@ export function useSave(): UseSaveReturn {
 
   const doClearCache = useCallback(() => {
     clearLocalSaveCache()
-    clearLocalPool()
     if (mounted.current) {
       setPlayerData(null)
       setError(null)

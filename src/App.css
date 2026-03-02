@@ -293,84 +293,11 @@
 
 /* ── Buttons ── */
 
-/* ── CSS Icon Badges (replacing emoji for cross-platform compatibility) ── */
-.icon-coin {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 1.2em;
-  height: 1.2em;
-  border-radius: 50%;
-  background: linear-gradient(135deg, #ffd700, #e6a800);
-  color: #5a3e00;
-  font-size: 0.75em;
-  font-weight: 900;
+/* ── Currency Emoji Icon ── */
+.currency-emoji {
   font-style: normal;
-  margin-right: 3px;
-  text-shadow: none;
-  line-height: 1;
+  margin-right: 2px;
   flex-shrink: 0;
-  box-shadow: 0 1px 2px rgba(0,0,0,0.3);
-}
-
-.icon-dia {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 1.2em;
-  height: 1.2em;
-  border-radius: 3px;
-  background: linear-gradient(135deg, #7df9ff, #4dabf7);
-  color: #003366;
-  font-size: 0.75em;
-  font-weight: 900;
-  font-style: normal;
-  margin-right: 3px;
-  text-shadow: none;
-  line-height: 1;
-  flex-shrink: 0;
-  transform: rotate(45deg);
-  box-shadow: 0 1px 2px rgba(0,0,0,0.3);
-}
-
-.icon-dia > * { transform: rotate(-45deg); }
-
-.icon-exp {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 1.2em;
-  height: 1.2em;
-  border-radius: 4px;
-  background: linear-gradient(135deg, #51cf66, #2b8a3e);
-  color: #e6ffe6;
-  font-size: 0.75em;
-  font-weight: 900;
-  font-style: normal;
-  margin-right: 3px;
-  text-shadow: none;
-  line-height: 1;
-  flex-shrink: 0;
-  box-shadow: 0 1px 2px rgba(0,0,0,0.3);
-}
-
-.icon-stardust {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 1.2em;
-  height: 1.2em;
-  border-radius: 50%;
-  background: linear-gradient(135deg, #ffd43b, #fab005);
-  color: #5a3e00;
-  font-size: 0.75em;
-  font-weight: 900;
-  font-style: normal;
-  margin-right: 3px;
-  text-shadow: none;
-  line-height: 1;
-  flex-shrink: 0;
-  box-shadow: 0 0 6px rgba(255,212,59,0.5);
 }
 
 .btn-start {
@@ -701,33 +628,7 @@
   100% { transform: translateY(100vh); }
 }
 
-/* ── Toast 浮動提示 ── */
-
-.toast-item {
-  position: absolute;
-  top: 40%;
-  left: 50%;
-  transform: translate(-50%, 0);
-  animation: toastFloat 1.8s ease-out forwards;
-  background: rgba(0, 0, 0, 0.72);
-  color: #ffcc00;
-  font-size: clamp(0.75rem, 2.2vw, 1rem);
-  font-weight: 700;
-  padding: 6px 20px;
-  border-radius: 20px;
-  border: 1px solid rgba(255, 204, 0, 0.3);
-  box-shadow: 0 2px 16px rgba(0, 0, 0, 0.5);
-  letter-spacing: 1px;
-  white-space: nowrap;
-  pointer-events: none;
-  z-index: 50;
-}
-
-@keyframes toastFloat {
-  0%   { opacity: 1; transform: translate(-50%, 0); }
-  70%  { opacity: 1; }
-  100% { opacity: 0; transform: translate(-50%, -60px); }
-}
+/* ── Toast 統一樣式由 acquire-toast-bar 提供 ── */
 
 /* Bottom panel: stacks button above card bar */
 .bottom-panel {
@@ -1196,43 +1097,6 @@
   font-weight: bold;
 }
 
-.menu-player-level {
-  color: #ccc;
-  font-size: 0.85rem;
-  background: rgba(255,255,255,0.1);
-  padding: 2px 8px;
-  border-radius: 4px;
-}
-
-/* ── Menu EXP Bar ── */
-.menu-exp-wrap {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-}
-
-.menu-exp-bar {
-  width: 72px;
-  height: 7px;
-  background: rgba(0,0,0,0.45);
-  border-radius: 4px;
-  overflow: hidden;
-  border: 1px solid rgba(255,255,255,0.12);
-}
-
-.menu-exp-fill {
-  height: 100%;
-  background: linear-gradient(90deg, #7df9ff, #38bdf8);
-  border-radius: 4px;
-  transition: width 0.4s ease;
-}
-
-.menu-exp-text {
-  color: #aadcf0;
-  font-size: 0.65rem;
-  white-space: nowrap;
-}
-
 .menu-resources {
   display: flex;
   justify-content: center;
@@ -1241,12 +1105,18 @@
 }
 
 .menu-res-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
   font-size: 0.9rem;
 }
 
 .menu-gold { color: #ffd43b; }
 .menu-diamond { color: #4dabf7; }
+.menu-exp { color: #51cf66; }
 .menu-cp { color: #ffa94d; }
+
+
 
 .menu-story-progress {
   color: #aaa;
@@ -1330,6 +1200,11 @@
   font-size: 0.8rem;
   color: #e9c46a;
   gap: 2px;
+}
+
+.disp-flex-center {
+  display: flex;
+  align-items: center;
 }
 
 .menu-timer-hours { color: #aaa; font-size: 0.7rem; }
@@ -2132,6 +2007,30 @@
 }
 .hd2-auto-btn:hover { background: rgba(77,171,247,0.2); }
 
+/* ── EXP 滑桿 ── */
+.hd2-exp-input-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+}
+.hd2-exp-slider {
+  flex: 1;
+  accent-color: #51cf66;
+  height: 6px;
+  cursor: pointer;
+}
+.hd2-exp-total {
+  color: #51cf66;
+  font-size: 0.82rem;
+  margin-left: 6px;
+}
+.hd2-mat-exp {
+  color: #51cf66;
+  font-size: 0.8rem;
+  margin-left: auto;
+}
+
 .hd2-preview {
   background: rgba(81,207,102,0.08);
   border: 1px solid rgba(81,207,102,0.2);
@@ -2196,6 +2095,13 @@
 }
 .hd2-modal-confirm:disabled { opacity: 0.4; cursor: default; }
 .hd2-modal-confirm:not(:disabled):hover { background: rgba(81,207,102,0.3); }
+
+.hd2-upgrade-btns {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 8px 0;
+}
 
 /* ── 裝備 UI 增強 ── */
 
@@ -2484,6 +2390,30 @@
 .inv-detail-rarity { color: #aaa; font-size: 0.75rem; }
 .inv-detail-desc { color: #ccc; font-size: 0.8rem; line-height: 1.4; }
 
+/* ── ItemInfoPopup（唯讀道具詳情） ── */
+.item-info-popup { max-width: 280px; padding: 16px; }
+
+/* ── 簽到道具可點擊 ── */
+.checkin-item-clickable {
+  cursor: pointer;
+  border-radius: 4px;
+  transition: background 0.15s;
+}
+.checkin-item-clickable:hover {
+  background: rgba(255,255,255,0.1);
+  text-decoration: underline;
+}
+
+/* ── 商店 icon 可點擊 ── */
+.shop-item-icon-clickable {
+  cursor: pointer;
+  transition: transform 0.15s, filter 0.15s;
+}
+.shop-item-icon-clickable:hover {
+  transform: scale(1.15);
+  filter: brightness(1.3);
+}
+
 .inv-detail-info {
   display: flex;
   justify-content: space-between;
@@ -2608,6 +2538,41 @@
 .inv-equip-enhance {
   color: #51cf66;
   font-size: 0.85rem;
+}
+
+/* 裝備 → 英雄選擇 */
+.inv-hero-select {
+  margin-top: 8px;
+  padding: 8px;
+  background: rgba(20, 20, 40, 0.9);
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  max-height: 180px;
+  overflow-y: auto;
+}
+.inv-hero-select-title {
+  font-size: 0.72rem;
+  color: #aaa;
+  text-align: center;
+  margin-bottom: 6px;
+}
+.inv-hero-select-btn {
+  display: block;
+  width: 100%;
+  padding: 6px 10px;
+  margin-bottom: 4px;
+  font-size: 0.78rem;
+  background: rgba(40, 40, 70, 0.8);
+  color: #e2e8f0;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.15s;
+}
+.inv-hero-select-btn:hover {
+  background: rgba(60, 60, 100, 0.9);
+  border-color: rgba(255, 200, 60, 0.3);
 }
 
 /* ══════════════════════════════════════════════════
@@ -2911,8 +2876,9 @@
 
 .gacha-results-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
-  gap: 8px;
+  grid-template-columns: repeat(auto-fill, 90px);
+  justify-content: center;
+  gap: 10px;
   margin-bottom: 16px;
 }
 
@@ -2926,6 +2892,15 @@
   border-radius: 8px;
   background: rgba(255,255,255,0.06);
   position: relative;
+  width: 86px;
+  min-height: 110px;
+  cursor: pointer;
+  transition: transform 0.15s, filter 0.15s;
+}
+
+.gacha-result-card:hover {
+  transform: scale(1.05);
+  filter: brightness(1.15);
 }
 
 .gacha-new-badge {
@@ -3071,7 +3046,7 @@
   to { opacity: 1; transform: scale(1) translateY(0); }
 }
 
-/* ── SSR Shimmer — golden glow + rainbow border pulse ── */
+/* ── SSR Shimmer — solid golden glow (彩框保留給未來更稀有角色) ── */
 .gacha-card-ssr {
   position: relative;
 }
@@ -3079,7 +3054,7 @@
 .gacha-card-ssr .gacha-result-card,
 .gacha-card-ssr .gacha-equip-card {
   animation: gachaSSRGlow 1.5s ease-in-out infinite alternate;
-  border-image: linear-gradient(135deg, #ffd700, #ff6b35, #ff2d95, #be4bdb, #4dabf7, #51cf66, #ffd700) 1;
+  border-color: #ffd700 !important;
   border-width: 2px;
   border-style: solid;
 }
@@ -3089,22 +3064,15 @@
   position: absolute;
   inset: -4px;
   border-radius: 10px;
-  background: linear-gradient(135deg, rgba(255, 215, 0, 0.25), rgba(255, 45, 149, 0.15), rgba(77, 171, 247, 0.2), rgba(255, 215, 0, 0.25));
-  background-size: 300% 300%;
-  animation: gachaSSRRainbow 2s ease infinite;
+  background: rgba(255, 215, 0, 0.18);
   z-index: -1;
   filter: blur(6px);
+  animation: gachaSSRGlow 1.5s ease-in-out infinite alternate;
 }
 
 @keyframes gachaSSRGlow {
   from { box-shadow: 0 0 8px rgba(255, 215, 0, 0.4), 0 0 20px rgba(255, 215, 0, 0.2); }
-  to   { box-shadow: 0 0 16px rgba(255, 215, 0, 0.7), 0 0 40px rgba(255, 215, 0, 0.3), 0 0 60px rgba(255, 107, 53, 0.15); }
-}
-
-@keyframes gachaSSRRainbow {
-  0%   { background-position: 0% 50%; }
-  50%  { background-position: 100% 50%; }
-  100% { background-position: 0% 50%; }
+  to   { box-shadow: 0 0 16px rgba(255, 215, 0, 0.7), 0 0 40px rgba(255, 215, 0, 0.3); }
 }
 
 /* Sparkle particles for SSR */
@@ -3133,6 +3101,197 @@
 @keyframes gachaSRGlow {
   from { box-shadow: 0 0 6px rgba(190, 75, 219, 0.3); }
   to   { box-shadow: 0 0 14px rgba(190, 75, 219, 0.6), 0 0 28px rgba(190, 75, 219, 0.2); }
+}
+
+/* ── Gacha Info Popup (hero / equipment 唯讀資訊彈窗) ── */
+.gacha-info-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  background: rgba(0, 0, 0, 0.75);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: panelFadeIn 0.2s;
+}
+
+.gacha-info-card {
+  width: 88%;
+  max-width: 340px;
+  max-height: 78vh;
+  overflow-y: auto;
+  background: linear-gradient(180deg, #22222c 0%, #181820 100%);
+  border: 1px solid rgba(255,255,255,0.16);
+  border-radius: 14px;
+  padding: 20px 16px 16px;
+  position: relative;
+}
+
+.gacha-info-card::-webkit-scrollbar { width: 4px; }
+.gacha-info-card::-webkit-scrollbar-track { background: transparent; }
+.gacha-info-card::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 2px; }
+
+.gacha-info-close {
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  background: rgba(255,255,255,0.08);
+  border: none;
+  color: #aaa;
+  font-size: 1.1rem;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.15s, background 0.15s;
+}
+.gacha-info-close:hover { color: #fff; background: rgba(255,255,255,0.15); }
+
+.gacha-info-top {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.gacha-info-portrait {
+  width: 72px;
+  height: 72px;
+  border-radius: 10px;
+  background: rgba(255,255,255,0.06);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+.gacha-info-identity {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  justify-content: center;
+}
+
+.gacha-info-name {
+  color: #eee;
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+
+.gacha-info-rarity {
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.gacha-info-tags {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.gacha-info-tag {
+  font-size: 0.65rem;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: rgba(255,255,255,0.08);
+  color: #ccc;
+}
+
+.gacha-info-desc {
+  color: #999;
+  font-size: 0.72rem;
+  margin-top: 4px;
+  line-height: 1.4;
+}
+
+.gacha-info-section-title {
+  color: #aaa;
+  font-size: 0.75rem;
+  font-weight: 600;
+  margin: 12px 0 6px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+}
+
+.gacha-info-stats-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 6px;
+}
+
+.gacha-info-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 6px 4px;
+  background: rgba(255,255,255,0.04);
+  border-radius: 6px;
+}
+
+.gacha-info-stat-label {
+  color: #999;
+  font-size: 0.6rem;
+}
+
+.gacha-info-stat-val {
+  color: #eee;
+  font-weight: 600;
+  font-size: 0.85rem;
+}
+
+/* ── Equipment Info specific ── */
+.gacha-info-equip-icon {
+  font-size: 2.4rem;
+  line-height: 1;
+}
+
+.gacha-info-main-stat {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px;
+  background: rgba(140, 233, 154, 0.08);
+  border-radius: 8px;
+  margin-bottom: 8px;
+}
+
+.gacha-info-main-stat-name {
+  color: #8ce99a;
+  font-weight: 600;
+  font-size: 0.85rem;
+}
+
+.gacha-info-main-stat-val {
+  color: #8ce99a;
+  font-weight: 700;
+  font-size: 1rem;
+}
+
+.gacha-info-sub-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.gacha-info-sub-item {
+  display: flex;
+  justify-content: space-between;
+  padding: 4px 8px;
+  background: rgba(255,255,255,0.04);
+  border-radius: 4px;
+  font-size: 0.75rem;
+}
+
+.gacha-info-sub-item-name { color: #aaa; }
+.gacha-info-sub-item-val { color: #ddd; font-weight: 600; }
+
+.gacha-info-set-name {
+  color: #ffd43b;
+  font-size: 0.7rem;
+  margin-top: 6px;
 }
 
 /* Gacha Loading Overlay */
@@ -3686,6 +3845,229 @@
   background: #444;
   cursor: not-allowed;
   opacity: 0.7;
+}
+
+/* ══════════════════════════════════════════════════
+   Story Stage Cards (API-driven themed UI)
+   ══════════════════════════════════════════════════ */
+
+.sc-loading {
+  text-align: center;
+  color: #aaa;
+  padding: 40px 0;
+  font-size: 0.9rem;
+}
+
+.sc-story {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* Chapter tabs */
+.sc-chapter-tabs {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+
+.sc-chapter-tab {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 8px 6px;
+  border: 2px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-size: 0.72rem;
+}
+
+.sc-chapter-tab:hover { filter: brightness(1.2); }
+
+.sc-chapter-tab-icon { font-size: 1.15rem; }
+.sc-chapter-tab-name { font-weight: bold; white-space: nowrap; }
+
+/* Chapter banner */
+.sc-chapter-banner {
+  padding: 8px 14px;
+  border: 1px solid;
+  border-radius: 8px;
+  margin-bottom: 4px;
+}
+
+.sc-chapter-banner-text {
+  color: #ccc;
+  font-size: 0.78rem;
+  font-style: italic;
+}
+
+/* Stage card grid */
+.sc-stage-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+
+/* Individual stage card */
+.sc-stage-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 10px 6px 8px;
+  border: 1px solid rgba(255,255,255,0.15);
+  border-radius: 10px;
+  background: rgba(255,255,255,0.06);
+  color: #eee;
+  cursor: pointer;
+  font-size: 0.72rem;
+  transition: all 0.2s;
+  position: relative;
+  min-height: 120px;
+}
+
+.sc-stage-card:hover:not(:disabled):not(.sc-locked):not(.sc-maxed) {
+  background: rgba(255,255,255,0.12);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+}
+
+/* Card states */
+.sc-cleared {
+  background: rgba(42,157,143,0.08);
+}
+
+.sc-current {
+  background: rgba(233,196,106,0.1);
+  box-shadow: 0 0 10px rgba(233,196,106,0.15);
+  animation: scCurrentPulse 2s ease-in-out infinite;
+}
+
+@keyframes scCurrentPulse {
+  0%, 100% { box-shadow: 0 0 10px rgba(233,196,106,0.15); }
+  50%      { box-shadow: 0 0 18px rgba(233,196,106,0.3); }
+}
+
+.sc-locked {
+  opacity: 0.4;
+  cursor: not-allowed;
+  filter: grayscale(0.5);
+}
+
+.sc-maxed {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.sc-boss-stage {
+  border-width: 2px;
+  background: rgba(233,196,106,0.06);
+}
+
+/* Card header */
+.sc-card-header {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  justify-content: center;
+  min-height: 18px;
+}
+
+.sc-card-id {
+  font-weight: bold;
+  font-size: 0.8rem;
+  color: #e9c46a;
+}
+
+.sc-card-boss-badge {
+  background: linear-gradient(135deg, #ffd700, #ff8c00);
+  color: #1a1a2e;
+  font-size: 0.55rem;
+  font-weight: 900;
+  padding: 1px 5px;
+  border-radius: 4px;
+  letter-spacing: 0.5px;
+}
+
+.sc-card-lock { font-size: 0.75rem; }
+.sc-card-current { font-size: 0.7rem; }
+.sc-card-complete { font-size: 0.65rem; }
+
+/* Card name */
+.sc-card-name {
+  font-weight: bold;
+  color: #ddd;
+  font-size: 0.78rem;
+  text-align: center;
+  line-height: 1.2;
+}
+
+/* Difficulty skulls */
+.sc-difficulty {
+  display: flex;
+  gap: 1px;
+  font-size: 0.55rem;
+}
+
+.sc-diff-filled { opacity: 1; }
+.sc-diff-empty { opacity: 0.2; filter: grayscale(1); }
+
+/* Meta info */
+.sc-card-meta {
+  display: flex;
+  gap: 6px;
+  color: #999;
+  font-size: 0.65rem;
+}
+
+.sc-card-rec { color: #7ec8e3; }
+.sc-card-enemy-count { color: #cba; }
+
+/* Rewards preview */
+.sc-card-rewards {
+  display: flex;
+  gap: 6px;
+  font-size: 0.6rem;
+  color: #bbb;
+  align-items: center;
+}
+
+.sc-card-rewards span {
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+}
+
+/* Star rating */
+.sc-card-stars {
+  display: flex;
+  gap: 1px;
+  font-size: 0.6rem;
+}
+
+.sc-star-earned { opacity: 1; }
+.sc-star-empty { opacity: 0.25; filter: grayscale(1); font-size: 0.7rem; }
+
+/* 手機版 RWD */
+@media (max-width: 480px) {
+  .sc-stage-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 6px;
+  }
+  .sc-chapter-tab { padding: 6px 4px; font-size: 0.65rem; }
+  .sc-chapter-tab-icon { font-size: 1rem; }
+  .sc-stage-card { min-height: 100px; padding: 8px 4px 6px; }
+}
+
+@media (min-width: 481px) and (max-width: 768px) {
+  .sc-stage-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
 }
 
 /* ══════════════════════════════════════════════════
@@ -4436,42 +4818,8 @@
 }
 
 /* ═══════════════════════════════════════════════════════
-   Combat Power HUD — 戰力顯示 + 變化提示
+   Combat Power HUD — 戰力顯示（戰力飛行動畫已合併至通用 toast）
    ═══════════════════════════════════════════════════════ */
-
-.combat-power-toast {
-  position: fixed;
-  top: 7%;
-  left: 50%;
-  transform: translateX(-50%);
-  padding: 6px 18px;
-  border-radius: 20px;
-  font-size: 1rem;
-  font-weight: 700;
-  z-index: 7000;
-  pointer-events: none;
-  animation: cp-fly 1.5s ease-out forwards;
-  backdrop-filter: blur(4px);
-  white-space: nowrap;
-}
-.combat-power-toast.up {
-  background: rgba(0, 200, 80, 0.25);
-  color: #4cff8a;
-  text-shadow: 0 0 8px rgba(0, 200, 80, 0.6);
-  border: 1px solid rgba(0, 200, 80, 0.3);
-}
-.combat-power-toast.down {
-  background: rgba(220, 50, 50, 0.25);
-  color: #ff6b6b;
-  text-shadow: 0 0 8px rgba(220, 50, 50, 0.6);
-  border: 1px solid rgba(220, 50, 50, 0.3);
-}
-@keyframes cp-fly {
-  0%   { opacity: 0; transform: translateX(-50%) translateY(10px) scale(0.8); }
-  15%  { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
-  80%  { opacity: 1; transform: translateX(-50%) translateY(-20px); }
-  100% { opacity: 0; transform: translateX(-50%) translateY(-35px); }
-}
 
 /* ── CP 比較條（IDLE 畫面底部） ── */
 .cp-comparison {
@@ -4537,201 +4885,92 @@
 }
 
 /* ═══════════════════════════════════════════════════════
-   Acquire Toast — 獲得物品動畫提示
+   Acquire Toast — 獲得物品飄浮提示（逐條 toast 風格）
    ═══════════════════════════════════════════════════════ */
 
-.acquire-overlay {
+.acquire-toast-stack {
   position: fixed;
-  inset: 0;
+  left: 50%;
+  top: 38%;
+  transform: translateX(-50%);
   z-index: 9000;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  pointer-events: auto;
-}
-.acquire-overlay-bg {
-  position: absolute;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.75);
-  backdrop-filter: blur(6px);
-}
-
-/* ── 單品展示（重要物品） ── */
-.acquire-single {
-  position: relative;
-  z-index: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 12px;
-  cursor: pointer;
-}
-.acquire-single-icon {
-  width: 120px;
-  height: 120px;
-  border-radius: 16px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 4rem;
-  position: relative;
-}
-.acquire-single-icon.enter {
-  animation: acquire-pop 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
-}
-.acquire-single-icon.show {
-  transform: scale(1);
-  opacity: 1;
-}
-.acquire-single-icon.exit {
-  animation: acquire-fly-out 0.3s ease-in forwards;
-}
-@keyframes acquire-pop {
-  0%   { opacity: 0; transform: scale(0.2) rotate(-15deg); }
-  60%  { opacity: 1; transform: scale(1.15) rotate(3deg); }
-  100% { opacity: 1; transform: scale(1) rotate(0deg); }
-}
-@keyframes acquire-fly-out {
-  to { opacity: 0; transform: scale(0.5) translateY(-40px); }
-}
-
-.acquire-item-name {
-  font-size: 1.3rem;
-  font-weight: 700;
-  text-shadow: 0 2px 8px rgba(0,0,0,0.8);
-}
-.acquire-item-qty {
-  font-size: 0.9rem;
-  opacity: 0.8;
-}
-.acquire-skip-hint {
-  position: absolute;
-  bottom: 15%;
-  font-size: 0.75rem;
-  color: rgba(255,255,255,0.5);
-  animation: acquire-blink 1.5s ease-in-out infinite;
-}
-@keyframes acquire-blink {
-  0%, 100% { opacity: 0.3; }
-  50% { opacity: 0.8; }
-}
-
-/* ── 稀有度光暈 ── */
-.acquire-glow-ssr {
-  box-shadow: 0 0 30px rgba(255, 200, 60, 0.7), 0 0 60px rgba(255, 180, 0, 0.4);
-  border: 2px solid rgba(255, 200, 60, 0.6);
-  animation: acquire-glow-pulse 1.2s ease-in-out infinite;
-}
-.acquire-glow-sr {
-  box-shadow: 0 0 20px rgba(180, 120, 255, 0.6), 0 0 40px rgba(150, 80, 220, 0.3);
-  border: 2px solid rgba(180, 120, 255, 0.5);
-  animation: acquire-glow-pulse 1.5s ease-in-out infinite;
-}
-.acquire-glow-r {
-  box-shadow: 0 0 12px rgba(100, 180, 255, 0.4);
-  border: 1px solid rgba(100, 180, 255, 0.3);
-}
-@keyframes acquire-glow-pulse {
-  0%, 100% { filter: brightness(1); }
-  50% { filter: brightness(1.3); }
-}
-
-/* ── rarity 名稱色 ── */
-.acquire-rarity-ssr { color: #ffc83c; }
-.acquire-rarity-sr  { color: #c07aff; }
-.acquire-rarity-r   { color: #6bb5ff; }
-.acquire-rarity-n   { color: #ccc; }
-
-/* ── 列表展示（一般物品） ── */
-.acquire-list-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 9000;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(0, 0, 0, 0.6);
-  backdrop-filter: blur(4px);
-  pointer-events: auto;
-}
-.acquire-list-panel {
-  position: relative;
-  z-index: 1;
-  background: rgba(30, 30, 40, 0.95);
-  border: 1px solid rgba(255,255,255,0.15);
-  border-radius: 12px;
-  padding: 20px 16px;
-  max-width: 360px;
-  width: 90%;
-  max-height: 70vh;
-  overflow-y: auto;
-}
-.acquire-list-title {
-  text-align: center;
-  font-size: 1.1rem;
-  font-weight: 700;
-  margin-bottom: 12px;
-  color: #ffc83c;
-}
-.acquire-list-items {
-  display: flex;
-  flex-direction: column;
   gap: 8px;
+  pointer-events: none;
 }
-.acquire-list-row {
+
+.acquire-toast-bar {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 6px 10px;
-  border-radius: 8px;
-  background: rgba(255,255,255,0.06);
-  animation: acquire-list-fade 0.3s ease forwards;
+  padding: 7px 18px 7px 12px;
+  background: rgba(12, 12, 22, 0.92);
+  border: 1px solid rgba(255,255,255,0.18);
+  border-radius: 24px;
+  backdrop-filter: blur(10px);
+  white-space: nowrap;
   opacity: 0;
+  animation: acquireToastRise 2.8s ease-out forwards;
 }
-.acquire-list-row:nth-child(1) { animation-delay: 0.05s; }
-.acquire-list-row:nth-child(2) { animation-delay: 0.1s; }
-.acquire-list-row:nth-child(3) { animation-delay: 0.15s; }
-.acquire-list-row:nth-child(4) { animation-delay: 0.2s; }
-.acquire-list-row:nth-child(5) { animation-delay: 0.25s; }
-.acquire-list-row:nth-child(6) { animation-delay: 0.3s; }
-.acquire-list-row:nth-child(7) { animation-delay: 0.35s; }
-.acquire-list-row:nth-child(8) { animation-delay: 0.4s; }
-@keyframes acquire-list-fade {
-  from { opacity: 0; transform: translateX(-10px); }
-  to   { opacity: 1; transform: translateX(0); }
-}
-.acquire-list-icon {
-  width: 36px;
-  height: 36px;
-  border-radius: 8px;
+
+.acquire-toast-icon {
+  width: 26px;
+  height: 26px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 1.3rem;
+  font-size: 1.05rem;
   flex-shrink: 0;
 }
-.acquire-list-info {
-  flex: 1;
-  min-width: 0;
-}
-.acquire-list-name {
-  font-size: 0.85rem;
+
+.acquire-toast-name {
+  font-size: 0.82rem;
   font-weight: 600;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  color: #e2e8f0;
 }
-.acquire-list-qty {
-  font-size: 0.7rem;
-  opacity: 0.7;
-}
-.acquire-list-new {
-  font-size: 0.6rem;
-  color: #ffc83c;
+
+.acquire-toast-qty {
+  font-size: 0.82rem;
   font-weight: 700;
-  background: rgba(255,200,60,0.2);
-  padding: 1px 6px;
-  border-radius: 4px;
+  color: #ffc83c;
+  margin-left: 2px;
+}
+
+/* SSR 金光 toast */
+.acquire-toast-ssr {
+  border-color: rgba(255, 200, 60, 0.6);
+  box-shadow: 0 0 14px rgba(255, 200, 60, 0.45), 0 0 5px rgba(255, 200, 60, 0.25);
+}
+.acquire-toast-ssr .acquire-toast-name {
+  color: #ffd43b;
+}
+
+/* SR 紫光 toast */
+.acquire-toast-sr {
+  border-color: rgba(190, 75, 219, 0.55);
+  box-shadow: 0 0 12px rgba(190, 75, 219, 0.35);
+}
+.acquire-toast-sr .acquire-toast-name {
+  color: #d0a0ff;
+}
+
+/* 純文字 toast（無 icon / qty，文字居中） */
+.acquire-toast-text {
+  justify-content: center;
+  padding: 7px 20px;
+  font-size: clamp(0.75rem, 2.2vw, 0.88rem);
+}
+.acquire-toast-text .acquire-toast-name {
+  text-align: center;
+}
+
+@keyframes acquireToastRise {
+  0%   { opacity: 0; transform: translateX(50px) scale(0.9); }
+  12%  { opacity: 1; transform: translateX(0) scale(1); }
+  75%  { opacity: 1; transform: translate(0, 0); }
+  100% { opacity: 0; transform: translateY(-35px) scale(0.95); }
 }
 
 /* ═══════════════════════════════════════════════════════
@@ -5023,4 +5262,241 @@
   padding: 40px;
   color: #888;
   font-size: 0.9rem;
+}
+
+/* ═══════════════════════════════════════════════════════
+   CheckinPanel — 每日簽到
+   ═══════════════════════════════════════════════════════ */
+
+.checkin-panel {
+  max-width: 480px;
+  margin: 0 auto;
+}
+
+.checkin-subtitle {
+  text-align: center;
+  color: #ccc;
+  font-size: 0.88rem;
+  padding: 8px 16px 4px;
+}
+
+.checkin-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+  padding: 12px 16px;
+  overflow-y: auto;
+  max-height: calc(100vh - 260px);
+}
+
+.checkin-day-card {
+  position: relative;
+  background: rgba(30, 30, 50, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  padding: 8px 6px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  transition: border-color 0.2s;
+  min-height: 80px;
+}
+
+.checkin-day-card.checkin-claimed {
+  opacity: 0.5;
+  border-color: rgba(100, 200, 100, 0.3);
+}
+
+.checkin-day-card.checkin-today {
+  border-color: #ffc83c;
+  box-shadow: 0 0 12px rgba(255, 200, 60, 0.4);
+  animation: checkinPulse 2s ease-in-out infinite;
+}
+
+.checkin-day-card.checkin-current-done {
+  border-color: rgba(100, 200, 100, 0.5);
+  box-shadow: 0 0 8px rgba(100, 200, 100, 0.25);
+}
+
+@keyframes checkinPulse {
+  0%, 100% { box-shadow: 0 0 8px rgba(255, 200, 60, 0.3); }
+  50% { box-shadow: 0 0 18px rgba(255, 200, 60, 0.6); }
+}
+
+.checkin-day-label {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: #e9a820;
+}
+
+.checkin-day-rewards {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.checkin-reward-line {
+  font-size: 0.68rem;
+  color: #ddd;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  white-space: nowrap;
+}
+
+.checkin-check-mark {
+  position: absolute;
+  top: 2px;
+  right: 4px;
+  font-size: 0.85rem;
+  color: #4ade80;
+}
+
+.checkin-btn {
+  display: block;
+  margin: 12px auto;
+  padding: 10px 40px;
+  font-size: 0.95rem;
+  font-weight: 700;
+  border: none;
+  border-radius: 24px;
+  cursor: pointer;
+  background: linear-gradient(135deg, #e9a820, #f0c74c);
+  color: #1a0e06;
+  box-shadow: 0 2px 12px rgba(233, 168, 32, 0.4);
+  transition: opacity 0.2s, transform 0.1s;
+}
+
+.checkin-btn:active:not(:disabled) {
+  transform: scale(0.96);
+}
+
+.checkin-btn:disabled,
+.checkin-btn.checkin-btn-done {
+  opacity: 0.5;
+  cursor: default;
+  background: #555;
+  color: #aaa;
+  box-shadow: none;
+}
+
+.checkin-msg {
+  text-align: center;
+  color: #ffc83c;
+  font-size: 0.82rem;
+  padding: 4px;
+}
+
+@media (max-width: 480px) {
+  .checkin-grid {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
+    padding: 8px 10px;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════
+   TutorialOverlay — 新手引導
+   ═══════════════════════════════════════════════════════ */
+
+.tutorial-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9500;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  pointer-events: auto;
+}
+
+.tutorial-overlay.tutorial-visible {
+  opacity: 1;
+}
+
+.tutorial-card {
+  background: linear-gradient(135deg, rgba(20, 20, 45, 0.98), rgba(30, 20, 50, 0.98));
+  border: 1px solid rgba(255, 200, 60, 0.3);
+  border-radius: 16px;
+  padding: 24px 28px;
+  max-width: 380px;
+  width: 90vw;
+  text-align: center;
+  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.5), 0 0 20px rgba(255, 200, 60, 0.15);
+}
+
+.tutorial-step-indicator {
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+  margin-bottom: 14px;
+}
+
+.tutorial-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.2);
+  transition: all 0.3s;
+}
+
+.tutorial-dot-active {
+  background: #ffc83c;
+  box-shadow: 0 0 6px rgba(255, 200, 60, 0.6);
+  transform: scale(1.3);
+}
+
+.tutorial-dot-done {
+  background: #4ade80;
+}
+
+.tutorial-title {
+  font-size: 1.1rem;
+  color: #ffd43b;
+  margin: 0 0 12px;
+}
+
+.tutorial-body {
+  font-size: 0.82rem;
+  color: #d0d0dd;
+  line-height: 1.6;
+  white-space: pre-line;
+  margin: 0 0 18px;
+}
+
+.tutorial-btn {
+  display: inline-block;
+  padding: 10px 32px;
+  font-size: 0.9rem;
+  font-weight: 700;
+  border: none;
+  border-radius: 24px;
+  cursor: pointer;
+  background: linear-gradient(135deg, #ffc83c, #f0a020);
+  color: #1a0e06;
+  box-shadow: 0 2px 12px rgba(255, 200, 60, 0.4);
+  transition: transform 0.1s;
+}
+
+.tutorial-btn:active {
+  transform: scale(0.96);
+}
+
+.tutorial-skip {
+  display: block;
+  margin: 10px auto 0;
+  background: none;
+  border: none;
+  color: #888;
+  font-size: 0.72rem;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.tutorial-skip:hover {
+  color: #bbb;
 }

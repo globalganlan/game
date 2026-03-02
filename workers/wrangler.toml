@@ -1,0 +1,17 @@
+name = "globalganlan-api"
+main = "src/index.ts"
+compatibility_date = "2024-12-01"
+
+[vars]
+PUSHER_APP_ID = "2122152"
+PUSHER_KEY = "9f709147d9aaf1df1517"
+PUSHER_SECRET = "1652f3789331fb4934e3"
+PUSHER_CLUSTER = "ap3"
+
+[triggers]
+crons = ["5 16 * * *", "0 16 * * 1"]
+
+[[d1_databases]]
+binding = "DB"
+database_name = "globalganlan-db"
+database_id = "65bf6901-e722-43ce-8b84-241fe0e2ee87"

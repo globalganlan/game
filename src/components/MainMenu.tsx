@@ -10,7 +10,6 @@ import type { MenuScreen } from '../types'
 import type { SaveData } from '../services/saveService'
 import { getTimerYield } from '../services/saveService'
 import { CurrencyIcon } from './CurrencyIcon'
-import { expToNextLevel } from '../domain/progressionSystem'
 
 /* ────────────────────────────
    Props
@@ -24,7 +23,7 @@ interface MainMenuProps {
   /** 領取計時器資源 */
   onCollectResources?: () => void
   /** 取得最新資源預覽的函式（每次呼叫即時計算） */
-  getResourcePreview?: () => { gold: number; expItems: number; hoursElapsed: number } | null
+  getResourcePreview?: () => { gold: number; exp: number; hoursElapsed: number } | null
   /** 信箱未領取獎勵數量（>0 顯示紅點） */
   mailUnclaimedCount?: number
   /** 隊伍總戰力 */
@@ -46,14 +45,15 @@ interface MenuItem {
 }
 
 const MENU_ITEMS: MenuItem[] = [
-  { key: 'stages',    icon: '🗺️', label: '關卡',  sub: '主線·爬塔·副本',   color: '#457b9d' },
-  { key: 'heroes',    icon: '🧟', label: '英雄',  sub: '養成·突破·升星',   color: '#2a9d8f', unlock: { chapter: 1, stage: 2, hint: '通關 1-1 後解鎖' } },
-  { key: 'gacha',     icon: '🎰', label: '召喚',  sub: '招募新同伴',       color: '#e9c46a', unlock: { chapter: 1, stage: 3, hint: '通關 1-2 後解鎖' } },
-  { key: 'inventory', icon: '🎒', label: '背包',  sub: '道具·裝備',        color: '#f4a261', unlock: { chapter: 1, stage: 2, hint: '通關 1-1 後解鎖' } },
-  { key: 'arena',     icon: '⚔️', label: '競技場', sub: '排名·對戰·獎勵',  color: '#e74c3c', unlock: { chapter: 2, stage: 1, hint: '通關 1-8 後解鎖' } },
-  { key: 'shop',      icon: '🏪', label: '商店',  sub: '購買素材·禮包',    color: '#72b01d', unlock: { chapter: 1, stage: 3, hint: '通關 1-2 後解鎖' } },
-  { key: 'mailbox',   icon: '📬', label: '信箱',  sub: '信件·獎勵',        color: '#7ec8e3' },
-  { key: 'settings',  icon: '⚙️', label: '設定',  sub: '帳號·綁定',        color: '#888' },
+  { key: 'stages', icon: '🗺️', label: '關卡', sub: '主線·爬塔·副本', color: '#457b9d' },
+  { key: 'heroes', icon: '🧟', label: '英雄', sub: '養成·突破·升星', color: '#2a9d8f', unlock: { chapter: 1, stage: 2, hint: '通關 1-1 後解鎖' } },
+  { key: 'gacha', icon: '🎰', label: '召喚', sub: '招募新同伴', color: '#e9c46a', unlock: { chapter: 1, stage: 3, hint: '通關 1-2 後解鎖' } },
+  { key: 'inventory', icon: '🎒', label: '背包', sub: '道具·裝備', color: '#f4a261', unlock: { chapter: 1, stage: 2, hint: '通關 1-1 後解鎖' } },
+  { key: 'arena', icon: '⚔️', label: '競技場', sub: '排名·對戰·獎勵', color: '#e74c3c', unlock: { chapter: 2, stage: 1, hint: '通關 1-8 後解鎖' } },
+  { key: 'shop', icon: '🏪', label: '商店', sub: '購買素材·禮包', color: '#72b01d', unlock: { chapter: 1, stage: 3, hint: '通關 1-2 後解鎖' } },
+  { key: 'checkin', icon: '📅', label: '簽到', sub: '每日登入獎勵', color: '#e9a820' },
+  { key: 'mailbox', icon: '📬', label: '信箱', sub: '信件·獎勵', color: '#7ec8e3' },
+  { key: 'settings', icon: '⚙️', label: '設定', sub: '帳號·綁定', color: '#888' },
 ]
 
 /* ────────────────────────────
@@ -81,12 +81,9 @@ export function MainMenu({
     return () => clearInterval(id)
   }, [refreshPreview])
   const name = saveData?.displayName || '倖存者'
-  const level = saveData?.level ?? 1
-  const curExp = saveData?.exp ?? 0
-  const needed = expToNextLevel(level)
-  const expPct = needed > 0 ? Math.min(100, (curExp / needed) * 100) : 100
   const gold = saveData?.gold ?? 0
   const diamond = saveData?.diamond ?? 0
+  const exp = saveData?.exp ?? 0
   const story = saveData?.storyProgress
   const storyText = story ? `${story.chapter}-${story.stage}` : '1-1'
   const storyProgress = story ?? { chapter: 1, stage: 1 }
@@ -123,18 +120,12 @@ export function MainMenu({
       <div className="menu-header">
         <div className="menu-player-info">
           <span className="menu-player-name">{name}</span>
-          <span className="menu-player-level" title="指揮官等級 — 提升等級解鎖更多功能與內容">Lv.{level}</span>
-          <div className="menu-exp-wrap" title={`EXP ${curExp} / ${needed}`}>
-            <div className="menu-exp-bar">
-              <div className="menu-exp-fill" style={{ width: `${expPct}%` }} />
-            </div>
-            <span className="menu-exp-text">{curExp}/{needed}</span>
-          </div>
         </div>
         <div className="menu-resources">
           <span className="menu-res-item menu-gold" title="金幣 — 升級、購買、強化"><CurrencyIcon type="gold" />{gold.toLocaleString()}</span>
           <span className="menu-res-item menu-diamond" title="鑽石 — 召喚、加速、購買稀有道具"><CurrencyIcon type="diamond" />{diamond.toLocaleString()}</span>
-          <span className="menu-res-item menu-cp" title="隊伍戰力">⚡{combatPower.toLocaleString()}</span>
+          <span className="menu-res-item menu-exp" title="經驗 — 英雄升級用"><CurrencyIcon type="exp" />{exp.toLocaleString()}</span>
+          <span className="menu-res-item menu-cp" title="隊伍戰力"><CurrencyIcon type="cp" />{combatPower.toLocaleString()}</span>
         </div>
       </div>
 
@@ -149,8 +140,8 @@ export function MainMenu({
             <div className="menu-progress-header">
               <span className="menu-progress-stage">🗺️ 關卡進度：{storyText}</span>
               {hasCleared && (
-                <span className="menu-progress-speed">
-                  產速：<CurrencyIcon type="gold" />{speed.goldPerHour}/h · <CurrencyIcon type="exp" />{speed.expItemsPerHour}/h
+                <span className="menu-progress-speed disp-flex-center" title="離線資源產出速度">
+                  產速：<CurrencyIcon type="gold" />{speed.goldPerHour}/h · <CurrencyIcon type="exp" />{speed.expPerHour}/h
                 </span>
               )}
             </div>
@@ -161,7 +152,7 @@ export function MainMenu({
                   <div className="menu-timer-info">
                     {resourcePreview && resourcePreview.gold > 0 ? (
                       <>
-                        <span>⏱️ 待領取：<CurrencyIcon type="gold" />{resourcePreview.gold.toLocaleString()} / <CurrencyIcon type="exp" />{resourcePreview.expItems}</span>
+                        <span className="disp-flex-center">⏱️ 待領取：<CurrencyIcon type="gold" />{resourcePreview.gold.toLocaleString()} / <CurrencyIcon type="exp" />{resourcePreview.exp.toLocaleString()}</span>
                         <span className="menu-timer-hours">({resourcePreview.hoursElapsed}h 累積)</span>
                       </>
                     ) : (

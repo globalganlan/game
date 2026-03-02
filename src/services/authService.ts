@@ -1,5 +1,5 @@
-/**
- * authService — 帳號系統前端服務
+﻿/**
+ * authService  帳號系統前端服務
  *
  * 訪客自動登入 + 帳密綁定 + 跨裝置登入。
  * Token 存 localStorage，狀態存 memory（不依賴 React）。
@@ -7,15 +7,13 @@
  * 對應 Spec: specs/auth-system.md v0.1
  */
 
-const POST_URL =
-  'https://script.google.com/macros/s/AKfycbzy3EHTCyTYjA9j1CvJGvWwDM_RrkCuzNYkMhP7T9DTJ6V6g7Sodrlo4uv3h9yx0HLdsg/exec'
+import { callAuthApi, getStoredToken, setStoredToken } from './apiClient'
 
-const STORAGE_KEY_TOKEN = 'globalganlan_guest_token'
 const STORAGE_KEY_LOGGED_OUT = 'globalganlan_logged_out'
 
-/* ════════════════════════════════════
+/* 
    型別
-   ════════════════════════════════════ */
+    */
 
 export interface AuthState {
   isLoggedIn: boolean
@@ -36,9 +34,9 @@ interface ApiResponse {
   message?: string
 }
 
-/* ════════════════════════════════════
+/* 
    內部 state
-   ════════════════════════════════════ */
+    */
 
 let currentAuth: AuthState = {
   isLoggedIn: false,
@@ -55,23 +53,9 @@ function notify() {
   for (const fn of listeners) fn({ ...currentAuth })
 }
 
-/* ════════════════════════════════════
-   通用 API 呼叫
-   ════════════════════════════════════ */
-
-async function callApi(action: string, params: Record<string, unknown> = {}): Promise<ApiResponse> {
-  const body = JSON.stringify({ action, ...params })
-  const res = await fetch(POST_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'text/plain; charset=utf-8' },
-    body,
-  })
-  return res.json()
-}
-
-/* ════════════════════════════════════
+/* 
    UUID v4 生成
-   ════════════════════════════════════ */
+    */
 
 function uuidv4(): string {
   if (typeof crypto !== 'undefined' && crypto.randomUUID) {
@@ -84,9 +68,9 @@ function uuidv4(): string {
   })
 }
 
-/* ════════════════════════════════════
+/* 
    公開 API
-   ════════════════════════════════════ */
+    */
 
 /** 取得當前認證狀態（唯讀副本） */
 export function getAuthState(): AuthState {
@@ -105,26 +89,26 @@ export function onAuthChange(fn: AuthListener): () => void {
 /**
  * 自動登入流程（進入遊戲時呼叫一次）
  *
- * 1. 有 localStorage token → login-guest
- * 2. 沒有 token → 不自動建帳，返回離線（由 UI 按鈕觸發 registerGuest）
- * 3. 失敗 → 離線模式（不阻塞遊戲）
+ * 1. 有 localStorage token  login-guest
+ * 2. 沒有 token  不自動建帳，返回離線（由 UI 按鈕觸發 registerGuest）
+ * 3. 失敗  離線模式（不阻塞遊戲）
  */
 export async function autoLogin(): Promise<AuthState> {
-  // ★ 使用者主動登出過 → 不自動登入，等手動點擊
+  //  使用者主動登出過  不自動登入，等手動點擊
   if (localStorage.getItem(STORAGE_KEY_LOGGED_OUT)) {
     currentAuth = { isLoggedIn: false, playerId: null, displayName: '倖存者', isBound: false, guestToken: null }
     notify()
     return getAuthState()
   }
 
-  const savedToken = localStorage.getItem(STORAGE_KEY_TOKEN)
+  const savedToken = getStoredToken()
 
   if (savedToken) {
     // 嘗試用 token 登入
     try {
-      const res = await callApi('login-guest', { guestToken: savedToken })
+      const res = await callAuthApi<ApiResponse>('login-guest', { guestToken: savedToken })
       if (res.success) {
-        localStorage.removeItem(STORAGE_KEY_LOGGED_OUT) // 自動登入成功 → 確保旗標清乾淨
+        localStorage.removeItem(STORAGE_KEY_LOGGED_OUT) // 自動登入成功  確保旗標清乾淨
         currentAuth = {
           isLoggedIn: true,
           playerId: res.playerId ?? null,
@@ -135,9 +119,9 @@ export async function autoLogin(): Promise<AuthState> {
         notify()
         return getAuthState()
       }
-      // token 不存在 → 可能被清除，等使用者手動選擇
+      // token 不存在  可能被清除，等使用者手動選擇
     } catch {
-      // 網路錯誤 → 離線模式
+      // 網路錯誤  離線模式
       console.warn('[auth] login-guest failed, offline mode')
       currentAuth = {
         isLoggedIn: false,
@@ -151,7 +135,7 @@ export async function autoLogin(): Promise<AuthState> {
     }
   }
 
-  // 無 token 或 token 失效 → 返回未登入狀態，等使用者按鈕觸發 registerGuest
+  // 無 token 或 token 失效  返回未登入狀態，等使用者按鈕觸發 registerGuest
   currentAuth = {
     isLoggedIn: false,
     playerId: null,
@@ -167,13 +151,13 @@ export async function autoLogin(): Promise<AuthState> {
  * 註冊新訪客帳號（由 UI 按鈕「訪客模式進入」觸發）
  */
 export async function registerGuest(): Promise<AuthState> {
-  // ★ 手動登入 → 清除登出旗標
+  //  手動登入  清除登出旗標
   localStorage.removeItem(STORAGE_KEY_LOGGED_OUT)
   // 先檢查是否已有本地 token（優先複用）
-  const existingToken = localStorage.getItem(STORAGE_KEY_TOKEN)
+  const existingToken = getStoredToken()
   if (existingToken) {
     try {
-      const res = await callApi('login-guest', { guestToken: existingToken })
+      const res = await callAuthApi<ApiResponse>('login-guest', { guestToken: existingToken })
       if (res.success) {
         currentAuth = {
           isLoggedIn: true,
@@ -192,9 +176,9 @@ export async function registerGuest(): Promise<AuthState> {
 
   const newToken = uuidv4()
   try {
-    const res = await callApi('register-guest', { guestToken: newToken })
+    const res = await callAuthApi<ApiResponse>('register-guest', { guestToken: newToken })
     if (res.success) {
-      localStorage.setItem(STORAGE_KEY_TOKEN, newToken)
+      setStoredToken(newToken)
       currentAuth = {
         isLoggedIn: true,
         playerId: res.playerId ?? null,
@@ -209,7 +193,7 @@ export async function registerGuest(): Promise<AuthState> {
     console.warn('[auth] register-guest failed, offline mode')
   }
 
-  // 註冊也失敗 → 純離線
+  // 註冊也失敗  純離線
   currentAuth = {
     isLoggedIn: false,
     playerId: null,
@@ -225,14 +209,14 @@ export async function registerGuest(): Promise<AuthState> {
  * 帳密登入（換裝置 / 另一台電腦）
  */
 export async function loginWithEmail(email: string, password: string): Promise<{ success: boolean; error?: string }> {
-  // ★ 手動登入 → 清除登出旗標
+  //  手動登入  清除登出旗標
   localStorage.removeItem(STORAGE_KEY_LOGGED_OUT)
-  const res = await callApi('login', { email, password })
+  const res = await callAuthApi<ApiResponse>('login', { email, password })
   if (!res.success) return { success: false, error: res.error }
 
   // 儲存 token + 更新 state
   if (res.guestToken) {
-    localStorage.setItem(STORAGE_KEY_TOKEN, res.guestToken)
+    setStoredToken(res.guestToken)
   }
   currentAuth = {
     isLoggedIn: true,
@@ -246,15 +230,11 @@ export async function loginWithEmail(email: string, password: string): Promise<{
 }
 
 /**
- * 綁定帳號（訪客 → 有帳密）
+ * 綁定帳號（訪客  有帳密）
  */
 export async function bindAccount(email: string, password: string): Promise<{ success: boolean; error?: string }> {
   if (!currentAuth.guestToken) return { success: false, error: 'not_logged_in' }
-  const res = await callApi('bind-account', {
-    guestToken: currentAuth.guestToken,
-    email,
-    password,
-  })
+  const res = await callAuthApi<ApiResponse>('bind-account', { guestToken: currentAuth.guestToken, email, password })
   if (res.success) {
     currentAuth = { ...currentAuth, isBound: true }
     notify()
@@ -267,10 +247,7 @@ export async function bindAccount(email: string, password: string): Promise<{ su
  */
 export async function changeName(newName: string): Promise<{ success: boolean; error?: string }> {
   if (!currentAuth.guestToken) return { success: false, error: 'not_logged_in' }
-  const res = await callApi('change-name', {
-    guestToken: currentAuth.guestToken,
-    newName,
-  })
+  const res = await callAuthApi<ApiResponse>('change-name', { guestToken: currentAuth.guestToken, newName })
   if (res.success) {
     currentAuth = { ...currentAuth, displayName: newName }
     notify()
@@ -284,17 +261,13 @@ export async function changeName(newName: string): Promise<{ success: boolean; e
 export async function changePassword(oldPassword: string, newPassword: string): Promise<{ success: boolean; error?: string }> {
   if (!currentAuth.guestToken) return { success: false, error: 'not_logged_in' }
   if (!currentAuth.isBound) return { success: false, error: 'account_not_bound' }
-  const res = await callApi('change-password', {
-    guestToken: currentAuth.guestToken,
-    oldPassword,
-    newPassword,
-  })
+  const res = await callAuthApi<ApiResponse>('change-password', { guestToken: currentAuth.guestToken, oldPassword, newPassword })
   return { success: res.success, error: res.error }
 }
 
 /**
  * 登出（清除記憶體狀態，回到登入畫面）
- * ★ 保留 localStorage 的 guestToken，下次訪客登入可回到同一帳號
+ *  保留 localStorage 的 guestToken，下次訪客登入可回到同一帳號
  */
 export function logout(): void {
   // 保留 guestToken，但標記已登出（阻止 autoLogin 自動登入）

@@ -5,8 +5,9 @@
  */
 
 import { useState, useCallback, useEffect } from 'react'
-import { bindAccount, changeName, changePassword, logout, getAuthState } from '../services/authService'
+import { bindAccount, changeName, changePassword, getAuthState } from '../services/authService'
 import { audioManager } from '../services/audioService'
+import { useLogout } from '../hooks/useLogout'
 import { translateError } from '../utils/errorMessages'
 import { CurrencyIcon } from './CurrencyIcon'
 import {
@@ -142,10 +143,7 @@ export function SettingsPanel({ onBack, onLogout, displayName, isBound: initialB
     }
   }, [oldPw, newPw, newPwConfirm])
 
-  const handleLogout = () => {
-    logout()
-    onLogout()
-  }
+  const handleFullLogout = useLogout(onLogout)
 
   /* ── PWA 事件訂閱 ── */
   useEffect(() => {
@@ -451,7 +449,7 @@ export function SettingsPanel({ onBack, onLogout, displayName, isBound: initialB
 
           {/* ── 登出 ── */}
           <section className="settings-section">
-            <button className="settings-btn settings-btn-danger" onClick={handleLogout}>
+            <button className="settings-btn settings-btn-danger" onClick={handleFullLogout}>
               🚪 登出
             </button>
           </section>

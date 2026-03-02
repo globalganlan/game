@@ -1,7 +1,7 @@
 # 技術架構 Spec
 
-> 版本：v1.7 ｜ 狀態：🟢 定稿（含 Domain Engine + Services 層 + Optimistic Queue + GAS CacheService + Audio Engine + CurrencyIcon 統一 icon + PWA）
-> 最後更新：2026-03-01
+> 版本：v1.9 ｜ 狀態：🟢 定稿（含 Domain Engine + Services 層 + Optimistic Queue + Audio Engine + CurrencyIcon 統一 icon + PWA + App 模組化拆分 + D1 原子批次寫入）
+> 最後更新：2025-07-14
 > 負責角色：🔧 CODING → 🏗️ ARCHITECT
 
 ## 概述
@@ -33,10 +33,14 @@
 ```
 src/
  main.tsx                    應用進入點
- App.tsx                     遊戲邏輯 + 3D 演出（onAction callback）
+ App.tsx                     遊戲主元件（狀態管理 + 戰鬥迴圈 + 3D 演出）
  App.css                     HUD / 按鈕 / RWD media queries
  types.ts                    表現層型別（RawHeroData, SlotHero）
  suppressWarnings.ts         console.warn 攔截
+
+ game/                        遊戲共用常數 & 工具（從 App.tsx 抽取）
+    constants.ts             戰鬥時序、格子佈局、API 端點、waitFrames
+    helpers.ts               normalizeModelId、clamp01、buildEnemySlotsFromStage
 
  domain/                      純邏輯層（零 React 依賴）
     index.ts                統一匯出
@@ -62,11 +66,10 @@ src/
     inventoryService.ts     背包服務（裝備/解除/鎖定/擴容/使用）
     localStorageMigration.ts 本地儲存版本遷移
     mailService.ts          信箱服務（領取/全領/刪除/刪除已讀）
-    optimisticQueue.ts      樂觀更新佇列（帶 opId 冊等性 + 重試）
     progressionService.ts   英雄養成服務（升級/突破/升星/強化/鍛造/拆解/通關/爬塔/副本）
     pwaService.ts           PWA 服務（安裝偵測/平台指引/獎勵領取）
     saveService.ts          存檔服務（儲存陣型/收集資源）
-    antiCheatService.ts     反作弊服務（戰鬥驗證）
+
  components/
     Arena.tsx               場景（地面/碎片/雨/天空/霧）
     Hero.tsx                英雄容器（移動/動畫狀態機）
@@ -84,11 +87,29 @@ src/
     SettingsPanel.tsx       設定面板（音量滑桿 + 靜音 + 帳號 + 清除快取）
     MailboxPanel.tsx        信箱面板（信件/獎勵/刪除/批量操作）
     CurrencyIcon.tsx        統一貨幣 icon 元件（CSS badge: gold/diamond/exp/stardust）
+    MenuScreenRouter.tsx    主選單子畫面路由（heroes/inventory/gacha/stages/settings/mailbox/shop/checkin/arena）
+    DragPlane.tsx           拖曳平面（R3F 子元件，投射到 y=1.25 平面）
+    BattleStatsPanel.tsx    戰鬥統計面板（輸出/治療/承傷柱狀圖）
+    VictoryPanel.tsx        勝利/敗北標語與獎勵面板
+    GameOverButtons.tsx     GAMEOVER 按鈕群組（下一關/重試/回放/統計/回大廳）
+    BattleSpeedControls.tsx 戰鬥倍速 + 跳過按鈕
 
  hooks/
     useResponsive.ts        RWD 偵測 hook
     useAuth.ts              認證 hook（登入/登出/綁定/改密碼）
     useSave.ts              存檔 hook（載入/儲存/同步）
+    useLogout.ts            登出 hook（auth logout + 9 快取清除 + onResetState 回呼）
+    useCurtain.ts           過場幕狀態 hook
+    useBattleHUD.ts         戰鬥 HUD 狀態 hook（buffs/energy/toasts/hints）
+    useAnimationPromises.ts 動畫 Promise 系統 hook
+    useDragFormation.ts     拖曳陣型 + 英雄上下陣 hook
+    useSlots.ts             槽位管理 hook（6 格 × 雙方）
+    useGameInit.ts          遊戲初始化 hook（fetchData/preload/PWA）
+    useBattleFlow.ts        戰鬥流程 hook（loop/retry/replay/back）
+    useStageHandlers.ts     關卡 handler hook
+    useMail.ts              信箱 hook
+    useBattleState.ts       戰鬥中介狀態 hook
+    useBgm.ts               BGM 自動切換 hook
 
  loaders/
      glbLoader.ts            GLB 載入器（全域快取 + Suspense）
@@ -314,14 +335,14 @@ fireOptimistic / fireOptimisticAsync
 
 ```
 
-                    Google Sheets                            
+              Cloudflare D1 (正規化表)
   heroes | skill_templates | hero_skills | element_matrix    
 
-                  fetch (GET/POST)
-                 
+           Workers API  POST /readSheet
+           (從專屬 D1 表查詢，回傳 JSON 陣列)
 
               src/services/sheetApi.ts                       
-  readSheet<T>(sheetName) → T[]                             
+  readSheet<T>(sheetName) → callApi → T[]                   
   快取：Map<string, unknown[]>                               
 
                  
@@ -461,7 +482,55 @@ export default defineConfig({
 ## 擴展點
 
 - [ ] **狀態管理庫**：若複雜度上升，可引入 Zustand 或 Jotai
-- [ ] **後端**：目前純前端 + Google Sheets API，未來可接 Firebase / Supabase
+
+---
+
+## D1 原子批次寫入（db.batch）
+
+所有涉及多次寫入的後端路由，均使用 `db.batch()` 將全部 `D1PreparedStatement` 包成單一 SQLite 交易（all-or-nothing），避免中途 crash 導致部分寫入。
+
+### 核心函式（`workers/src/routes/save.ts`）
+
+| 函式 | 回傳型別 | 用途 |
+|------|----------|------|
+| `upsertItemStmt(db, playerId, itemId, delta)` | `D1PreparedStatement` | 單一 SQL `INSERT ... ON CONFLICT` 物品 upsert |
+| `upsertItem(db, playerId, itemId, delta)` | `Promise<void>` | 向後相容包裝（內部呼叫 stmt.run()）|
+| `grantRewardsStmts(db, playerId, rewards)` | `D1PreparedStatement[]` | 合併同欄資源增減為單一 UPDATE + 道具 upsert |
+| `grantRewards(db, playerId, rewards)` | `Promise<void>` | 向後相容包裝（內部呼叫 batch）|
+
+### 核心函式（`workers/src/routes/mail.ts`）
+
+| 函式 | 回傳型別 | 用途 |
+|------|----------|------|
+| `insertMailStmt(db, mailId, playerId, title, body, rewards)` | `D1PreparedStatement` | 信件 INSERT 語句（不執行）|
+| `insertMail(db, playerId, title, body, rewards)` | `Promise<string>` | 向後相容包裝（執行並回傳 mailId）|
+
+### 已批次化路由
+
+| 路由 | 檔案 | 批次內容 |
+|------|------|----------|
+| `init-save` | save.ts | INSERT save_data + 3× INSERT hero_instances（陣型內建）|
+| `register-guest` | auth.ts | INSERT players + INSERT mailbox 歡迎信 |
+| `bind-account` | auth.ts | UPDATE players + INSERT mailbox 獎勵信 |
+| `add-items` | inventory.ts | N× upsertItemStmt |
+| `remove-items` | inventory.ts | N× upsertItemStmt |
+| `sell-items` | inventory.ts | 扣物品 + 加金幣 |
+| `shop-buy` | inventory.ts | 扣貨幣 + 購買次數 + 發放獎勵 |
+| `use-item` | inventory.ts | 扣道具 + 加資源 / 裝備 |
+| `equip-item` | inventory.ts | 卸舊裝 + 穿新裝 |
+| `gacha-pull` | gacha.ts | 扣鑽石 + INSERT 英雄 + upsert 碎片/星塵 + 更新 pity |
+| `equip-gacha-pull` | gacha.ts | 扣貨幣 + INSERT 裝備 |
+| `upgrade-hero` | progression.ts | 扣 EXP + 更新英雄等級 |
+| `ascend-hero` | progression.ts | 扣碎片/職業石/金幣 + 更新覺醒 |
+| `star-up-hero` | progression.ts | 扣碎片 + 更新星數 |
+| `enhance-equipment` | progression.ts | 扣金幣 + 更新強化等級 |
+| `claim-mail-reward` | mail.ts | 發放獎勵 + 標記已領 |
+| `claim-all-mail` | mail.ts | 全部獎勵 + 全部標記 |
+| `delete-all-read` | mail.ts | N× 軟刪除 |
+| `send-mail` | mail.ts | N× INSERT mailbox |
+| `claim-pwa-reward` | mail.ts | 標記已領 + INSERT 獎勵信 |
+| `daily-checkin` | checkin.ts | UPDATE save_data + N× upsertItemStmt |
+| `arena-challenge-complete` | arena.ts | 扣次數 + 排名交換 + 最高排名 + 金幣鑽石 + pvpCoin |
 
 ---
 
@@ -537,3 +606,4 @@ POST { "action": "invalidate-cache" }
 | v1.6 | 2026-03-01 | PWA 支援：manifest.json + service worker（Network/Cache First 策略）+ `pwaService.ts`（安裝偵測/平台指引/獎勵領取）+ 帳號綁定獎勵（💎200+🪙5000）+ PWA 安裝獎勵（💎100+🪙3000） |
 | v1.7 | 2026-03-01 | 同步實際程式碼：完整更新 services/（16 檔）、domain/（13 檔）、components/（16 檔）、hooks/（3 檔）目錄列表；Optimistic Queue 操作數更新（mailService 4 ops、saveService 2 ops、新增 gachaLocalPool）；orientationchange timeout 修正為 100ms |
 | v1.8 | 2026-06-15 | **配合裝備模板制 v2**：inventoryService Optimistic Queue 操作數 5→1（移除 equip/unequip/lock/expand）；progressionService 操作數 8+→7+（移除 forge/dismantle，新增 enhanceEquipment/equipGachaPull）；不快取資料表移除 equipment |
+| v1.9 | 2026-03-02 | **useLogout hook**：hooks/ 目錄新增 `useLogout.ts`（auth logout + 9 快取清除）；新增 App.tsx Phase 4 抽出的 12 個 hooks 完整列表（useCurtain/useBattleHUD/useAnimationPromises/useDragFormation/useSlots/useGameInit/useBattleFlow/useStageHandlers/useMail/useBattleState/useBgm） |

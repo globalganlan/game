@@ -1,8 +1,8 @@
 # 開發狀態快照 — Dev Status
 
-> 最後更新：2026-03-02（第三十三次更新 — 屬性提示修復 + DOT/被動致死動畫修復）
+> 最後更新：2025-07-16（第四十五次更新 — 召喚結果 UI 改進：金框 + 統一尺寸 + 資訊彈窗）
 
-## 截至 2026-03-02 的開發狀態
+## 截至 2025-07-16 的開發狀態
 
 ### 已完成
 - [x] 3D 喪屍對戰場景（React 19 + Vite 5 + R3F 9 + Three.js 0.183 + TypeScript 5.9）
@@ -13,9 +13,27 @@
 - [x] 提示詞模板集（`agents/prompt-playbook.md`，P-01~P-07）
 - [x] 模組化規格系統（specs/）
 - [x] 記憶持久化系統（memory/）
-- [x] **Google Sheets 讀寫能力** — GET 讀取 + POST 寫入（doPost API 已部署）
-- [x] **heroes.tsv + Google Sheet 已同步更新** — 新增 DEF / CritRate / CritDmg / Element 欄位
-- [x] **全 12 張 Google Sheet 資料表已建立** — heroes, skill_templates, hero_skills, element_matrix, stage_configs, daily_dungeons, boss_configs, equipment_templates, equipment_sets, gacha_banners, progression_config, tower_configs
+- [x] **Cloudflare Workers + D1 後端** — Hono 路由 + D1 SQLite，取代 GAS + Google Sheets
+  - `workers/src/index.ts` — 主入口 + CORS + Cron Triggers
+  - `workers/src/routes/` — 11 個路由模組（auth / save / battle / inventory / progression / gacha / mail / arena / sheet / checkin / **stage**）
+  - `workers/schema.sql` — **15 張** D1 資料表（含新增的 skill_templates / hero_skills / element_matrix）
+- [x] **D1 原子批次寫入** — 所有多寫入路由使用 `db.batch()` 包成單一 SQLite 交易
+  - 核心 helper：`upsertItemStmt` / `grantRewardsStmts` / `insertMailStmt`
+  - 共 22 條路由完成批次化（save/auth/inventory/gacha/progression/mail/checkin/arena）
+- [x] **D1 遊戲資料正規化** — heroes/skill_templates/hero_skills/element_matrix 從 game_sheets KV blob 拉出為專屬 D1 表
+  - `readSheet` 端點自動從專屬表讀取，前端零改動
+  - heroes 表新增 modelId/critRate/critDmg/description 獨立欄位
+- [x] **CurrencyIcon 統一 emoji** — 💰💎💚✨⚔️，移除 CSS badge 樣式
+- [x] **裝備系統穩定性** — addEquipmentLocally + parseEquipment 正規化、UI 空值防護
+- [x] **裝備中文名稱** — HeroListPanel + InventoryPanel 全面使用 `getEquipDisplayName()` 顯示中文
+- [x] **升級英雄 UI v2** — 雙按鈕（升1級/升N級）+ 費用預覽，取代 slider
+- [x] **經驗資源即時更新** — 信箱/簽到/寶箱/道具使用的 exp 正確回寫 save.exp
+- [x] **戰力動畫改進** — 穿脫裝備即時觸發 + 顯示最終戰力值 + 綠增紅減顏色
+- [x] **heroes.tsv + D1 heroes 表已同步** — 新增 DEF / CritRate / CritDmg / Element 欄位
+- [x] **主線關卡 API 驅動** — D1 stage_configs 存 24 筆關卡配置，Workers `/list-stages` API 提供，前端 StageSelect 動態載入
+  - 3 章主題（廢墟之城/暗夜森林/死寂荒原），每章 8 關
+  - 章節主題色卡片 UI + 難度骷髏 + 推薦等級 + BOSS 金框
+  - `getStoryStageConfig()` 前端死碼已移除
 - [x] **Domain 層戰鬥引擎** — 純 TypeScript 函式，零 React 依賴
   - `src/domain/types.ts` — 完整型別定義（BattleHero, BattleAction, SkillTemplate 等）
   - `src/domain/elementSystem.ts` — 7 屬性剋制矩陣
@@ -25,8 +43,8 @@
   - `src/domain/targetStrategy.ts` — 8+ 種目標選擇策略（嘲諷/前排/後排/隨機/全體/AOE）
   - `src/domain/battleEngine.ts` — 核心引擎 `runBattle()`、普攻/技能執行、被動觸發、BattleHero 工廠
   - `src/domain/index.ts` — 統一匯出
-- [x] **資料服務層** — 從 Google Sheets 載入遊戲配置
-  - `src/services/sheetApi.ts` — Sheet 讀寫 + 快取
+- [x] **資料服務層** — 透過 Workers API 載入遊戲配置
+  - `src/services/apiClient.ts` — Workers callApi + callAuthApi
   - `src/services/dataService.ts` — 解析 heroes/skill_templates/hero_skills/element_matrix → domain 型別
   - `src/services/index.ts` — 統一匯出
 - [x] **App.tsx 整合** — 戰鬥迴圈已切換至 Domain Engine 驅動
@@ -56,6 +74,24 @@
   - 已修復 3 個 bug（tickStatusDurations 永久 buff 誤判 / runBattle break 誤判平手 / ESLint 配置）
   - 詳見 `memory/qa-report.md`
 
+### 2026-03-02 新增功能（4 項）
+- [x] 每日簽到 — GAS `handleDailyCheckin_()` + CheckinPanel.tsx + `doDailyCheckin()` saveService + SaveData checkinDay/checkinLastDate + MenuScreen 'checkin'
+- [x] 寶箱開啟邏輯 — GAS `generateChestRewards_(chestId, qty)` bronze/silver/gold 三階 + `handleUseItem_()` chest 偵測 + InventoryPanel 結果顯示 + `updateLocalCurrency()` 同步
+- [x] 背包裝/卸裝備 — InventoryPanel equip/unequip 按鈕 + 英雄選擇 popup + equipItem/unequipItem/getHeroEquipment
+- [x] 新手引導 — TutorialOverlay.tsx + useTutorial() hook + 5 步引導 + localStorage 追蹤
+
+### 2026-03-02 EXP 資源重構 + 星塵兌換商店 + UI 修復
+- [x] EXP 資源重構 — 移除 exp_core_s/m/l 道具，EXP 改為頂層資源（save_data.exp），戰鬥/離線/商店皆直接發放 EXP；英雄升級改滑桿 UI
+- [x] 星塵兌換商店 — 6 種商品（exp/gold/職業石/強化石/金寶箱/diamond），以 currency_stardust 扣除
+- [x] 移除重洗石 — ShopPanel / Workers SHOP_CATALOG / ItemInfoPopup / constants/rarity.ts
+- [x] 裝備 UI Crash Fix — HeroListPanel / InventoryPanel 裝備屬性 null guard
+- [x] 背包裝備分頁補回 — InventoryPanel TABS 新增 equipment tab
+
+### 2026-03-02 重構（useLogout hook）
+- [x] `src/hooks/useLogout.ts` — auth logout + 9 個服務快取 clear，接收 `onResetState` 回呼
+- [x] `SettingsPanel.tsx` 改用 `useLogout(onLogout)` 取代手寫登出邏輯
+- [x] `App.tsx` `handleFullLogout` 簡化為 `handleLogoutResetState`（純 React state reset），移除 9 個 cache clearing import
+
 ### Spec 狀態
 
 | Spec | 版本 | 狀態 |
@@ -64,14 +100,14 @@
 | hero-schema.md | v2.1 | 🟢 4 層型別 + 14 角色完整數值表 |
 | damage-formula.md | v1.0 | 🟢 10 步完整傷害公式 |
 | skill-system.md | v1.3 | 🟢 SkillTemplate + 15 PassiveTrigger + extra_turn 機制 + on_ally_death/on_ally_skill |
-| progression.md | v0.3 | 🟢 樂觀佇列 + 自動等級 + EXP bar |
+| progression.md | v2.3 | 🟢 EXP 資源重構（頂層資源 + 滑桿升級 UI） |
 | tech-architecture.md | v1.5 | 🟢 CurrencyIcon 統一 icon + constants 層 |
 | auth-system.md | v0.1 | 🟡 草案 |
-| save-system.md | v1.2 | 🟢 初始英雄 3 隻 + 自動陣型 + 登出重置 |
-| stage-system.md | v0.3 | 🟢 三星鎖定 + 模式解鎖 toast + 過場遮幕 |
+| save-system.md | v1.7 | 🟢 checkinDay/checkinLastDate + daily-checkin API |
+| stage-system.md | v2.2 | 🟢 EXP 資源獎勵（取代 exp_core 掉落） |
 | gacha.md | v1.1 | 🟢 stardust/fragments + 本地池 |
 | element-system.md | v1.0 | 🟢 7 屬性 + 倍率矩陣 |
-| inventory.md | v1.2 | 🟢 CurrencyIcon 統一 icon |
+| inventory.md | v2.4 | 🟢 移除 exp_core / reroll + 星塵兌換商店 |
 | optimistic-queue.md | v1.0 | 🟢 3 種套用模式 |
 | local-storage-migration.md | v1.0 | 🟢 版本化遷移鏈 |
 | buff-debuff-icons.md | v1.0 | 🟢 3D 狀態圖示（綠底/紅底 + 疊層數） |
@@ -178,49 +214,38 @@
 - [x] 戰鬥回放 — `battleActionsRef` 紀錄 → `replayBattle()` 恢復陣容 → `runBattleLoop(replayActions)` 重現 3D 動畫（不發放獎勵/不推進進度）
 - [x] Spec 同步 — stage-system v0.4, core-combat v2.4
 
-### Google Sheets API
+### Workers API（已取代 GAS）
 
 | 用途 | 方法 | 端點 |
 |------|------|------|
-| 讀取英雄資料 | GET | `AKfycbxXdy3QCv...exec` |
-| 寫入/更新資料 | POST | `AKfycbzy3EHTCy...exec` |
+| 全部遊戲 API | POST | `https://globalganlan-api.s971153.workers.dev/api/*` |
+| 認證 API | POST | `https://globalganlan-api.s971153.workers.dev/api/auth/*` |
 
-POST 格式：`{ action: "updateHeroes", newColumns: [...], data: [{HeroID:N, ...}] }`
-回傳：`{ success: true, updated: N }`
+前端透過 `src/services/apiClient.ts` 的 `callApi()` / `callAuthApi()` 統一呼叫。
 
-### 下一步（7 Phase 路線圖）
+### 部署架構
+- **前端**：GitHub Pages（`globalganlan.github.io/game/`）
+- **後端**：Cloudflare Workers + D1（`globalganlan-api.s971153.workers.dev`）
+- **即時通知**：Pusher Channels（app_id 2122152, cluster ap3）
+- **CI/CD**：GitHub Actions 雙 job（push main → 前端部署 + Workers 部署）
+
+### 下一步（7 Phase 路線圖）— 全部完成
 1. ~~Phase 1: 認證系統~~ ✅ 完成
-2. ~~Phase 2: 存檔系統~~ ✅ 完成（save-system.md v0.2 + 資源計時器 + HUD 資源顯示）
-3. ~~Phase 3: 主選單 UI~~ ✅ 完成（MainMenu + HeroListPanel + InventoryPanel + GachaScreen + StageSelect）
-4. ~~Phase 4: 養成系統~~ ✅ Domain 完成（progressionSystem.ts + inventoryService.ts + progressionService.ts + GAS 20+ handlers）
-5. ~~Phase 5: 關卡系統~~ ✅ Domain 完成（stageSystem.ts + GAS complete-stage/tower/daily）
-6. ~~Phase 6: 抽卡系統~~ ✅ Domain 完成（gachaSystem.ts + GAS gacha-pull）
-7. ~~Phase 7: 戰鬥 UI 強化~~ ✅ 完成（BattleHUD — Buff/Debuff icons + Energy bar + Skill toast + Element hints）
+2. ~~Phase 2: 存檔系統~~ ✅ 完成
+3. ~~Phase 3: 主選單 UI~~ ✅ 完成
+4. ~~Phase 4: 養成系統~~ ✅ 完成（Workers 路由取代 GAS handlers）
+5. ~~Phase 5: 關卡系統~~ ✅ 完成（Workers battle/stage 路由）
+6. ~~Phase 6: 抽卡系統~~ ✅ 完成（Workers gacha 路由）
+7. ~~Phase 7: 戰鬥 UI 強化~~ ✅ 完成
 
 ### 測試
-- Vitest 1.6.1: **224 tests pass** (10 test files)
-  - damageFormula: 19 | buffSystem: 33 | boundary: 24 | targetStrategy: 18 | energySystem: 14 | battleEngine: 13 | elementSystem: 12
-  - **NEW** progressionSystem: 45 | stageSystem: 25 | gachaSystem: 21
+- Vitest 1.6.1: **594 tests pass**
 - `tsc --noEmit`: 零錯誤
-- `vite build`: 成功（634 modules）
-
-### Phase 3 + Phase 7 新增檔案清單
-| 檔案 | 用途 |
-|------|------|
-| `src/components/MainMenu.tsx` | 主選單導航中心（~130 行） |
-| `src/components/HeroListPanel.tsx` | 英雄列表面板（~241 行） |
-| `src/components/InventoryPanel.tsx` | 背包面板（~175 行） |
-| `src/components/GachaScreen.tsx` | 召喚/抽卡畫面（~203 行） |
-| `src/components/StageSelect.tsx` | 關卡選擇面板（~294 行） |
-| `src/components/BattleHUD.tsx` | 戰鬥增強 HUD（~302 行） |
-| `src/App.css` | +600 行新 CSS（主選單/面板/抽卡/關卡/BattleHUD） |
-| `src/App.tsx` | 整合全部新元件 + MAIN_MENU GameState |
-| `src/types.ts` | +MAIN_MENU GameState + MenuScreen type |
+- `vite build`: 成功（686 modules）
 
 ### 技術債
-- App.tsx 仍有舊版 target strategy 程式碼（dead code，可清除）
-- `getHeroSpeed()` 多重 fallback 欄位名 — 已透過 domain 層 FinalStats 統一
-- 敵方陣型隨機生成較簡陋（隨機 1~6 隻）— 需串接 stage_configs
+- ~~敵方陣型隨機生成較簡陋（隨機 1~6 隻）— 需串接 stage_configs D1 表~~ ✅ 已修復（v2.0）
+- 無已知技術債
 - heroes 表 Element 用中文（闇/毒/火/冰/雷/光），domain 用英文 — `toElement()` 橋接
-- **Bug #002 已修復**: `calculateDamage()` 中 ATK buff 雙重套用 — `getAttackerDamageModifier` 移除 atk_up/atk_down，`getTargetDamageModifier` 移除 def_down
+- Narrative 劇情系統（specs/narrative.md v0.1）— 已擱置
 - ESLint 殘餘 42 問題（28 errors + 14 warnings），多為 unused-vars / prefer-const / Math.random purity

@@ -1,10 +1,11 @@
 /**
- * useAcquireToast — 獲得物品動畫佇列管理
+ * useAcquireToast — 統一浮動 Toast 系統
  *
- * 對應 Spec: specs/item-acquire-toast.md v0.1
+ * 同時處理「純文字提示」與「獲得物品動畫」，每條 toast 獨立動畫、自動移除。
+ * 對應 Spec: specs/item-acquire-toast.md v0.2
  */
 
-import { useState, useCallback, useRef } from 'react'
+import { useState, useCallback, useRef, ReactNode } from 'react'
 
 /* ════════════════════════════════════
    型別
@@ -20,40 +21,54 @@ export interface AcquireItem {
   thumbnail?: string
 }
 
+/** 統一 Toast 條目 */
+export interface ToastEntry {
+  id: number
+  kind: 'text' | 'item'
+  text?: ReactNode | string
+  item?: AcquireItem
+  /** 出場延遲 ms（物品批次用 stagger） */
+  delay: number
+}
+
+/* ════════════════════════════════════
+   常數
+   ════════════════════════════════════ */
+
+const STAGGER_MS = 350
+
 /* ════════════════════════════════════
    Hook
    ════════════════════════════════════ */
 
 export function useAcquireToast() {
-  const [items, setItems] = useState<AcquireItem[]>([])
-  const [isShowing, setIsShowing] = useState(false)
-  const queueRef = useRef<AcquireItem[][]>([])
-  const processingRef = useRef(false)
+  const [entries, setEntries] = useState<ToastEntry[]>([])
+  const idRef = useRef(0)
 
-  const processNext = useCallback(() => {
-    if (queueRef.current.length === 0) {
-      processingRef.current = false
-      setIsShowing(false)
-      setItems([])
-      return
-    }
-    const next = queueRef.current.shift()!
-    setItems(next)
-    setIsShowing(true)
+  /** 顯示物品取得提示（帶 icon、stagger） */
+  const show = useCallback((items: AcquireItem[]) => {
+    if (items.length === 0) return
+    setEntries(prev => [
+      ...prev,
+      ...items.map((item, i) => ({
+        id: ++idRef.current,
+        kind: 'item' as const,
+        item,
+        delay: i * STAGGER_MS,
+      })),
+    ])
   }, [])
 
-  const show = useCallback((newItems: AcquireItem[]) => {
-    if (newItems.length === 0) return
-    queueRef.current.push(newItems)
-    if (!processingRef.current) {
-      processingRef.current = true
-      processNext()
-    }
-  }, [processNext])
+  /** 顯示純文字提示 */
+  const showText = useCallback((text: string | ReactNode) => {
+    const id = ++idRef.current
+    setEntries(prev => [...prev, { id, kind: 'text', text, delay: 0 }])
+  }, [])
 
-  const dismiss = useCallback(() => {
-    processNext()
-  }, [processNext])
+  /** 移除單條（由 onAnimationEnd 呼叫） */
+  const remove = useCallback((id: number) => {
+    setEntries(prev => prev.filter(e => e.id !== id))
+  }, [])
 
-  return { items, isShowing, show, dismiss }
+  return { entries, show, showText, remove }
 }

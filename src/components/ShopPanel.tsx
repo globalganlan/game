@@ -5,10 +5,10 @@
  * 使用金幣/鑽石/競技幣等貨幣兌換素材。
  */
 
-import { useState, useMemo, useCallback } from 'react'
+import { useState, useMemo, useCallback, useEffect } from 'react'
 import { getSaveState, updateProgress } from '../services/saveService'
-import { addItemsLocally } from '../services/inventoryService'
-import { fireOptimisticAsync } from '../services/optimisticQueue'
+import { addItemsLocally, getItemQuantity, removeItemsLocally } from '../services/inventoryService'
+import { callApi } from '../services/apiClient'
 import { emitAcquire } from '../services/acquireToastBus'
 
 /* ────────────────────────────
@@ -21,43 +21,43 @@ interface ShopItem {
   icon: string
   description: string
   price: number
-  currency: 'gold' | 'diamond' | 'arena'
+  currency: 'gold' | 'diamond' | 'arena' | 'stardust'
   rewards: { itemId: string; quantity: number }[]
   /** 每日購買上限（0=無限） */
   dailyLimit: number
   category: ShopCategory
 }
 
-type ShopCategory = 'daily' | 'material' | 'equipment' | 'special'
+type ShopCategory = 'daily' | 'material' | 'special' | 'stardust'
 
 const SHOP_CATEGORIES: { key: ShopCategory; label: string; icon: string }[] = [
   { key: 'daily', label: '每日商店', icon: '🔄' },
   { key: 'material', label: '素材商店', icon: '🧪' },
-  { key: 'equipment', label: '裝備商店', icon: '⚔️' },
+  { key: 'stardust', label: '星塵兌換', icon: '✨' },
   { key: 'special', label: '特殊商店', icon: '⭐' },
 ]
 
 const SHOP_ITEMS: ShopItem[] = [
   // ── 每日商店 ──
   {
-    id: 'daily_exp_s', name: '小型經驗核心 ×5', icon: '🟢',
-    description: '為英雄提升經驗的基礎素材',
+    id: 'daily_exp_s', name: '經驗 ×500', icon: '',
+    description: '為英雄提升等級的經驗資源',
     price: 1000, currency: 'gold',
-    rewards: [{ itemId: 'exp_core_s', quantity: 5 }],
+    rewards: [{ itemId: 'exp', quantity: 500 }],
     dailyLimit: 10, category: 'daily',
   },
   {
-    id: 'daily_exp_m', name: '中型經驗核心 ×3', icon: '🔵',
-    description: '中等經驗素材，後期必備',
+    id: 'daily_exp_m', name: '經驗 ×1,500', icon: '',
+    description: '中量經驗資源，後期必備',
     price: 5000, currency: 'gold',
-    rewards: [{ itemId: 'exp_core_m', quantity: 3 }],
+    rewards: [{ itemId: 'exp', quantity: 1500 }],
     dailyLimit: 5, category: 'daily',
   },
   {
-    id: 'daily_exp_l', name: '大型經驗核心 ×1', icon: '🟣',
-    description: '大量經驗，快速升級',
+    id: 'daily_exp_l', name: '經驗 ×2,000', icon: '',
+    description: '大量經驗，快速提升英雄等級',
     price: 20, currency: 'diamond',
-    rewards: [{ itemId: 'exp_core_l', quantity: 1 }],
+    rewards: [{ itemId: 'exp', quantity: 2000 }],
     dailyLimit: 3, category: 'daily',
   },
   {
@@ -96,34 +96,48 @@ const SHOP_ITEMS: ShopItem[] = [
     rewards: [{ itemId: 'asc_class_universal', quantity: 1 }],
     dailyLimit: 0, category: 'material',
   },
+  // ── 星塵兌換店 ──
   {
-    id: 'mat_reroll', name: '重洗石 ×1', icon: '🔮',
-    description: '重新隨機裝備副屬性',
-    price: 80, currency: 'diamond',
-    rewards: [{ itemId: 'eqm_reroll', quantity: 1 }],
-    dailyLimit: 0, category: 'material',
-  },
-  // ── 裝備商店 ──
-  {
-    id: 'equip_chest', name: '裝備寶箱', icon: '📦',
-    description: '隨機獲得一件 R~SSR 裝備',
-    price: 100, currency: 'diamond',
-    rewards: [{ itemId: 'chest_equipment', quantity: 1 }],
-    dailyLimit: 5, category: 'equipment',
+    id: 'sd_exp_5000', name: '經驗 ×5,000', icon: '💚',
+    description: '用星塵兌換大量經驗資源',
+    price: 10, currency: 'stardust',
+    rewards: [{ itemId: 'exp', quantity: 5000 }],
+    dailyLimit: 0, category: 'stardust',
   },
   {
-    id: 'forge_ore_common', name: '普通鍛造礦 ×10', icon: '⛏️',
-    description: '鍛造裝備用基礎礦石',
-    price: 5000, currency: 'gold',
-    rewards: [{ itemId: 'forge_ore_common', quantity: 10 }],
-    dailyLimit: 0, category: 'equipment',
+    id: 'sd_gold_50k', name: '金幣 ×50,000', icon: '💰',
+    description: '用星塵兌換大量金幣',
+    price: 15, currency: 'stardust',
+    rewards: [{ itemId: 'gold', quantity: 50000 }],
+    dailyLimit: 0, category: 'stardust',
   },
   {
-    id: 'forge_ore_rare', name: '稀有鍛造礦 ×5', icon: '💠',
-    description: '鍛造高級裝備用礦石',
-    price: 30, currency: 'diamond',
-    rewards: [{ itemId: 'forge_ore_rare', quantity: 5 }],
-    dailyLimit: 0, category: 'equipment',
+    id: 'sd_class_universal', name: '通用職業石 ×2', icon: '🌐',
+    description: '可替代任何職業石的突破素材',
+    price: 20, currency: 'stardust',
+    rewards: [{ itemId: 'asc_class_universal', quantity: 2 }],
+    dailyLimit: 0, category: 'stardust',
+  },
+  {
+    id: 'sd_enhance_l', name: '大型強化石 ×3', icon: '🔨',
+    description: '裝備強化用高級素材',
+    price: 25, currency: 'stardust',
+    rewards: [{ itemId: 'eqm_enhance_l', quantity: 3 }],
+    dailyLimit: 0, category: 'stardust',
+  },
+  {
+    id: 'sd_chest_gold', name: '金級寶箱 ×1', icon: '🥇',
+    description: '頂級獎勵，含大量資源與經驗',
+    price: 50, currency: 'stardust',
+    rewards: [{ itemId: 'chest_gold', quantity: 1 }],
+    dailyLimit: 3, category: 'stardust',
+  },
+  {
+    id: 'sd_diamond_100', name: '鑽石 ×100', icon: '💎',
+    description: '用星塵兌換高級貨幣',
+    price: 80, currency: 'stardust',
+    rewards: [{ itemId: 'diamond', quantity: 100 }],
+    dailyLimit: 0, category: 'stardust',
   },
   // ── 特殊商店 ──
   {
@@ -137,6 +151,7 @@ const SHOP_ITEMS: ShopItem[] = [
 
 import { getItemIcon, getItemName } from '../constants/rarity'
 import { CurrencyIcon } from './CurrencyIcon'
+import { ItemInfoPopup } from './ItemInfoPopup'
 
 /* (CURRENCY_ICON removed — now using CurrencyIcon component) */
 
@@ -156,10 +171,23 @@ export function ShopPanel({ onBack }: ShopPanelProps) {
   const [activeCategory, setActiveCategory] = useState<ShopCategory>('daily')
   const [purchaseMsg, setPurchaseMsg] = useState('')
   const [purchasedToday, setPurchasedToday] = useState<Record<string, number>>({})
+  const [previewItemId, setPreviewItemId] = useState<string | null>(null)
+
+  // 載入今日已購買次數
+  useEffect(() => {
+    callApi<{ purchases: Record<string, number> }>('shop-daily-status', {})
+      .then(res => {
+        if (res.success && res.purchases) {
+          setPurchasedToday(res.purchases)
+        }
+      })
+      .catch(() => { /* ignore */ })
+  }, [])
 
   const saveState = getSaveState()
   const gold = saveState?.save.gold ?? 0
   const diamond = saveState?.save.diamond ?? 0
+  const stardust = getItemQuantity('currency_stardust')
 
   const filteredItems = useMemo(
     () => SHOP_ITEMS.filter(item => item.category === activeCategory),
@@ -169,8 +197,9 @@ export function ShopPanel({ onBack }: ShopPanelProps) {
   const canAfford = useCallback((item: ShopItem): boolean => {
     if (item.currency === 'gold') return gold >= item.price
     if (item.currency === 'diamond') return diamond >= item.price
+    if (item.currency === 'stardust') return stardust >= item.price
     return false
-  }, [gold, diamond])
+  }, [gold, diamond, stardust])
 
   const getRemainingPurchases = useCallback((item: ShopItem): number | null => {
     if (item.dailyLimit <= 0) return null
@@ -185,7 +214,8 @@ export function ShopPanel({ onBack }: ShopPanelProps) {
       return
     }
     if (!canAfford(item)) {
-      setPurchaseMsg(`${item.currency === 'gold' ? '金幣' : '鑽石'}不足`)
+      const names: Record<string, string> = { gold: '金幣', diamond: '鑽石', stardust: '星塵' }
+      setPurchaseMsg(`${names[item.currency] ?? '貨幣'}不足`)
       return
     }
 
@@ -194,21 +224,35 @@ export function ShopPanel({ onBack }: ShopPanelProps) {
       updateProgress({ gold: gold - item.price })
     } else if (item.currency === 'diamond') {
       updateProgress({ diamond: diamond - item.price })
+    } else if (item.currency === 'stardust') {
+      removeItemsLocally([{ itemId: 'currency_stardust', quantity: item.price }])
     }
 
-    // 樂觀發放獎勵
-    addItemsLocally(item.rewards)
+    // 樂觀發放獎勵 — 資源類走 updateProgress，物品類走 addItemsLocally
+    const RESOURCE_REWARDS = ['exp', 'gold', 'diamond', 'stardust'] as const
+    const resourceItems = item.rewards.filter(r => (RESOURCE_REWARDS as readonly string[]).includes(r.itemId))
+    const inventoryItems = item.rewards.filter(r => !(RESOURCE_REWARDS as readonly string[]).includes(r.itemId))
+    if (resourceItems.length > 0) {
+      const patch: Record<string, number> = {}
+      const save = getSaveState()?.save
+      for (const r of resourceItems) {
+        patch[r.itemId] = (save?.[r.itemId as keyof typeof save] as number ?? 0) + r.quantity
+      }
+      updateProgress(patch as any)
+    }
+    if (inventoryItems.length > 0) addItemsLocally(inventoryItems)
 
     // 獲得物品動畫
+    const CURRENCY_IDS = ['gold', 'diamond', 'stardust', 'exp'] as const
     emitAcquire(item.rewards.map(r => ({
-      type: r.itemId.startsWith('currency_') || r.itemId === 'gold' || r.itemId === 'diamond' ? 'currency' as const : 'item' as const,
+      type: r.itemId.startsWith('currency_') || (CURRENCY_IDS as readonly string[]).includes(r.itemId) ? 'currency' as const : 'item' as const,
       id: r.itemId,
       name: getItemName(r.itemId),
       quantity: r.quantity,
     })))
 
-    // 背景 API（帶冪等保護）
-    fireOptimisticAsync('shop-buy', { shopItemId: item.id }).serverResult.catch(console.warn)
+    // 背景 API
+    callApi('shop-buy', { shopItemId: item.id }).catch(console.warn)
 
     // 更新購買計數
     setPurchasedToday(prev => ({
@@ -219,7 +263,7 @@ export function ShopPanel({ onBack }: ShopPanelProps) {
     const rewardNames = item.rewards.map(r => `${getItemIcon(r.itemId)} ${getItemName(r.itemId)} ×${r.quantity}`).join('、')
     setPurchaseMsg(`購買成功！獲得 ${rewardNames}`)
     setTimeout(() => setPurchaseMsg(''), 2500)
-  }, [canAfford, getRemainingPurchases, gold, diamond])
+  }, [canAfford, getRemainingPurchases, gold, diamond, stardust])
 
   return (
     <div className="panel-overlay">
@@ -231,6 +275,7 @@ export function ShopPanel({ onBack }: ShopPanelProps) {
           <div className="shop-currency-bar">
             <span className="shop-currency gold"><CurrencyIcon type="gold" /> {gold.toLocaleString()}</span>
             <span className="shop-currency diamond"><CurrencyIcon type="diamond" /> {diamond.toLocaleString()}</span>
+            <span className="shop-currency stardust"><CurrencyIcon type="stardust" /> {stardust.toLocaleString()}</span>
           </div>
         </div>
 
@@ -259,13 +304,13 @@ export function ShopPanel({ onBack }: ShopPanelProps) {
             const soldOut = remaining !== null && remaining <= 0
             return (
               <div key={item.id} className={`shop-item ${!affordable || soldOut ? 'shop-item-disabled' : ''}`}>
-                <div className="shop-item-icon">{item.icon}</div>
+                <div className="shop-item-icon shop-item-icon-clickable" onClick={() => setPreviewItemId(item.rewards[0]?.itemId)}>{item.icon || getItemIcon(item.rewards[0]?.itemId ?? '')}</div>
                 <div className="shop-item-body">
                   <div className="shop-item-name">{item.name}</div>
                   <div className="shop-item-desc">{item.description}</div>
                   <div className="shop-item-footer">
                     <span className={`shop-price ${!affordable ? 'shop-price-insufficient' : ''}`}>
-                      {item.currency === 'gold' ? <CurrencyIcon type="gold" /> : item.currency === 'diamond' ? <CurrencyIcon type="diamond" /> : '🏟️'} {item.price.toLocaleString()}
+                      {item.currency === 'gold' ? <CurrencyIcon type="gold" /> : item.currency === 'diamond' ? <CurrencyIcon type="diamond" /> : item.currency === 'stardust' ? <CurrencyIcon type="stardust" /> : '🏟️'} {item.price.toLocaleString()}
                     </span>
                     {remaining !== null && (
                       <span className={`shop-remaining ${soldOut ? 'sold-out' : ''}`}>
@@ -285,6 +330,7 @@ export function ShopPanel({ onBack }: ShopPanelProps) {
             )
           })}
         </div>
+        {previewItemId && <ItemInfoPopup itemId={previewItemId} onClose={() => setPreviewItemId(null)} />}
       </div>
     </div>
   )

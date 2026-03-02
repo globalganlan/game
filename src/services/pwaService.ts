@@ -5,8 +5,7 @@
  * 平台特定安裝指引及 PWA 安裝獎勵 API。
  */
 
-const POST_URL =
-  'https://script.google.com/macros/s/AKfycbzy3EHTCyTYjA9j1CvJGvWwDM_RrkCuzNYkMhP7T9DTJ6V6g7Sodrlo4uv3h9yx0HLdsg/exec'
+import { callApi } from './apiClient'
 
 /* ════════════════════════════════════
    平台偵測
@@ -110,12 +109,7 @@ export async function claimPwaReward(
   guestToken: string,
 ): Promise<{ success: boolean; error?: string; message?: string }> {
   try {
-    const res = await fetch(POST_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'text/plain; charset=utf-8' },
-      body: JSON.stringify({ action: 'claim-pwa-reward', guestToken }),
-    })
-    return res.json()
+    return await callApi<{ message?: string }>('claim-pwa-reward', {})
   } catch {
     return { success: false, error: 'network_error' }
   }

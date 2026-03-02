@@ -1,7 +1,7 @@
 # 存檔系統 Spec
 
-> 版本：v1.6 ｜ 狀態：🟢 已實作
-> 最後更新：2026-06-15
+> 版本：v2.0 ｜ 狀態：🟢 已實作
+> 最後更新：2026-03-02
 > 負責角色：🎯 GAME_DESIGN → 🔧 CODING
 
 ## 概述
@@ -21,7 +21,7 @@
 
 | 原始碼 | 說明 |
 |--------|------|
-| `src/services/saveService.ts` | 核心服務 — loadSave / enqueueSave / collectResources / saveFormation |
+| `src/services/saveService.ts` | 核心服務 — loadSave / updateLocal / collectResources / saveFormation |
 | `src/hooks/useSave.ts` | React Hook — 封裝 saveService |
 | `gas/程式碼.js` | GAS Handler — `handleLoadSave_ / handleInitSave_ / handleSaveProgress_ / handleSaveFormation_ / handleCollectResources_` |
 
@@ -35,8 +35,6 @@
 |------|------|------|
 | `playerId` | string | 主鍵，對應 players Sheet |
 | `displayName` | string | 暱稱 |
-| `level` | number | 玩家等級（帳號等級） |
-| `exp` | number | 當前經驗值 |
 | `diamond` | number | 鑽石（premium 貨幣） |
 | `gold` | number | 金幣（一般貨幣） |
 | `resourceTimerStage` | string | 資源產出器掛載的最高通關關卡 ID（如 `"2-5"`，純文字格式 `@` 防 Sheets 日期轉換） |
@@ -49,6 +47,8 @@
 | `gachaPool` | string | 預生成抽卡池 JSON（200 組 pull results） |
 | `pwaRewardClaimed` | boolean | PWA 安裝獎勵是否已領取（`true` = 已領） |
 | `equipment` | string | **v2.0 新增** — 裝備 JSON `OwnedEquipment[]`（見 `progression.md` §四） |
+| `checkinDay` | number | **v1.7 新增** — 每日簽到天數（1~7 循環） |
+| `checkinLastDate` | string | **v1.7 新增** — 上次簽到日期（UTC+8 格式 `YYYY-MM-DD`） |
 | `lastSaved` | string | 最後存檔時間（ISO 8601） |
 
 > **注意**：`stageStars` 欄位不在 GAS `SAVE_HEADERS_` 初始定義中，由 `handleCompleteBattle_` 在首次寫入星級時動態新增。
@@ -85,17 +85,15 @@
 |--------|------|------|-------------|
 | `load-save` | `{ guestToken }` | `{ saveData, heroes, isNew, gachaPool, ownedHeroIds }` | `handleLoadSave_` |
 | `init-save` | `{ guestToken }` | `{ success, alreadyExists, starterHeroInstanceId }` | `handleInitSave_` |
-| `save-progress` | `{ guestToken, changes }` | `{ success, lastSaved }` | `handleSaveProgress_` |
 | `save-formation` | `{ guestToken, formation }` | `{ success }` | `handleSaveFormation_` |
 | `collect-resources` | `{ guestToken, opId? }` | `{ success, gold, expItems, newGoldTotal }` | `handleCollectResources_` |
+| `daily-checkin` | `{ guestToken }` | `{ success, day, rewards }` 或 `{ success: false, reason }` | `handleDailyCheckin_` |
 
-### save-progress 白名單欄位
-
-`['displayName', 'resourceTimerStage', 'resourceTimerLastCollect', 'formation']`
-
-> **v1.4 安全強化**：`gold / diamond / exp / level / storyProgress / towerFloor / stageStars` 已從白名單移除。
-> 這些敏感欄位只能透過 `complete-battle`、`shop-buy`、`gacha-pull` 等受驗證的 GAS 操作修改。
-> `formation` 若非 string 會自動 `JSON.stringify()`。
+> **v2.0**：`save-progress` 已移除。原本 4 個允許欄位均已由專用路由負責：
+> - `displayName` → `change-name`
+> - `formation` → `save-formation`
+> - `resourceTimerStage` → `complete-battle`
+> - `resourceTimerLastCollect` → `collect-resources`
 
 ---
 
@@ -140,35 +138,31 @@ handleLoadSave_:
 
 | 觸發點 | 寫入內容 |
 |--------|---------|
-| 過關 | storyProgress / towerFloor / stageStars + 獎勵（gold, exp, items） |
+| 過關 | storyProgress / towerFloor / stageStars + 獎勵（gold, items） |
 | 英雄升級 | hero_instances 該行 level, exp |
 | 陣型調整 | save_data.formation（戰鬥開始時存檔，非即時） |
 | 抽卡 | hero_instances + inventory + diamond 扣除 |
 | 每日副本 | 掉落物寫入 inventory |
 
-### 寫入方式（Optimistic Queue）
+### 寫入方式（本地即時 + 專用路由同步）
 
 ```
 前端狀態變更
     ↓
-更新本地 state + localStorage（即時反映 UI）
+updateLocal(changes):
+  1. 即時更新 currentData.save + 寫 localStorage + notify()
     ↓
-enqueueSave(changes):
-  1. 合併到 pendingChanges 物件
-  2. 即時更新 currentData.save + 寫 localStorage + notify()
-  3. 清除舊 debounce timer
-  4. 設定 2 秒後 flushChanges()
-    ↓
-flushChanges():
-  1. 複製 pendingChanges → 清空原物件
-  2. POST save-progress { guestToken, changes }
-  3. 成功 → 更新 lastSaved
-  4. 失敗 → 合併回 pendingChanges + scheduleRetry()
-    ↓
-scheduleRetry(): 指數退避 3000ms × retryCount，最多 3 次
+專用路由負責寫入伺服器：
+  - 金幣/鑽石/經驗 → complete-battle / shop-buy / collect-resources
+  - 陣型 → save-formation
+  - 暱稱 → change-name
+  - 關卡進度 → complete-battle
+  - 資源計時器 → complete-battle / collect-resources
 ```
 
-> **全面採用 Optimistic Queue**：`inventoryService`（5 個操作）、`progressionService`（8 個操作）、`mailService`（2 個操作）、`saveService`（`saveFormation` / `collectResources`）全部改用 `fireOptimistic` / `fireOptimisticAsync`。
+> **v2.0 架構簡化**：移除 debounce 2s + retry 機制，不再使用 `save-progress` 統一寫入。
+> 所有存檔欄位皆由專用 API 路由在對應操作時直接寫入伺服器，前端僅做本地樂觀更新。
+> 所有寫入操作均採用 Optimistic Queue（`fireOptimistic` / `fireOptimisticAsync`）。
 
 ### 本地快取
 
@@ -207,8 +201,6 @@ updatePlayerSlots() 還原上次陣型
 interface SaveData {
   playerId: string
   displayName: string
-  level: number
-  exp: number
   diamond: number
   gold: number
   resourceTimerStage: string
@@ -220,6 +212,8 @@ interface SaveData {
   lastSaved: string
   gachaPity?: { pullsSinceLastSSR: number; guaranteedFeatured: boolean }
   equipment?: OwnedEquipment[]   // v2.0 新增：裝備模板制
+  checkinDay?: number             // v1.7 新增：簽到天數 (1~7)
+  checkinLastDate?: string        // v1.7 新增：上次簽到日期
 }
 
 /** v2.0 裝備模板制（詳見 progression.md §四） */
@@ -278,8 +272,6 @@ interface PlayerData {
 // GAS handleInitSave_ 寫入的初始值
 const INITIAL_SAVE = {
   displayName: '倖存者#0001',        // '倖存者#' + playerId.replace('P','')
-  level: 1,
-  exp: 0,
   diamond: 500,                       // 新手禮包
   gold: 10000,
   resourceTimerStage: '1-1',          // 通關 1-1 後啟動
@@ -393,6 +385,9 @@ GAS handleCollectResources_:（包在 executeWithIdempotency_ 中）
 | v0.4 | 2026-02-28 | 移除 `battleSpeed` 欄位（改存 localStorage，不再同步到 Google Sheet）、GAS 新增 `delete-column` handler |
 | v1.0 | 2026-03-01 | 全面同步實作：新增 gachaPity/gachaPool 欄位至 Sheet 結構、補齊 loadSave 完整流程（含 isNew/initSave/sanitize/reconcile/fallback）、enqueueSave debounce 2s + retry 3x 機制、collectResources 幂等保護 + 樂觀更新、陣型改為戰鬥開始時才保存、完整列出所有導出函式簽名、init-save 初始值詳列 |
 | v1.1 | 2026-02-28 | 初始英雄從 1 隻（無名活屍 N）改為 3 隻（+女喪屍 R、倖存者 R），formation 自動填入前 3 格，修復新帳號卡關 1-1 問題 |
-| v1.2 | 2026-02-28 | 新增完整登出狀態重置（`handleFullLogout`）：清除 8 個服務層快取 + 20+ 個 React state + 5 個 ref 守門旗標，修復登出再登入殘留舊帳號資料問題 |
+| v1.2 | 2026-02-28 | 新增完整登出狀態重置（`handleFullLogout`→v1.8 改為 `useLogout` hook）：清除 9 個服務層快取 + 20+ 個 React state + 5 個 ref 守門旗標，修復登出再登入殘留舊帳號資料問題 |
 | v1.5 | 2026-03-01 | Spec 修正：hero_instances 新增 `stars` 欄位（第 9 欄，預設 0）；`ascension` 範圍修正 0-5（非 0-6）；`save-progress` 白名單阻擋加入 `stageStars`；標注 `stageStars` 非 SAVE_HEADERS_ 初始欄位（由 complete-battle 動態新增）；初始 formation 標注為 heroId 數字（非 heroInstanceId）；towerFloor 初始 0 / 前端 sanitize 修正為 1 |
 | v1.6 | 2026-06-15 | **配合裝備模板制 v2**：`save_data` 新增 `equipment` JSON 欄位（`OwnedEquipment[]`）；`hero_instances.equippedItems` 說明更新（equipId 對應 save_data.equipment 中的 OwnedEquipment.id）；前端 SaveData 介面新增 `equipment?: OwnedEquipment[]` |
+| v1.7 | 2026-03-02 | **每日簽到欄位**：`save_data` 新增 `checkinDay`（number, 1~7 循環）、`checkinLastDate`（string, UTC+8 日期）；新增 `daily-checkin` API 端點 → `handleDailyCheckin_` handler；前端 SaveData 介面新增 `checkinDay?` / `checkinLastDate?` |
+| v1.8 | 2025-07-14 | **Bug Fix: `updateStoryProgress` notify 時序**：`enqueueSave` 先設 JSON 字串再 notify，導致 React 端 `storyProgress` 為字串、`isFirstClear` 得到 `NaN`、後續關卡勝利不推進進度。修復：覆寫物件型態後再 `notify()` |
+| v2.0 | 2026-03-02 | **移除 `save-progress` 路由**：原本的 debounce 2s + retry 寫入佇列已經完全無用—— 4 個 allowedFields 均已有專用路由（change-name / save-formation / complete-battle / collect-resources）。前端 `enqueueSave` 簡化為 `updateLocal()`（僅更新本地 state + localStorage），不再發送 API 請求 |

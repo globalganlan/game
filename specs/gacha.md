@@ -1,13 +1,14 @@
 # 抽卡系統 Spec
 
-> 版本：v1.6 ｜ 狀態：🟢 已實作
-> 最後更新：2026-06-15
+> 版本：v2.0 ｜ 狀態：🟢 已實作
+> 最後更新：2026-06-16
 > 負責角色：🎯 GAME_DESIGN → 🔧 CODING
 
 ## 概述
 
 定義英雄招募（抽卡/Gacha）的機率、保底機制、卡池類型與經濟成本。  
-核心架構：**伺服器預生成 400 組結果 → 登入時下載到前端 → 抽卡 0ms 本地消耗 → 背景同步伺服器**。
+核心架構：**前端呼叫 `gacha-pull` API → 後端即時生成結果 → 回傳前端顯示**。  
+v2.0 移除了舊版 GAS 時代的 400 筆預生成池機制，改為每次抽卡即時產生結果。
 
 ## 依賴
 
@@ -46,28 +47,21 @@ interface PityConfig {
   guaranteedFeatured: boolean; // 歪一次後下次保底 UP
 }
 
-/** 伺服器預生成的池 entry（縮寫 key 節省空間） */
-interface PoolEntry {
-  h: number;     // heroId
-  r: string;     // rarity: 'N' | 'R' | 'SR' | 'SSR'
-  f: boolean;    // isFeatured
-}
-
-interface LocalPullResult {
+/** 抽卡結果（API 回傳） */
+interface GachaPullResult {
   heroId: number;
   rarity: GachaRarity;
   isNew: boolean;
   isFeatured: boolean;
-  stardust: number;    // 重複時依稀有度計算（SSR=25, SR=5, R=1, N=0.2），新角色為 0
+  stardust: number;    // 重複時依稀有度計算（SSR=25, SR=5, R=1, N=1），新角色為 0
   fragments: number;   // 重複時依星級計算英雄碎片數，新角色為 0
 }
 
-interface LocalPullResponse {
+interface GachaPullResponse {
   success: boolean;
-  results: LocalPullResult[];
+  results: GachaPullResult[];
   diamondCost: number;
   newPityState: PityState;
-  poolRemaining: number;
   error?: string;
 }
 
@@ -108,203 +102,105 @@ interface PityState {
 
 ---
 
-## 3. 本地池架構（核心機制）
+## 3. 抽卡架構（v2.0 即時生成）
 
 ### 設計目標
 
-Google Apps Script 每次 API 呼叫需 10-17 秒，直接即時抽卡 UX 極差。  
-解決方案：**伺服器預先生成未來 400 次抽卡的完整結果，登入時一次下載到前端。  
-抽卡時 100% 本地消耗，零網路等待，背景非同步通知伺服器。**
+後端已從 GAS 遷移至 Cloudflare Workers + D1，API 延遲降至 ~100ms。  
+不再需要預生成 400 筆池的複雜同步機制。  
+改為**每次抽卡直接呼叫後端 API，即時生成結果**。
 
 ### 架構流程圖
 
 ```
-┌─────────────┐    login (load-save)    ┌──────────────┐
-│  GAS 後端   │ ─────────────────────→  │  前端記憶體   │
-│  gachaPool  │   400 entries (~24KB)   │  _pool[]     │
-│  (Sheets)   │   + ownedHeroIds[]      │  _ownedIds   │
-└──────┬──────┘   + pityState           └──────┬───────┘
-       │                                       │
-       │   ②  背景 gacha-pull                  │ ① 本地消耗 (0ms)
-       │   (fireOptimistic)                    │ splice(0, count)
-       │ ◄─────────────────────────────────────┤
-       │                                       │
-       │   ③  背景 refill-pool                 │
-       │ ─────────────────────────────────────→ │
-       │   回傳補充後的完整池                    │
-       └───────────────────────────────────────┘
+┌─────────────┐     gacha-pull API       ┌──────────────┐
+│  Workers    │ ◄────────────────────────│  前端         │
+│  D1 (pity)  │   { count: 1|10 }       │  GachaScreen  │
+│             │ ────────────────────────→│              │
+│             │   results + pity         │  顯示結果     │
+└─────────────┘                          └──────────────┘
 ```
 
-### 3.1 伺服器端：預生成池
+### 3.1 後端：即時生成
 
-**位置**：`gas/程式碼.js`
+**位置**：`workers/src/routes/gacha.ts`
 
-#### 資料結構（Google Sheets `saves` 表）
+#### D1 相關欄位（`save_data`）
 
 | 欄位 | 型別 | 說明 |
 |------|------|------|
-| `gachaPool` | JSON text | `PoolEntry[]`（最多 400 筆） |
-| `gachaPoolEndPity` | JSON text | 生成最後一筆 entry 時的保底狀態（用來續生） |
-| `gachaPity` | JSON text | 玩家 UI 顯示用的保底狀態 |
+| `gachaPity` | JSON text | 保底狀態 `PityState` |
+| `diamond` | INTEGER | 鑽石餘額 |
+
+> ⚠️ `gachaPool`、`gachaPoolEndPity` 欄位仍存在於 D1 但不再使用（僅歷史資料）
 
 #### 核心函數
 
 | 函數 | 說明 |
 |------|------|
-| `generateGachaPoolEntries_(heroPool, startPity, count)` | 根據機率表 + 保底狀態生成 N 筆 `PoolEntry[]`，回傳 `{entries, endPity}` |
-| `ensureGachaPool_(playerId, saveData, sheet, row)` | 讀取現有池，不足則呼叫 `generateGachaPoolEntries_` 補滿到 400，寫回 Sheets |
+| `generateGachaEntries(heroPool, startPity, count)` | 根據機率表 + 保底狀態即時生成 N 筆結果 |
 
-#### `gachaPoolEndPity` vs `gachaPity` 區別
+#### `gacha-pull` API 流程
 
-- `gachaPoolEndPity`：生成池最後一筆 entry 後的保底狀態 → 用來**續生新 entries**
-- `gachaPity`：玩家**實際消耗到哪一筆**的保底狀態 → 用於 **UI 顯示**  
-  （兩者分離是因為池是預先生成的，玩家可能才抽了 10 筆但池已經算到第 400 筆的保底）
+```
+POST /api/gacha-pull  { guestToken, count: 1|10 }
+1. 驗證鑽石 ≥ cost
+2. 讀取 gachaPity（保底狀態）
+3. 載入 heroes 表取得英雄池
+4. generateGachaEntries(heroPool, pity, count)  — 即時生成
+5. 遍歷結果：
+   a. isNew → INSERT hero_instances
+   b. 重複 → INSERT stardust + fragments 到 inventory
+6. UPDATE save_data: diamond - cost, gachaPity = newPity
+7. 回傳 { results, diamondCost, newPityState }
+```
 
-### 3.2 GAS API 端點
+### 3.2 前端整合
 
-#### `load-save`（登入）
+**位置**：`src/components/GachaScreen.tsx`
 
-回傳值新增：
-```json
-{
-  "gachaPool": [{"h":3,"r":"N","f":false}, ...],   // 完整 400 筆
-  "ownedHeroIds": [1, 3, 6],                        // 已擁有英雄 ID（供 isNew 判斷）
-  "saveData": { "gachaPity": {...}, ... }            // 含保底狀態
+#### `doPull()` 流程
+
+```typescript
+async function doPull(count: 1 | 10) {
+  // 1. 前端預檢鑽石
+  // 2. 開始動畫 (setIsPulling)
+  // 3. const res = await callApi('gacha-pull', { count })
+  // 4. 處理結果：更新鑽石、保底計數
+  // 5. 動畫完成後顯示結果卡片
+  // 6. 本地同步：addItemsLocally(重複碎片+星塵)
+  // 7. emitAcquire(toast 動畫)
 }
 ```
-- `load-save` 內部呼叫 `ensureGachaPool_()` 確保池存在且補滿
-- `ownedHeroIds` 從 `hero_instances` 表去重取得
 
-#### `gacha-pull`（伺服器端消耗）
+#### 已移除的檔案/函數
 
-- 前端背景透過 `fireOptimistic('gacha-pull', {bannerId, count})` 呼叫
-- 伺服器端：扣鑽石 → 消耗池前 N 筆 → 新英雄建 instance / 重複轉星塵+碎片 → 更新 `gachaPity` → 自動補池
-- 使用 `executeWithIdempotency_(opId, ...)` 冪等保護（不會重複扣鑽/重複入帳）
-
-#### `refill-pool`（背景補池）
-
-```json
-POST { "action": "refill-pool", "guestToken": "..." }
-→ {
-    "success": true,
-    "newEntries": [...],          // ⚠️ 只有新生成的 entries（非全池）
-    "newEntriesCount": 10,        // 新增數量
-    "serverPoolTotal": 400,       // 伺服器端池總量
-    "ownedHeroIds": [...],        // 最新 owned（可能有新英雄）
-    "diamond": 1234               // 最新鑽石
-  }
-```
-- 前端消耗池後背景呼叫，取回**新生成的 entries**（只追加、不覆蓋）
-- ⚠️ **不回傳 pityState**：client pity 由本地消耗 entries 維護，server pity 僅用於池生成
-
-### 3.3 前端：本地池服務
-
-**位置**：`src/services/gachaLocalPool.ts`
-
-#### 記憶體狀態
-
-| 變數 | 型別 | 說明 |
-|------|------|------|
-| `_pool` | `PoolEntry[]` | 預生成池（登入載入 400 筆，消耗後減少） |
-| `_pityState` | `PityState` | 保底計數（本地即時更新） |
-| `_ownedHeroIds` | `Set<number>` | 已擁有英雄（用於判斷 isNew） |
-
-#### localStorage 備份
-
-| key | 內容 | 用途 |
-|-----|------|------|
-| `globalganlan_gacha_pool` | `PoolEntry[]` JSON | 頁面 reload 後可恢復 |
-| `globalganlan_gacha_pity` | `PityState` JSON | 保底狀態備份 |
-| `globalganlan_owned_heroes` | `number[]` JSON | owned hero 備份 |
-| `globalganlan_pending_pulls` | `PendingPull[]` JSON | 尚未同步的抽卡操作（離線保護） |
-
-#### 公開 API
-
-| 函數 | 說明 |
-|------|------|
-| `initLocalPool(pool, pityState, ownedHeroIds)` | 登入時呼叫，載入伺服器資料到記憶體 |
-| `localPull(bannerId, count, currentDiamond)` | **同步**（0ms）本地抽卡 → 回傳 `LocalPullResponse` |
-| `getPoolRemaining()` | 取得剩餘池數量 |
-| `getPityState()` | 取得當前保底狀態 |
-| `getOwnedHeroIds()` | 取得已擁有英雄 ID |
-| `onPoolChange(fn)` | 訂閱池數量變化（UI 用） |
-| `tryRestoreFromStorage()` | 從 localStorage 恢復（離線 fallback） |
-| `clearLocalPool()` | 清除所有本地資料（登出時呼叫） |
-| `triggerRefill()` | 手動觸發背景補池 |
-
-#### `localPull()` 內部流程
-
-```
-1. 檢查 diamond ≥ cost — 不足 → error: 'insufficient_diamond'
-2. 檢查 _pool.length ≥ count — 不足 → error: 'pool_empty'
-3. consumed = _pool.splice(0, count)  — 同步取出
-4. 遍歷 consumed：
-   a. isNew = !_ownedHeroIds.has(heroId)
-   b. if isNew → _ownedHeroIds.add(heroId)
-   c. if SSR → pity 歸零 + 更新 guaranteedFeatured
-   d. else → pity++
-5. savePoolToStorage() — localStorage 持久化
-6. savePendingPull() — 記錄待同步操作（離線保護）
-7. fireOptimistic('gacha-pull', {bannerId, count}) — 背景 API 通知伺服器
-8. scheduleRefill() — 排程背景補池（debounce 500ms）
-9. notifyListeners() — 通知 UI 更新
-10. return { success:true, results, diamondCost, newPityState, poolRemaining }
-```
-
-#### 背景補池機制
-
-- `scheduleRefill()` — debounce 500ms（連抽時不重複呼叫）
-- `doRefill()` — 呼叫 `refill-pool` API → **追加**伺服器新生成的 entries 到本地池（不覆蓋）
-- 同步 `ownedHeroIds`（安全）。⚠️ **不同步 pityState**（client pity 由消耗 entries 維護，避免 race condition 跳號）
-- `_isRefilling` flag 防止並行補池
-
-### 3.4 前端整合點
-
-| 檔案 | 整合方式 |
-|------|---------|
-| `saveService.ts` `loadSave()` | 登入時呼叫 `initLocalPool(res.gachaPool, res.saveData.gachaPity, res.ownedHeroIds)` |
-| `GachaScreen.tsx` | `doPull()` 呼叫 `localPull()` — 同步回傳，無 async/loading 狀態 |
-| `App.tsx` `handleFullLogout()` | 登出時呼叫 `clearLocalPool()` 清理 |
+| 已刪除 | 說明 |
+|--------|------|
+| `src/services/gachaLocalPool.ts` | 本地池管理（400 筆預生成池、localStorage 備份、背景同步） |
+| `src/services/gachaPreloadService.ts` | 預載快取服務 |
+| `initLocalPool()` 呼叫 | saveService.ts 中移除 |
+| `clearLocalPool()` 呼叫 | useLogout.ts、useSave.ts 中移除 |
+| `refill-pool` API | Workers 端已移除 |
+| `gacha-pool-status` API | Workers 端已移除 |
 
 ---
 
-## 4. 資料一致性保障
+## 4. 效能特徵
 
-### 一致性策略
-
-| 場景 | 處理方式 |
-|------|---------|
-| 正常抽卡 | 本地消耗 → 背景 `gacha-pull` 同步 → 背景 `refill-pool` 補池 |
-| 頁面 reload | localStorage 恢復本地池 → 繼續消耗 |
-| API 失敗 | `fireOptimistic` 自動重試 3 次 → `pendingPulls` localStorage 備份 |
-| 離線抽卡 | 可用池本地消耗（有 localStorage 備份） → 上線後 `reconcilePendingOps` |
-| 補池後本地池替換 | `doRefill()` 以伺服器完整池替換本地 → 確保本地與伺服器一致 |
-
-### isNew 判斷一致性
-
-- 登入時從 `hero_instances` 表取得 `ownedHeroIds` 集合
-- 每次本地抽到新英雄 → 立即 `_ownedHeroIds.add(heroId)`
-- `refill-pool` 回傳最新 `ownedHeroIds` → 覆蓋本地（以伺服器為準）
-- **極端邊界**：兩個分頁同時抽卡可能造成 isNew 顯示不一致，但伺服器端 `gacha-pull` handler 會正確判斷並建立/轉碎片 — **不影響資料正確性，僅影響顯示瞬間**
+| 指標 | v1.x（本地池） | v2.0（即時 API） |
+|------|----------------|------------------|
+| 抽卡回應時間 | 0ms（同步本地） | ~100-300ms（API 往返） |
+| 登入載入量 | +24KB（400 筆池） | 無額外載入 |
+| 離線抽卡 | 可（有 localStorage 備份） | 不可（需要網路） |
+| 程式碼複雜度 | 高（池管理+同步+補池+localStorage） | 低（單一 API 呼叫） |
+| 資料一致性 | 需要多層同步保障 | 100% 伺服器端（唯一來源） |
 
 ---
 
-## 5. 效能特徵
+## 5. 裝備抽卡
 
-| 指標 | 數值 |
-|------|------|
-| 池大小 | 400 筆 |
-| 池資料大小 | ~24 KB（JSON） |
-| 登入載入時間增量 | 包含在 `load-save` 回應，幾乎無額外延遲 |
-| 抽卡回應時間 | **0ms**（同步本地操作） |
-| 背景同步延遲 | `gacha-pull` ~10s + `refill-pool` ~10s（不影響 UX） |
-| 連續抽卡上限 | 400 次（極端情況：比背景補池更快抽完 → 顯示「請稍後再試」） |
-
----
-
-## 6. 裝備抽卡（v2.0 新增）
-
-> 裝備抽卡與英雄抽卡獨立，有專屬貨幣池。詳細裝備模板定義見 `progression.md` §四。
+> 裝備抽卡與英雄抽卡獨立，使用**前端生成 + 背景同步**模式。
 
 ### 兩種裝備池
 
@@ -315,56 +211,44 @@ POST { "action": "refill-pool", "guestToken": "..." }
 
 ### 規則
 
-- 從 128 種模板中隨機抽 1 件（等機率，不區分套裝/部位）
-- **可重複取得**（同模板多件給不同英雄穿）
-- **十連保底**：至少 1 件 SR 以上
-- **無 pity 保底**（與英雄池不同，裝備池無累計保底機制）
-- 抽到的裝備以 `OwnedEquipment` 結構直接寫入 `save_data.equipment` JSON
+- 從 128 種模板中隨機抽 1 件（8 套裝 × 4 部位 × 4 稀有度）
+- **可重複取得**
+- **十連保底**：至少 1 件 SR+
+- **無 pity 保底**
 
-### Service 進入點
+### 流程
 
 ```typescript
-// Domain (pure logic, no React deps):
-equipSinglePull(pool: EquipPoolType, rng?): EquipPullResult
-equipTenPull(pool: EquipPoolType, rng?): EquipPullResult[]
-// Local persist:
-addEquipmentLocally(equipment: EquipmentInstance[]): void
-// Backend sync:
-fireOptimisticAsync('equip-gacha-pull', { poolType, count, equipment })
+// 前端生成裝備（Domain pure logic）
+equipSinglePull(pool) / equipTenPull(pool)
+// 本地入帳
+addEquipmentLocally(equipment)
+// 背景同步
+callApi('equip-gacha-pull', { poolType, count, equipment })
 ```
-
-UI: `GachaScreen.tsx`（英雄/裝備雙頁籤切換）。
 
 ---
 
-## 7. 擴展點
+## 6. 擴展點
 
-- [x] **裝備池**：金幣池 + 鑽石池（✅ v2.0 新增）
+- [x] **裝備池**：金幣池 + 鑽石池（✅ v2.0）
 - [ ] **友情抽**：用友情點抽 N/R
 - [ ] **選擇券**：週年慶自選 SSR
 - [ ] **碎片系統**：累積碎片合成特定角色
-- [ ] **限定 banner**：獨立保底計數器 + 專屬池生成
-- [ ] **池容量動態調整**：根據玩家活躍度調整（高活躍 → 600 筆）
+- [ ] **限定 banner**：獨立保底計數器
 
 ---
 
-## 8. 關鍵檔案索引
+## 7. 關鍵檔案索引
 
 | 檔案 | 職責 |
 |------|------|
-| `gas/程式碼.js` → `generateGachaPoolEntries_()` | 伺服器端：根據機率+保底生成池 entries |
-| `gas/程式碼.js` → `ensureGachaPool_()` | 確保池補滿到 400 |
-| `gas/程式碼.js` → `handleGachaPull_()` | 伺服器端消耗池、扣鑽石、入帳英雄 |
-| `gas/程式碼.js` → `handleEquipGachaPull_()` | 伺服器端裝備抽卡：扣貨幣、持久化裝備 |
-| `gas/程式碼.js` → `handleRefillPool_()` | 背景補池 API |
-| `gas/程式碼.js` → `handleLoadSave_()` | 登入時回傳完整池+ownedHeroIds |
-| `src/domain/gachaSystem.ts` | 前端 Domain：英雄抽卡機率表、banner 定義、PityState 型別 |
+| `workers/src/routes/gacha.ts` | 後端：`gacha-pull`（即時生成）、`equip-gacha-pull`、`reset-gacha-pool`（QA） |
+| `src/domain/gachaSystem.ts` | 前端 Domain：機率表、banner 定義、PityState 型別、成本常數 |
 | `src/domain/equipmentGacha.ts` | 前端 Domain：裝備抽卡機率表、生成邏輯、費用計算 |
-| `src/services/gachaLocalPool.ts` | 前端核心：英雄本地池管理、同步抽卡、背景補池 |
-| `src/services/inventoryService.ts` → `addEquipmentLocally()` | 裝備本地入帳（optimistic） |
-| `src/components/GachaScreen.tsx` | UI：英雄/裝備雙頁籤、`localPull()` / `doEquipPull()` |
-| `src/services/saveService.ts` | 登入時 `initLocalPool()` |
-| `src/services/gachaPreloadService.ts` | 前端：預載池管理、剩餘追蹤、`clearGachaPreload()` |
+| `src/components/GachaScreen.tsx` | UI：英雄/裝備雙頁籤、`doPull()` async API 呼叫 |
+| `src/services/progressionService.ts` | `gachaPull()` API wrapper |
+| `src/services/inventoryService.ts` | `addEquipmentLocally()` 裝備本地入帳 |
 
 ---
 
@@ -373,10 +257,11 @@ UI: `GachaScreen.tsx`（英雄/裝備雙頁籤切換）。
 | 版本 | 日期 | 變更內容 |
 |------|------|---------|
 | v0.1 | 2026-02-26 | 初版草案：機率表、保底機制、成本、重複處理 |
-| v1.0 | 2026-02-27 | **重大改版**：新增本地池架構（§3-§5），伺服器預生成 400 組 → 前端 0ms 同步抽卡 → 背景同步。新增 GAS `refill-pool` API、前端 `gachaLocalPool.ts`。升級為已實作狀態 🟢 |
-| v1.1 | 2026-02-28 | 新增重複角色獎勵（`stardust` + `fragments` 欄位）、抽卡 UI 顯示「重複」badge + 星塵/碎片數量、重複獎勵透過 `addItemsLocally()` 入帳背包 |
-| v1.2 | 2026-02-28 | **Bug Fix**：N卡重複星塵從 0.2（小數）改為 1（整數） |
-| v1.3 | 2026-03-01 | **Spec 同步**：池大小 200→400（同步 GAS `GACHA_REFILL_COUNT_=400` + 前端 `REFILL_THRESHOLD=400`）；池資料大小 ~12KB→~24KB；`clearLocalPool()` 呼叫者修正為 `App.tsx handleFullLogout()`；新增 `gachaPreloadService.ts` 到檔案索引 |
-| v1.4 | 2026-06-15 | **裝備抽卡 v2**：新增 §6 裝備抽卡章節（金幣池 + 鑽石池，128 種模板隨機抽取，十連保底 SR+）；擴展點更新（裝備池已實作） |
-| v1.5 | 2026-06-15 | **裝備抽卡完整實作**：新增 `equipmentGacha.ts` 純 Domain 邏輯層；`GachaScreen.tsx` 改為英雄/裝備雙頁籤；`inventoryService.ts` 新增 `addEquipmentLocally()`；GAS 新增 `handleEquipGachaPull_()`；修正 SR/N 機率（金幣: SR 13%/N 50%、鑽石: SR 20%/N 32%）使機率加總為 100%；新增 26 個單元測試全部通過 |
-| v1.6 | 2026-03-01 | **抽卡動畫 + 裝備寶箱**：新增抽卡拉動動畫（旋轉光環 1.6s）；SSR 金光彩虹邊框 + 閃烁粒子、SR 紫光光暈；結果卡片逐張入場動畫（staggered 0.1s）；新增 `openEquipmentChest()` Domain 函式（SSR 5% / SR 20% / R 40% / N 35%）；`InventoryPanel` 裝備寶箱開啟→本地生成裝備 + acquireToast；GAS `handleUseItem_` 支援 chest_equipment 持久化；新增 4 個寶箱單元測試（30/30 pass）；Google Sheet item_definitions 新增 chest_equipment 行 + 全寶箱加 useAction 欄 |
+| v1.0 | 2026-02-27 | 本地池架構：伺服器預生成 400 組 → 前端 0ms 同步抽卡 → 背景同步 |
+| v1.1 | 2026-02-28 | 新增重複角色獎勵（stardust + fragments） |
+| v1.2 | 2026-02-28 | N卡重複星塵從 0.2 改為 1（整數） |
+| v1.3 | 2026-03-01 | 池大小 200→400；新增 gachaPreloadService |
+| v1.4 | 2026-06-15 | 新增裝備抽卡章節（金幣池 + 鑽石池） |
+| v1.5 | 2026-06-15 | 裝備抽卡完整實作：equipmentGacha.ts Domain 層 |
+| v1.6 | 2026-03-01 | 抽卡動畫 + 結果卡片入場；裝備寶箱 |
+| **v2.0** | **2026-06-16** | **重大改版**：移除 400 筆預生成池機制，改為即時 API 生成。刪除 `gachaLocalPool.ts`、`gachaPreloadService.ts`。移除 `refill-pool`、`gacha-pool-status` 端點。前端 `doPull()` 改為 async API 呼叫。後端 `gacha-pull` 回傳 stardust/fragments 欄位。 |

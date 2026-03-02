@@ -20,7 +20,7 @@ import {
 } from '../domain/combatPower'
 import type { RawHeroData, SlotHero } from '../types'
 import type { HeroInstance } from '../services/saveService'
-import { getHeroEquipment } from '../services/inventoryService'
+import { getHeroEquipment, onInventoryChange } from '../services/inventoryService'
 
 /* ════════════════════════════════════
    型別
@@ -124,6 +124,13 @@ export function useCombatPower(
   const [powerDelta, setPowerDelta] = useState<number | null>(null)
   const deltaTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
+  // 訂閱背包變化（裝備穿脫/強化時即時觸發 CP 重算）
+  const [invTick, setInvTick] = useState(0)
+  useEffect(() => {
+    const unsub = onInventoryChange(() => setInvTick(t => t + 1))
+    return unsub
+  }, [])
+
   // 我方 CP
   const formationKey = formation.join(',')
   const heroKey = heroInstances.map(h => {
@@ -152,7 +159,7 @@ export function useCombatPower(
     prevPowerRef.current = newPower
     setCurrentPower(newPower)
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [formationKey, heroKey, heroesList])
+  }, [formationKey, heroKey, heroesList, invTick])
 
   // 敵方 CP
   const enemyPower = useMemo(() => {

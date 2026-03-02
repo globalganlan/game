@@ -3,7 +3,6 @@
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import {
-  getStoryStageConfig,
   getNextStageId,
   getDailyDungeonConfig,
   getDailyDungeonDisplayName,
@@ -24,72 +23,6 @@ import {
 describe('stageSystem - 進階測試', () => {
   beforeEach(() => {
     vi.restoreAllMocks()
-  })
-
-  /* ═══════ getStoryStageConfig ═══════ */
-
-  describe('getStoryStageConfig', () => {
-    it('1-1 產生有效配置', () => {
-      const config = getStoryStageConfig('1-1')
-      expect(config.stageId).toBe('1-1')
-      expect(config.chapter).toBe(1)
-      expect(config.stage).toBe(1)
-      expect(config.enemies.length).toBeGreaterThanOrEqual(2)
-      expect(config.enemies.length).toBeLessThanOrEqual(6)
-      expect(config.recommendedLevel).toBeGreaterThan(0)
-      expect(config.rewards.exp).toBeGreaterThan(0)
-      expect(config.rewards.gold).toBeGreaterThan(0)
-    })
-
-    it('同一關卡每次回傳相同結果（seeded PRNG）', () => {
-      const result1 = getStoryStageConfig('2-5')
-      const result2 = getStoryStageConfig('2-5')
-      expect(result1.enemies.length).toBe(result2.enemies.length)
-      expect(result1.enemies.map(e => e.heroId)).toEqual(result2.enemies.map(e => e.heroId))
-      expect(result1.recommendedLevel).toBe(result2.recommendedLevel)
-    })
-
-    it('不同關卡產生不同配置', () => {
-      const config1 = getStoryStageConfig('1-1')
-      const config2 = getStoryStageConfig('3-8')
-      // 後面的關卡更強
-      expect(config2.recommendedLevel).toBeGreaterThan(config1.recommendedLevel)
-    })
-
-    it('每章最後一關（X-8）給鑽石', () => {
-      for (let ch = 1; ch <= MAX_CHAPTER; ch++) {
-        const config = getStoryStageConfig(`${ch}-8`)
-        expect(config.rewards.diamond).toBeGreaterThan(0)
-      }
-    })
-
-    it('非最後一關不給鑽石', () => {
-      const config = getStoryStageConfig('1-3')
-      expect(config.rewards.diamond).toBe(0)
-    })
-
-    it('首通獎勵包含額外鑽石', () => {
-      const config = getStoryStageConfig('1-1')
-      expect(config.firstClearRewards).toBeDefined()
-      expect(config.firstClearRewards!.diamond).toBeGreaterThan(0)
-    })
-
-    it('敵人數量不超過 6', () => {
-      for (let ch = 1; ch <= MAX_CHAPTER; ch++) {
-        for (let st = 1; st <= STAGES_PER_CHAPTER; st++) {
-          const config = getStoryStageConfig(`${ch}-${st}`)
-          expect(config.enemies.length).toBeLessThanOrEqual(6)
-        }
-      }
-    })
-
-    it('難度倍率隨關卡遞增', () => {
-      const early = getStoryStageConfig('1-1')
-      const late = getStoryStageConfig('3-8')
-      const earlyHpMult = early.enemies[0].hpMultiplier
-      const lateHpMult = late.enemies[0].hpMultiplier
-      expect(lateHpMult).toBeGreaterThan(earlyHpMult)
-    })
   })
 
   /* ═══════ getNextStageId ═══════ */

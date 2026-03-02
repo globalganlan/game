@@ -1,25 +1,21 @@
-/**
- * inventoryService — 背包與道具系統前端服務
+﻿/**
+ * inventoryService  背包與道具系統前端服務
  *
  * 負責：背包載入、道具增減、裝備管理、擴容、出售
  *
  * 對應 Spec: specs/inventory.md v0.1
  */
 
-import { getAuthState } from './authService'
+import { callApi } from './apiClient'
 import type { InventoryItem } from './saveService'
 import type { EquipmentInstance, EquipmentSlot, Rarity, SubStat } from '../domain/progressionSystem'
 import { getEnhanceCost, getMaxEnhanceLevel, enhancedMainStat } from '../domain/progressionSystem'
-import { fireOptimisticAsync, hasPendingOps } from './optimisticQueue'
-
-const POST_URL =
-  'https://script.google.com/macros/s/AKfycbzy3EHTCyTYjA9j1CvJGvWwDM_RrkCuzNYkMhP7T9DTJ6V6g7Sodrlo4uv3h9yx0HLdsg/exec'
 
 const STORAGE_KEY_INVENTORY = 'globalganlan_inventory_cache'
 
-/* ════════════════════════════════════
+/* 
    型別
-   ════════════════════════════════════ */
+    */
 
 export type ItemCategory =
   | 'exp_material'
@@ -50,9 +46,9 @@ export interface InventoryState {
   definitions: Map<string, ItemDefinition>
 }
 
-/* ════════════════════════════════════
+/* 
    內部 State
-   ════════════════════════════════════ */
+    */
 
 let cachedDefinitions: Map<string, ItemDefinition> | null = null
 let inventoryState: InventoryState | null = null
@@ -65,7 +61,6 @@ function notify(): void {
   for (const fn of listeners) fn(snapshot)
 }
 
-/** localStorage 備份 — 只存 items（equipment/definitions 由 API 載入） */
 function saveInventoryToLocal(): void {
   if (!inventoryState) return
   try {
@@ -73,7 +68,6 @@ function saveInventoryToLocal(): void {
   } catch { /* 容量不足忽略 */ }
 }
 
-/** 從 localStorage 恢復 items（離線 fallback） */
 function loadInventoryFromLocal(): InventoryItem[] | null {
   try {
     const raw = localStorage.getItem(STORAGE_KEY_INVENTORY)
@@ -82,36 +76,14 @@ function loadInventoryFromLocal(): InventoryItem[] | null {
   return null
 }
 
-/* ════════════════════════════════════
-   通用 API 呼叫
-   ════════════════════════════════════ */
-
-async function callApi<T = Record<string, unknown>>(
-  action: string,
-  params: Record<string, unknown> = {},
-): Promise<T & { success: boolean; error?: string }> {
-  const token = getAuthState().guestToken
-  if (!token) throw new Error('not_logged_in')
-  const body = JSON.stringify({ action, guestToken: token, ...params })
-  const res = await fetch(POST_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'text/plain; charset=utf-8' },
-    body,
-  })
-  return res.json()
-}
-
-/* ════════════════════════════════════
+/* 
    道具定義（靜態資料）
-   ════════════════════════════════════ */
+    */
 
-/** 載入道具定義表（快取） */
 export async function loadItemDefinitions(): Promise<Map<string, ItemDefinition>> {
   if (cachedDefinitions) return cachedDefinitions
-
   const res = await callApi<{ items: ItemDefinition[] }>('load-item-definitions')
   if (!res.success) throw new Error(res.error || 'load-item-definitions failed')
-
   const map = new Map<string, ItemDefinition>()
   for (const item of (res.items || [])) {
     map.set(item.itemId, item)
@@ -120,16 +92,14 @@ export async function loadItemDefinitions(): Promise<Map<string, ItemDefinition>
   return map
 }
 
-/** 取得單個道具定義 */
 export function getItemDefinition(itemId: string): ItemDefinition | undefined {
   return cachedDefinitions?.get(itemId)
 }
 
-/* ════════════════════════════════════
+/* 
    背包操作
-   ════════════════════════════════════ */
+    */
 
-/** 載入完整背包 */
 export async function loadInventory(): Promise<InventoryState> {
   const definitions = await loadItemDefinitions()
   const res = await callApi<{
@@ -137,49 +107,31 @@ export async function loadInventory(): Promise<InventoryState> {
     equipment: EquipmentInstance[]
     equipmentCapacity: number
   }>('load-inventory')
-
   if (!res.success) throw new Error(res.error || 'load-inventory failed')
 
-  // Parse equipment subStats JSON if needed
   const equipment = (res.equipment || []).map(parseEquipment)
-
-  // 合併 localStorage 暫存的樂觀道具（API 未反映的本地變更）
   const serverItems = res.items || []
   const localItems = loadInventoryFromLocal()
   let mergedItems = serverItems
   if (localItems) {
-    const pending = hasPendingOps()
     const map = new Map<string, number>()
     for (const it of serverItems) map.set(it.itemId, it.quantity)
     for (const it of localItems) {
       const sv = map.get(it.itemId) ?? 0
-      if (pending) {
-        // 有待處理操作 → 信任本地值（可能包含樂觀扣除）
-        map.set(it.itemId, it.quantity)
-      } else if (it.quantity > sv) {
-        // 無待處理操作 → 只取更多的（舊邏輯，處理離線新增）
-        map.set(it.itemId, it.quantity)
-      }
+      if (it.quantity > sv) map.set(it.itemId, it.quantity)
     }
     mergedItems = [...map.entries()].map(([itemId, quantity]) => ({ itemId, quantity }))
   }
 
-  inventoryState = {
-    items: mergedItems,
-    equipment,
-    equipmentCapacity: res.equipmentCapacity || 200,
-    definitions,
-  }
+  inventoryState = { items: mergedItems, equipment, equipmentCapacity: res.equipmentCapacity || 200, definitions }
   saveInventoryToLocal()
   notify()
   return inventoryState
 }
 
-/** 新增道具（前端不直接呼叫，由後端結算觸發） */
 export async function addItems(items: { itemId: string; quantity: number }[]): Promise<boolean> {
   const res = await callApi<{ inventory: InventoryItem[] }>('add-items', { items })
   if (!res.success) return false
-
   if (inventoryState && res.inventory) {
     inventoryState.items = res.inventory
     saveInventoryToLocal()
@@ -188,11 +140,9 @@ export async function addItems(items: { itemId: string; quantity: number }[]): P
   return true
 }
 
-/** 消耗道具 */
 export async function removeItems(items: { itemId: string; quantity: number }[]): Promise<boolean> {
   const res = await callApi<{ inventory: InventoryItem[] }>('remove-items', { items })
   if (!res.success) return false
-
   if (inventoryState && res.inventory) {
     inventoryState.items = res.inventory
     saveInventoryToLocal()
@@ -201,13 +151,13 @@ export async function removeItems(items: { itemId: string; quantity: number }[])
   return true
 }
 
-/** 出售道具 */
-export async function sellItems(items: { itemId: string; quantity: number }[]): Promise<number> {
-  const res = await callApi<{ goldGained: number }>('sell-items', { items })
-  if (!res.success) return 0
-
-  // 本地更新 inventory
+export function sellItems(items: { itemId: string; quantity: number }[]): number {
+  let estimatedGold = 0
   if (inventoryState) {
+    for (const sold of items) {
+      const def = inventoryState.definitions.get(sold.itemId)
+      estimatedGold += (def?.sellPrice || 0) * sold.quantity
+    }
     for (const sold of items) {
       const existing = inventoryState.items.find(i => i.itemId === sold.itemId)
       if (existing) existing.quantity = Math.max(0, existing.quantity - sold.quantity)
@@ -215,18 +165,18 @@ export async function sellItems(items: { itemId: string; quantity: number }[]): 
     saveInventoryToLocal()
     notify()
   }
-
-  return res.goldGained || 0
+  callApi<{ goldGained: number }>('sell-items', { items }).catch(e =>
+    console.warn('[inventory] sell-items error:', e),
+  )
+  return estimatedGold
 }
 
-/** 使用道具（寶箱開啟/經驗核心使用等 — 樂觀佇列保護） */
 export async function useItem(
   itemId: string,
   quantity: number,
   targetId?: string,
   extra?: Record<string, unknown>,
 ): Promise<{ success: boolean; result?: unknown }> {
-  // 樂觀扣減本地數量
   if (inventoryState) {
     const existing = inventoryState.items.find(i => i.itemId === itemId)
     if (existing) {
@@ -235,60 +185,48 @@ export async function useItem(
       notify()
     }
   }
-  const { serverResult } = fireOptimisticAsync<{ result: unknown }>(
+  const res = await callApi<{ result: unknown }>(
     'use-item', { itemId, quantity, ...(targetId ? { targetId } : {}), ...(extra || {}) },
   )
-  const res = await serverResult
   return { success: res.success, result: res.result }
 }
 
-/* ════════════════════════════════════
+/* 
    裝備操作
-   ════════════════════════════════════ */
+    */
 
-/** 裝備到英雄（樂觀佇列保護） */
 export async function equipItem(equipId: string, heroInstanceId: string): Promise<boolean> {
-  // 樂觀立即更新
   if (inventoryState) {
     const eq = inventoryState.equipment.find(e => e.equipId === equipId)
     if (eq) eq.equippedBy = heroInstanceId
     notify()
   }
-  const { serverResult } = fireOptimisticAsync('equip-item', { equipId, heroInstanceId })
-  const res = await serverResult
+  const res = await callApi('equip-item', { equipId, heroInstanceId })
   return res.success
 }
 
-/** 卸下裝備（樂觀佇列保護） */
 export async function unequipItem(equipId: string): Promise<boolean> {
-  // 樂觀立即更新
   if (inventoryState) {
     const eq = inventoryState.equipment.find(e => e.equipId === equipId)
     if (eq) eq.equippedBy = ''
     notify()
   }
-  const { serverResult } = fireOptimisticAsync('unequip-item', { equipId })
-  const res = await serverResult
+  const res = await callApi('unequip-item', { equipId })
   return res.success
 }
 
-/** 鎖定/解鎖裝備（樂觀佇列保護） */
 export async function lockEquipment(equipId: string, locked: boolean): Promise<boolean> {
-  // 樂觀立即更新
   if (inventoryState) {
     const eq = inventoryState.equipment.find(e => e.equipId === equipId)
     if (eq) eq.locked = locked
     notify()
   }
-  const { serverResult } = fireOptimisticAsync('lock-equipment', { equipId, locked })
-  const res = await serverResult
+  const res = await callApi('lock-equipment', { equipId, locked })
   return res.success
 }
 
-/** 擴容（樂觀佇列保護） */
 export async function expandInventory(): Promise<number> {
-  const { serverResult } = fireOptimisticAsync<{ newCapacity: number }>('expand-inventory', {})
-  const res = await serverResult
+  const res = await callApi<{ newCapacity: number }>('expand-inventory', {})
   if (res.success && inventoryState) {
     inventoryState.equipmentCapacity = res.newCapacity
     notify()
@@ -296,77 +234,53 @@ export async function expandInventory(): Promise<number> {
   return res.newCapacity || inventoryState?.equipmentCapacity || 200
 }
 
-/** 強化裝備（僅消耗金幣，v2 無素材需求） */
 export async function enhanceEquipment(equipId: string): Promise<{
-  success: boolean
-  newLevel?: number
-  newMainStatValue?: number
-  goldConsumed?: number
-  error?: string
+  success: boolean; newLevel?: number; newMainStatValue?: number; goldConsumed?: number; error?: string
 }> {
   if (!inventoryState) return { success: false, error: 'inventory_not_loaded' }
   const eq = inventoryState.equipment.find(e => e.equipId === equipId)
   if (!eq) return { success: false, error: 'equip_not_found' }
-
   const maxLvl = getMaxEnhanceLevel(eq.rarity)
   if (eq.enhanceLevel >= maxLvl) return { success: false, error: 'max_enhance_level' }
-
   const cost = getEnhanceCost(eq.enhanceLevel, eq.rarity)
-
-  // 樂觀更新：先升級本地裝備
   const oldLevel = eq.enhanceLevel
   eq.enhanceLevel = Math.min(maxLvl, oldLevel + 1)
   notify()
 
-  const { serverResult } = fireOptimisticAsync<{
-    newLevel: number
-    newMainStatValue: number
-    goldConsumed: number
-    error?: string
+  const res = await callApi<{
+    newLevel: number; newMainStatValue: number; goldConsumed: number; error?: string
   }>('enhance-equipment', { equipId })
-  const res = await serverResult
 
   if (res.success) {
-    // 伺服器回傳的等級以伺服器為準
     eq.enhanceLevel = res.newLevel ?? eq.enhanceLevel
     notify()
-    return {
-      success: true,
-      newLevel: res.newLevel,
-      newMainStatValue: res.newMainStatValue,
-      goldConsumed: res.goldConsumed,
-    }
+    return { success: true, newLevel: res.newLevel, newMainStatValue: res.newMainStatValue, goldConsumed: res.goldConsumed }
   } else {
-    // 回滾
     eq.enhanceLevel = oldLevel
     notify()
     return { success: false, error: res.error ?? 'enhance_failed' }
   }
 }
 
-/* ════════════════════════════════════
+/* 
    查詢工具
-   ════════════════════════════════════ */
+    */
 
-/** 取得某道具的數量 */
 export function getItemQuantity(itemId: string): number {
   if (!inventoryState) return 0
   return inventoryState.items.find(i => i.itemId === itemId)?.quantity || 0
 }
 
-/** 取得某英雄已裝備的裝備 */
 export function getHeroEquipment(heroInstanceId: string): EquipmentInstance[] {
   if (!inventoryState) return []
   return inventoryState.equipment.filter(e => e.equippedBy === heroInstanceId)
 }
 
-/** 取得背包中未裝備的裝備 */
 export function getUnequippedEquipment(): EquipmentInstance[] {
   if (!inventoryState) return []
   return inventoryState.equipment.filter(e => !e.equippedBy)
 }
 
-/** 依分類篩選道具 */
 export function filterItemsByCategory(category: ItemCategory | 'all'): InventoryItem[] {
   if (!inventoryState) return []
   if (category === 'all') return inventoryState.items.filter(i => i.quantity > 0)
@@ -376,7 +290,6 @@ export function filterItemsByCategory(category: ItemCategory | 'all'): Inventory
   })
 }
 
-/** 訂閱背包變化 */
 export function onInventoryChange(fn: InventoryListener): () => void {
   listeners.push(fn)
   return () => {
@@ -385,12 +298,10 @@ export function onInventoryChange(fn: InventoryListener): () => void {
   }
 }
 
-/** 取得當前背包狀態 */
 export function getInventoryState(): InventoryState | null {
   return inventoryState
 }
 
-/** 清除背包快取（登出時呼叫） */
 export function clearInventoryCache(): void {
   inventoryState = null
   cachedDefinitions = null
@@ -398,105 +309,56 @@ export function clearInventoryCache(): void {
   notify()
 }
 
-/**
- * 樂觀新增道具到本地背包（不呼叫 API）
- * 用於戰勝掉落、抽卡重複、信件獎勵等即時更新場景。
- * Server 入帳由對應的背景 API 處理。
- */
 export function addItemsLocally(items: { itemId: string; quantity: number }[]): void {
-  // 若 inventoryState 未初始化（玩家還沒開過背包），建立一個最小狀態
   if (!inventoryState) {
     const localItems = loadInventoryFromLocal() ?? []
-    inventoryState = {
-      items: localItems,
-      equipment: [],
-      equipmentCapacity: 200,
-      definitions: cachedDefinitions ?? new Map(),
-    }
+    inventoryState = { items: localItems, equipment: [], equipmentCapacity: 200, definitions: cachedDefinitions ?? new Map() }
   }
   let changed = false
   for (const { itemId, quantity } of items) {
     if (quantity <= 0) continue
     const existing = inventoryState.items.find(i => i.itemId === itemId)
-    if (existing) {
-      existing.quantity += quantity
-    } else {
-      inventoryState.items.push({ itemId, quantity })
-    }
+    if (existing) { existing.quantity += quantity } else { inventoryState.items.push({ itemId, quantity }) }
     changed = true
   }
-  if (changed) {
-    saveInventoryToLocal()
-    notify()
-  }
+  if (changed) { saveInventoryToLocal(); notify() }
 }
 
-/**
- * 樂觀扣除道具（不呼叫 API）
- * 用於升級消耗經驗石、突破消耗碎片/職業石、升星消耗碎片等即時扣除場景。
- * Server 扣除由對應的背景 API 處理。
- */
 export function removeItemsLocally(items: { itemId: string; quantity: number }[]): void {
   if (!inventoryState) {
     const localItems = loadInventoryFromLocal() ?? []
-    inventoryState = {
-      items: localItems,
-      equipment: [],
-      equipmentCapacity: 200,
-      definitions: cachedDefinitions ?? new Map(),
-    }
+    inventoryState = { items: localItems, equipment: [], equipmentCapacity: 200, definitions: cachedDefinitions ?? new Map() }
   }
   let changed = false
   for (const { itemId, quantity } of items) {
     if (quantity <= 0) continue
     const existing = inventoryState.items.find(i => i.itemId === itemId)
-    if (existing) {
-      existing.quantity = Math.max(0, existing.quantity - quantity)
-      changed = true
-    }
+    if (existing) { existing.quantity = Math.max(0, existing.quantity - quantity); changed = true }
   }
-  if (changed) {
-    saveInventoryToLocal()
-    notify()
-  }
+  if (changed) { saveInventoryToLocal(); notify() }
 }
 
-/**
- * 樂觀新增裝備到本地背包（不呼叫 API）
- * 用於裝備抽卡、寶箱開啟等即時更新場景。
- * Server 入帳由背景 equip-gacha-pull API 處理。
- */
 export function addEquipmentLocally(equipment: EquipmentInstance[]): void {
   if (!inventoryState) {
     const localItems = loadInventoryFromLocal() ?? []
-    inventoryState = {
-      items: localItems,
-      equipment: [],
-      equipmentCapacity: 200,
-      definitions: cachedDefinitions ?? new Map(),
-    }
+    inventoryState = { items: localItems, equipment: [], equipmentCapacity: 200, definitions: cachedDefinitions ?? new Map() }
   }
   if (equipment.length === 0) return
-  inventoryState.equipment.push(...equipment)
-  // 同時存到 localStorage（equipment 也要快取）
-  try {
-    localStorage.setItem('gg_equipment_cache', JSON.stringify(inventoryState.equipment))
-  } catch { /* 容量不足忽略 */ }
+  // 透過 parseEquipment 正規化，避免 rarity/subStats 為 undefined 或字串導致崩潰
+  const normalized = equipment.map(eq => parseEquipment(eq))
+  inventoryState.equipment.push(...normalized)
+  try { localStorage.setItem('gg_equipment_cache', JSON.stringify(inventoryState.equipment)) } catch { /* ignore */ }
   notify()
 }
 
-/* ════════════════════════════════════
+/* 
    內部工具
-   ════════════════════════════════════ */
+    */
 
 function parseEquipment(raw: EquipmentInstance & { subStats?: unknown }): EquipmentInstance {
   let subStats: SubStat[] = []
   if (typeof raw.subStats === 'string') {
-    try {
-      subStats = JSON.parse(raw.subStats) as SubStat[]
-    } catch {
-      subStats = []
-    }
+    try { subStats = JSON.parse(raw.subStats) as SubStat[] } catch { subStats = [] }
   } else if (Array.isArray(raw.subStats)) {
     subStats = raw.subStats as SubStat[]
   }

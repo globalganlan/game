@@ -6,23 +6,18 @@
 ## ❗ 強制規則（每次任務必讀）
 
 0. **一律使用繁體中文回覆**，不得用英文回覆使用者。程式碼變數名/commit message 可保留英文，但解說說明一律繁中。
-1. **使用者只提需求，AI 團隊負責全部實現**（前端/後端/GAS/部署/測試）。絕對不要要求使用者手動操作。
+1. **使用者只提需求，AI 團隊負責全部實現**（前端/後端/部署/測試）。絕對不要要求使用者手動操作。
 2. **完成功能後必須執行完整測試**，確認遊戲可正常運行再回報完成：
    - `npx tsc --noEmit`（零錯誤）
    - `npx vite build`（編譯成功）
-   - API 端點測試（若有改 GAS）
+   - `cd workers && npx tsc --noEmit`（Workers 零錯誤）
    - 確認遊戲流程不會壞：登入 → 載入 → 選英雄 → 戰鬥 → 結果 → 重啟
+   - **⚠️ 必須實際開瀏覽器測試**：啟動 `npx vite --host`，在瀏覽器打開遊戲，走一遍完整流程（登入→大廳→點擊相關功能→確認無白屏/報錯），不能只靠 tsc 和 vite build 就宣稱測試通過
    - 有 bug 就修，不能把壞掉的狀態交給使用者
    - **測試通過後、回報完成前，必須播放提示音**：`[console]::beep(800,300); Start-Sleep -ms 100; [console]::beep(1000,300); Start-Sleep -ms 100; [console]::beep(1200,400)`
-3. **GAS 修改後自行部署**：改 `gas/程式碼.js` → `clasp push` → `clasp deploy -i <ID>`
-4. **Google Sheets 中文亂碼防護**：每次新增（createSheet）、修改（updateSheet / appendRows）、或讀取（readSheet）Google Sheet 時，必須做以下檢查：
-   - **寫入前**：POST body 必須使用 `[System.Text.Encoding]::UTF8.GetBytes()` 編碼，ContentType 為 `text/plain; charset=utf-8`
-   - **寫入後**：立即用 GET API 讀回資料，抽樣檢查中文欄位是否正確（不可含 `?`、方塊字亂碼如 `撣賊`、`銋`、`璉格` 等）
-   - **發現亂碼**：立即修正 — deleteSheet → createSheet 重建正確資料
-   - **日期自動轉換防護**：含 `X-Y` 格式的欄位（如 stageId "1-1"）必須在 createSheet 時使用 `textColumns` 參數，GAS 會對該欄設 `setNumberFormat('@')` 防止自動轉為日期
-   - **根因**：PowerShell `ConvertTo-Json` 在 Windows Big5 環境下可能產生編碼錯誤，務必用 `UTF8.GetBytes()` 確保 UTF-8
-5. **程式碼改動必須同步更新 Spec**：每次完成使用者任務後，若有改動程式碼，必須將功能變更同步到對應的 `specs/` 文件上（含版本號遞增、變更歷史更新），以確保 spec 始終與實際程式碼一致。不可遺漏任何功能變更未被記錄。
-6. **貨幣 & 物品 Icon 必須使用統一元件**（ADR-007）：
+3. **Workers 修改後自行部署**：改 `workers/src/` → `cd workers && npx wrangler deploy`
+4. **程式碼改動必須同步更新 Spec**：每次完成使用者任務後，若有改動程式碼，必須將功能變更同步到對應的 `specs/` 文件上（含版本號遞增、變更歷史更新），以確保 spec 始終與實際程式碼一致。不可遺漏任何功能變更未被記錄。
+5. **貨幣 & 物品 Icon 必須使用統一元件**（ADR-007）：
    - **四種貨幣**必須用 `<CurrencyIcon type="..." />`（來自 `src/components/CurrencyIcon.tsx`）：
      - 金幣 → `type="gold"`（金色圓形 G）
      - 鑽石 → `type="diamond"`（藍色菱形 D）
@@ -35,7 +30,8 @@
 ## 專案概覽
 
 - **名稱**：全球感染 (GlobalGanLan) — 3D 喪屍對戰競技場
-- **技術棧**：React 18 + Vite + @react-three/fiber + @react-three/drei + Three.js + TypeScript
+- **技術棧**：React 19 + Vite 5 + @react-three/fiber + @react-three/drei + Three.js + TypeScript
+- **後端**：Cloudflare Workers + Hono + D1 SQLite（`workers/` 目錄）
 - **主程式**：`src/App.tsx`（遊戲邏輯）+ `src/components/`（3D 元件拆分）
 - **樣式**：`src/App.css`（HUD、按鈕、RWD media queries）
 - **模型**：`public/models/zombie_1/` ~ `zombie_6/`（FBX 原始 + GLB 壓縮）
@@ -74,8 +70,25 @@
 - `import './App.css'` 漏掉 → 整個 UI 消失
 - async 函數中用 `useRef` 讀即時值，避免閉包陷阱
 - `orientationchange` 事件需 `setTimeout(150ms)` 才能拿到正確尺寸
-- **Google Sheets 寫入後必須驗證中文不是亂碼**（讀回抽查），發現亂碼立即 deleteSheet → createSheet 修復
+- **Google Sheets 寫入後必須驗證中文不是亂碼**（讀回抽查），發現亂碼立即 deleteSheet → createSheet 修復（僅限 GAS 路徑仍在使用時）
 - **stageId "1-1" 格式會被 Sheets 自動轉日期** — createSheet 時用 `textColumns:["stageId"]` 參數防護
+
+## 後端架構（Cloudflare Workers + D1）
+
+- **Workers 入口**：`workers/src/index.ts`（Hono 路由 + CORS + Cron Triggers）
+- **路由模組**：`workers/src/routes/`（10 個：auth / save / battle / inventory / progression / gacha / mail / arena / sheet / checkin）
+- **D1 Schema**：`workers/schema.sql`（12 張表）
+- **部署**：`cd workers && npx wrangler deploy`
+- **前端 API 客戶端**：`src/services/apiClient.ts`（`callApi` + `callAuthApi`）
+- **即時通知**：Pusher Channels（app_id 2122152, cluster ap3）
+- **CI/CD**：`.github/workflows/deploy.yml`（雙 job：前端 GitHub Pages + 後端 Workers）
+
+### 重要原則
+
+- **使用者只負責提需求，AI 團隊負責全部實現（前端、後端、Workers、部署、測試）**
+- 需要新增 API → 直接改 `workers/src/routes/` + `wrangler deploy`
+- 需要改 D1 表結構 → 修改 `workers/schema.sql` + 遠端執行 `ALTER TABLE`
+- **絕對不要要求使用者手動貼程式碼、手動部署、或手動操作**
 
 ## 效能原則
 
@@ -83,9 +96,10 @@
 - 修改場景時先決定 fog far → 其他元素 spread/area ≤ fog far
 - mobile DPR 限 `[1, 1.5]`，desktop `[1, 2]`
 
-## Google Sheets 讀寫能力
+## 舊版 GAS 架構（已棄用）
 
-本專案以 Google Sheets 作為後端資料庫，AI 可直接讀寫。
+> 後端已從 GAS + Google Sheets 遷移至 Cloudflare Workers + D1。
+> 以下 GAS 相關資訊僅供歷史參考，`gas/` 目錄保留但不再使用。
 
 - **讀取（GET）**：`https://script.google.com/macros/s/AKfycbxXdy3QCvgX7knCCnxfmVY0CMqmUgcG422nVgFDlx5l9CsyldFZ4bwLVHPHxbtXp0LaTw/exec`
 - **寫入（POST）**：`https://script.google.com/macros/s/AKfycbzy3EHTCyTYjA9j1CvJGvWwDM_RrkCuzNYkMhP7T9DTJ6V6g7Sodrlo4uv3h9yx0HLdsg/exec`
@@ -115,9 +129,9 @@ Invoke-RestMethod -Uri $url -Method Post -ContentType "text/plain; charset=utf-8
 - `data` 陣列中每個物件以 `HeroID` 為 key 定位行，其餘欄位直接寫入對應欄
 - **當需要更新 Google Sheet 時，直接用 PowerShell POST，不需要請使用者手動操作**
 
-## Apps Script 部署能力（clasp）
+## 舊版 Apps Script 部署（已棄用）
 
-**AI 團隊可自行修改 GAS 程式碼並部署，不需要使用者介入。**
+> 已遷移至 Cloudflare Workers，以下僅供歷史參考。
 
 - **GAS 原始碼**：`gas/程式碼.js`（完整 doGet + doPost + 所有 handler）
 - **clasp 設定**：`gas/.clasp.json`（scriptId: `1nTjW3rZftAlH3XcbYvg3fP5nrm3TeAkEXFpWDmdcRqbgKEm6HQg7BU5J`）
@@ -135,12 +149,9 @@ npx @google/clasp deploy -i "AKfycbxXdy3QCvgX7knCCnxfmVY0CMqmUgcG422nVgFDlx5l9Cs
 Pop-Location
 ```
 
-### 重要原則
+### 舊版重要原則（GAS 架構，已廢棄）
 
-- **使用者只負責提需求，AI 團隊負責全部實現（前端、後端、GAS、部署、測試）**
-- 需要新增 GAS API → 直接改 `gas/程式碼.js` 的 doPost switch-case + 加 handler → clasp push + deploy
-- 需要改 Google Sheet 結構 → 用 POST API（createSheet / updateSheet / appendRows）
-- **絕對不要要求使用者手動貼程式碼、手動部署、或手動操作 Google Sheet**
+> 後端已遷移至 Cloudflare Workers + D1，下列 GAS 相關規則僅供歷史參考。
 
 ## AI 團隊調度
 
@@ -171,4 +182,4 @@ Pop-Location
 | `scripts/fbx_to_glb.py` | FBX→GLB 批次轉換（Blender Python） | `blender --background --python scripts/fbx_to_glb.py` |
 | `scripts/convert_models.ps1` | 上述腳本的 PowerShell 包裝器 | `.\scripts\convert_models.ps1` |
 | `scripts/generate_thumbnails.js` | 角色大頭照生成（Puppeteer） | `node scripts/generate_thumbnails.js` |
-| `scripts/update_heroes_sheet.gs` | Google Sheet heroes 表結構更新 | 貼入 Apps Script 執行（或用 POST API） |
+

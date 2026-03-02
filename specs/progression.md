@@ -1,21 +1,21 @@
 # 養成系統 Spec
 
-> 版本：v2.0 ｜ 狀態：🟢 已實作
-> 最後更新：2026-03-01
+> 版本：v2.3 ｜ 狀態：🟢 已實作
+> 最後更新：2026-03-02
 > 負賬角色：🎯 GAME_DESIGN → 🔧 CODING
 
 ## 概述
 
-角色成長路徑：**等級**（消耗素材升級）、**突破**（提升等級上限+屬性加成）、**星級**（碎片升星，解鎖被動技能）、**裝備**（模板制 128 種，4 格位 × 8 套裝 × 4 稀有度，主屬性 + 強化，套裝 2 件 / 4 件效果，抽卡取得可重複持有）。
+角色成長路徑：**等級**（消耗 EXP 頂層資源升級）、**突破**（提升等級上限+屬性加成）、**星級**（碎片升星，解鎖被動技能）、**裝備**（模板制 128 種，4 格位 × 8 套裝 × 4 稀有度，主屬性 + 強化，套裝 2 件 / 4 件效果，抽卡取得可重複持有）。
 
-養成 UI 已全面實作：升級（素材選擇 + 預覽）、突破、升星、裝備穿脫均可操作，全部走 Optimistic Queue。
+養成 UI 已全面實作：升級（EXP 滑桿 + 預覽）、突破、升星、裝備穿脫均可操作，全部走 Optimistic Queue。
 
 ## 依賴
 
 - `specs/hero-schema.md` — HeroInstance 結構（HP, ATK, DEF, SPD, CritRate, CritDmg, stars）
 - `specs/skill-system.md` — 被動技能星級解鎖
 - `specs/save-system.md` — 存檔結構
-- `specs/inventory.md` — 素材消耗與背包操作（經驗核心/碎片/職業石/強化石等）
+- `specs/inventory.md` — 素材消耗與背包操作（碎片/職業石等）；EXP 已改為頂層資源（save_data.exp）
 
 ## 實作對照
 
@@ -35,7 +35,7 @@
 | 項目 | 值 |
 |------|-----|
 | 等級範圍 | 1-60 |
-| 升級方式 | 消耗「經驗素材」（非自動經驗） |
+| 升級方式 | 消耗 EXP 頂層資源（滑桿 UI 選擇投入量） |
 | 等級上限 | 由突破階段決定（見 §二） |
 
 ### 升級所需經驗（expToNextLevel）
@@ -88,13 +88,20 @@ function getStatAtLevel(baseStat: number, level: number, rarity: number = 3): nu
 
 > **SPD / CritRate / CritDmg** 不受等級影響，只受裝備/buff。
 
-### 經驗素材
+### EXP 資源（v2.3 重構）
 
-| 素材 | 提供經驗 | 來源 |
-|------|---------|------|
-| 小型經驗核心 | 100 EXP | 主線掉落、資源計時器、每日副本 |
-| 中型經驗核心 | 500 EXP | 主線後期、每日副本（中/高級） |
-| 大型經驗核心 | 2,000 EXP | 爬塔獎勵（每10層）、Boss 戰 |
+> **v2.3 變更**：EXP 改為頂層資源（與 gold / diamond 同級），存於 `save_data.exp`。
+> 舊版 exp_core_s / exp_core_m / exp_core_l 道具已移除。
+
+| 來源 | EXP 獲取量 |
+|------|------------|
+| 主線通關 | 依關卡公式（見 stage-system.md） |
+| 無盡爬塔 | `50 + floor × 10` |
+| 每日副本 | easy: 100 / normal: 200 / hard: 400 |
+| PvP 競技場 | `80 + progress × 10` |
+| Boss 挑戰 | 依段位 100~600 |
+| 離線計時器 | `expPerHour = Math.max(100, progress * 50)` |
+| 商店購買 | 直接購買 EXP 資源 |
 
 ---
 
@@ -433,7 +440,7 @@ function getFinalStats(base: BaseStats, hero: HeroInstanceData): FinalStats {
 
 | 操作 | UI 按鈕 | 狀態 |
 |------|--------|------|
-| 升級 | 📈 升級 | ✅ **已實作** — 素材選擇（經驗核心 S/M/L）+ 預覽 + Optimistic update |
+| 升級 | 📈 升級 | ✅ **已實作** — EXP 滑桿選擇投入量 + 預覽 + Optimistic update |
 | 突破 | 🔥 突破 | ✅ **已實作** — canAscend 檢查 + 費用顯示 + Optimistic update |
 | 升星 | ⭐ 升星 | ✅ **已實作** — canStarUp 檢查 + 碎片費用 + Optimistic update |
 | 裝備穿脫 | ⚔️/🛡️/💍/👢 | ✅ **已實作** — 4 槽位（weapon/armor/ring/boots）、裝備選擇彈窗、卸下功能 |
@@ -441,6 +448,60 @@ function getFinalStats(base: BaseStats, hero: HeroInstanceData): FinalStats {
 | 裝備抽卡 | 🎰 裝備抽 | ❌ 未實作 — 需新增裝備抽卡頁面（金幣池 / 鑽石池、單抽 / 十連） |
 
 > 全部養成操作均透過 `progressionService` 走 Optimistic Queue，本地即時更新 + 背景同步 GAS。
+
+---
+
+## 八、每日簽到系統
+
+> **v2.2 新增**
+
+### 概述
+
+7 天循環簽到獎勵系統，每日可簽到一次領取獎勵。UTC+8 日期判斷。
+
+### GAS Handler
+
+`handleDailyCheckin_()` — action: `daily-checkin`
+
+```
+POST { action: 'daily-checkin', guestToken }
+    ↓
+1. resolvePlayerId_(guestToken) → playerId
+2. 取得 UTC+8 當日日期（YYYY-MM-DD）
+3. 讀取 save_data.checkinLastDate
+4. 若 checkinLastDate === 當日 → { success: false, reason: 'already_checked_in' }
+5. 讀取 checkinDay → 遞增（>7 重置為 1）
+6. 依 checkinDay 發放對應獎勵（7 天循環表）
+7. 更新 checkinDay + checkinLastDate + lastSaved
+8. 回傳 { success: true, day: checkinDay, rewards: [...] }
+```
+
+### 7 天獎勵循環
+
+| Day | 獎勵 |
+|-----|------|
+| 1 | 金幣 |
+| 2 | 經驗素材 |
+| 3 | 鑽石 |
+| 4 | 突破素材 |
+| 5 | 金幣 + 經驗素材 |
+| 6 | 鑽石 + 素材 |
+| 7 | 大獎（高額鑽石/稀有素材） |
+
+> 獎勵具體數值由 GAS `handleDailyCheckin_()` 內部定義。
+
+### SaveData 欄位
+
+| 欄位 | 型別 | 說明 |
+|------|------|------|
+| `checkinDay` | number | 當前簽到天數（1~7 循環） |
+| `checkinLastDate` | string | 上次簽到日期（UTC+8 格式 `YYYY-MM-DD`） |
+
+### 前端
+
+- **元件**：`CheckinPanel.tsx`（見 `ui-flow.md` §6.15）
+- **Service**：`saveService.ts` — `doDailyCheckin()` 呼叫 GAS `daily-checkin` action
+- **MenuScreen**：MainMenu 新增 `'checkin'` 選項
 
 ---
 
@@ -469,3 +530,5 @@ function getFinalStats(base: BaseStats, hero: HeroInstanceData): FinalStats {
 | v1.4 | 2026-03-01 | 新增 `completeBattle()` 統一結算 API（POST `complete-battle`），對應 GAS `handleCompleteBattle_`；STAR_PASSIVE_SLOTS 補齊全 7 級（★0~★6 → 1/1/2/2/3/3/4）；舊 completeStage/completeTower/completeDaily 保留向下相容 |
 | v2.0 | 2026-06-15 | **裝備系統 v2 — 模板制大改版**：移除副屬性隨機池、鍛造/拆解系統、強化石、容量管理；改為 128 固定模板（8 套裝 × 4 部位 × 4 稀有度 N/R/SR/SSR）；強化只消耗金幣；新增裝備抽卡取得途徑（金幣池 / 鑽石池）；套裝效果改為 2 件 + 4 件且按稀有度差異化；同 setId + 同 rarity 才計件；Service 層移除 forge/dismantle、新增 enhanceEquipment / equipGachaPull |
 | v2.1 | 2026-06-15 | **裝備系統接通**：修正 App.tsx/useCombatPower 中 `equipment:[]` 改為讀取 `getHeroEquipment()`、裝備數值正式影響戰鬥與戰力；`enhancedMainStat` 依稀有度差異化成長(N:6%/R:8%/SR:10%/SSR:12%)；`getEnhanceCost` 基礎費用調升(N:200/R:500/SR:1000/SSR:2000)；EQUIPMENT_SETS 新增 8 套 4pc 效果；`getActiveSetBonuses` 改為同 setId+同 rarity 才計件；新增 `enhanceEquipment()` service + 強化 UI Modal；GAS enhance handler 改為僅消耗金幣；InventoryPanel tabs 清理移除 3 個廢棄分頁 |
+| v2.2 | 2026-03-02 | **每日簽到系統**：新增 §八 每日簽到（7 天循環、UTC+8 日期邏輯、GAS `handleDailyCheckin_()` handler）；SaveData 新增 `checkinDay` / `checkinLastDate` 欄位；前端 `CheckinPanel.tsx` + `doDailyCheckin()` service |
+| v2.3 | 2026-03-02 | **EXP 資源重構**：移除 exp_core_s/m/l 道具，EXP 改為頂層資源（save_data.exp）；英雄升級改用 EXP 資源 + 滑桿 UI；戰鬥獎勵/離線計時器/商店皆直接發放 EXP；主選單頂欄新增 EXP 顯示；勝利面板顯示 EXP 獎勵 |

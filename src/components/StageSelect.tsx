@@ -1,11 +1,16 @@
 /**
  * StageSelect — 關卡選擇面板
  *
- * 三大模式：主線關卡、無盡爬塔、每日副本
- * 各模式根據玩家進度解鎖。
+ * 主線關卡從 Workers API 動態載入（stage_configs D1 表），
+ * 其他模式（爬塔/每日/PvP/Boss）保持 domain 層邏輯。
+ *
+ * UI 特色：
+ *  - 每章有獨立主題色（城市灰/森林綠/荒原橘）
+ *  - 關卡卡片顯示名稱、難度星、推薦等級、獎勵預覽
+ *  - Boss 關有特殊金框
  */
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import {
   isModeUnlocked,
   MODE_UNLOCK,
@@ -18,21 +23,17 @@ import {
   type BossConfig,
 } from '../domain/stageSystem'
 import { CurrencyIcon } from './CurrencyIcon'
+import { fetchStageConfigs, type StageConfigFromAPI } from '../services/stageService'
 
 /* ────────────────────────────
    Props
    ──────────────────────────── */
 
 interface StageSelectProps {
-  /** 玩家當前劇情進度 */
   storyProgress: { chapter: number; stage: number }
-  /** 玩家爬塔樓層 */
   towerFloor: number
-  /** 各關卡最佳星級 */
   stageStars: Record<string, number>
-  /** 返回主選單 */
   onBack: () => void
-  /** 選擇關卡後進入戰鬥準備 */
   onSelectStage: (mode: 'story' | 'tower' | 'daily' | 'pvp' | 'boss', stageId: string) => void
 }
 
@@ -50,15 +51,56 @@ interface ModeTab {
 }
 
 const MODE_TABS: ModeTab[] = [
-  { key: 'story', icon: '📖', label: '主線',   unlockMode: null },
-  { key: 'tower', icon: '🗼', label: '爬塔',   unlockMode: 'tower' },
+  { key: 'story', icon: '📖', label: '主線', unlockMode: null },
+  { key: 'tower', icon: '🗼', label: '爬塔', unlockMode: 'tower' },
   { key: 'daily', icon: '📅', label: '每日副本', unlockMode: 'daily' },
-  { key: 'pvp',   icon: '⚔️', label: '競技場', unlockMode: 'pvp' },
-  { key: 'boss',  icon: '👹', label: 'Boss',   unlockMode: 'boss' },
+  { key: 'pvp', icon: '⚔️', label: '競技場', unlockMode: 'pvp' },
+  { key: 'boss', icon: '👹', label: 'Boss', unlockMode: 'boss' },
 ]
 
 /* ────────────────────────────
-   Story Stages
+   章節主題定義
+   ──────────────────────────── */
+
+const CHAPTER_THEMES: Record<number, {
+  icon: string; gradient: string; accentColor: string; borderColor: string
+}> = {
+  1: {
+    icon: '🏙️',
+    gradient: 'linear-gradient(135deg, rgba(74,85,104,0.35), rgba(45,55,72,0.15))',
+    accentColor: '#a0aec0',
+    borderColor: 'rgba(160,174,192,0.35)',
+  },
+  2: {
+    icon: '🌲',
+    gradient: 'linear-gradient(135deg, rgba(39,103,73,0.35), rgba(34,84,61,0.15))',
+    accentColor: '#68d391',
+    borderColor: 'rgba(104,211,145,0.35)',
+  },
+  3: {
+    icon: '🏜️',
+    gradient: 'linear-gradient(135deg, rgba(156,66,33,0.35), rgba(124,45,18,0.15))',
+    accentColor: '#ed8936',
+    borderColor: 'rgba(237,137,54,0.35)',
+  },
+}
+
+/* ────────────────────────────
+   Difficulty Skulls
+   ──────────────────────────── */
+
+function DifficultyStars({ level }: { level: number }) {
+  return (
+    <span className="sc-difficulty">
+      {[1, 2, 3, 4, 5].map(i => (
+        <span key={i} className={i <= level ? 'sc-diff-filled' : 'sc-diff-empty'}>💀</span>
+      ))}
+    </span>
+  )
+}
+
+/* ────────────────────────────
+   Story Stages (API-driven)
    ──────────────────────────── */
 
 function StoryStages({
@@ -72,67 +114,152 @@ function StoryStages({
   onSelect: (stageId: string) => void
   onLockedClick: (stageId: string) => void
 }) {
-  const currentChapter = storyProgress.chapter
-  const currentStage = storyProgress.stage
+  const [configs, setConfigs] = useState<StageConfigFromAPI[]>([])
+  const [loading, setLoading] = useState(true)
+  const [selectedChapter, setSelectedChapter] = useState(storyProgress.chapter)
 
-  // Generate chapters 1-3 with 8 stages each
+  useEffect(() => {
+    let cancelled = false
+    fetchStageConfigs()
+      .then(data => { if (!cancelled) { setConfigs(data); setLoading(false) } })
+      .catch(() => { if (!cancelled) setLoading(false) })
+    return () => { cancelled = true }
+  }, [])
+
+  const playerProgress = (storyProgress.chapter - 1) * 8 + storyProgress.stage
+
   const chapters = useMemo(() => {
-    return Array.from({ length: 3 }, (_, ci) => {
-      const ch = ci + 1
-      const stages = Array.from({ length: 8 }, (_, si) => {
-        const st = si + 1
-        const stageId = `${ch}-${st}`
-        const progress = (ch - 1) * 8 + st
-        const playerProgress = (currentChapter - 1) * 8 + currentStage
-        const cleared = progress < playerProgress
-        const current = progress === playerProgress
-        const locked = progress > playerProgress
-        const bestStars = stageStars[stageId] || 0
-        const maxStars = cleared && bestStars === 0 ? 3 : bestStars // fallback: cleared前端視為3星
+    const map = new Map<number, StageConfigFromAPI[]>()
+    for (const cfg of configs) {
+      const arr = map.get(cfg.chapter) || []
+      arr.push(cfg)
+      map.set(cfg.chapter, arr)
+    }
+    return Array.from(map.entries())
+      .sort(([a], [b]) => a - b)
+      .map(([ch, stages]) => ({ chapter: ch, stages: stages.sort((a, b) => a.stage - b.stage) }))
+  }, [configs])
 
-        return { stageId, stage: st, cleared, current, locked, bestStars: maxStars }
-      })
-      return { chapter: ch, stages }
-    })
-  }, [currentChapter, currentStage, stageStars])
+  const currentChapter = chapters.find(c => c.chapter === selectedChapter)
+  const theme = CHAPTER_THEMES[selectedChapter] || CHAPTER_THEMES[1]
+
+  if (loading) {
+    return <div className="sc-loading">⏳ 載入關卡資料中…</div>
+  }
+
+  if (chapters.length === 0) {
+    return <div className="sc-loading">暫無關卡資料</div>
+  }
 
   return (
-    <div className="stage-story">
-      {chapters.map((ch) => (
-        <div key={ch.chapter} className="stage-chapter">
-          <h3 className="stage-chapter-title">第 {ch.chapter} 章</h3>
-          <div className="stage-list">
-            {ch.stages.map((s) => {
-              const is3Star = s.bestStars >= 3
-              return (
-                <button
-                  key={s.stageId}
-                  className={`stage-btn ${s.cleared ? 'stage-cleared' : ''} ${s.current ? 'stage-current' : ''} ${s.locked ? 'stage-locked' : ''} ${is3Star ? 'stage-maxed' : ''}`}
-                  disabled={is3Star}
-                  onClick={() => {
-                    if (s.locked) { onLockedClick(s.stageId); return }
-                    onSelect(s.stageId)
-                  }}
-                >
-                  <span className="stage-btn-id">{s.stageId}</span>
-                  {s.cleared && (
-                    <span className="stage-btn-stars">
-                      {[1, 2, 3].map(i => (
-                        <span key={i} className={i <= s.bestStars ? 'star-active' : 'star-empty'}>
-                          {i <= s.bestStars ? '⭐' : '☆'}
-                        </span>
-                      ))}
-                    </span>
-                  )}
-                  {s.current && <span className="stage-btn-badge">📍</span>}
-                  {s.locked && <span className="stage-btn-lock">🔒</span>}
-                  {is3Star && <span className="stage-btn-complete">✅</span>}
-                </button>
-              )
-            })}
-          </div>
+    <div className="sc-story">
+      {/* 章節選擇器 */}
+      <div className="sc-chapter-tabs">
+        {chapters.map(ch => {
+          const t = CHAPTER_THEMES[ch.chapter] || CHAPTER_THEMES[1]
+          const chExtra = ch.stages[0]?.extra
+          const chapterName = chExtra?.chapterName || `第 ${ch.chapter} 章`
+          const chapterIcon = chExtra?.chapterIcon || t.icon
+          const isActive = selectedChapter === ch.chapter
+          return (
+            <button
+              key={ch.chapter}
+              className={`sc-chapter-tab ${isActive ? 'sc-chapter-active' : ''}`}
+              style={{
+                borderColor: isActive ? t.accentColor : 'transparent',
+                color: isActive ? t.accentColor : '#999',
+                background: isActive ? t.gradient : 'transparent',
+              }}
+              onClick={() => setSelectedChapter(ch.chapter)}
+            >
+              <span className="sc-chapter-tab-icon">{chapterIcon}</span>
+              <span className="sc-chapter-tab-name">{chapterName}</span>
+            </button>
+          )
+        })}
+      </div>
+
+      {/* 章節描述 Banner */}
+      {currentChapter && currentChapter.stages[0]?.extra?.description && (
+        <div className="sc-chapter-banner" style={{ background: theme.gradient, borderColor: theme.borderColor }}>
+          <span className="sc-chapter-banner-text">
+            {currentChapter.stages[0].extra.description}
+          </span>
         </div>
-      ))}
+      )}
+
+      {/* 關卡卡片 */}
+      {currentChapter && (
+        <div className="sc-stage-grid">
+          {currentChapter.stages.map(cfg => {
+            const linearIdx = (cfg.chapter - 1) * 8 + cfg.stage
+            const cleared = linearIdx < playerProgress
+            const current = linearIdx === playerProgress
+            const locked = linearIdx > playerProgress
+            const bestStars = stageStars[cfg.stageId] || 0
+            const displayStars = cleared && bestStars === 0 ? 3 : bestStars
+            const is3Star = displayStars >= 3
+            const isBoss = cfg.extra?.isBoss || false
+
+            return (
+              <button
+                key={cfg.stageId}
+                className={`sc-stage-card ${cleared ? 'sc-cleared' : ''} ${current ? 'sc-current' : ''} ${locked ? 'sc-locked' : ''} ${is3Star ? 'sc-maxed' : ''} ${isBoss ? 'sc-boss-stage' : ''}`}
+                style={{
+                  borderColor: current ? theme.accentColor
+                    : isBoss && !locked ? 'rgba(233,196,106,0.5)'
+                      : cleared ? theme.borderColor : undefined,
+                }}
+                disabled={is3Star}
+                onClick={() => {
+                  if (locked) { onLockedClick(cfg.stageId); return }
+                  onSelect(cfg.stageId)
+                }}
+              >
+                {/* Header */}
+                <div className="sc-card-header">
+                  <span className="sc-card-id">{cfg.stageId}</span>
+                  {isBoss && <span className="sc-card-boss-badge">BOSS</span>}
+                  {locked && <span className="sc-card-lock">🔒</span>}
+                  {current && <span className="sc-card-current">📍</span>}
+                  {is3Star && <span className="sc-card-complete">✅</span>}
+                </div>
+
+                {/* 名稱 */}
+                <div className="sc-card-name">{cfg.extra?.stageName || `關卡 ${cfg.stage}`}</div>
+
+                {/* 難度 */}
+                <DifficultyStars level={cfg.extra?.difficulty || 1} />
+
+                {/* 推薦等級 + 敵人數量 */}
+                <div className="sc-card-meta">
+                  <span className="sc-card-rec">Lv.{cfg.extra?.recommendedLevel || 1}</span>
+                  <span className="sc-card-enemy-count">👾×{cfg.enemies.length}</span>
+                </div>
+
+                {/* 獎勵 */}
+                <div className="sc-card-rewards">
+                  <span><CurrencyIcon type="gold" />{cfg.rewards.gold}</span>
+                  {(cfg.rewards.diamond ?? 0) > 0 && (
+                    <span><CurrencyIcon type="diamond" />{cfg.rewards.diamond}</span>
+                  )}
+                </div>
+
+                {/* 星級 */}
+                {cleared && (
+                  <div className="sc-card-stars">
+                    {[1, 2, 3].map(i => (
+                      <span key={i} className={i <= displayStars ? 'sc-star-earned' : 'sc-star-empty'}>
+                        {i <= displayStars ? '⭐' : '☆'}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </button>
+            )
+          })}
+        </div>
+      )}
     </div>
   )
 }
@@ -217,39 +344,33 @@ function DailyPanel({
         <div className="daily-empty">今日無開放副本</div>
       )}
 
-      {today.map((dungeon: DailyDungeon) => {
-        const _availableTiers = dungeon.difficulties.filter(
-          d => storyProgress.chapter >= d.requiredChapter,
-        )
-
-        return (
-          <div key={dungeon.dungeonId} className="daily-dungeon-card">
-            <div className="daily-dungeon-header">
-              <span className="daily-dungeon-name">{dungeon.name}</span>
-              <span className="daily-dungeon-days">
-                開放日：{dungeon.availableDays.map(d => dayNames[d]).join('、')}
-              </span>
-            </div>
-            <div className="daily-dungeon-tiers">
-              {dungeon.difficulties.map((diff) => {
-                const unlocked = storyProgress.chapter >= diff.requiredChapter
-                const tierLabel = { easy: '簡單', normal: '普通', hard: '困難' }[diff.tier]
-                return (
-                  <button
-                    key={diff.tier}
-                    className={`daily-tier-btn ${unlocked ? '' : 'daily-tier-locked'}`}
-                    disabled={!unlocked}
-                    onClick={() => onSelect(`${dungeon.dungeonId}_${diff.tier}`)}
-                  >
-                    <span>{tierLabel}</span>
-                    {!unlocked && <span className="daily-tier-req">需第{diff.requiredChapter}章</span>}
-                  </button>
-                )
-              })}
-            </div>
+      {today.map((dungeon: DailyDungeon) => (
+        <div key={dungeon.dungeonId} className="daily-dungeon-card">
+          <div className="daily-dungeon-header">
+            <span className="daily-dungeon-name">{dungeon.name}</span>
+            <span className="daily-dungeon-days">
+              開放日：{dungeon.availableDays.map(d => dayNames[d]).join('、')}
+            </span>
           </div>
-        )
-      })}
+          <div className="daily-dungeon-tiers">
+            {dungeon.difficulties.map((diff) => {
+              const unlocked = storyProgress.chapter >= diff.requiredChapter
+              const tierLabel = { easy: '簡單', normal: '普通', hard: '困難' }[diff.tier]
+              return (
+                <button
+                  key={diff.tier}
+                  className={`daily-tier-btn ${unlocked ? '' : 'daily-tier-locked'}`}
+                  disabled={!unlocked}
+                  onClick={() => onSelect(`${dungeon.dungeonId}_${diff.tier}`)}
+                >
+                  <span>{tierLabel}</span>
+                  {!unlocked && <span className="daily-tier-req">需第{diff.requiredChapter}章</span>}
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      ))}
     </div>
   )
 }
@@ -282,7 +403,7 @@ function PvPPanel({
           <div key={opp.opponentId} className="pvp-opponent-card">
             <div className="pvp-opponent-header">
               <span className="pvp-opponent-name">{difficulties[idx]} {opp.name}</span>
-              <span className="pvp-opponent-power">⚡ {opp.power.toLocaleString()}</span>
+              <span className="pvp-opponent-power">{opp.power.toLocaleString()}</span>
             </div>
             <div className="pvp-opponent-info">
               <span>編隊：{opp.enemies.length} 名</span>
@@ -321,7 +442,7 @@ function BossPanel2({
       </div>
       <div className="boss-list">
         {BOSS_CONFIGS.map((boss: BossConfig, idx: number) => {
-          const requiredProgress = idx === 0 ? 16 : idx === 1 ? 20 : 24 // 2-8, 3-4, 3-8
+          const requiredProgress = idx === 0 ? 16 : idx === 1 ? 20 : 24
           const unlocked = progress >= requiredProgress
           return (
             <div key={boss.bossId} className={`boss-card ${!unlocked ? 'boss-card-locked' : ''}`}>
@@ -368,7 +489,6 @@ export function StageSelect({
   const [activeMode, setActiveMode] = useState<StageMode>('story')
   const [lockToast, setLockToast] = useState<string | null>(null)
 
-  /** 點擊未解鎖tab時顯示 toast */
   const handleTabClick = (tab: ModeTab) => {
     if (tab.unlockMode && !isModeUnlocked(tab.unlockMode, storyProgress)) {
       const req = MODE_UNLOCK[tab.unlockMode]
@@ -382,13 +502,11 @@ export function StageSelect({
   return (
     <div className="panel-overlay">
       <div className="panel-container">
-        {/* Header */}
         <div className="panel-header">
           <button className="panel-back-btn" onClick={onBack}>← 返回</button>
           <h2 className="panel-title">🗺️ 關卡選擇</h2>
         </div>
 
-        {/* Mode Tabs */}
         <div className="stage-mode-tabs">
           {MODE_TABS.map((tab) => {
             const unlocked = tab.unlockMode
@@ -409,7 +527,6 @@ export function StageSelect({
           })}
         </div>
 
-        {/* Content */}
         <div className="stage-content">
           {activeMode === 'story' && (
             <StoryStages
@@ -448,7 +565,6 @@ export function StageSelect({
           )}
         </div>
 
-        {/* 鎖定提示 */}
         {lockToast && (
           <div className="stage-lock-toast">{lockToast}</div>
         )}

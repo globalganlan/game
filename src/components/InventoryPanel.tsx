@@ -24,8 +24,9 @@ import {
 import type { EquipmentInstance } from '../domain/progressionSystem'
 import { enhancedMainStat } from '../domain/progressionSystem'
 import { emitAcquire } from '../services/acquireToastBus'
+import { emitToast } from '../services/acquireToastBus'
 import { openEquipmentChest, getEquipDisplayName } from '../domain/equipmentGacha'
-import { addEquipmentLocally } from '../services/inventoryService'
+import { addEquipmentLocally, equipItem, unequipItem, getHeroEquipment } from '../services/inventoryService'
 
 /* ────────────────────────────
    Props
@@ -34,6 +35,7 @@ import { addEquipmentLocally } from '../services/inventoryService'
 interface InventoryPanelProps {
   onBack: () => void
   heroesList?: RawHeroData[]
+  heroInstances?: import('../services/saveService').HeroInstance[]
 }
 
 /* ────────────────────────────
@@ -75,6 +77,7 @@ interface CategoryTab {
 
 const TABS: CategoryTab[] = [
   { key: 'all',                icon: '📦', label: '全部' },
+  { key: 'equipment',          icon: '⚔️', label: '裝備' },
   { key: 'exp_material',       icon: '📗', label: '經驗' },
   { key: 'ascension_material', icon: '🔥', label: '突破' },
   { key: 'general_material',   icon: '🧪', label: '通用' },
@@ -162,16 +165,21 @@ function ItemDetail({ item, definition, onClose, heroMap }: ItemDetailProps & { 
 
   const canUse = !!definition?.useAction
   const canSell = sellPrice > 0 && qty > 0
+  const [loading, setLoading] = useState(false)
+
+  const isChest = item.itemId.startsWith('chest_')
 
   const handleUse = useCallback(async () => {
-    if (!canUse) return
+    if (!canUse || loading) return
     try {
-      // 裝備寶箱 — 本地生成裝備
+      // 裝備寶箱 — 本地生成裝備（裝備 ID 需前端產生以綁定 equipId）
       if (item.itemId === 'chest_equipment') {
         const eq = openEquipmentChest()
         addEquipmentLocally([eq])
-        // 扣減寶箱（本地 + 背景同步，帶 equipment 讓 server 持久化）
+        setLoading(true)
+        setActionMsg('開啟中...')
         const result = await useItem(item.itemId, 1, undefined, { equipment: [eq] })
+        setLoading(false)
         if (!result.success) {
           setActionMsg('使用失敗')
           return
@@ -187,37 +195,100 @@ function ItemDetail({ item, definition, onClose, heroMap }: ItemDetailProps & { 
         }])
         return
       }
+
+      // 銅/銀/金寶箱 — 伺服器開獎（防作弊，結果以伺服器為準）
+      if (item.itemId === 'chest_bronze' || item.itemId === 'chest_silver' || item.itemId === 'chest_gold') {
+        setLoading(true)
+        setActionMsg('開啟中...')
+        const result = await useItem(item.itemId, 1)
+        setLoading(false)
+        if (!result.success) {
+          setActionMsg('使用失敗')
+          return
+        }
+        // 伺服器回傳實際獎勵 → 寫入本地
+        if (result.result && typeof result.result === 'object') {
+          const r = result.result as Record<string, unknown>
+          const { addItemsLocally } = await import('../services/inventoryService')
+          const { updateLocalCurrency, updateProgress, getSaveState } = await import('../services/saveService')
+          const acquireItems: { type: 'currency' | 'item'; id: string; name: string; quantity: number; rarity?: 'N' | 'R' | 'SR' | 'SSR' }[] = []
+          if (typeof r.gold === 'number' && r.gold > 0) {
+            updateLocalCurrency('gold', r.gold)
+            acquireItems.push({ type: 'currency', id: 'gold', name: '金幣', quantity: r.gold })
+          }
+          if (typeof r.diamond === 'number' && r.diamond > 0) {
+            updateLocalCurrency('diamond', r.diamond)
+            acquireItems.push({ type: 'currency', id: 'diamond', name: '鑽石', quantity: r.diamond, rarity: 'SR' })
+          }
+          if (typeof r.exp === 'number' && r.exp > 0) {
+            updateProgress({ exp: (getSaveState()?.save.exp ?? 0) + r.exp })
+            acquireItems.push({ type: 'currency', id: 'exp', name: '經驗', quantity: r.exp })
+          }
+          if (Array.isArray(r.items)) {
+            const toAdd = (r.items as { itemId?: string; quantity?: number }[])
+              .filter(i => i.itemId && i.quantity)
+              .map(i => ({ itemId: i.itemId!, quantity: i.quantity! }))
+            if (toAdd.length > 0) addItemsLocally(toAdd)
+            for (const ri of toAdd) {
+              acquireItems.push({ type: 'item', id: ri.itemId, name: getItemName(ri.itemId), quantity: ri.quantity })
+            }
+          }
+          if (acquireItems.length > 0) emitAcquire(acquireItems)
+        }
+        setActionMsg('寶箱已開啟！')
+        return
+      }
+
       // 一般道具
-      // eslint-disable-next-line react-hooks/rules-of-hooks
       const result = await useItem(item.itemId, 1)
       if (result.success) {
-        setActionMsg('使用成功！')
-        // 寶箱/道具結果觸發獲得物品動畫
         if (result.result && typeof result.result === 'object') {
           const r = result.result as Record<string, unknown>
           const items: { type: 'currency' | 'item'; id: string; name: string; quantity: number; rarity?: 'N' | 'R' | 'SR' | 'SSR' }[] = []
           if (typeof r.gold === 'number' && r.gold > 0) items.push({ type: 'currency', id: 'gold', name: '金幣', quantity: r.gold })
           if (typeof r.diamond === 'number' && r.diamond > 0) items.push({ type: 'currency', id: 'diamond', name: '鑽石', quantity: r.diamond, rarity: 'SR' })
-          if (typeof r.exp === 'number' && r.exp > 0) items.push({ type: 'currency', id: 'exp', name: '經驗', quantity: r.exp })
           if (Array.isArray(r.items)) {
             for (const ri of r.items as { itemId?: string; name?: string; quantity?: number }[]) {
-              if (ri.itemId && ri.quantity) items.push({ type: 'item', id: ri.itemId, name: ri.name || ri.itemId, quantity: ri.quantity })
+              if (ri.itemId && ri.quantity) items.push({ type: 'item', id: ri.itemId, name: getItemName(ri.itemId), quantity: ri.quantity })
             }
           }
-          if (items.length > 0) emitAcquire(items)
+          if (items.length > 0) {
+            emitAcquire(items)
+            try {
+              const { updateLocalCurrency, updateProgress, getSaveState } = await import('../services/saveService')
+              const { addItemsLocally } = await import('../services/inventoryService')
+              if (typeof r.gold === 'number' && r.gold > 0) updateLocalCurrency('gold', r.gold as number)
+              if (typeof r.diamond === 'number' && r.diamond > 0) updateLocalCurrency('diamond', r.diamond as number)
+              if (typeof r.exp === 'number' && r.exp > 0) updateProgress({ exp: (getSaveState()?.save.exp ?? 0) + (r.exp as number) })
+              // 同步道具到本地背包
+              if (Array.isArray(r.items)) {
+                const toAdd = (r.items as { itemId?: string; quantity?: number }[])
+                  .filter(i => i.itemId && i.quantity)
+                  .map(i => ({ itemId: i.itemId!, quantity: i.quantity! }))
+                if (toAdd.length > 0) addItemsLocally(toAdd)
+              }
+            } catch { /* silent */ }
+          }
+          setActionMsg(r.type === 'chest' ? '寶箱已開啟！' : '使用成功！')
+        } else {
+          setActionMsg('使用成功！')
         }
       } else {
         setActionMsg('使用失敗')
       }
     } catch { setActionMsg('使用失敗') }
-  }, [item.itemId, canUse])
+  }, [item.itemId, canUse, loading])
 
-  const handleSell = useCallback(async () => {
+  const handleSell = useCallback(() => {
     if (!canSell) return
-    try {
-      const gold = await sellItems([{ itemId: item.itemId, quantity: 1 }])
-      setActionMsg(`出售獲得 ${gold} 金幣`)
-    } catch { setActionMsg('出售失敗') }
+    const gold = sellItems([{ itemId: item.itemId, quantity: 1 }])
+    // 本地金幣同步（sellItems 已樂觀扣背包，金幣需 saveService 更新）
+    if (gold > 0) {
+      import('../services/saveService').then(({ updateLocalCurrency }) => {
+        updateLocalCurrency('gold', gold)
+      })
+    }
+    setActionMsg(`出售獲得 ${gold} 金幣`)
   }, [item.itemId, canSell])
 
   return (
@@ -246,8 +317,8 @@ function ItemDetail({ item, definition, onClose, heroMap }: ItemDetailProps & { 
         {actionMsg && <div className="inv-action-msg">{actionMsg}</div>}
         <div className="inv-detail-actions">
           {canUse && (
-            <button className="inv-action-btn inv-use-btn" onClick={handleUse}>
-              使用
+            <button className="inv-action-btn inv-use-btn" onClick={handleUse} disabled={loading}>
+              {loading ? '開啟中...' : (isChest ? '開啟' : '使用')}
             </button>
           )}
           {canSell && (
@@ -268,10 +339,13 @@ function ItemDetail({ item, definition, onClose, heroMap }: ItemDetailProps & { 
 interface EquipmentDetailProps {
   equip: EquipmentInstance
   onClose: () => void
+  heroInstances?: import('../services/saveService').HeroInstance[]
+  heroNameMap?: Map<number, string>
 }
 
-function EquipmentDetail({ equip, onClose }: EquipmentDetailProps) {
+function EquipmentDetail({ equip, onClose, heroInstances, heroNameMap }: EquipmentDetailProps) {
   const [actionMsg, setActionMsg] = useState('')
+  const [showHeroSelect, setShowHeroSelect] = useState(false)
   const slotLabel = equip.slot === 'weapon' ? '武器' : equip.slot === 'armor' ? '護甲'
     : equip.slot === 'ring' ? '戒指' : '鞋子'
   const slotIcon = equip.slot === 'weapon' ? '⚔️' : equip.slot === 'armor' ? '🛡️'
@@ -283,6 +357,33 @@ function EquipmentDetail({ equip, onClose }: EquipmentDetailProps) {
     setActionMsg(newLocked ? '已鎖定' : '已解鎖')
   }, [equip])
 
+  const handleUnequip = useCallback(async () => {
+    try {
+      await unequipItem(equip.equipId)
+      setActionMsg('已卸下裝備')
+      emitToast('✅ 已卸下裝備')
+    } catch { setActionMsg('卸下失敗') }
+  }, [equip.equipId])
+
+  const handleEquipTo = useCallback(async (heroInstId: string, heroName: string) => {
+    try {
+      // 先檢查該英雄同格位是否已有裝備
+      const heroEqs = getHeroEquipment(heroInstId)
+      const conflict = heroEqs.find(e => e.slot === equip.slot && e.equipId !== equip.equipId)
+      await equipItem(equip.equipId, heroInstId)
+      setActionMsg(`已裝備給 ${heroName}`)
+      emitToast(`✅ 已裝備給 ${heroName}${conflict ? '（舊裝備已自動卸下）' : ''}`)
+      setShowHeroSelect(false)
+    } catch { setActionMsg('裝備失敗') }
+  }, [equip.equipId, equip.slot])
+
+  // 英雄名稱解析
+  const getHeroName = useCallback((instId: string) => {
+    const inst = heroInstances?.find(h => h.instanceId === instId)
+    if (!inst) return instId
+    return heroNameMap?.get(inst.heroId) ?? `英雄#${inst.heroId}`
+  }, [heroInstances, heroNameMap])
+
   return (
     <div className="inv-detail-backdrop" onClick={onClose}>
       <div className="inv-detail-card inv-equip-detail" onClick={e => e.stopPropagation()}>
@@ -291,7 +392,7 @@ function EquipmentDetail({ equip, onClose }: EquipmentDetailProps) {
           <span className="inv-detail-icon">{slotIcon}</span>
           <div>
             <h3 style={{ color: RARITY_COLORS[equip.rarity] ?? '#ddd' }}>
-              {equip.templateId}
+              {getEquipDisplayName(equip)}
               {equip.enhanceLevel > 0 && <span className="inv-equip-enhance"> +{equip.enhanceLevel}</span>}
             </h3>
             <span className="inv-detail-rarity">
@@ -302,13 +403,13 @@ function EquipmentDetail({ equip, onClose }: EquipmentDetailProps) {
         </div>
         {/* 主屬性 */}
         <div className="inv-equip-main-stat">
-          <span>{equip.mainStat}</span>
-          <span className="inv-equip-stat-val">+{enhancedMainStat(equip.mainStatValue, equip.enhanceLevel)}</span>
+          <span>{equip.mainStat ?? '?'}</span>
+          <span className="inv-equip-stat-val">+{enhancedMainStat(equip.mainStatValue ?? 0, equip.enhanceLevel ?? 0)}</span>
         </div>
         {/* 副屬性 */}
-        {equip.subStats.length > 0 && (
+        {(equip.subStats ?? []).length > 0 && (
           <div className="inv-equip-sub-stats">
-            {equip.subStats.map((sub, i) => (
+            {(equip.subStats ?? []).map((sub, i) => (
               <div key={i} className="inv-equip-sub-row">
                 <span>{sub.stat}</span>
                 <span>+{sub.value}{sub.isPercent ? '%' : ''}</span>
@@ -322,14 +423,42 @@ function EquipmentDetail({ equip, onClose }: EquipmentDetailProps) {
         )}
         {/* 裝備狀態 */}
         {equip.equippedBy && (
-          <div className="inv-equip-equipped-by">已裝備給英雄</div>
+          <div className="inv-equip-equipped-by">已裝備給：{getHeroName(equip.equippedBy)}</div>
         )}
         {actionMsg && <div className="inv-action-msg">{actionMsg}</div>}
         <div className="inv-detail-actions">
           <button className="inv-action-btn inv-lock-btn" onClick={handleToggleLock}>
             {equip.locked ? '🔓 解鎖' : '🔒 鎖定'}
           </button>
+          {equip.equippedBy ? (
+            <button className="inv-action-btn inv-sell-btn" onClick={handleUnequip}>
+              ⬇️ 卸下
+            </button>
+          ) : (
+            <button className="inv-action-btn inv-use-btn" onClick={() => setShowHeroSelect(true)}>
+              ⬆️ 裝備給英雄
+            </button>
+          )}
         </div>
+
+        {/* 英雄選擇彈窗 */}
+        {showHeroSelect && heroInstances && heroInstances.length > 0 && (
+          <div className="inv-hero-select">
+            <div className="inv-hero-select-title">選擇英雄</div>
+            {heroInstances.map(h => {
+              const name = heroNameMap?.get(h.heroId) ?? `英雄#${h.heroId}`
+              return (
+                <button
+                  key={h.instanceId}
+                  className="inv-hero-select-btn"
+                  onClick={() => handleEquipTo(h.instanceId, name)}
+                >
+                  {name} (Lv.{h.level})
+                </button>
+              )
+            })}
+          </div>
+        )}
       </div>
     </div>
   )
@@ -339,7 +468,7 @@ function EquipmentDetail({ equip, onClose }: EquipmentDetailProps) {
    Main Panel
    ──────────────────────────── */
 
-export function InventoryPanel({ onBack, heroesList }: InventoryPanelProps) {
+export function InventoryPanel({ onBack, heroesList, heroInstances }: InventoryPanelProps) {
   const heroNameMap = useMemo(() => {
     const m = new Map<number, string>()
     for (const h of (heroesList ?? [])) {
@@ -489,7 +618,7 @@ export function InventoryPanel({ onBack, heroesList }: InventoryPanelProps) {
               <span className="inv-cell-icon">
                 {eq.slot === 'weapon' ? '⚔️' : eq.slot === 'armor' ? '🛡️' : eq.slot === 'ring' ? '💍' : '👢'}
               </span>
-              <span className="inv-cell-name">{eq.templateId}</span>
+              <span className="inv-cell-name">{getEquipDisplayName(eq)}</span>
               <span className="inv-cell-qty">
                 +{eq.enhanceLevel}
                 {eq.locked && ' 🔒'}
@@ -514,6 +643,8 @@ export function InventoryPanel({ onBack, heroesList }: InventoryPanelProps) {
         <EquipmentDetail
           equip={selectedEquip}
           onClose={() => setSelectedEquip(null)}
+          heroInstances={heroInstances}
+          heroNameMap={heroNameMap}
         />
       )}
     </div>

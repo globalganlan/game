@@ -42,13 +42,8 @@ export const ITEM_ICONS: Record<string, string> = {
   currency_diamond: '💎',
   currency_gold: '💰',
   currency_stardust: '✨',
-  // 經驗素材
-  exp_core_s: '🟢',
-  exp_core_m: '🔵',
-  exp_core_l: '🟣',
-  exp_stone_s: '🟢',
-  exp_stone_m: '🔵',
-  exp_stone_l: '🟣',
+  // 經驗資源
+  exp: '💚',
   // 突破職業石
   asc_class_power: '🗡️',
   asc_class_agility: '🏃',
@@ -56,10 +51,12 @@ export const ITEM_ICONS: Record<string, string> = {
   asc_class_universal: '🌐',
   // 裝備相關
   chest_equipment: '📦',
+  chest_bronze: '🥉',
+  chest_silver: '🥈',
+  chest_gold: '🥇',
   eqm_enhance_s: '🔨',
   eqm_enhance_m: '🔨',
   eqm_enhance_l: '🔨',
-  eqm_reroll: '🔮',
   forge_ore_common: '⛏️',
   forge_ore_rare: '💠',
   // 其他
@@ -87,13 +84,8 @@ export const ITEM_NAMES: Record<string, string> = {
   currency_diamond: '鑽石',
   currency_gold: '金幣',
   currency_stardust: '星塵',
-  // 經驗素材
-  exp_core_s: '小型經驗核心',
-  exp_core_m: '中型經驗核心',
-  exp_core_l: '大型經驗核心',
-  exp_stone_s: '小型經驗核心',
-  exp_stone_m: '中型經驗核心',
-  exp_stone_l: '大型經驗核心',
+  // 經驗資源
+  exp: '經驗',
   // 突破職業石
   asc_class_power: '力量職業石',
   asc_class_agility: '敏捷職業石',
@@ -101,10 +93,12 @@ export const ITEM_NAMES: Record<string, string> = {
   asc_class_universal: '通用職業石',
   // 裝備相關
   chest_equipment: '裝備寶箱',
+  chest_bronze: '銅寶箱',
+  chest_silver: '銀寶箱',
+  chest_gold: '金寶箱',
   eqm_enhance_s: '小型強化石',
   eqm_enhance_m: '中型強化石',
   eqm_enhance_l: '大型強化石',
-  eqm_reroll: '重洗石',
   forge_ore_common: '普通鍛造礦',
   forge_ore_rare: '稀有鍛造礦',
   // 其他

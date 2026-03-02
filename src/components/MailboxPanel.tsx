@@ -84,7 +84,7 @@ export function MailboxPanel({
     if (mail && !mail.read) {
       // 樂觀更新已讀
       setMails(mails.map(m => m.mailId === mailId ? { ...m, read: true } : m))
-      readMail(mailId).catch(() => { /* silent */ })
+      readMail(mailId)
     }
   }, [mails, setMails])
 
@@ -98,8 +98,8 @@ export function MailboxPanel({
     setActionMsg({ ok: true, text: `已領取：${text}` })
     setMails(mails.map(m => m.mailId === selected.mailId ? { ...m, claimed: true, read: true } : m))
 
-    // 背景 API（claimMailReward 內部走 optimisticQueue）
-    claimMailReward(selected.mailId).catch(() => { /* 備份在 localStorage，登入時 reconcile */ })
+    // 背景 API
+    claimMailReward(selected.mailId).catch(() => { /* 網路失敗時靜默 */ })
     onRewardsClaimed?.(rewards)
   }, [selected, mails, setMails, onRewardsClaimed])
 

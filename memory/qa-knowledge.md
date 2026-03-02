@@ -17,6 +17,10 @@
 ### ⛔ 強制規則：RD 完成功能後 QA 必須實際進遊戲驗證
 
 > **此規則跨對話永久生效。新對話看到此處必須遵守。**
+>
+> **教訓（2026-03-02）**：stage_configs 技術債修復後只跑了 tsc/vite build/API curl，
+> 沒有實際開瀏覽器→結果本地 dev server 連不上 Workers（.env 指向 localhost:8787 而本地沒跑 wrangler dev），
+> 使用者卡在「連線中」進不去大廳。**光靠編譯通過不代表遊戲可玩。**
 
 1. **RD 寫完功能不等於完成** — 必須啟動遊戲（`npx vite --port 5174`），用 Puppeteer 或手動進入對應畫面實際操作
 2. **能用自動化就用自動化** — 優先使用 `scripts/qa_test_*.mjs` 腳本進行 E2E 測試

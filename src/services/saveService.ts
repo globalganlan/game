@@ -1,5 +1,5 @@
-/**
- * saveService — 存檔系統前端服務
+﻿/**
+ * saveService  存檔系統前端服務
  *
  * 負責：
  *  - 載入 / 初始化 / 寫入存檔
@@ -10,35 +10,31 @@
  * 對應 Spec: specs/save-system.md v0.2
  */
 
-import { getAuthState } from './authService'
-import { initLocalPool, type PoolEntry } from './gachaLocalPool'
-import { fireOptimistic, reconcilePendingOps, hasPendingOps } from './optimisticQueue'
-
-const POST_URL =
-  'https://script.google.com/macros/s/AKfycbzy3EHTCyTYjA9j1CvJGvWwDM_RrkCuzNYkMhP7T9DTJ6V6g7Sodrlo4uv3h9yx0HLdsg/exec'
+import { callApi } from './apiClient'
 
 const STORAGE_KEY_SAVE = 'globalganlan_save_cache'
 
-/* ════════════════════════════════════
+/* 
    型別
-   ════════════════════════════════════ */
+    */
 
 export interface SaveData {
   playerId: string
   displayName: string
-  level: number
-  exp: number
   diamond: number
   gold: number
+  exp: number
   resourceTimerStage: string
   resourceTimerLastCollect: string
   towerFloor: number
   storyProgress: { chapter: number; stage: number }
   formation: (string | null)[] // 6 slots, heroInstanceId or null
-  stageStars: Record<string, number> // stageId → best star (1-3)
+  stageStars: Record<string, number> // stageId  best star (1-3)
   lastSaved: string
   gachaPity?: { pullsSinceLastSSR: number; guaranteedFeatured: boolean }
   pwaRewardClaimed?: boolean
+  checkinDay?: number
+  checkinLastDate?: string
 }
 
 export interface HeroInstance {
@@ -66,23 +62,20 @@ export interface PlayerData {
 
 export interface ResourceTimerYield {
   goldPerHour: number
-  expItemsPerHour: number
+  expPerHour: number
 }
 
 export interface AccumulatedResources {
   gold: number
-  expItems: number
+  exp: number
   hoursElapsed: number
 }
 
-/* ════════════════════════════════════
+/* 
    內部 state
-   ════════════════════════════════════ */
+    */
 
 let currentData: PlayerData | null = null
-let pendingChanges: Record<string, unknown> = {}
-let debounceTimer: ReturnType<typeof setTimeout> | null = null
-let isSaving = false
 
 type SaveListener = (data: PlayerData | null) => void
 const listeners: SaveListener[] = []
@@ -92,28 +85,9 @@ function notify() {
   for (const fn of listeners) fn(snapshot)
 }
 
-/* ════════════════════════════════════
-   通用 API 呼叫
-   ════════════════════════════════════ */
-
-async function callApi<T = Record<string, unknown>>(
-  action: string,
-  params: Record<string, unknown> = {},
-): Promise<T & { success: boolean; error?: string }> {
-  const token = getAuthState().guestToken
-  if (!token) throw new Error('not_logged_in')
-  const body = JSON.stringify({ action, guestToken: token, ...params })
-  const res = await fetch(POST_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'text/plain; charset=utf-8' },
-    body,
-  })
-  return res.json()
-}
-
-/* ════════════════════════════════════
+/* 
    資源產出計時器公式
-   ════════════════════════════════════ */
+    */
 
 /** 根據已通關最高關卡計算每小時產出 */
 export function getTimerYield(stageId: string): ResourceTimerYield {
@@ -123,7 +97,7 @@ export function getTimerYield(stageId: string): ResourceTimerYield {
   const progress = (ch - 1) * 8 + st // 線性進度 1~24
   return {
     goldPerHour: 100 + progress * 50,
-    expItemsPerHour: Math.max(1, Math.floor(progress / 3)),
+    expPerHour: Math.max(100, progress * 50),
   }
 }
 
@@ -135,23 +109,23 @@ export function getAccumulatedResources(
 ): AccumulatedResources {
   const elapsed = Date.now() - new Date(lastCollect).getTime()
   const hours = Math.min(maxHours, Math.max(0, elapsed / (3600 * 1000)))
-  const { goldPerHour, expItemsPerHour } = getTimerYield(stageId)
+  const { goldPerHour, expPerHour } = getTimerYield(stageId)
   return {
     gold: Math.floor(goldPerHour * hours),
-    expItems: Math.floor(expItemsPerHour * hours),
+    exp: Math.floor(expPerHour * hours),
     hoursElapsed: Math.round(hours * 10) / 10,
   }
 }
 
-/* ════════════════════════════════════
+/* 
    本地快取
-   ════════════════════════════════════ */
+    */
 
 function saveToLocal(data: PlayerData) {
   try {
     localStorage.setItem(STORAGE_KEY_SAVE, JSON.stringify(data))
   } catch {
-    // localStorage 滿了 → 忽略
+    // localStorage 滿了  忽略
   }
 }
 
@@ -168,79 +142,24 @@ function loadFromLocal(): PlayerData | null {
 export function clearLocalSaveCache(): void {
   localStorage.removeItem(STORAGE_KEY_SAVE)
   currentData = null
-  pendingChanges = {}
-  if (debounceTimer) {
-    clearTimeout(debounceTimer)
-    debounceTimer = null
-  }
 }
 
-/* ════════════════════════════════════
-   寫入佇列（debounce 2s）
-   ════════════════════════════════════ */
-
-async function flushChanges(): Promise<void> {
-  if (isSaving || Object.keys(pendingChanges).length === 0) return
-  isSaving = true
-  const batch = { ...pendingChanges }
-  pendingChanges = {}
-
-  try {
-    const res = await callApi('save-progress', { changes: batch })
-    if (!res.success) {
-      console.warn('[save] flush failed:', res.error)
-      // 合併回去重試
-      pendingChanges = { ...batch, ...pendingChanges }
-      scheduleRetry()
-    } else {
-      // 更新 lastSaved
-      if (currentData && (res as Record<string, unknown>).lastSaved) {
-        currentData.save.lastSaved = (res as Record<string, unknown>).lastSaved as string
-        saveToLocal(currentData)
-      }
+/** 即時更新本地 state + localStorage（不打 API，各功能由專用路由負責寫入伺服器） */
+function updateLocal(changes: Record<string, unknown>) {
+  if (!currentData) return
+  for (const [key, val] of Object.entries(changes)) {
+    if (key in currentData.save) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      ;(currentData.save as any)[key] = val
     }
-  } catch (err) {
-    console.warn('[save] flush network error:', err)
-    pendingChanges = { ...batch, ...pendingChanges }
-    scheduleRetry()
-  } finally {
-    isSaving = false
   }
+  saveToLocal(currentData)
+  notify()
 }
 
-let retryCount = 0
-function scheduleRetry() {
-  retryCount++
-  if (retryCount > 3) {
-    console.error('[save] 存檔失敗已達 3 次上限')
-    retryCount = 0
-    return
-  }
-  debounceTimer = setTimeout(flushChanges, 3000 * retryCount)
-}
-
-function enqueueSave(changes: Record<string, unknown>) {
-  pendingChanges = { ...pendingChanges, ...changes }
-  if (currentData) {
-    currentData.isDirty = true
-    // 即時更新 local state
-    for (const [key, val] of Object.entries(changes)) {
-      if (key in currentData.save) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        ;(currentData.save as any)[key] = val
-      }
-    }
-    saveToLocal(currentData)
-    notify()
-  }
-  if (debounceTimer) clearTimeout(debounceTimer)
-  retryCount = 0
-  debounceTimer = setTimeout(flushChanges, 2000)
-}
-
-/* ════════════════════════════════════
+/* 
    公開 API
-   ════════════════════════════════════ */
+    */
 
 /** 取得當前存檔（唯讀） */
 export function getSaveState(): PlayerData | null {
@@ -257,8 +176,8 @@ export function onSaveChange(fn: SaveListener): () => void {
 }
 
 /**
- * 防禦性解析 GAS 回傳的 SaveData
- * GAS Sheets 的 JSON 欄位可能被雙重序列化，前端必須確保是物件
+ * 防禦性解析回傳的 SaveData
+ * JSON 欄位可能被雙重序列化，前端必須確保是物件
  */
 function sanitizeSaveData(sd: SaveData): SaveData {
   if (!sd) return sd
@@ -276,7 +195,7 @@ function sanitizeSaveData(sd: SaveData): SaveData {
   if (!Array.isArray(sd.formation)) {
     sd.formation = [null, null, null, null, null, null]
   }
-  // stageStars — 防穋多層序列化（GAS Sheets 可能回傳 '"{}"' 多層字串）
+  // stageStars  防多層序列化
   for (let i = 0; i < 3 && typeof sd.stageStars === 'string'; i++) {
     try { sd.stageStars = JSON.parse(sd.stageStars as unknown as string) } catch { sd.stageStars = {}; break }
   }
@@ -301,7 +220,7 @@ function sanitizeSaveData(sd: SaveData): SaveData {
  * 載入存檔（進入遊戲時呼叫一次）
  *
  * 1. 嘗試從 API 載入
- * 2. 若 isNew → 呼叫 init-save
+ * 2. 若 isNew  呼叫 init-save
  * 3. 失敗時使用本地快取
  */
 export async function loadSave(): Promise<PlayerData> {
@@ -311,14 +230,12 @@ export async function loadSave(): Promise<PlayerData> {
       heroes: HeroInstance[]
       inventory?: InventoryItem[]
       isNew: boolean
-      gachaPool?: PoolEntry[]
-      ownedHeroIds?: number[]
     }>('load-save')
 
     if (!res.success) throw new Error(res.error || 'load-save failed')
 
     if (res.isNew) {
-      // 新玩家 → 初始化存檔
+      // 新玩家  初始化存檔
       const initRes = await callApi<{ starterHeroInstanceId?: string }>('init-save')
       if (!initRes.success) throw new Error(initRes.error || 'init-save failed')
       // 重新載入
@@ -326,20 +243,10 @@ export async function loadSave(): Promise<PlayerData> {
         saveData: SaveData
         heroes: HeroInstance[]
         inventory?: InventoryItem[]
-        gachaPool?: PoolEntry[]
-        ownedHeroIds?: number[]
       }>('load-save')
       if (!reload.success) throw new Error(reload.error || 'reload failed')
 
-      // 防禦性解析 GAS JSON 欄位
       const reloadSave = sanitizeSaveData(reload.saveData)
-
-      // 初始化本地抽卡池
-      initLocalPool(
-        reload.gachaPool || [],
-        reloadSave?.gachaPity || { pullsSinceLastSSR: 0, guaranteedFeatured: false },
-        reload.ownedHeroIds || [],
-      )
 
       currentData = {
         save: reloadSave,
@@ -348,15 +255,7 @@ export async function loadSave(): Promise<PlayerData> {
         isDirty: false,
       }
     } else {
-      // 防禦性解析 GAS JSON 欄位
       const cleanSave = sanitizeSaveData(res.saveData)
-
-      // 初始化本地抽卡池
-      initLocalPool(
-        res.gachaPool || [],
-        cleanSave?.gachaPity || { pullsSinceLastSSR: 0, guaranteedFeatured: false },
-        res.ownedHeroIds || [],
-      )
 
       currentData = {
         save: cleanSave,
@@ -366,10 +265,8 @@ export async function loadSave(): Promise<PlayerData> {
       }
     }
 
-    // ── 合併本地樂觀英雄進度 ──
-    // 若有尚未送達 server 的樂觀操作（upgrade-hero / ascend-hero / star-up-hero），
-    // server heroes 可能還是舊值。取 MAX(local, server) 確保不倒退。
-    // level / ascension / stars 為單調遞增，取 MAX 永遠安全。
+    //  合併本地樂觀英雄進度 
+    // 若本地有較新的 level/ascension/stars（單調遞增），取 MAX
     const localCache = loadFromLocal()
     if (localCache?.heroes?.length) {
       const localMap = new Map<string, HeroInstance>()
@@ -379,7 +276,7 @@ export async function loadSave(): Promise<PlayerData> {
         if (!lh) continue
         if ((lh.level ?? 1) > (sh.level ?? 1)) {
           sh.level = lh.level
-          sh.exp = lh.exp // 配套等級的經驗
+          sh.exp = lh.exp
         }
         if ((lh.ascension ?? 0) > (sh.ascension ?? 0)) {
           sh.ascension = lh.ascension
@@ -392,12 +289,6 @@ export async function loadSave(): Promise<PlayerData> {
 
     saveToLocal(currentData)
     notify()
-
-    // ── 登入成功後：背景 reconcile 上次未完成的樂觀操作 ──
-    reconcilePendingOps().catch(e =>
-      console.warn('[save] reconcilePendingOps error:', e),
-    )
-
     return currentData
   } catch (err) {
     console.warn('[save] load from server failed, trying local cache:', err)
@@ -414,24 +305,23 @@ export async function loadSave(): Promise<PlayerData> {
 /** 從 HeroInstance 移除 playerId、補全缺少的欄位（前端不需要 playerId） */
 function stripPlayerId(h: HeroInstance & { playerId?: string }): HeroInstance {
   const { playerId: _, ...rest } = h
-  // 舊存檔可能沒有 stars 欄位或為空字串，預設 0（所有英雄從 ★0 開始）
   if (rest.stars == null || (rest.stars as unknown) === '') (rest as HeroInstance).stars = 0
   return rest as HeroInstance
 }
 
 /**
- * 更新玩家進度（金幣、鑽石、等級、經驗等）
+ * 更新玩家進度（金幣、鑽石等）
  * 變更即時反映到本地 state，2 秒後批次寫入伺服器
  */
 export function updateProgress(changes: Partial<Pick<SaveData,
-  'gold' | 'diamond' | 'level' | 'exp' | 'displayName' |
+  'gold' | 'diamond' | 'exp' | 'displayName' |
   'towerFloor' | 'resourceTimerStage'
 >>): void {
   const serialized: Record<string, unknown> = {}
   for (const [key, val] of Object.entries(changes)) {
     serialized[key] = val
   }
-  enqueueSave(serialized)
+  updateLocal(serialized)
 }
 
 /**
@@ -439,9 +329,12 @@ export function updateProgress(changes: Partial<Pick<SaveData,
  */
 export function updateStoryProgress(chapter: number, stage: number): void {
   const sp = JSON.stringify({ chapter, stage })
-  enqueueSave({ storyProgress: sp })
+  updateLocal({ storyProgress: sp })
   if (currentData) {
+    // enqueueSave 將 storyProgress 設為 JSON 字串再 notify，
+    // 必須覆蓋為正確的物件型態後再 notify，否則 React 端會拿到字串
     currentData.save.storyProgress = { chapter, stage }
+    notify()
   }
 }
 
@@ -450,7 +343,6 @@ export function updateStoryProgress(chapter: number, stage: number): void {
  */
 export function updateStageStars(stageId: string, stars: number): void {
   if (currentData) {
-    // ★ 防穋：若 stageStars 意外變成字串（localStorage 反序列化或 GAS 回寫），先修復
     if (typeof currentData.save.stageStars === 'string') {
       try { currentData.save.stageStars = JSON.parse(currentData.save.stageStars as unknown as string) } catch { currentData.save.stageStars = {} }
     }
@@ -462,13 +354,13 @@ export function updateStageStars(stageId: string, stars: number): void {
       currentData.save.stageStars[stageId] = stars
       saveToLocal(currentData)
       notify()
-      enqueueSave({ stageStars: JSON.stringify(currentData.save.stageStars) })
+      updateLocal({ stageStars: JSON.stringify(currentData.save.stageStars) })
     }
   }
 }
 
 /**
- * 儲存陣型（樂觀佇列 — 立即本地更新 + 背景 API + localStorage 備份）
+ * 儲存陣型  本地即時更新 + 背景 API 同步
  */
 export function saveFormation(formation: (string | null)[]): boolean {
   if (currentData) {
@@ -476,7 +368,9 @@ export function saveFormation(formation: (string | null)[]): boolean {
     saveToLocal(currentData)
     notify()
   }
-  fireOptimistic('save-formation', { formation })
+  callApi('save-formation', { formation }).catch(e =>
+    console.warn('[save] save-formation error:', e),
+  )
   return true
 }
 
@@ -489,7 +383,6 @@ export function addHeroesLocally(heroIds: number[]): void {
   const now = new Date().toISOString()
   let changed = false
   for (const heroId of heroIds) {
-    // 不重複加入
     if (currentData.heroes.some(h => h.heroId === heroId)) continue
     currentData.heroes.push({
       instanceId: `local_${heroId}_${Date.now()}`,
@@ -511,7 +404,6 @@ export function addHeroesLocally(heroIds: number[]): void {
 
 /**
  * 樂觀更新英雄資料（不呼叫 API）
- * 用於升級/突破/升星後即時反映結果，server 入帳由各操作的 optimistic queue 處理。
  */
 export function updateHeroLocally(
   heroId: number,
@@ -557,18 +449,25 @@ export async function addHero(heroId: number): Promise<HeroInstance | null> {
   }
 }
 
+/** 本地增減金幣或鑽石（寶箱獎勵等場景用） */
+export function updateLocalCurrency(field: 'gold' | 'diamond', delta: number) {
+  if (!currentData || delta === 0) return
+  currentData.save[field] = (currentData.save[field] ?? 0) + delta
+  saveToLocal(currentData)
+  notify()
+}
+
 /**
- * 領取計時器累積資源（樂觀更新 — 零等待）
+ * 領取計時器累積資源
  *
  * 1. 本地計算累積資源（公式與伺服器一致）
  * 2. 立即更新本地 state + localStorage
- * 3. 背景非同步呼叫 API → 成功後移除備份
- * 4. 伺服器回傳若金幣不同則校正
+ * 3. 背景呼叫 API  伺服器回傳若金幣不同則校正
  */
 export async function collectResources(): Promise<AccumulatedResources | null> {
   if (!currentData) return null
 
-  // 尚未通關 1-1 → 離線獎勵未解鎖
+  // 尚未通關 1-1  離線獎勵未解鎖
   const sp = currentData.save.storyProgress
   if (sp && sp.chapter === 1 && sp.stage === 1) return null
 
@@ -576,43 +475,153 @@ export async function collectResources(): Promise<AccumulatedResources | null> {
     currentData.save.resourceTimerStage,
     currentData.save.resourceTimerLastCollect,
   )
-  if (resources.gold <= 0 && resources.expItems <= 0) return null
+  if (resources.gold <= 0 && resources.exp <= 0) return null
 
-  // ── 樂觀本地更新 ──
-  const optimisticGold = currentData.save.gold + resources.gold
-  currentData.save.gold = optimisticGold
+  //  樂觀本地更新 
+  currentData.save.gold += resources.gold
+  currentData.save.exp = (currentData.save.exp ?? 0) + resources.exp
   currentData.save.resourceTimerLastCollect = new Date().toISOString()
   saveToLocal(currentData)
   notify()
 
-  // ── 背景 API（附帶 opId 做幂等保護） ──
-  fireOptimistic<{
+  //  背景 API（不阻塞） 
+  callApi<{
     gold: number
+    exp: number
     newGoldTotal: number
-    expItems: number
+    newExpTotal: number
     hoursElapsed: number
-  }>('collect-resources', {}, undefined, (result) => {
-    // 伺服器回傳後校正
+  }>('collect-resources', {}).then(result => {
     if (result.success && currentData) {
-      const serverGold = (result as Record<string, unknown>).newGoldTotal as number | undefined
-      if (serverGold !== undefined && serverGold !== currentData.save.gold) {
-        currentData.save.gold = serverGold
-        saveToLocal(currentData)
-        notify()
+      if (result.newGoldTotal !== undefined && result.newGoldTotal !== currentData.save.gold) {
+        currentData.save.gold = result.newGoldTotal
       }
+      if (result.newExpTotal !== undefined) {
+        currentData.save.exp = result.newExpTotal
+      }
+      saveToLocal(currentData)
+      notify()
     }
-  })
+  }).catch(e => console.warn('[save] collect-resources error:', e))
 
   return resources
 }
 
 /**
- * 立即同步未寫入變更（離開頁面前呼叫）
+ * 已不需要（save-progress 已移除，各功能由專用路由同步）
+ * 保留空殼以免呼叫端報錯
  */
 export async function flushPendingChanges(): Promise<void> {
-  if (debounceTimer) {
-    clearTimeout(debounceTimer)
-    debounceTimer = null
+  // no-op
+}
+
+/* 
+   每日簽到
+    */
+
+export interface DailyCheckinResult {
+  success: boolean
+  error?: string
+  checkinDay?: number
+  checkinLastDate?: string
+  reward?: { gold?: number; diamond?: number; items?: { itemId: string; quantity: number }[] }
+}
+
+/**
+ * 每日簽到獎勵表
+ */
+const CHECKIN_REWARDS: { gold?: number; diamond?: number; items?: { itemId: string; quantity: number }[] }[] = [
+  { gold: 5000 },
+  { gold: 8000, items: [{ itemId: 'exp', quantity: 500 }] },
+  { diamond: 50 },
+  { gold: 12000, items: [{ itemId: 'chest_bronze', quantity: 1 }] },
+  { diamond: 80, items: [{ itemId: 'exp', quantity: 1500 }] },
+  { gold: 20000, items: [{ itemId: 'chest_silver', quantity: 1 }] },
+  { diamond: 200, items: [{ itemId: 'chest_gold', quantity: 1 }] },
+]
+
+/** 取得 UTC+8 (Taipei) 的 YYYY-MM-DD 字串 */
+function getTaipeiDate(): string {
+  const now = new Date()
+  const utc = now.getTime() + now.getTimezoneOffset() * 60000
+  const taipei = new Date(utc + 8 * 3600000)
+  const y = taipei.getFullYear()
+  const m = String(taipei.getMonth() + 1).padStart(2, '0')
+  const d = String(taipei.getDate()).padStart(2, '0')
+  return `${y}-${m}-${d}`
+}
+
+export async function doDailyCheckin(): Promise<DailyCheckinResult> {
+  if (!currentData) return { success: false, error: 'no_save_data' }
+
+  const todayStr = getTaipeiDate()
+  const lastDate = currentData.save.checkinLastDate ?? ''
+
+  // 防重複
+  if (lastDate === todayStr) {
+    return { success: false, error: 'already_checked_in' }
   }
-  await flushChanges()
+  const CHECKIN_LS_KEY = 'gg_checkin_date'
+  if (localStorage.getItem(CHECKIN_LS_KEY) === todayStr) {
+    return { success: false, error: 'already_checked_in' }
+  }
+
+  // 計算新的簽到天數（斷簽重置）
+  const oldDay = currentData.save.checkinDay ?? 0
+  let newDay: number
+  if (lastDate) {
+    const lastMs = new Date(lastDate + 'T00:00:00+08:00').getTime()
+    const todayMs = new Date(todayStr + 'T00:00:00+08:00').getTime()
+    const diffDays = Math.round((todayMs - lastMs) / 86400000)
+    newDay = diffDays === 1 ? (oldDay % 7) + 1 : 1
+  } else {
+    newDay = 1
+  }
+
+  const reward = CHECKIN_REWARDS[newDay - 1] || CHECKIN_REWARDS[0]
+
+  //  本地樂觀更新 
+  currentData.save.checkinDay = newDay
+  currentData.save.checkinLastDate = todayStr
+  if (reward.gold) currentData.save.gold += reward.gold
+  if (reward.diamond) currentData.save.diamond += reward.diamond
+  saveToLocal(currentData)
+  notify()
+
+  localStorage.setItem('gg_checkin_date', todayStr)
+
+  // 道具寫入背包（exp 直接加到 save.exp，其餘進背包）
+  if (reward.items && reward.items.length > 0) {
+    const expItems = reward.items.filter(i => i.itemId === 'exp')
+    const otherItems = reward.items.filter(i => i.itemId !== 'exp')
+    if (expItems.length > 0 && currentData) {
+      const totalExp = expItems.reduce((acc, i) => acc + i.quantity, 0)
+      currentData.save.exp += totalExp
+      saveToLocal(currentData)
+      notify()
+    }
+    if (otherItems.length > 0) {
+      try {
+        const { addItemsLocally } = await import('./inventoryService')
+        addItemsLocally(otherItems.map(i => ({ itemId: i.itemId, quantity: i.quantity })))
+      } catch { /* silent */ }
+    }
+  }
+
+  //  背景同步伺服器 
+  callApi<DailyCheckinResult>('daily-checkin', {}).then(serverRes => {
+    if (serverRes.success && currentData) {
+      if (serverRes.checkinDay !== undefined) currentData.save.checkinDay = serverRes.checkinDay
+      if (serverRes.checkinLastDate) currentData.save.checkinLastDate = serverRes.checkinLastDate
+      saveToLocal(currentData)
+      notify()
+    }
+  }).catch(e => console.warn('[save] daily-checkin error:', e))
+
+  return {
+    success: true,
+    checkinDay: newDay,
+    checkinLastDate: todayStr,
+    reward,
+  }
 }

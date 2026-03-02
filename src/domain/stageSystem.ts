@@ -17,6 +17,8 @@ export interface StageEnemy {
   hpMultiplier: number
   atkMultiplier: number
   speedMultiplier: number
+  /** DEF 乘數（預設 1.0 — 不縮放）。早期關卡應設 < 1.0 以避免敵人 DEF 相對 HP/ATK 過高 */
+  defMultiplier?: number
 }
 
 export interface StageReward {
@@ -84,82 +86,11 @@ export type StarRating = 1 | 2 | 3
 
 const ZOMBIE_IDS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]
 
-/** 章節 1 用較弱的殭屍池（1~3 星，排除高攻力量型 4 星） */
-const CHAPTER1_ZOMBIE_IDS = [1, 5, 6, 7, 9, 11, 14]  // 女喪屍/口器者/無名活屍/腐學者/倖存者/白面鬼/脫逃者
-
 function seededRandom(seed: number): () => number {
   let s = seed
   return () => {
     s = (s * 1103515245 + 12345) & 0x7fffffff
     return s / 0x7fffffff
-  }
-}
-
-/* ════════════════════════════════════
-   主線關卡 — 固定敵方陣容（seeded random）
-   ════════════════════════════════════ */
-
-/**
- * 根據 stageId（如 "1-3"）產生固定不變的敵方陣容。
- * 使用 seeded PRNG 確保同一關卡每次傳回相同結果。
- */
-export function getStoryStageConfig(stageId: string): StageConfig {
-  const parts = stageId.split('-').map(Number)
-  const chapter = parts[0] || 1
-  const stage = parts[1] || 1
-  const linearIndex = (chapter - 1) * 8 + stage  // 1~24
-
-  // Seed: chapter * 1000 + stage → deterministic
-  const rng = seededRandom(chapter * 1000 + stage)
-
-  // 敵方數量：早期固定少量，隨關卡遞增 2~6
-  const minCount = Math.min(2 + Math.floor((linearIndex - 1) / 4), 6)
-  const maxCount = Math.min(minCount + Math.floor(linearIndex / 6), 6)
-  const enemyCount = minCount + Math.floor(rng() * (maxCount - minCount + 1))
-
-  // 難度倍率：1-1 起始較弱（hpMult=0.5, atkMult=0.4），隨關卡逐漸增強
-  const hpMult  = 0.5 + (linearIndex - 1) * 0.12
-  const atkMult = 0.4 + (linearIndex - 1) * 0.08
-  const spdMult = 1.0 + (linearIndex - 1) * 0.015
-
-  // 章節 1 使用較弱殭屍池，章節 2+ 使用完整池
-  const pool = chapter <= 1 ? CHAPTER1_ZOMBIE_IDS : ZOMBIE_IDS
-
-  const enemies: StageEnemy[] = []
-  for (let i = 0; i < enemyCount; i++) {
-    const heroId = pool[Math.floor(rng() * pool.length)]
-    enemies.push({
-      heroId,
-      slot: i,
-      levelMultiplier: 1,
-      hpMultiplier: hpMult,
-      atkMultiplier: atkMult,
-      speedMultiplier: spdMult,
-    })
-  }
-
-  const recommendedLevel = Math.min(1 + (linearIndex - 1) * 2, 60)
-
-  return {
-    stageId,
-    chapter,
-    stage,
-    enemies,
-    recommendedLevel,
-    rewards: {
-      exp: 30 + linearIndex * 15,
-      gold: 50 + linearIndex * 30,
-      diamond: stage === 8 ? 20 : 0,           // 每章最後一關給鑽石
-      items: linearIndex % 3 === 0
-        ? [{ itemId: 'exp_core_s', quantity: 1, dropRate: 0.6 }]
-        : [],
-    },
-    firstClearRewards: {
-      exp: 60 + linearIndex * 20,
-      gold: 100 + linearIndex * 50,
-      diamond: 30,
-      items: [{ itemId: 'exp_core_s', quantity: 2, dropRate: 1.0 }],
-    },
   }
 }
 
@@ -259,7 +190,7 @@ export function getTowerReward(floor: number): StageReward {
     items: isBossFloor
       ? [{ itemId: 'chest_equipment', quantity: 1, dropRate: 1.0 }]
       : floor % 5 === 0
-        ? [{ itemId: 'exp_core_m', quantity: 1, dropRate: 0.5 }]
+        ? [{ itemId: 'exp', quantity: 500, dropRate: 0.5 }]
         : [],
   }
 }
@@ -304,7 +235,7 @@ export const DAILY_DUNGEONS: DailyDungeon[] = [
           items: [
             { itemId: 'asc_class_power', quantity: 4, dropRate: 1.0 },
             { itemId: 'eqm_enhance_m', quantity: 2, dropRate: 1.0 },
-            { itemId: 'exp_core_m', quantity: 1, dropRate: 0.5 },
+            { itemId: 'exp', quantity: 500, dropRate: 0.5 },
           ],
         },
       },
@@ -323,7 +254,7 @@ export const DAILY_DUNGEONS: DailyDungeon[] = [
           items: [
             { itemId: 'asc_class_power', quantity: 8, dropRate: 1.0 },
             { itemId: 'eqm_enhance_l', quantity: 1, dropRate: 1.0 },
-            { itemId: 'exp_core_l', quantity: 1, dropRate: 0.3 },
+            { itemId: 'exp', quantity: 2000, dropRate: 0.3 },
           ],
         },
       },
@@ -663,8 +594,8 @@ export function getBossReward(bossId: string, totalDamage: number): StageReward 
   const rewards: Record<string, StageReward> = {
     S: { exp: 600, gold: 3000, diamond: 100, items: [{ itemId: 'chest_equipment', quantity: 2, dropRate: 1.0 }] },
     A: { exp: 400, gold: 2000, diamond: 50, items: [{ itemId: 'chest_equipment', quantity: 1, dropRate: 1.0 }] },
-    B: { exp: 200, gold: 1000, diamond: 20, items: [{ itemId: 'exp_core_l', quantity: 1, dropRate: 1.0 }] },
-    C: { exp: 100, gold: 500, diamond: 0, items: [{ itemId: 'exp_core_m', quantity: 1, dropRate: 1.0 }] },
+    B: { exp: 200, gold: 1000, diamond: 20, items: [{ itemId: 'exp', quantity: 2000, dropRate: 1.0 }] },
+    C: { exp: 100, gold: 500, diamond: 0, items: [{ itemId: 'exp', quantity: 500, dropRate: 1.0 }] },
   }
   return rewards[rank]
 }

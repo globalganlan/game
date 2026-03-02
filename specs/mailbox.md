@@ -1,7 +1,7 @@
 # 信箱系統 Spec
 
-> 版本：v1.1 ｜ 狀態：🟢 已實作
-> 最後更新：2026-02-28
+> 版本：v1.2 ｜ 狀態：🟢 已實作
+> 最後更新：2026-03-02
 > 負責角色：🎯 GAME_DESIGN → 🔧 CODING
 
 ## 概述
@@ -246,3 +246,4 @@ interface MailboxPanelProps {
 |------|------|---------|
 | v0.1 | 2025-07-23 | 初版草案：資料結構、7 個 API 端點、前端 Service + UI 設計 |
 | v1.0 | 2026-03-01 | 全面同步實作：preloadMail/invalidateMailCache 預載機制、Optimistic Queue（claim 系列零等待 + delete 系列 await 回滾）、executeWithIdempotency_ 幂等保護、reconcile-pending 離線補償、MailboxPanel 6 props 完整文件、UI 列表↔詳情切換模式、onRewardsClaimed App 側即時加算、mailUnclaimedCount badge、send-mail 無 adminKey 現狀標注 |
+| v1.2 | 2026-03-02 | **Bug Fix: deletedAt/expiresAt 查詢修復** — Schema 定義 `NOT NULL DEFAULT ''` 但查詢用 `IS NULL` 導致所有信件不可見；修正 4 個查詢條件為 `(deletedAt IS NULL OR deletedAt = '')`；`insertMail` 的 `expiresAt || null` 改為 `expiresAt || ''` 避免 NOT NULL 違規 |

@@ -29,9 +29,9 @@
 |------|----------|--------|------|
 | 遊戲狀態機 | 1 | `src/App.tsx` useState | ✅ |
 | 陣型系統 | 2 | `src/App.tsx` SLOT_POSITIONS | ✅ |
-| 戰鬥迴圈 | 3 | `src/domain/battleEngine.ts` `runBattleCollect()`（本地優先）+ `gas/battleEngine.js` `runBattleEngine_()`（背景校驗） | ✅ |
-| 反作弊校驗 | 3.3 | `src/services/antiCheatService.ts` + `gas/battleEngine.js` `handleVerifyBattle_()` + `src/domain/seededRng.ts` | ✅ |
-| 伺服器端結算 | 3.4 | `gas/程式碼.js` `handleCompleteBattle_()` + `src/services/progressionService.ts` `completeBattle()` | ✅ |
+| 戰鬥迴圈 | 3 | `src/domain/battleEngine.ts` `runBattleCollect()`（前端）+ Workers `complete-battle`（後端驗證） | ✅ |
+| 確定性戰鬥 seed | 3.3 | `src/domain/seededRng.ts`（Mulberry32 PRNG）+ Workers `complete-battle` 以相同 seed 重播驗證 | ✅ |
+| 伺服器端結算 | 3.4 | `workers/src/routes/battle.ts` `complete-battle` + `src/services/progressionService.ts` `completeBattle()` | ✅ |
 | 能量系統 | 4 | `src/domain/energySystem.ts` | ✅ |
 | Buff/Debuff | 5 | `src/domain/buffSystem.ts` | ✅ |
 | 被動觸發 | 6 | `src/domain/battleEngine.ts` `triggerPassives()` | ✅ |
@@ -39,7 +39,7 @@
 | 傷害計算 | 8 | `src/domain/damageFormula.ts` | ✅ |
 | 3D 演出 | 10 | `src/App.tsx` `onAction` callback | ✅ |
 | 插入式大招 | 3.1 | `src/domain/battleEngine.ts` `processInterruptUltimates()` | ✅ |
-| 後端戰鬥引擎 | 3.2 | `gas/battleEngine.js` + `src/services/battleService.ts` | ✅ |
+| 後端戰鬥引擎 | 3.2 | `workers/src/domain/battleEngine.ts` + `workers/src/routes/battle.ts` | ✅ |
 | 跳過戰鬥 | 11 | `src/App.tsx` `skipBattleRef` | ✅ |
 | 戰鬥回放 | 12 | `src/App.tsx` `battleActionsRef` + `replayBattle()` | ✅ |
 | 戰鬥統計 | 13 | `src/App.tsx` `battleStats` + stats panel UI | ✅ |

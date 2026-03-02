@@ -3,6 +3,469 @@
 > 按時間倒序排列，最新的在最上面。
 
 ---
+### [2025-07-16] 召喚結果 UI 改進 — 金框 + 統一尺寸 + 資訊彈窗
+
+- **觸發者**：使用者
+- **執行角色**：🔧 CODING + 🎨 UI_DESIGN
+- **變更摘要**：
+  1. **SSR 金框取代彩框** — `.gacha-card-ssr` 從 rainbow border-image 改為純金色邊框 + 金色光暈動畫；彩框（rainbow）保留給未來更稀有角色
+  2. **召喚結果卡片統一尺寸** — grid 改為固定 90px 欄位、每張卡片 86px 寬 + 110px 最小高度，不再隨內容彈性變化
+  3. **英雄資訊彈窗** — 點擊召喚結果中的英雄卡片彈出 `HeroInfoPopup`：3D 頭像、名稱、稀有度、元素/類型標籤、描述、Lv.1 六維屬性（HP/ATK/DEF/SPD/暴擊率/暴擊傷害），無操作按鈕
+  4. **裝備資訊彈窗** — 點擊裝備卡片彈出 `EquipInfoPopup`：部位 emoji、名稱、稀有度、套裝/部位標籤、主屬性、副屬性列表，無操作按鈕
+  5. **裝備卡片簡化** — 結果頁中的裝備卡片不再顯示主屬性與副屬性，點擊查看詳情
+- **影響檔案**：
+  - `src/components/GachaScreen.tsx` — ResultCard/EquipResultCard 加 onClick、新增 HeroInfoPopup/EquipInfoPopup 元件、新增 popup state
+  - `src/App.css` — SSR 金框 CSS、統一卡片尺寸、gacha-info-* 彈窗樣式
+
+---
+### [2025-07-16] DB 正規化 & 裝備名稱 & 戰力動畫改進
+
+- **觸發者**：使用者（4 項合併需求）
+- **執行角色**：🔧 CODING + 🎨 UI_DESIGN
+- **變更摘要**：
+  1. **game_sheets DB 正規化** — 新增 3 個專屬 D1 表（`skill_templates`、`hero_skills`、`element_matrix`），heroes 表增加 `modelId/critRate/critDmg/description` 欄位。`readSheet` 端點改從專屬表查詢，不再依賴 game_sheets KV blob。
+  2. **裝備中文名稱修正** — HeroListPanel（6 處）+ InventoryPanel（2 處）將 `eq.templateId` 改用 `getEquipDisplayName()` 顯示中文（如「狂戰士武器」）
+  3. **戰力動畫即時觸發** — useCombatPower hook 新增 `onInventoryChange` 訂閱，穿脫裝備/強化時立即顯示 CP 變化動畫
+  4. **戰力動畫格式改進** — Toast 格式改為「⚔️ 戰力 12,345 +500 ↑」，增加量綠色、減少量紅色
+- **影響檔案**：
+  - `workers/schema.sql` — 新增 3 表 + heroes 新欄位
+  - `workers/src/routes/data.ts` — readSheet 改從專屬表查詢
+  - `src/components/HeroListPanel.tsx` — 裝備名稱 6 處
+  - `src/components/InventoryPanel.tsx` — 裝備名稱 2 處
+  - `src/hooks/useCombatPower.ts` — invTick 訂閱
+  - `src/App.tsx` — CP toast 格式 + 顏色
+  - `src/components/CombatPowerHUD.tsx` — CombatPowerToast 組件更新
+
+---
+### [2025-07-15] UI 修正 & 經驗更新 Bug 修復
+
+- **觸發者**：使用者（6 項合併需求）
+- **執行角色**：🔧 CODING + 🎨 UI_DESIGN
+- **變更摘要**：
+  1. **ShopPanel 錯字修正** — 5 處 `兆換` → `兌換`
+  2. **CurrencyIcon 改用 emoji** — 金幣💰、鑽石💎、經驗💚、星塵✨、戰力⚔️
+     - `CurrencyIcon.tsx` 全面重寫：CSS badge → emoji `<span>`
+     - `App.css` 移除 `.icon-coin` / `.icon-dia` / `.icon-exp` / `.icon-stardust` / `.icon-cp` 共 ~80 行 CSS
+     - 新增 `.currency-emoji` 極簡樣式
+  3. **裝備崩潰修復**：
+     - `inventoryService.ts` `addEquipmentLocally()` — 新裝備通過 `parseEquipment()` 正規化
+     - `HeroListPanel.tsx` — 裝備選擇/強化 Modal 加入 `rarity` / `subStats` 空值防護
+  4. **升級英雄 UI 改版** — 拋棄 slider，改為「升 1 級」「升 N 級」雙按鈕（含費用預覽）
+  5. **經驗資源 UI 即時更新修復**：
+     - `MenuScreenRouter.tsx` 信箱獎勵 — exp 改走 `updateProgress()` 而非 `addItemsLocally()`
+     - `saveService.ts` 每日簽到 — exp 直接加到 `save.exp` 而非 inventory
+     - `InventoryPanel.tsx` 寶箱 & 道具使用 — 新增 exp 即時回寫 `save.exp`
+- **驗證**：tsc 零錯誤、vite build 成功
+
+---
+### [2025-07-14] D1 原子批次寫入（db.batch）重構
+
+- **觸發者**：使用者：後端 `db.prepare().run()` 不是原子操作，中途 crash 會部分寫入
+- **執行角色**：🔧 CODING
+- **變更摘要**：
+  - **核心函式**（`workers/src/routes/save.ts`）：
+    - 新增 `upsertItemStmt()` — 單 SQL `INSERT...ON CONFLICT` 物品 upsert，回傳 `D1PreparedStatement`
+    - 新增 `grantRewardsStmts()` — 合併同欄資源增減為單一 UPDATE，回傳 `D1PreparedStatement[]`
+    - 保留向後相容 `upsertItem()` / `grantRewards()` 包裝
+  - **核心函式**（`workers/src/routes/mail.ts`）：
+    - 新增 `insertMailStmt()` — 信件 INSERT 語句，回傳 `D1PreparedStatement`
+  - **save.ts** — `init-save` 批次化（INSERT save_data + 3× INSERT hero_instances，陣型內建）
+  - **auth.ts** — `register-guest` 批次化（INSERT players + INSERT mailbox 歡迎信）
+  - **auth.ts** — `bind-account` 批次化（UPDATE players + INSERT mailbox 獎勵信）
+  - **inventory.ts** — 7 個路由批次化（add-items / remove-items / sell-items / shop-buy / use-item / equip-item）
+  - **gacha.ts** — `gacha-pull` + `equip-gacha-pull` 批次化
+  - **progression.ts** — 4 個路由批次化（upgrade-hero / ascend-hero / star-up-hero / enhance-equipment）
+  - **mail.ts** — 5 個路由批次化（claim-mail-reward / claim-all-mail / delete-all-read / send-mail / claim-pwa-reward）
+  - **checkin.ts** — `daily-checkin` 批次化
+  - **arena.ts** — `arena-challenge-complete` 全面重構：合併散落的 5~6 次寫入為單一 batch
+  - **Spec 更新**：`specs/tech-architecture.md` v1.8 → v1.9（新增「D1 原子批次寫入」章節）
+- **驗證**：
+  - Workers `tsc --noEmit` 零錯誤
+  - 前端 `tsc --noEmit` 零錯誤
+  - `vite build` 成功
+  - Workers 部署成功
+  - API 測試：register-guest → init-save → load-save 完整流程正常（3 英雄 + 陣型 + 歡迎信）
+
+---
+### [2026-03-02] 移除 save-progress 路由
+
+- **觸發者**：架構審查 — 發現 save-progress 4 個 allowedFields 全部已有專用路由負責
+- **執行角色**：🔧 CODING
+- **變更摘要**：
+  - **Workers**：刪除 `save-progress` 路由（`workers/src/routes/save.ts`）
+  - **前端**：移除 debounce 2s 寫入佇列機制（`flushChanges` / `enqueueSave` / `pendingChanges` / `scheduleRetry`）
+  - `enqueueSave()` 簡化為 `updateLocal()`（僅更新本地 state + localStorage，不打 API）
+  - `flushPendingChanges()` 改為 no-op 空殼（保留 export 避免呼叫端報錯）
+  - 欄位存入改由專用路由負責：`displayName` → `change-name`、`formation` → `save-formation`、`resourceTimerStage` → `complete-battle`、`resourceTimerLastCollect` → `collect-resources`
+  - **Spec 更新**：`specs/save-system.md` v1.9 → v2.0
+
+---
+### [2026-03-02] EXP 資源重構 + 星塵兌換商店 + UI 修復
+
+- **觸發者**：使用者回饋多項改善需求
+- **執行角色**：🔧 CODING + 🎯 GAME_DESIGN + 🛡️ QA
+- **變更摘要**：
+
+  **1. Hero Equipment UI Crash Fix**
+  - `src/components/HeroListPanel.tsx` — 新增裝備屬性防禦性 null guard（mainStat / mainStatValue / enhanceLevel / rarity）
+  - `src/components/InventoryPanel.tsx` — 同步新增裝備屬性 null guard
+
+  **2. Inventory Equipment Tab**
+  - `src/components/InventoryPanel.tsx` — TABS 陣列補回缺失的 equipment 分頁
+
+  **3. 移除重洗石（eqm_reroll）**
+  - `src/components/ShopPanel.tsx` — 移除重洗石商品
+  - `workers/src/routes/inventory.ts` — SHOP_CATALOG 移除 eqm_reroll
+  - `src/components/ItemInfoPopup.tsx` — 移除重洗石相關顯示
+  - `src/constants/rarity.ts` — 移除重洗石常數
+
+  **4. EXP 資源重構（重大變更）**
+  - **概念**：移除 exp_core_s / exp_core_m / exp_core_l 道具，EXP 改為頂層資源（與 gold / diamond 同級），存於 `save_data.exp`
+  - `workers/schema.sql` — save_data 新增 `exp` 欄位
+  - 戰鬥獎勵（story / tower / pvp / boss / daily）直接發放 exp 到 save_data
+  - 離線計時器產出 EXP 資源（公式：`expPerHour = Math.max(100, progress * 50)`）
+  - 英雄升級改用 EXP 資源 + 滑桿 UI（取代舊版素材選擇）
+  - 商店直接販售 EXP 資源
+  - 主選單頂欄新增 EXP 顯示（與 gold / diamond 並列）
+  - 勝利面板顯示 EXP 獎勵
+
+  **5. 星塵兌換商店**
+  - 新增商店分類：星塵兌換（6 種商品）
+  - 商品：exp×5000（10☆）、gold×50k（15☆）、通用職業石×2（20☆）、大型強化石×3（25☆）、金寶箱（50☆）、diamond×100（80☆）
+  - 後端以 inventory 表 `currency_stardust` 作為星塵貨幣扣除來源
+
+- **Spec 更新**：`specs/progression.md` v2.2→v2.3、`specs/inventory.md` v2.3→v2.4、`specs/stage-system.md` v2.1→v2.2
+- **Workers 部署**：已部署
+
+---
+### [2026-03-02] 抽卡系統重構：移除預生成池機制
+
+- **觸發者**：使用者回饋「英雄召喚有問題——GAS 時代的 400 筆預加載已不需要」
+- **執行角色**：🔧 CODING + 🛡️ QA
+- **變更摘要**：
+
+  **後端（Workers）**
+  - `workers/src/routes/gacha.ts` — 重寫 `gacha-pull` 端點，移除預生成池 splice 機制，改為即時呼叫 `generateGachaEntries()` 產生結果
+  - 移除 3 個端點：`refill-pool`、`gacha-pool-status` 完全移除；`reset-gacha-pool` 簡化為僅重設 pity
+  - 移除 `ensureGachaPool()` 函數、`GACHA_REFILL_COUNT` 常數
+  - `gacha-pull` 回傳新增 `stardust`/`fragments` 欄位（前端不再需要自行計算）
+  - 修復 `hero_instances` INSERT 欄位名：`equipment` → `equippedItems`、`createdAt` → `obtainedAt`
+  - `workers/src/routes/save.ts` — `load-save` 不再回傳 `gachaPool`/`gachaPoolRemaining`
+
+  **前端**
+  - **刪除** `src/services/gachaLocalPool.ts`（384 行）— 本地池管理、localStorage 備份、背景同步/補池
+  - **刪除** `src/services/gachaPreloadService.ts`（134 行）— 預載快取服務
+  - `src/components/GachaScreen.tsx` — `doPull()` 從同步 `localPull()` 改為 `async callApi('gacha-pull')` 直接呼叫後端
+  - 移除狀態：`_poolRemaining`、`onPoolChange` 訂閱
+  - `src/services/saveService.ts` — 移除 `initLocalPool()` 呼叫和 `PoolEntry` import
+  - `src/services/progressionService.ts` — 移除 `getGachaPoolStatus()`，更新 `gachaPull()` 回傳型別
+  - `src/services/index.ts` — 移除所有 gachaLocalPool 重新匯出
+  - `src/hooks/useLogout.ts` — 移除 `clearLocalPool()` + `clearGachaPreload()` 呼叫
+  - `src/hooks/useSave.ts` — 移除 `clearLocalPool()` 呼叫
+
+- **Spec 更新**：`specs/gacha.md` v1.6 → v2.0
+- **QA 驗證**：tsc 零錯誤、vite build 成功、API 測試 gacha-pull 回傳正確結果
+- **Workers 部署**：Version 7af96a95
+
+---
+### [2026-03-02] 商店/寶箱/道具詳情優化
+
+- **觸發者**：使用者回饋三項優化建議
+- **執行角色**：🎯 GAME_DESIGN + 🔧 CODING + 🛡️ QA
+- **變更摘要**：
+
+  **1. 移除裝備商店分頁**
+  - `src/components/ShopPanel.tsx` — 商店分頁從 4 個縮為 3 個（每日/素材/特殊），移除 `equipment` 分類和 `equip_chest` 商品
+  - `workers/src/routes/inventory.ts` — 同步移除後端 `equip_chest` 商品目錄
+  - 原因：裝備商店僅一個商品（裝備寶箱），與裝備銻造/抽取功能重複
+
+  **2. 修復寶箱無法開啟問題**
+  - 根因：D1 `item_definitions` 表的 `useAction` 存在 `extra` JSON 內，但後端 `load-item-definitions` API 只回傳原始 row，未解析 `extra`
+  - 前端 `definition?.useAction` 永遠為 undefined → 「開啟」按鈕不顯示
+  - 修復：`workers/src/routes/inventory.ts` 的 `load-item-definitions` 現在解析 `extra` JSON，合併 `useAction`/`category`/`name`/`description` 等欄位到回傳結果
+  - API 驗證：4 種寶箱都回傳 `useAction: "open"`
+
+  **3. 簽到/商店道具點擊查看詳情**
+  - 新增 `src/components/ItemInfoPopup.tsx` 共用元件（唯讀道具詳情彈窗）
+  - 簽到面板：道具行可點擊，顯示名稱/稀有度/說明
+  - 商店面板：商品 icon 可點擊，顯示獎勵道具詳情
+  - CSS 新增 `.item-info-popup`/`.checkin-item-clickable`/`.shop-item-icon-clickable`
+
+- **QA 驗證**：24 PASS / 0 FAIL / 0 WARN
+- **Workers 部署**：Version e5890616
+
+---
+### [2026-03-02] 信箱系統修復 — deletedAt/expiresAt 查詢條件修正
+
+- **觸發者**：使用者回報「新辦帳號獎勵信件消失了」
+- **執行角色**：🔧 CODING + 🛡️ QA
+- **根因分析**：
+  - `workers/schema.sql` 定義 `deletedAt TEXT NOT NULL DEFAULT ''`
+  - 所有信件的 `deletedAt` 值為空字串 `''`（NOT NULL 約束不允許 NULL）
+  - 但 `mail.ts` 所有查詢條件都用 `deletedAt IS NULL`（SQLite 中 `'' IS NULL` = false）
+  - **結果：整個信箱系統無法顯示任何信件**（歡迎信、競技場獎勵、定時信件全部隱形）
+- **修正內容**：
+  - `workers/src/routes/mail.ts` — 4 個查詢條件從 `deletedAt IS NULL` 改為 `(deletedAt IS NULL OR deletedAt = '')`
+  - `insertMail` 函式 — `expiresAt || null` 改為 `expiresAt || ''`（避免 NOT NULL 約束違規）
+  - `workers/src/routes/auth.ts` — 確認歡迎信件使用 `'', ''`（與 schema 一致）
+- **QA 驗證**：20 PASS / 0 FAIL / 3 WARN（信箱 badge 顯示 1 封未讀歡迎信件）
+- **Workers 部署**：Version 7e571088
+
+---
+### [2026-03-02] 遊戲平衡修正 — Chapter 1 難度曲線重新平衡
+
+- **觸發者**：QA 全功能測試發現 1-2 對新帳號形成死鎖（3 敵 vs 3 隻 Lv.1 英雄必敗→無法解鎖召喚/商店）
+- **執行角色**：🎯 GAME_DESIGN + 🔧 CODING + 🛡️ QA
+- **變更摘要**：
+
+  **新機制：敵方 defMultiplier**
+  - `src/domain/stageSystem.ts` — `StageEnemy` 介面新增 `defMultiplier?: number`（預設 1.0）
+  - `src/game/helpers.ts` — `buildEnemySlotsFromStage` 支援 defMultiplier 縮放敵人 DEF
+  - 修正早期敵人 HP/ATK 被縮放但 DEF 維持原值的比例失衡問題
+
+  **Chapter 1 關卡重新平衡**
+  - `scripts/seed_stage_configs.sql` — 全 8 關加入 defMultiplier
+  - **1-2**：3 敵→2 敵（移除 heroId 1，保留 7+14）+ 保底掉落 exp_core_s（100%）
+  - 1-1~1-7：defMultiplier = atkMultiplier（DEF 與 ATK 同步縮放）
+  - 1-8（Boss）：defMultiplier = 1.0（Boss DEF 維持基礎值）
+  - D1 遠端已重新 seed
+
+  **QA 驗證結果**：24 PASS / 0 FAIL / 0 WARN（瀏覽器實測通過）
+
+---
+### [2025-07-14] saveService storyProgress notify 時序修復
+
+- **觸發者**：QA 全功能 E2E 測試發現 1-2 通關後進度未推進到 1-3
+- **執行角色**：🛡️ QA + 🔧 CODING
+- **變更摘要**：
+
+  **Bug 修復：**
+  - `src/services/saveService.ts` — `updateStoryProgress()` 修復 notify 時序
+    - 根因：`enqueueSave({ storyProgress: JSON_STRING })` 先設字串再 notify，
+      導致 React 端收到 `storyProgress` 為字串而非物件，
+      `isFirstClear()` 計算 `progress.chapter` 得到 undefined → NaN → first=false，
+      後續關卡勝利永遠不推進劇情進度
+    - 修復：在 `enqueueSave` 後覆寫為正確物件型態再呼叫 `notify()`
+
+  **QA 測試基礎建設：**
+  - `scripts/qa_full_playtest.mjs` — 全功能 E2E 測試腳本
+    - 修正關卡卡片點擊選擇器（避免點到父容器 div）
+    - 修正戰鬥結果偵測（.battle-result-banner / VICTORY / DEFEAT）
+    - 修正 1-2 敗北/勝利判定邏輯
+
+---
+### [2025-07-14] stage_configs 技術債修復 — 主線關卡改 API 驅動
+
+- **觸發者**：使用者要求「把技術債修一修吧 從worker拿關卡資料 然後前端生成對應的UI」
+- **執行角色**：🔧 CODING + 🎯 GAME_DESIGN
+- **變更摘要**：
+
+  **Workers 後端：**
+  - 新增 `workers/src/routes/stage.ts`（~80 行）— `/list-stages`（全部）+ `/stage-config`（單筆）
+  - `workers/src/index.ts` — 註冊 stage 路由（protectedApi 第 11 個模組）
+  - D1 `stage_configs` 表 seed 24 筆關卡配置（`scripts/seed_stage_configs.sql`）
+
+  **前端服務層：**
+  - 新增 `src/services/stageService.ts`（~100 行）— fetchStageConfigs / getStageConfig / getCachedStageConfig / clearStageCache
+  - 型別：StageExtra（chapterName/stageName/description/bgTheme/difficulty/recommendedLevel/isBoss/chapterIcon）
+
+  **StageSelect 重寫：**
+  - `src/components/StageSelect.tsx` — 全面重寫（~340 行），主線改用 API 動態載入
+  - 章節主題選擇器（🏙️ 廢墟之城 / 🌲 暗夜森林 / 🏜️ 死寂荒原），每章獨立主題色
+  - 關卡卡片顯示：名稱、難度骷髏（1-5）、推薦等級、敵人數量、獎勵預覽、星級
+  - Boss 關金框 + BOSS 徽章、當前關卡脈衝動畫
+
+  **遊戲流程串接：**
+  - `src/game/helpers.ts` — `buildEnemySlotsFromStage` 新增 `injectedEnemies` 參數，story 模式從 API 取得
+  - `src/hooks/useStageHandlers.ts` — `handleStageSelect` 改為先 await `getStageConfig()` 再生成敵方
+  - `src/hooks/useBattleFlow.ts` — retryBattle / replayBattle / goNextStage 改為 async，story 模式注入 API 敵方
+  - `src/game/runBattleLoop.ts` — 結算改用 `getCachedStageConfig()` 取得獎勵（含 fallback 公式）
+
+  **死碼清理：**
+  - `src/domain/stageSystem.ts` — 移除 `getStoryStageConfig()` + `CHAPTER1_ZOMBIE_IDS`（~60 行）
+  - `src/domain/__tests__/stageSystemAdvanced.test.ts` — 移除 getStoryStageConfig 測試區段
+
+  **CSS：**
+  - `src/App.css` — 新增 ~180 行 `sc-*` 前綴樣式類別（章節選擇器/關卡卡片/難度骷髏/BOSS 徽章/RWD）
+
+  **Spec / 文件：**
+  - `specs/stage-system.md` v1.4 → v2.0（D1 驅動架構、章節主題表、前端流程圖）
+  - `memory/dev-status.md` 第 41 次更新
+  - `memory/changelog.md` 同步記錄
+
+- **Workers 部署**：Version 55841f88（11 個路由模組）
+- **驗證**：tsc 零錯誤 + Workers tsc 零錯誤 + vite build 成功（687 modules）
+
+---
+### [2026-03-02] handleFullLogout 移至 SettingsPanel — useLogout hook
+
+- **觸發者**：使用者要求「handleFullLogout 移到 SettingPanel.tsx Component」
+- **執行角色**：🔧 CODING
+- **變更摘要**：
+  - 新增 `src/hooks/useLogout.ts`（~50 行）：auth logout + 9 個服務快取 clear，接收 `onResetState` 回呼
+  - `SettingsPanel.tsx`：改用 `useLogout(onLogout)` 取代手寫 `logout() + onLogout()`，移除 `logout` import
+  - `App.tsx`：`handleFullLogout` 簡化為 `handleLogoutResetState`（純 React state / hook reset），移除 5 個 cache clearing import（invalidateMailCache/clearSheetCache/clearGachaPreload/clearLocalPool/clearPendingOps）+ 4 個額外 unused import（clearGameDataCache/clearLocalSaveCache/clearInventoryCache/clearArenaCache）
+  - 淨減 App.tsx ~10 行（685 → ~675 行）
+  - tsc 零錯誤 + vite build 成功
+- **GAS 部署**：無（純前端重構）
+
+---
+### [2026-03-02] App.tsx 方法拆分 Phase 4 — 3 個 hooks + import 清理
+
+- **觸發者**：使用者要求「App.tsx 方法也都拆出去到各自的 component」（延續 Phase 3）
+- **執行角色**：🔧 CODING → 🏗️ ARCHITECT
+- **變更摘要**：
+  - App.tsx **696 行 → 685 行**（淨減 11 行 import；邏輯面更大的改善是 3 塊 state/effect 抽入 hooks）
+  - 新增 `src/hooks/useMail.ts`（~44 行）：mailItems / mailLoaded / mailUnclaimedCount / refreshMailData / resetMail
+  - 新增 `src/hooks/useBattleState.ts`（~107 行）：所有戰鬥中介狀態（turn/speed/battleResult/victoryRewards/battleStats/actorStates/domain refs/setActorState/resetBattleRefs）
+  - 新增 `src/hooks/useBgm.ts`（~35 行）：BGM 自動切換 effect（login/lobby/battle/gacha/victory/defeat）
+  - `handleFullLogout` 簡化：inline state reset 改為 `mail.resetMail()` + `resetBattleRefs()`
+  - 移除 15 條 unused import（loadMail / MailItem / ActorState / Vector3Tuple / BattleHero / BattleAction / SkillTemplate / HeroSkillConfig / BattleFlowValidator / RawHeroInput / VerifyResult / CompleteBattleResult / audioManager / VictoryRewards / BattleStatEntry）
+  - tsc 零錯誤 + vite build 成功
+- **GAS 部署**：無（純前端重構）
+
+---
+### [2026-03-02] App.tsx 方法拆分 Phase 3 — 4 個 hooks 完全抽出
+
+- **觸發者**：使用者要求「App.tsx 方法也都拆出去到各自的 component」（延續 Phase 2）
+- **執行角色**：🔧 CODING → 🏗️ ARCHITECT
+- **變更摘要**：
+  - App.tsx **1294 行 → 696 行**（淨減 598 行，再減幅 46%；累計從 2652 行降到 696 行，總減幅 74%）
+  - 新增 `src/hooks/useSlots.ts`（104 行）：槽位狀態管理（6 格 × 雙方）+ ref 同步 + 陣型恢復
+  - 新增 `src/hooks/useGameInit.ts`（283 行）：fetchData + 模型/縮圖預載 + Phase 0/1/2 Effects + PWA 獎勵 + 載入超時
+  - 新增 `src/hooks/useBattleFlow.ts`（298 行）：resetBattleState / buildBattleCtx / retryBattle / replayBattle / backToLobby / goNextStage / runBattleLoop / startAutoBattle
+  - 新增 `src/hooks/useStageHandlers.ts`（159 行）：handleStageSelect / handleArenaStartBattle / handleCheckin / handleMenuNavigate / handleBackToMenu
+  - `handleFullLogout` 簡化：slot 重設用 `resetSlots()`，init ref 重設用 `gameInit.resetInitRefs()`
+  - 清理 unused imports（normalizeModelId, RawHeroInput 等已移至 hooks）
+  - 修正 `useBattleFlow.ts` 遺漏的 `setStageId` 呼叫（goNextStage 推進時需更新關卡 ID）
+  - BattleFlowDeps 型別修正：useState setter 改用 `Dispatch<SetStateAction<T>>`、addDamage/waitForAction 簽名對齊
+  - tsc 零錯誤 + vite build 成功
+- **GAS 部署**：無（純前端重構）
+
+---
+### [2026-03-02] App.tsx 方法拆分 Phase 2 — hooks + game module
+
+- **觸發者**：使用者要求「App.tsx 方法也都拆出去到各自的 component」
+- **執行角色**：🔧 CODING → 🏗️ ARCHITECT
+- **變更摘要**：
+  - App.tsx **2652 行 → 1293 行**（淨減 1359 行，減幅 51%）
+  - 新增 `src/hooks/useCurtain.ts`（48 行）：過場幕狀態 + closeCurtain + resetCurtain
+  - 新增 `src/hooks/useBattleHUD.ts`（63 行）：戰鬥 HUD 狀態（buffs/energy/toasts/hints）+ reset 方法
+  - 新增 `src/hooks/useAnimationPromises.ts`（109 行）：動畫 Promise 系統 + 傷害彈窗 + 閃光
+  - 新增 `src/hooks/useDragFormation.ts`（127 行）：拖曳陣型 + 英雄上下陣邏輯
+  - 新增 `src/game/runBattleLoop.ts`（~750 行）：完整戰鬥迴圈（BattleLoopContext 50 欄位）
+  - App.tsx：retryBattle/replayBattle/backToLobby/goNextStage 簡化為各 ~15 行（共用 resetBattleState）
+  - App.tsx：runBattleLoop 本體替換為 `executeBattleLoop(buildBattleCtx())` 委託呼叫
+  - App.tsx：拖曳邏輯替換為 `useDragFormation()` hook 呼叫
+  - 清理 unused imports（ATTACK_DELAY_MS, BUFF_TYPE_SET, REPLAY_SCENE_SETTLE_MS 等）
+  - tsc 零錯誤 + vite build 成功
+- **GAS 部署**：無（純前端重構）
+
+---
+### [2026-03-02] App.tsx 結構化拆分
+
+- **觸發者**：使用者要求「把 App.tsx 結構化 分資料夾分檔案 他現在太大包了」
+- **執行角色**：🔧 CODING → 🏗️ ARCHITECT
+- **變更摘要**：
+  - App.tsx 3105 行 → 2651 行（淨減 454 行）
+  - 新增 `src/game/constants.ts`：戰鬥時序常數、格子佈局、API 端點、waitFrames
+  - 新增 `src/game/helpers.ts`：normalizeModelId、getHeroSpeed、clamp01、buildEnemySlotsFromStage、TargetStrategy type
+  - 新增 `src/components/DragPlane.tsx`：R3F 拖曳平面元件
+  - 新增 `src/components/MenuScreenRouter.tsx`：9 個主選單子畫面的路由元件
+  - 新增 `src/components/VictoryPanel.tsx`：勝負標語 + 獎勵面板
+  - 新增 `src/components/GameOverButtons.tsx`：GAMEOVER 按鈕群組
+  - 新增 `src/components/BattleStatsPanel.tsx`：戰鬥統計面板
+  - 新增 `src/components/BattleSpeedControls.tsx`：倍速 + 跳過按鈕
+  - `saveService.ts`：匯出 `DailyCheckinResult` interface
+  - App.tsx：移除 inline 常數/工具函式/DragPlane/選單子畫面/勝負標語/統計面板/倍速按鈕 JSX，改用 import
+  - specs/tech-architecture.md v1.7→v1.8
+- **GAS 部署**：無（純前端重構）
+
+---
+### [2026-03-02] 移除帳號等級/經驗系統
+
+- **觸發者**：使用者觀察「帳號等級無實質功能，所有解鎖以通關進度驅動」
+- **執行角色**：🔧 CODING
+- **變更摘要**：
+  - 移除 `SaveData.level` / `SaveData.exp` 欄位（前端型別 + GAS SAVE_HEADERS_）
+  - 移除 MainMenu Lv 標籤 + EXP 進度條 + 相關 CSS 樣式
+  - 移除 App.tsx 戰鬥結算帳號升等邏輯（expToNextLevel 迴圈 + leveledUp toast）
+  - 移除勝利獎勵面板的經驗顯示行 + 競技場經驗 acquireToast
+  - 移除 `updateProgress` 中的 `'level' | 'exp'` 欄位
+  - GAS `handleCompleteBattle_`：移除 exp/level 寫入 + 升等迴圈，回傳不再含 newLevel/leveledUp
+  - GAS `handleInitSave_`：初始值移除 level=1、exp=0；resourceTimerStage 欄位位移修正 (col 7→5)
+  - `expToNextLevel` 函式保留（英雄升級仍需使用）
+  - specs/save-system.md v1.7→v1.8
+- **GAS 部署**：POST @104、GET @105
+
+---
+### [2026-03-02] Optimistic Queue v2 — Polling Retry + Operation Group + 全專案套用
+
+- **觸發者**：使用者需求（合併樂觀更新機制 + 全專案掃描套用）
+- **執行角色**：🔧 CODING
+
+#### 核心升級（optimisticQueue.ts）
+1. **Polling Retry Loop**：每 30 秒自動重送失敗操作，不再被動等下次登入
+2. **Operation Group**：`fireOptimisticGroup()` — 原子批次操作 + onLocal 回傳 undo 做 rollback
+3. **PendingOp** 新增 `retryCount`（最多 10 次）+ `groupId`（群組歸屬）
+4. **`ensureRetryLoop()` / `stopRetryLoop()`**：自動管理輪詢生命週期
+5. 登入後 reconcile → 失敗自動啟動 retry loop
+
+#### 新轉換的操作（3 項 → 總計 25 項）
+1. **`doDailyCheckin()`**：本地已知 7 天獎勵表 → 即時 +金幣/鑽石/道具 → 背景同步（修復簽到延遲問題）
+2. **`sellItems()`**：本地已知售價 → 即時扣背包+加金幣 → 背景同步（從 async 改為 sync）
+3. **`readMail()`**：fire-and-forget → 背景同步（從 async 改為 sync）
+
+#### GAS 端
+- `daily-checkin` + `sell-items` 加入 `executeWithIdempotency_()` 冪等保護
+- Reconcile 支援 action 19→21 種（新增 `daily-checkin`、`sell-items`）
+
+#### Spec 更新
+- `specs/optimistic-queue.md` v1.1 → v2.0
+
+---
+### [2026-03-02] 每日簽到 + 寶箱開啟 + 背包裝備穿脫 + 新手引導
+
+- **觸發者**：使用者需求（4 項新功能）
+- **執行角色**：🔧 CODING + 🎯 GAME_DESIGN + 🎨 UI_DESIGN
+
+#### 1. 每日簽到 (Daily Check-in)
+1. **GAS `handleDailyCheckin_()`**：UTC+8 日期邏輯，7 天獎勵循環
+2. **SaveData 新增欄位**：`checkinDay`（number, 1~7）、`checkinLastDate`（string, UTC+8 日期）
+3. **`CheckinPanel.tsx`**：簽到面板元件，顯示 7 天獎勵 + 當日簽到按鈕
+4. **`saveService.ts`**：新增 `doDailyCheckin()` 呼叫 GAS `daily-checkin` action
+5. **MainMenu**：新增 `'checkin'` 選項按鈕
+6. **MenuScreen 型別**：新增 `'checkin'`（9 值）
+
+#### 2. 寶箱開啟邏輯 (Chest Opening)
+1. **GAS `generateChestRewards_(chestId, qty)`**：bronze/silver/gold 三階寶箱獎勵生成
+2. **GAS `handleUseItem_()`**：偵測 chest 類道具 → 呼叫 `generateChestRewards_()` → 分配貨幣/道具
+3. **InventoryPanel**：寶箱使用後顯示開啟結果，`updateLocalCurrency()` 同步金幣/鑽石
+4. **`ITEM_ICONS` / `ITEM_NAMES`**：新增 chest_bronze、chest_silver、chest_gold
+
+#### 3. 背包裝/卸裝備 (Equip/Unequip from Inventory)
+1. **InventoryPanel**：EquipmentDetail 新增 equip/unequip 按鈕
+2. **英雄選擇 popup**：裝備時彈出英雄列表，顯示實際英雄名稱
+3. **依賴服務**：`equipItem` / `unequipItem` / `getHeroEquipment`（progressionService）
+
+#### 4. 新手引導 (Tutorial System)
+1. **`TutorialOverlay.tsx`** + **`useTutorial()` hook**
+2. **5 步引導**：Welcome → Start-battle → Victory-congrats → Explore → Complete
+3. **localStorage 追蹤**：`globalganlan_tutorial_step`（步驟編號 / `done`）
+4. **觸發條件**：首次造訪自動啟動、首次勝利推進、返回主選單推進
+
+#### Spec 更新
+- `specs/ui-flow.md` v1.4 → v1.5（CheckinPanel + TutorialOverlay + 背包裝備穿脫）
+- `specs/inventory.md` v2.1 → v2.2（寶箱三階開啟 + 背包裝備穿脫）
+- `specs/progression.md` v2.1 → v2.2（每日簽到系統 §八）
+- `specs/save-system.md` v1.6 → v1.7（checkinDay / checkinLastDate 欄位 + daily-checkin API）
+
+#### 驗證
+- `npx tsc --noEmit` → 0 errors
+- `npx vite build` → 成功
+- GAS clasp push + deploy 完成
+
+---
 ### [2026-03-02] QA 報告缺口修補 — exp 欄位 + CP HUD + toast 場景連接
 
 - **觸發者**：使用者針對 QA 報告提出 4 個問題，要求補齊缺口

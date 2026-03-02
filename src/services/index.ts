@@ -81,55 +81,22 @@ export {
   ascendHero,
   starUpHero,
   enhanceEquipment,
-  forgeEquipment,
-  dismantleEquipment,
   completeStage,
   completeTower,
   completeDaily,
   gachaPull,
-  getGachaPoolStatus,
   type UpgradeHeroResult,
   type AscendHeroResult,
   type StarUpResult,
   type EnhanceEquipmentResult,
-  type ForgeResult,
   type StageCompleteResult,
 } from './progressionService'
-
-// 樂觀更新佇列
-export {
-  fireOptimistic,
-  fireOptimisticAsync,
-  generateOpId,
-  reconcilePendingOps,
-  getPendingOps,
-  hasPendingOps,
-  clearPendingOps,
-  onQueueChange,
-  getInflightCount,
-  type PendingOp,
-} from './optimisticQueue'
 
 // localStorage 遷移引擎
 export {
   runMigrations,
   CURRENT_SCHEMA_VERSION,
 } from './localStorageMigration'
-
-// 本地抽卡池
-export {
-  initLocalPool,
-  localPull,
-  getPoolRemaining,
-  getPityState,
-  getOwnedHeroIds,
-  onPoolChange,
-  clearLocalPool,
-  tryRestoreFromStorage,
-  type PoolEntry,
-  type LocalPullResult,
-  type LocalPullResponse,
-} from './gachaLocalPool'
 
 // 後端戰鬥引擎
 export { runBattleRemote } from './battleService'

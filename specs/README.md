@@ -28,7 +28,7 @@
 | `specs/gacha.md` | 抽卡系統（本地池架構 + 裝備抽卡 v2） | v1.4 | 🟢 已實作 |
 | `specs/inventory.md` | 背包與道具系統（5 類道具、14 個 service 函式 + UI + CurrencyIcon） | v2.0 | 🟢 已實作 |
 | `specs/mailbox.md` | 信箱系統（預載/樂觀領取/幂等保護/離線補償） | v1.0 | 🟢 已實作 |
-| `specs/optimistic-queue.md` | 樂觀更新佇列（冪等 + localStorage 備份 + reconcile 19 種 action） | v1.1 | 🟢 已實作 |
+| ~~`specs/optimistic-queue.md`~~ | ~~樂觀更新佇列~~ — 已刪除（遷移至 Workers 後廢棄） | — | 🔴 已廢棄 |
 | `specs/local-storage-migration.md` | localStorage Schema 版本遷移（版本化 + 自動 migration + 安全降級） | v1.0 | 🟢 已實作 |
 | `specs/ui-flow.md` | UI 流程與畫面定義（GameState/MenuScreen 8 值/導航函式/條件式過場幕/CurrencyIcon） | v1.2 | 🟢 已實作 |
 | `specs/audio.md` | 音效與音樂系統（Web Audio API 合成 BGM 6 曲目 + SFX 9 種 + AudioManager） | v0.3 | 🟢 已實作 |
@@ -68,7 +68,7 @@
 | `src/components/ShopPanel.tsx` | inventory | 商店面板（4 類商品 + 購買流程） |
 | `src/components/SettingsPanel.tsx` | audio, ui-flow | 設定面板（音量滑桿 + 靜音 + 帳號） |
 | `src/components/SceneWidgets.tsx` | buff-debuff-icons, buff-apply-toast | BuffIcons3D + BuffApplyToast3D 3D 狀態圖示/漂字 |
-| `gas/程式碼.js` | auth, save, stage, progression, inventory, mailbox | GAS 全部 handler |
+| `workers/src/routes/*.ts` | auth, save, battle, progression, inventory, mail, gacha, arena, sheet, checkin | Workers 全部 handler |
 
 ## Spec 檔案格式規範
 

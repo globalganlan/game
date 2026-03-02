@@ -6,13 +6,7 @@
  * 裝備：金幣池/鑽石池、十連保底 SR+、無保底累計
  */
 
-import { useState, useCallback, useEffect } from 'react'
-import {
-  localPull,
-  getPoolRemaining,
-  getPityState,
-  onPoolChange,
-} from '../services/gachaLocalPool'
+import { useState, useCallback } from 'react'
 import {
   SINGLE_PULL_COST,
   TEN_PULL_COST,
@@ -31,6 +25,7 @@ import {
   type EquipPullResult,
 } from '../domain/equipmentGacha'
 import type { EquipmentInstance } from '../domain/progressionSystem'
+import { getStatAtLevel, getAscensionMultiplier, getStarMultiplier, RARITY_INITIAL_STARS } from '../domain/progressionSystem'
 import type { RawHeroData } from '../types'
 import { translateError } from '../utils/errorMessages'
 import { Thumbnail3D } from './UIOverlay'
@@ -38,7 +33,7 @@ import { addItemsLocally, addEquipmentLocally } from '../services/inventoryServi
 import { emitAcquire } from '../services/acquireToastBus'
 import { getItemName } from '../constants/rarity'
 import type { AcquireItem } from '../hooks/useAcquireToast'
-import { fireOptimisticAsync } from '../services/optimisticQueue'
+import { callApi } from '../services/apiClient'
 
 /** 將原始英雄資料的 ID 正規化為 `zombie_N` 格式 */
 function resolveModelId(h: RawHeroData): string {
@@ -89,7 +84,7 @@ interface PullResult {
   fragments: number
 }
 
-function ResultCard({ result, hero }: { result: PullResult; hero?: RawHeroData }) {
+function ResultCard({ result, hero, onClick }: { result: PullResult; hero?: RawHeroData; onClick?: () => void }) {
   const cfg = RARITY_CONFIG[(result.rarity as GachaRarity) || 'N'] || RARITY_CONFIG.N
   const name = hero?.Name || `英雄#${result.heroId}`
   const modelId = hero ? resolveModelId(hero) : `zombie_${result.heroId}`
@@ -98,6 +93,7 @@ function ResultCard({ result, hero }: { result: PullResult; hero?: RawHeroData }
     <div
       className="gacha-result-card"
       style={{ borderColor: cfg.color, boxShadow: cfg.glow }}
+      onClick={onClick}
     >
       {result.isNew && <span className="gacha-new-badge">NEW!</span>}
       {!result.isNew && <span className="gacha-dupe-badge">重複</span>}
@@ -121,7 +117,7 @@ function ResultCard({ result, hero }: { result: PullResult; hero?: RawHeroData }
    Equipment Result Card
    ──────────────────────────── */
 
-function EquipResultCard({ eq, isGuaranteed }: { eq: EquipmentInstance; isGuaranteed: boolean }) {
+function EquipResultCard({ eq, isGuaranteed, onClick }: { eq: EquipmentInstance; isGuaranteed: boolean; onClick?: () => void }) {
   const cfg = RARITY_CONFIG[eq.rarity] || RARITY_CONFIG.N
   const name = getEquipDisplayName(eq)
   // 部位 emoji
@@ -131,21 +127,139 @@ function EquipResultCard({ eq, isGuaranteed }: { eq: EquipmentInstance; isGuaran
     <div
       className="gacha-result-card gacha-equip-card"
       style={{ borderColor: cfg.color, boxShadow: cfg.glow }}
+      onClick={onClick}
     >
       {isGuaranteed && <span className="gacha-new-badge">保底!</span>}
       <div className="gacha-equip-icon">{slotEmoji[eq.slot] || '📦'}</div>
       <span className="gacha-result-name">{name}</span>
       <span className="gacha-result-rarity" style={{ color: cfg.color }}>{cfg.label}</span>
-      <span className="gacha-equip-stat">{eq.mainStat} +{eq.mainStatValue}</span>
-      {eq.subStats.length > 0 && (
-        <div className="gacha-equip-sub">
-          {eq.subStats.map((s, i) => (
-            <span key={i} className="gacha-equip-sub-item">
-              {s.stat} {s.isPercent ? `+${s.value}%` : `+${s.value}`}
-            </span>
-          ))}
+    </div>
+  )
+}
+
+/* ────────────────────────────
+   Hero Info Popup（唯讀 — 召喚結果點擊查看）
+   ──────────────────────────── */
+
+/** 將稀有度文字轉為數字 */
+function rarityToNum(r: string): number {
+  const map: Record<string, number> = { N: 1, R: 2, SR: 3, SSR: 4 }
+  return map[r] || 1
+}
+
+const ELEMENT_LABEL: Record<string, string> = {
+  fire: '🔥 火', water: '💧 水', wind: '🌀 風', earth: '🪨 地',
+  light: '✨ 光', dark: '🌑 暗', Fire: '🔥 火', Water: '💧 水',
+  Wind: '🌀 風', Earth: '🪨 地', Light: '✨ 光', Dark: '🌑 暗',
+}
+const TYPE_LABEL: Record<string, string> = {
+  tank: '🛡️ 坦克', attacker: '⚔️ 攻擊', support: '💚 輔助', healer: '💗 治療',
+  Tank: '🛡️ 坦克', Attacker: '⚔️ 攻擊', Support: '💚 輔助', Healer: '💗 治療',
+}
+
+function HeroInfoPopup({ hero, rarity, onClose }: { hero: RawHeroData; rarity: string; onClose: () => void }) {
+  const cfg = RARITY_CONFIG[(rarity as GachaRarity) || 'N'] || RARITY_CONFIG.N
+  const modelId = resolveModelId(hero)
+  const heroAny = hero as Record<string, unknown>
+  const rarityNum = rarityToNum(rarity)
+  const initStars = RARITY_INITIAL_STARS[rarityNum] ?? 0
+  const ascMult = getAscensionMultiplier(0, rarityNum)
+  const starMult = getStarMultiplier(initStars, rarityNum)
+
+  const calcStat = (base: number | undefined) =>
+    base != null ? Math.floor(getStatAtLevel(Number(base), 1, rarityNum) * ascMult * starMult) : '?'
+
+  return (
+    <div className="gacha-info-backdrop" onClick={onClose}>
+      <div className="gacha-info-card" onClick={(e) => e.stopPropagation()}>
+        <button className="gacha-info-close" onClick={onClose}>✕</button>
+
+        <div className="gacha-info-top">
+          <div className="gacha-info-portrait">
+            <Thumbnail3D modelId={modelId} />
+          </div>
+          <div className="gacha-info-identity">
+            <span className="gacha-info-name">{hero.Name || '???'}</span>
+            <span className="gacha-info-rarity" style={{ color: cfg.color }}>{cfg.label}</span>
+            <div className="gacha-info-tags">
+              {heroAny.Element ? <span className="gacha-info-tag">{ELEMENT_LABEL[String(heroAny.Element)] ?? String(heroAny.Element)}</span> : null}
+              {heroAny.Type ? <span className="gacha-info-tag">{TYPE_LABEL[String(heroAny.Type)] ?? String(heroAny.Type)}</span> : null}
+            </div>
+            {heroAny.Description ? <span className="gacha-info-desc">{String(heroAny.Description)}</span> : null}
+          </div>
         </div>
-      )}
+
+        <div className="gacha-info-section-title">Lv.1 屬性</div>
+        <div className="gacha-info-stats-grid">
+          <div className="gacha-info-stat"><span className="gacha-info-stat-label">HP</span><span className="gacha-info-stat-val">{calcStat(hero.HP as number)}</span></div>
+          <div className="gacha-info-stat"><span className="gacha-info-stat-label">ATK</span><span className="gacha-info-stat-val">{calcStat(hero.ATK as number)}</span></div>
+          <div className="gacha-info-stat"><span className="gacha-info-stat-label">DEF</span><span className="gacha-info-stat-val">{calcStat(heroAny.DEF as number)}</span></div>
+          <div className="gacha-info-stat"><span className="gacha-info-stat-label">SPD</span><span className="gacha-info-stat-val">{String(heroAny.Speed ?? heroAny.SPD ?? '?')}</span></div>
+          <div className="gacha-info-stat"><span className="gacha-info-stat-label">暴擊率</span><span className="gacha-info-stat-val">{String(heroAny.CritRate ?? '?')}%</span></div>
+          <div className="gacha-info-stat"><span className="gacha-info-stat-label">暴擊傷害</span><span className="gacha-info-stat-val">{String(heroAny.CritDmg ?? '?')}%</span></div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/* ────────────────────────────
+   Equipment Info Popup（唯讀 — 裝備結果點擊查看）
+   ──────────────────────────── */
+
+const STAT_ZH: Record<string, string> = {
+  HP: '生命', ATK: '攻擊', DEF: '防禦', SPD: '速度',
+  CritRate: '暴擊率', CritDmg: '暴擊傷害',
+  HP_percent: '生命%', ATK_percent: '攻擊%', DEF_percent: '防禦%',
+}
+
+function EquipInfoPopup({ eq, onClose }: { eq: EquipmentInstance; onClose: () => void }) {
+  const cfg = RARITY_CONFIG[eq.rarity] || RARITY_CONFIG.N
+  const name = getEquipDisplayName(eq)
+  const slotEmoji: Record<string, string> = { weapon: '🗡️', armor: '🛡️', ring: '💍', boots: '👢' }
+  const setName = SET_NAMES[eq.setId] || eq.setId
+  const slotName = SLOT_NAMES[eq.slot] || eq.slot
+
+  return (
+    <div className="gacha-info-backdrop" onClick={onClose}>
+      <div className="gacha-info-card" onClick={(e) => e.stopPropagation()}>
+        <button className="gacha-info-close" onClick={onClose}>✕</button>
+
+        <div className="gacha-info-top">
+          <div className="gacha-info-portrait">
+            <span className="gacha-info-equip-icon">{slotEmoji[eq.slot] || '📦'}</span>
+          </div>
+          <div className="gacha-info-identity">
+            <span className="gacha-info-name">{name}</span>
+            <span className="gacha-info-rarity" style={{ color: cfg.color }}>{cfg.label}</span>
+            <div className="gacha-info-tags">
+              <span className="gacha-info-tag">{setName}</span>
+              <span className="gacha-info-tag">{slotName}</span>
+            </div>
+            <span className="gacha-info-set-name">+{eq.enhanceLevel} 強化</span>
+          </div>
+        </div>
+
+        <div className="gacha-info-section-title">主屬性</div>
+        <div className="gacha-info-main-stat">
+          <span className="gacha-info-main-stat-name">{STAT_ZH[eq.mainStat] || eq.mainStat}</span>
+          <span className="gacha-info-main-stat-val">+{eq.mainStatValue}</span>
+        </div>
+
+        {eq.subStats.length > 0 && (
+          <>
+            <div className="gacha-info-section-title">副屬性</div>
+            <div className="gacha-info-sub-list">
+              {eq.subStats.map((s, i) => (
+                <div key={i} className="gacha-info-sub-item">
+                  <span className="gacha-info-sub-item-name">{STAT_ZH[s.stat] || s.stat}</span>
+                  <span className="gacha-info-sub-item-val">{s.isPercent ? `+${s.value}%` : `+${s.value}`}</span>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+      </div>
     </div>
   )
 }
@@ -163,14 +277,17 @@ export function GachaScreen({
   // ─── Hero Gacha state ───
   const [results, setResults] = useState<PullResult[]>([])
   const [showResults, setShowResults] = useState(false)
-  const [pityCount, setPityCount] = useState(getPityState().pullsSinceLastSSR || initialPity)
-  const [_poolRemaining, setPoolRemainingState] = useState(getPoolRemaining())
+  const [pityCount, setPityCount] = useState(initialPity)
   const [error, setError] = useState<string | null>(null)
 
   // ─── Equipment Gacha state ───
   const [equipPool, setEquipPool] = useState<EquipPoolType>('gold')
   const [equipResults, setEquipResults] = useState<EquipPullResult[]>([])
   const [showEquipResults, setShowEquipResults] = useState(false)
+
+  // ─── Info Popup state ───
+  const [selectedHeroResult, setSelectedHeroResult] = useState<{ result: PullResult; hero?: RawHeroData } | null>(null)
+  const [selectedEquip, setSelectedEquip] = useState<EquipmentInstance | null>(null)
 
   // ─── Pull Animation state ───
   const [isPulling, setIsPulling] = useState(false)
@@ -185,16 +302,8 @@ export function GachaScreen({
     if (hid) heroMap.set(hid, h)
   }
 
-  /* ── 訂閱池數量變化 ── */
-  useEffect(() => {
-    const unsub = onPoolChange((remaining) => {
-      setPoolRemainingState(remaining)
-    })
-    return unsub
-  }, [])
-
-  /* ── 英雄抽卡 ── */
-  const doPull = useCallback((count: 1 | 10) => {
+  /* ── 英雄抽卡（直接呼叫後端） ── */
+  const doPull = useCallback(async (count: 1 | 10) => {
     const cost = count === 10 ? TEN_PULL_COST : SINGLE_PULL_COST
     if (diamond < cost) {
       setError(`鑽石不足！需要 ${cost} 鑽石，目前 ${diamond} 鑽石`)
@@ -204,59 +313,72 @@ export function GachaScreen({
     setError(null)
     setIsPulling(true)
     setRevealPhase(false)
-    const res = localPull(banner.id, count, diamond)
 
-    if (!res.success) {
-      setIsPulling(false)
-      if (res.error === 'pool_empty') {
-        setError('伺服器忙碌中，請稍後再試...')
-      } else {
+    try {
+      const res = await callApi<{
+        results: { heroId: number; rarity: string; isNew: boolean; isFeatured: boolean; stardust: number; fragments: number }[]
+        diamondCost: number
+        newPityState: { pullsSinceLastSSR: number; guaranteedFeatured: boolean }
+      }>('gacha-pull', { bannerId: banner.id, count })
+
+      if (!res.success) {
+        setIsPulling(false)
         setError(translateError(res.error, '抽卡失敗'))
+        return
       }
-      return
-    }
 
-    onDiamondChange?.(-res.diamondCost)
-    setPityCount(res.newPityState.pullsSinceLastSSR)
-    setPoolRemainingState(res.poolRemaining)
+      onDiamondChange?.(-res.diamondCost)
+      setPityCount(res.newPityState.pullsSinceLastSSR)
 
-    // Stash results but delay reveal
-    const pullResults = res.results
-    setTimeout(() => {
-      setIsPulling(false)
-      setResults(pullResults)
-      setShowResults(true)
-      setRevealPhase(true)
-    }, PULL_ANIM_MS)
+      const pullResults: PullResult[] = res.results.map(r => ({
+        heroId: r.heroId,
+        rarity: r.rarity,
+        isNew: r.isNew,
+        isFeatured: r.isFeatured,
+        stardust: r.stardust || 0,
+        fragments: r.fragments || 0,
+      }))
 
-    const newIds = res.results.filter(r => r.isNew).map(r => r.heroId)
-    if (newIds.length > 0) onPullSuccess?.(newIds)
+      setTimeout(() => {
+        setIsPulling(false)
+        setResults(pullResults)
+        setShowResults(true)
+        setRevealPhase(true)
+      }, PULL_ANIM_MS)
 
-    const dupeItems: { itemId: string; quantity: number }[] = []
-    let totalStardust = 0
-    for (const r of res.results) {
-      if (!r.isNew) {
-        if (r.stardust > 0) totalStardust += r.stardust
-        if (r.fragments > 0) {
-          dupeItems.push({ itemId: `asc_fragment_${r.heroId}`, quantity: r.fragments })
+      const newIds = pullResults.filter(r => r.isNew).map(r => r.heroId)
+      if (newIds.length > 0) onPullSuccess?.(newIds)
+
+      const dupeItems: { itemId: string; quantity: number }[] = []
+      let totalStardust = 0
+      for (const r of pullResults) {
+        if (!r.isNew) {
+          if (r.stardust > 0) totalStardust += r.stardust
+          if (r.fragments > 0) {
+            dupeItems.push({ itemId: `asc_fragment_${r.heroId}`, quantity: r.fragments })
+          }
         }
       }
-    }
-    if (totalStardust > 0) dupeItems.push({ itemId: 'currency_stardust', quantity: totalStardust })
-    if (dupeItems.length > 0) addItemsLocally(dupeItems)
+      if (totalStardust > 0) dupeItems.push({ itemId: 'currency_stardust', quantity: totalStardust })
+      if (dupeItems.length > 0) addItemsLocally(dupeItems)
 
-    const toastItems: AcquireItem[] = res.results.map((r: PullResult) => ({
-      type: 'hero' as const,
-      id: String(r.heroId),
-      name: heroesList.find(h => Number(h.HeroID) === r.heroId)?.Name || `英雄#${r.heroId}`,
-      quantity: 1,
-      rarity: r.rarity as 'N' | 'R' | 'SR' | 'SSR',
-      isNew: r.isNew,
-    }))
-    for (const d of dupeItems) {
-      toastItems.push({ type: 'item' as const, id: d.itemId, name: getItemName(d.itemId), quantity: d.quantity })
+      const toastItems: AcquireItem[] = pullResults.map((r: PullResult) => ({
+        type: 'hero' as const,
+        id: String(r.heroId),
+        name: heroesList.find(h => Number(h.HeroID) === r.heroId)?.Name || `英雄#${r.heroId}`,
+        quantity: 1,
+        rarity: r.rarity as 'N' | 'R' | 'SR' | 'SSR',
+        isNew: r.isNew,
+      }))
+      for (const d of dupeItems) {
+        toastItems.push({ type: 'item' as const, id: d.itemId, name: getItemName(d.itemId), quantity: d.quantity })
+      }
+      emitAcquire(toastItems)
+    } catch (err) {
+      setIsPulling(false)
+      setError('網路錯誤，請稍後再試')
+      console.warn('[GachaScreen] pull error:', err)
     }
-    emitAcquire(toastItems)
   }, [diamond, banner.id, onDiamondChange, onPullSuccess, heroesList])
 
   /* ── 裝備抽卡 ── */
@@ -288,11 +410,11 @@ export function GachaScreen({
     addEquipmentLocally(newEquipment)
 
     // 背景同步到 server
-    fireOptimisticAsync('equip-gacha-pull', {
+    callApi('equip-gacha-pull', {
       poolType: equipPool,
       count,
-      equipment: JSON.stringify(newEquipment),
-    })
+      equipment: newEquipment,
+    }).catch(console.warn)
 
     // Delay reveal for animation
     const captured = pullResults
@@ -478,9 +600,10 @@ export function GachaScreen({
               {results.map((r, i) => {
                 const rar = (r.rarity as 'SSR' | 'SR' | 'R' | 'N') || 'N'
                 const shimmerClass = rar === 'SSR' ? ' gacha-card-ssr' : rar === 'SR' ? ' gacha-card-sr' : ''
+                const hero = heroMap.get(r.heroId)
                 return (
                   <div key={i} className={`gacha-card-reveal${shimmerClass}`} style={{ animationDelay: `${i * 0.1}s` }}>
-                    <ResultCard result={r} hero={heroMap.get(r.heroId)} />
+                    <ResultCard result={r} hero={hero} onClick={() => setSelectedHeroResult({ result: r, hero })} />
                   </div>
                 )
               })}
@@ -501,7 +624,7 @@ export function GachaScreen({
                 const shimmerClass = rar === 'SSR' ? ' gacha-card-ssr' : rar === 'SR' ? ' gacha-card-sr' : ''
                 return (
                   <div key={i} className={`gacha-card-reveal${shimmerClass}`} style={{ animationDelay: `${i * 0.1}s` }}>
-                    <EquipResultCard eq={r.equipment} isGuaranteed={r.isGuaranteed} />
+                    <EquipResultCard eq={r.equipment} isGuaranteed={r.isGuaranteed} onClick={() => setSelectedEquip(r.equipment)} />
                   </div>
                 )
               })}
@@ -509,6 +632,23 @@ export function GachaScreen({
             <button className="gacha-results-close" onClick={closeEquipResults}>確認</button>
           </div>
         </div>
+      )}
+
+      {/* Hero Info Popup */}
+      {selectedHeroResult && selectedHeroResult.hero && (
+        <HeroInfoPopup
+          hero={selectedHeroResult.hero}
+          rarity={selectedHeroResult.result.rarity}
+          onClose={() => setSelectedHeroResult(null)}
+        />
+      )}
+
+      {/* Equipment Info Popup */}
+      {selectedEquip && (
+        <EquipInfoPopup
+          eq={selectedEquip}
+          onClose={() => setSelectedEquip(null)}
+        />
       )}
     </div>
   )

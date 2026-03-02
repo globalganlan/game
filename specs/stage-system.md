@@ -1,14 +1,16 @@
 # 關卡系統 Spec
 
-> 版本：v1.4 ｜ 狀態：🟢 已實作
-> 最後更新：2026-06-15
+> 版本：v2.2 ｜ 狀態：🟢 已實作
+> 最後更新：2026-03-02
 > 負責角色：🎯 GAME_DESIGN → 🔧 CODING
 
 ## 概述
 
 五種已實作關卡模式：**主線章節**（劇情推進）、**無盡爬塔**（挑戰極限）、**每日副本**（素材農場）、**PvP 競技場**（每日對手）、**Boss 挑戰**（高難度單體戰）。
 所有模式共用 `core-combat.md` 戰鬥引擎，差異在於敵方配置、勝負條件、獎勵。
-敵方配置全部由**前端 seeded PRNG** 確定性生成，無需 GAS 端提供關卡配置。
+
+主線關卡配置改由 **Workers API + D1 `stage_configs` 表**驅動，前端不再 hardcode。
+爬塔、每日副本、PvP、Boss 仍由前端 seeded PRNG 確定性生成。
 
 ## 依賴
 
@@ -16,15 +18,19 @@
 - `specs/hero-schema.md` — 英雄數值（ZOMBIE_IDS [1-14]）
 - `specs/save-system.md` — 進度儲存（storyProgress / towerFloor / stageStars）
 - `specs/auth-system.md` — 玩家身份
+- Cloudflare Workers + D1 — 關卡配置 API
 
 ## 實作對照
 
 | 原始碼 | 說明 |
 |--------|------|
-| `src/domain/stageSystem.ts` | 核心邏輯 — 配置生成 / PRNG / 星級計算 / 副本定義 / 掉落擲骰 |
-| `src/components/StageSelect.tsx` | 關卡選擇 UI — 5 個分頁（主線/爬塔/每日/競技場/Boss） |
-| `src/App.tsx` | 遊戲流程整合 — handleStageSelect / buildEnemySlots / 勝利結算 / goNextStage |
-| `gas/程式碼.js` | GAS Handler — `handleCompleteBattle_`（統一結算）/ `handleCompleteStage_ / handleCompleteTower_ / handleCompleteDaily_`（向下相容） |
+| `workers/src/routes/stage.ts` | Workers API — `/list-stages`、`/stage-config` 端點 |
+| `src/services/stageService.ts` | 前端關卡服務 — fetchStageConfigs / getCachedStageConfig / getStageConfig |
+| `src/domain/stageSystem.ts` | 核心邏輯 — 爬塔/副本/PvP/Boss 配置生成 / 星級計算 / 掉落擲骰（主線部分已移至 D1） |
+| `src/components/StageSelect.tsx` | 關卡選擇 UI — 5 個分頁，主線改用 API 驅動的章節主題卡片 |
+| `src/game/helpers.ts` | buildEnemySlotsFromStage — 接受 injectedEnemies 參數（story 模式從 API 取得）+ defMultiplier 縮放敵方 DEF |
+| `src/game/runBattleLoop.ts` | 戰鬥結算 — 使用 getCachedStageConfig 取得獎勵 |
+| `scripts/seed_stage_configs.sql` | D1 種子資料 — 24 筆關卡配置 |
 
 ---
 
@@ -36,9 +42,9 @@ const STAGES_PER_CHAPTER = 8
 const ZOMBIE_IDS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]
 ```
 
-## Seeded PRNG
+## Seeded PRNG（爬塔 / PvP 用）
 
-所有敵方組合使用確定性偽隨機生成（Linear Congruential Generator）：
+爬塔與 PvP 的敵方組合使用確定性偽隨機生成（Linear Congruential Generator）：
 
 ```typescript
 function seededRandom(seed: number): () => number {
@@ -52,8 +58,8 @@ function seededRandom(seed: number): () => number {
 
 | 模式 | Seed 公式 |
 |------|----------|
-| 主線 | `chapter * 1000 + stage` |
 | 爬塔 | `floor * 7919`（7919 為質數） |
+| PvP | `dateSeed + progress * 7` |
 
 ---
 
@@ -84,32 +90,63 @@ function seededRandom(seed: number): () => number {
 | 星級記錄 | `save_data.stageStars` JSON，`updateStageStars()` 只升不降 |
 | 首通效果 | 推進 storyProgress + 更新 resourceTimerStage + 首通獎勵 |
 
-### 敵方配置公式（getStoryStageConfig）
+### 敵方配置（D1 stage_configs 表）
 
+主線敵方不再由前端 PRNG 生成，改為存放在 D1 `stage_configs` 表中，由 Workers `/list-stages` API 提供。
+
+**StageEnemy 結構：**
 ```typescript
-linearIndex = (chapter - 1) * 8 + stage  // 1~24
-seed = chapter * 1000 + stage
-
-// 敵人數量（早期固定少量，逐漸增加）
-minCount = min(2 + floor((linearIndex - 1) / 4), 6)
-maxCount = min(minCount + floor(linearIndex / 6), 6)
-enemyCount = minCount + floor(rng() * (maxCount - minCount + 1))
-
-// 倍率（1-1 起始較弱，給新玩家緩衝）
-hpMult    = 0.5 + (linearIndex - 1) * 0.12
-atkMult   = 0.4 + (linearIndex - 1) * 0.08
-speedMult = 1.0 + (linearIndex - 1) * 0.015
-
-// 章節 1 使用弱殭屍池 [1,5,6,7,9,11,14]，章節 2+ 使用完整池 [1-14]
-recommendedLevel = min(1 + (linearIndex - 1) * 2, 60)
+interface StageEnemy {
+  heroId: number          // 對應 heroes.tsv 的 HeroID
+  slot: number            // 陣位 0~5
+  levelMultiplier: number // 保留欄位（目前固定 1）
+  hpMultiplier: number    // 基礎 HP × 此值 = 實戰 HP
+  atkMultiplier: number   // 基礎 ATK × 此值 = 實戰 ATK
+  speedMultiplier: number // 基礎 SPD × 此值 = 實戰 SPD
+  defMultiplier?: number  // 基礎 DEF × 此值 = 實戰 DEF（預設 1.0）
+}
 ```
+
+> **defMultiplier 設計原則**：早期關卡（Ch1）設為 `= atkMultiplier`，讓 DEF 與 ATK 同步縮放，避免低 HP 敵人有不相稱的高 DEF。Boss 關及後期關卡設為 `1.0`（維持基礎值）。
+
+**D1 Schema：**
+```sql
+CREATE TABLE stage_configs (
+  stageId TEXT PRIMARY KEY,
+  chapter INTEGER NOT NULL DEFAULT 1,
+  stage INTEGER NOT NULL DEFAULT 1,
+  enemies TEXT NOT NULL DEFAULT '[]',   -- JSON: StageEnemy[]
+  rewards TEXT NOT NULL DEFAULT '{}',   -- JSON: { exp, gold, diamond?, items? }
+  extra TEXT NOT NULL DEFAULT '{}'      -- JSON: { chapterName, stageName, description, bgTheme, difficulty, recommendedLevel, isBoss, chapterIcon }
+);
+```
+
+**章節主題：**
+
+| 章節 | 名稱 | 主題色 | 圖示 | 推薦等級範圍 |
+|------|------|--------|------|-------------|
+| 1 | 廢墟之城 | 灰色 (#a0aec0) | 🏙️ | Lv.1~18 |
+| 2 | 暗夜森林 | 綠色 (#68d391) | 🌲 | Lv.20~38 |
+| 3 | 死寂荒原 | 橘色 (#ed8936) | 🏜️ | Lv.40~60 |
+
+**每關最後一關為 Boss 關**（1-8, 2-8, 3-8），有金色邊框、BOSS 徽章、更高倍率。
+
+**前端流程：**
+1. StageSelect 載入時呼叫 `fetchStageConfigs()` 取得 24 筆資料（快取於記憶體）
+2. 選關時 `handleStageSelect` → `getStageConfig(stageId)` → 取得 enemies
+3. 傳入 `buildEnemySlotsFromStage(mode, sid, heroesList, injectedEnemies)` 生成 SlotHero[]
+4. 戰鬥結算用 `getCachedStageConfig(stageId)` 同步取得獎勵
+
+**Fallback：** 若快取未命中，結算時使用公式計算獎勵：`exp = 30 + li*15, gold = 50 + li*30`
 
 ### 獎勵公式
 
 | 類型 | exp | gold | diamond | items |
 |------|-----|------|---------|-------|
-| **普通** | `30 + linearIndex × 15` | `50 + linearIndex × 30` | 章底關(stage=8): 20, 其餘: 0 | `linearIndex % 3 === 0` → `exp_core_s ×1` (60%) |
-| **首通** | `60 + linearIndex × 20` | `100 + linearIndex × 50` | 30 | `exp_core_s ×2` (100%) |
+| **普通** | `30 + linearIndex × 15` | `50 + linearIndex × 30` | 章底關(stage=8): 20, 其餘: 0 | — |
+| **首通** | `60 + linearIndex × 20` | `100 + linearIndex × 50` | 30 | — |
+
+> **v2.2 變更**：exp 獎勵直接發放至 `save_data.exp`（頂層資源），不再掉落 exp_core 道具。
 
 ### 星級判定（calculateStarRating）
 
@@ -163,9 +200,11 @@ enemies = randomFormation(enemyCount, hpMult, atkMult, speedMult)
 
 | 條件 | exp | gold | diamond | items |
 |------|-----|------|---------|-------|
-| Boss 層 (floor%10=0) | `50 + floor×10` | `100 + floor×20` | 50 | `exp_core_l ×1` (100%) |
-| 每5層 (floor%5=0) | `50 + floor×10` | `100 + floor×20` | 0 | `exp_core_m ×1` (50%) |
-| 其他 | `50 + floor×10` | `100 + floor×20` | 0 | 無 |
+| Boss 層 (floor%10=0) | `50 + floor×10` | `100 + floor×20` | 50 | — |
+| 每5層 (floor%5=0) | `50 + floor×10` | `100 + floor×20` | 0 | — |
+| 其他 | `50 + floor×10` | `100 + floor×20` | 0 | — |
+
+> **v2.2 變更**：exp 獎勵直接發放至 `save_data.exp`，不再掉落 exp_core_l / exp_core_m 道具。
 
 ### 連續挑戰（goNextStage — tower）
 
@@ -203,9 +242,11 @@ enemies = randomFormation(enemyCount, hpMult, atkMult, speedMult)
 
 | 難度 | exp | gold | 專屬掉落 |
 |------|-----|------|---------|
-| easy | 100 | 500 | `asc_class_power ×2`, `exp_core_s ×3` |
-| normal | 200 | 1000 | `asc_class_power ×4`, `exp_core_m ×2`, `exp_core_m ×1` (50%) |
-| hard | 400 | 2000 | `asc_class_power ×8`, `exp_core_l ×1`, `exp_core_l ×1` (30%) |
+| easy | 100 | 500 | `asc_class_power ×2` |
+| normal | 200 | 1000 | `asc_class_power ×4` |
+| hard | 400 | 2000 | `asc_class_power ×8` |
+
+> **v2.2 變更**：每日副本 exp 獎勵直接發放至 `save_data.exp`，不再掉落 exp_core 道具。
 
 > Daily 模式勝利後無「下一關」按鈕。
 
@@ -313,10 +354,12 @@ interface BossConfig {
 
 | 段位 | 傷害門檻 | exp | gold | diamond | items |
 |------|---------|-----|------|---------|-------|
-| S | `≥ damageThresholds.S` | 600 | 3000 | 100 | `exp_core_l ×3` |
-| A | `≥ damageThresholds.A` | 400 | 2000 | 50 | `exp_core_l ×2` |
-| B | `≥ damageThresholds.B` | 200 | 1000 | 20 | `exp_core_l ×1` |
-| C | 其他 | 100 | 500 | 0 | `exp_core_m ×1` |
+| S | `≥ damageThresholds.S` | 600 | 3000 | 100 | — |
+| A | `≥ damageThresholds.A` | 400 | 2000 | 50 | — |
+| B | `≥ damageThresholds.B` | 200 | 1000 | 20 | — |
+| C | 其他 | 100 | 500 | 0 | — |
+
+> **v2.2 變更**：Boss 戰 exp 獎勵直接發放至 `save_data.exp`，不再掉落 exp_core 道具。
 
 ### 場景主題
 
@@ -499,3 +542,5 @@ mergeDrops(items: InventoryItem[]): InventoryItem[]   // 合併同 itemId
 | v1.1 | 2026-02-28 | PvP 競技場完整實作：PvPOpponent 型別 + getPvPOpponents()（seeded daily 3 梯隊）+ getPvPReward() + StageSelect 競技場分頁 + Arena pvpTheme；Boss 挑戰完整實作：3 Boss（腐化巨獸/暗夜領主/末日審判者）+ BossConfig + BOSS_CONFIGS + getBossConfig/getBossEnemies/getBossReward + 傷害段位(S/A/B/C)獎勵 + Arena bossTheme；SceneMode 擴展為 5 種 |
 | v1.3 | 2026-03-01 | 統一結算：新增 `handleCompleteBattle_` 為所有模式的統一 GAS 結算 handler（story/tower/daily/pvp/boss）；完整記載 GAS 端獎勵公式（含 PvP / Boss）；標注前端與 GAS 獎勵公式差異（前端為顯示預估值，GAS 為實際發放）；舊 per-mode handler 保留向下相容 |
 | v1.4 | 2026-06-15 | **配合裝備模板制 v2**：移除所有 `chest_equipment` 獎勵（Boss 層/Boss 戰 S/A 段位）改為 `exp_core_l`；每日副本掉落移除強化石（`eqm_enhance_*`）改為經驗核心 |
+| v2.1 | 2026-03-02 | **遊戲平衡修正**：新增 `defMultiplier` 敵方 DEF 乘數（StageEnemy 介面 + buildEnemySlotsFromStage）；Chapter 1 關卡重新平衡 — 1-2 從 3 敵→2 敵（解決新手死鎖）+ 保底 exp_core_s；全 Ch1 加入 defMultiplier = atkMultiplier（DEF 與 ATK 連動）；D1 seed 已更新 |
+| v2.2 | 2026-03-02 | **EXP 資源重構**：所有模式（story/tower/daily/pvp/boss）的 exp 獎勵改為直接發放至 `save_data.exp` 頂層資源；移除所有 exp_core_s/m/l 掉落物；Boss 段位獎勵 items 欄清空；每日副本獎勵表移除經驗核心 |
