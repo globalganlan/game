@@ -152,24 +152,24 @@
 
 ---
 
-### ADR-009: PWA Service Worker 禁止攔截導航請求（防 Standalone Reload 迴圈）
+### ADR-009: PWA — Standalone 模式完全禁用 Service Worker
 
-- **狀態**：✅ 已定案 — **修過兩次，絕對不可再改壞**
-- **日期**：2026-03-03
-- **背景**：PWA 加入主畫面（iOS/Android standalone）後，遊戲會無限 reload 白屏。根因是 SW 攔截了 HTML 導航請求，在 standalone 冷啟動時 fetch 失敗 + cache miss → `respondWith(undefined)` → 瀏覽器自動重試 → 無限迴圈。
-- **決定**：`public/sw.js` 的 fetch handler **絕對禁止**攔截以下請求：
-  1. **導航請求**（`event.request.mode === 'navigate'`）→ 直接 `return`
-  2. **跨域請求**（`url.origin !== self.location.origin`）→ 直接 `return`
-  3. **`manifest.json`** 和 **`sw.js`** 本身 → 直接 `return`
-- **禁止事項**（每次觸碰 SW 前必讀）：
-  - ❌ **禁止**在 install 中呼叫 `self.skipWaiting()`
-  - ❌ **禁止**在 activate 中呼叫 `clients.claim()`
-  - ❌ **禁止**預快取 HTML（`/game/`、`/game/index.html`）
-  - ❌ **禁止**監聽 `controllerchange` 事件自動 reload
-  - ❌ **禁止**將更新輪詢間隔設得低於 5 分鐘
+- **狀態**：✅ 已定案 — **修過三次，絕對不可再改壞**
+- **日期**：2026-03-03（第三次修正）
+- **背景**：PWA 加入主畫面（iOS/Android standalone）後，遊戲載入到一半就重新開始。前兩次修復（導航不攔截 + 跨域排除）未根治，因為舊版 SW 仍在裝置上活躍，新 SW 停在 waiting 狀態。
+- **根因**：舊版 SW (v5) 在 standalone webview 中持續攔截請求、預快取過期 HTML、觸發 controllerchange，而新 SW (v6) 因不呼叫 skipWaiting 永遠無法接管。
+- **最終方案（v7）**：
+  1. **Standalone 模式完全不使用 SW** — `main.tsx` 偵測 `display-mode: standalone` → 直接 unregister 所有 SW + 清除所有 caches
+  2. **Browser 模式正常使用 SW** — 註冊 `/game/sw.js`，提供快取加速 + 版本更新通知
+  3. **SW install 呼叫 `skipWaiting()`** — 強制取代有 bug 的舊版 SW，因 main.tsx 已無 controllerchange 監聽器所以不會造成迴圈
+- **`public/sw.js` 規則**：
+  - ✅ install 可呼叫 `self.skipWaiting()`（因為 standalone 已不註冊 SW，browser 已移除 controllerchange）
+  - ❌ **禁止** activate 呼叫 `clients.claim()`
+  - ❌ **禁止**預快取 HTML
+  - ❌ 導航請求（`mode: 'navigate'`）→ 直接 `return`
+  - ❌ 跨域請求 → 直接 `return`
 - **`src/main.tsx` 規則**：
-  - 更新輪詢：≥ 5 分鐘（`setInterval(() => reg.update(), 5 * 60_000)`）
-  - Reload 防護：sessionStorage 3 秒冷卻（防連續 reload）
-  - 更新 bar 去重：用 `id="sw-update-bar"` 檢查
-  - 只在使用者點擊 banner 時才 `skipWaiting` + `reload`
-- **理由**：iOS standalone 模式的 SW 生命週期行為與一般 Safari 不同，冷啟動時會重複觸發 controllerchange，而 respondWith(undefined) 會導致瀏覽器級錯誤。此修復已驗證有效。
+  - Standalone 模式：`getRegistrations()` → `unregister()` + `caches.keys()` → `delete()`
+  - Browser 模式：正常註冊 + 5 分鐘輪詢 + sessionStorage 3 秒 reload 冷卻 + 更新 bar 去重
+  - ❌ **絕對禁止**監聽 `controllerchange` 事件
+- **理由**：遊戲需要網路（auth/save/battle），SW 的離線快取在 standalone 模式下無實質幫助，但 SW 生命週期在 standalone webview 中行為異常，是所有問題的根源。徹底移除是最可靠的解法。
