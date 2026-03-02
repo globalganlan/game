@@ -163,6 +163,7 @@
   2. **非 iOS Standalone 模式也禁用 SW** — `display-mode: standalone` 或 `navigator.standalone` 為 true 時同理
   3. **僅非 iOS + 非 Standalone 的 browser 模式才註冊 SW** — 提供快取加速 + 版本更新通知
   4. **SW install 呼叫 `skipWaiting()`** — 強制取代有 bug 的舊版 SW
+  5. **index.html preflight** — 在載入主程式前即 unregister SW + 清除 caches，避免舊 SW 抢先接管
 - **`public/sw.js` 規則**：
   - ✅ install 可呼叫 `self.skipWaiting()`
   - ❌ **禁止** activate 呼叫 `clients.claim()`
@@ -174,4 +175,5 @@
   - **非 iOS Standalone**：同上，完全禁用
   - **非 iOS Browser**：正常註冊 + 5 分鐘輪詢 + sessionStorage 3 秒 reload 冷卻 + 更新 bar 去重
   - ❌ **絕對禁止**監聽 `controllerchange` 事件
+- **`index.html` 規則**：head 內 preflight script，iOS 或 standalone 一律 unregister SW + 刪除 caches，確保第一時間清乾淨
 - **理由**：iOS 的所有瀏覽器底層都是 WKWebView，SW 生命週期在其中行為異常。遊戲需要網路（auth/save/battle），iOS 原生已有 HTTP 快取，額外 SW 快取效益低但風險極高。Android 正常、Desktop 正常，僅 iOS 有此問題。

@@ -74,6 +74,7 @@
 - **Google Sheets 寫入後必須驗證中文不是亂碼**（讀回抽查），發現亂碼立即 deleteSheet → createSheet 修復（僅限 GAS 路徑仍在使用時）
 - **stageId "1-1" 格式會被 Sheets 自動轉日期** — createSheet 時用 `textColumns:["stageId"]` 參數防護
 - **⚠️ PWA Service Worker — iOS 全面禁用 + Standalone 禁用（ADR-009）** — 修過四次，絕對不可再改壞：
+  - `index.html` head preflight：iOS 或 standalone 先 unregister SW + 清除 caches，防止舊 SW 抢先接管
   - `src/main.tsx` 偵測 iOS（`/iPhone|iPad|iPod/`）→ **無條件** unregister 所有 SW + 清除快取
   - `src/main.tsx` 偵測 `display-mode: standalone` → 同上，完全禁用 SW
   - **僅非 iOS + 非 Standalone 的 browser 模式**才註冊 `/game/sw.js`
