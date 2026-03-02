@@ -149,3 +149,27 @@
   3. 逐一檢視每個命中點是否需要相同修改
   4. 統一修正，不遺漏
   5. 完成後再搜一次確認全部同步
+
+---
+
+### ADR-009: PWA Service Worker 禁止攔截導航請求（防 Standalone Reload 迴圈）
+
+- **狀態**：✅ 已定案 — **修過兩次，絕對不可再改壞**
+- **日期**：2026-03-03
+- **背景**：PWA 加入主畫面（iOS/Android standalone）後，遊戲會無限 reload 白屏。根因是 SW 攔截了 HTML 導航請求，在 standalone 冷啟動時 fetch 失敗 + cache miss → `respondWith(undefined)` → 瀏覽器自動重試 → 無限迴圈。
+- **決定**：`public/sw.js` 的 fetch handler **絕對禁止**攔截以下請求：
+  1. **導航請求**（`event.request.mode === 'navigate'`）→ 直接 `return`
+  2. **跨域請求**（`url.origin !== self.location.origin`）→ 直接 `return`
+  3. **`manifest.json`** 和 **`sw.js`** 本身 → 直接 `return`
+- **禁止事項**（每次觸碰 SW 前必讀）：
+  - ❌ **禁止**在 install 中呼叫 `self.skipWaiting()`
+  - ❌ **禁止**在 activate 中呼叫 `clients.claim()`
+  - ❌ **禁止**預快取 HTML（`/game/`、`/game/index.html`）
+  - ❌ **禁止**監聽 `controllerchange` 事件自動 reload
+  - ❌ **禁止**將更新輪詢間隔設得低於 5 分鐘
+- **`src/main.tsx` 規則**：
+  - 更新輪詢：≥ 5 分鐘（`setInterval(() => reg.update(), 5 * 60_000)`）
+  - Reload 防護：sessionStorage 3 秒冷卻（防連續 reload）
+  - 更新 bar 去重：用 `id="sw-update-bar"` 檢查
+  - 只在使用者點擊 banner 時才 `skipWaiting` + `reload`
+- **理由**：iOS standalone 模式的 SW 生命週期行為與一般 Safari 不同，冷啟動時會重複觸發 controllerchange，而 respondWith(undefined) 會導致瀏覽器級錯誤。此修復已驗證有效。

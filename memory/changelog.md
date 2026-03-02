@@ -3,6 +3,24 @@
 > 按時間倒序排列，最新的在最上面。
 
 ---
+### [2026-03-03] PWA Standalone Reload 迴圈修復
+
+- **觸發者**：使用者（PWA 加入主畫面後遊戲一直 reload）
+- **執行角色**：🔧 CODING
+- **變更摘要**：
+  1. **導航請求不攔截** — SW fetch handler 遇到 `mode: 'navigate'` 直接 return，讓瀏覽器原生處理 HTML 載入（根因修復）
+  2. **跨域請求不攔截** — 排除非同源請求（Workers API 等），避免快取過期 token/資料
+  3. **移除 HTML 預快取** — 不再預快取 `/game/` 和 `/game/index.html`，避免陳舊 HTML 引用錯誤 hash 資源
+  4. **降低更新輪詢頻率** — 從 60 秒改為 5 分鐘，減少 iOS standalone 生命週期 churn
+  5. **Reload 防護** — 3 秒內不允許連續 reload（sessionStorage 計時）
+  6. **更新 bar 防重複** — 加入 `id` 檢查，避免多個 update bar 疊加
+  7. **SW 版號升級** — v5 → v6，自動清除舊快取
+  8. **fallback 修復** — fetch 失敗 + cache miss 時回傳 `503 Response`（而非 `undefined`）
+- **影響檔案**：
+  - `public/sw.js` — 全面重寫 fetch handler + 移除預快取
+  - `src/main.tsx` — reload 防護 + 降頻 + 防重複 bar
+
+---
 ### [2026-03-03] 裝備圖鑑系統（Codex）
 
 - **觸發者**：使用者

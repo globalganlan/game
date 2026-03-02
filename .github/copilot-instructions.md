@@ -72,6 +72,11 @@
 - `orientationchange` 事件需 `setTimeout(150ms)` 才能拿到正確尺寸
 - **Google Sheets 寫入後必須驗證中文不是亂碼**（讀回抽查），發現亂碼立即 deleteSheet → createSheet 修復（僅限 GAS 路徑仍在使用時）
 - **stageId "1-1" 格式會被 Sheets 自動轉日期** — createSheet 時用 `textColumns:["stageId"]` 參數防護
+- **⚠️ PWA Service Worker 禁止攔截導航請求（ADR-009）** — 修過兩次，絕對不可再改壞：
+  - `public/sw.js` fetch handler 遇到 `mode: 'navigate'` 或跨域請求必須直接 `return`
+  - 禁止 `skipWaiting()` / `clients.claim()` / 預快取 HTML / 監聽 `controllerchange` 自動 reload
+  - `src/main.tsx` 更新輪詢 ≥ 5 分鐘 + sessionStorage reload 防護 + 更新 bar 去重
+  - 詳見 `memory/decisions.md` ADR-009
 
 ## 後端架構（Cloudflare Workers + D1）
 
