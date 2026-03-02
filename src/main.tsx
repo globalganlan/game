@@ -25,20 +25,26 @@ createRoot(document.getElementById('root')!).render(
 
 // ── Service Worker 管理（PWA） ──
 if ('serviceWorker' in navigator) {
+  // ★ iOS 偵測（所有 iOS 瀏覽器都用 WKWebView，SW 生命週期有已知問題）
+  const _isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent)
+
   // 偵測 standalone 模式（從主畫面開啟）
   const _isStandalone =
     window.matchMedia('(display-mode: standalone)').matches ||
     (navigator as unknown as { standalone?: boolean }).standalone === true
 
-  if (_isStandalone) {
-    // ★ Standalone 模式：完全不使用 SW
-    // 遊戲需要網路（auth/save/battle），SW 的離線快取無實質幫助，
-    // 但 SW 的生命週期在 iOS/Android standalone webview 中會造成
-    // controllerchange → 重載、預快取 HTML 版本不一致等問題。
-    // 直接 unregister 所有 SW，確保乾淨環境。
+  // ★ iOS 或 Standalone → 完全不使用 SW
+  // 理由：
+  //   1. iOS Safari standalone：SW 生命週期在 WKWebView 中會造成 reload 迴圈
+  //   2. iOS Chrome「加入主畫面」：display-mode 不是 standalone，但 Chrome iOS 的
+  //      WKWebView 對 SW skipWaiting/controllerchange 處理有 bug，導致連續 crash
+  //   3. 遊戲需要網路（auth/save/battle），SW 離線快取無實質幫助
+  //   4. iOS 原生已有 HTTP 快取，額外 SW 快取效益低、風險高
+  if (_isStandalone || _isIOS) {
+    // 移除所有已註冊的 SW
     navigator.serviceWorker.getRegistrations().then((regs) => {
       for (const reg of regs) {
-        reg.unregister().then(() => console.log('[SW] unregistered for standalone mode'))
+        reg.unregister().then(() => console.log('[SW] unregistered:', reg.scope))
       }
     })
     // 清除所有 SW 快取
@@ -47,9 +53,9 @@ if ('serviceWorker' in navigator) {
         for (const name of names) caches.delete(name)
       })
     }
-    console.log('[SW] standalone mode — SW disabled')
+    console.log(`[SW] disabled — iOS=${_isIOS}, standalone=${_isStandalone}`)
   } else {
-    // ★ Browser 模式：正常註冊 SW（快取加速 + 更新提示）
+    // ★ 非 iOS Browser 模式：正常註冊 SW（快取加速 + 更新提示）
     window.addEventListener('load', () => {
       navigator.serviceWorker
         .register('/game/sw.js')
