@@ -78,9 +78,8 @@ interface CategoryTab {
 const TABS: CategoryTab[] = [
   { key: 'all',                icon: '📦', label: '全部' },
   { key: 'equipment',          icon: '⚔️', label: '裝備' },
-  { key: 'exp_material',       icon: '📗', label: '經驗' },
   { key: 'ascension_material', icon: '🔥', label: '突破' },
-  { key: 'general_material',   icon: '🧪', label: '通用' },
+  { key: 'general_material',   icon: '🧪', label: '素材' },
   { key: 'chest',              icon: '🎁', label: '寶箱' },
   { key: 'currency',           icon: <CurrencyIcon type="gold" />, label: '貨幣' },
 ]
@@ -106,7 +105,9 @@ interface ItemCellProps {
 
 function ItemCell({ item, definition, onClick, heroMap }: ItemCellProps & { heroMap?: Map<number, string> }) {
   const fallback = resolveFallbackName(item.itemId, heroMap)
-  const name = definition?.name || fallback.name
+  // 英雄碎片：一律用 fallback（帶英雄名稱），不用 DB 原始 name
+  const isFragment = item.itemId.startsWith('asc_fragment_')
+  const name = isFragment ? fallback.name : (definition?.name || fallback.name)
   const rarity = definition?.rarity || 'N'
   const icon = definition?.icon || fallback.icon
   const border = RARITY_COLORS[rarity] || '#666'
@@ -150,7 +151,8 @@ interface ItemDetailProps {
 
 function ItemDetail({ item, definition, onClose, heroMap }: ItemDetailProps & { heroMap?: Map<number, string> }) {
   const fallback = resolveFallbackName(item.itemId, heroMap)
-  const name = definition?.name || fallback.name
+  const isFragment = item.itemId.startsWith('asc_fragment_')
+  const name = isFragment ? fallback.name : (definition?.name || fallback.name)
   const desc = definition?.description || '無描述'
   const rarity = definition?.rarity || 'N'
   const sellPrice = definition?.sellPrice || 0
@@ -532,11 +534,20 @@ export function InventoryPanel({ onBack, heroesList, heroInstances }: InventoryP
     return items
   }, [invState, activeTab, sortMode])
 
-  /** 裝備分頁用的裝備清單 */
+  /** 裝備清單（全部 / 裝備分頁都需要） */
   const equipmentList = useMemo(() => {
-    if (!invState || activeTab !== 'equipment') return []
-    return invState.equipment
+    if (!invState || (activeTab !== 'equipment' && activeTab !== 'all')) return []
+    return [...invState.equipment].sort((a, b) => {
+      const aEquipped = a.equippedBy ? 0 : 1
+      const bEquipped = b.equippedBy ? 0 : 1
+      if (aEquipped !== bEquipped) return aEquipped - bEquipped
+      // 同組內依稀有度排序
+      const rarityOrder: Record<string, number> = { SSR: 4, SR: 3, R: 2, N: 1 }
+      return (rarityOrder[b.rarity] ?? 0) - (rarityOrder[a.rarity] ?? 0)
+    })
   }, [invState, activeTab])
+
+  const showEquipment = activeTab === 'all' || activeTab === 'equipment'
 
   const getDef = useCallback(
     (itemId: string): ItemDefinition | undefined => invState?.definitions.get(itemId),
@@ -592,7 +603,7 @@ export function InventoryPanel({ onBack, heroesList, heroInstances }: InventoryP
         {/* Items Grid */}
         <div className="inv-grid">
           {isLoading && <div className="inv-loading">載入中...</div>}
-          {!isLoading && activeTab !== 'equipment' && filteredItems.length === 0 && (
+          {!isLoading && activeTab !== 'equipment' && filteredItems.length === 0 && equipmentList.length === 0 && (
             <div className="inv-empty">此分類無道具</div>
           )}
           {activeTab !== 'equipment' && filteredItems.map((item) => (
@@ -604,14 +615,14 @@ export function InventoryPanel({ onBack, heroesList, heroInstances }: InventoryP
               onClick={() => setSelectedItem(item)}
             />
           ))}
-          {/* 裝備分頁 */}
-          {activeTab === 'equipment' && equipmentList.length === 0 && (
+          {/* 裝備（全部 / 裝備分頁） */}
+          {showEquipment && activeTab === 'equipment' && equipmentList.length === 0 && (
             <div className="inv-empty">尚無裝備</div>
           )}
-          {activeTab === 'equipment' && equipmentList.map(eq => (
+          {showEquipment && equipmentList.map(eq => (
             <button
               key={eq.equipId}
-              className="inv-cell inv-equip-cell"
+              className={`inv-cell inv-equip-cell${eq.equippedBy ? ' inv-equip-in-use' : ''}`}
               style={{ '--cell-border': RARITY_COLORS[eq.rarity] ?? '#666' } as React.CSSProperties}
               onClick={() => setSelectedEquip(eq)}
             >
@@ -623,6 +634,7 @@ export function InventoryPanel({ onBack, heroesList, heroInstances }: InventoryP
                 +{eq.enhanceLevel}
                 {eq.locked && ' 🔒'}
               </span>
+              {eq.equippedBy && <span className="inv-equip-badge">使用中</span>}
             </button>
           ))}
         </div>

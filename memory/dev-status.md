@@ -1,8 +1,8 @@
 # 開發狀態快照 — Dev Status
 
-> 最後更新：2025-07-16（第四十五次更新 — 召喚結果 UI 改進：金框 + 統一尺寸 + 資訊彈窗）
+> 最後更新：2026-03-03（第四十八次更新 — 記憶檔案全面更新 + 背包「全部」分頁含裝備 + 英雄碎片名稱修復 + 裝備稀有度強化）
 
-## 截至 2025-07-16 的開發狀態
+## 截至 2026-03-03 的開發狀態
 
 ### 已完成
 - [x] 3D 喪屍對戰場景（React 19 + Vite 5 + R3F 9 + Three.js 0.183 + TypeScript 5.9）
@@ -75,8 +75,8 @@
   - 詳見 `memory/qa-report.md`
 
 ### 2026-03-02 新增功能（4 項）
-- [x] 每日簽到 — GAS `handleDailyCheckin_()` + CheckinPanel.tsx + `doDailyCheckin()` saveService + SaveData checkinDay/checkinLastDate + MenuScreen 'checkin'
-- [x] 寶箱開啟邏輯 — GAS `generateChestRewards_(chestId, qty)` bronze/silver/gold 三階 + `handleUseItem_()` chest 偵測 + InventoryPanel 結果顯示 + `updateLocalCurrency()` 同步
+- [x] 每日簽到 — Workers `daily-checkin` 路由 + CheckinPanel.tsx + `doDailyCheckin()` saveService + SaveData checkinDay/checkinLastDate + MenuScreen 'checkin'
+- [x] 寶箱開啟邏輯 — Workers `use-item` 路由處理 chest bronze/silver/gold 三階 + InventoryPanel 結果顯示 + `updateLocalCurrency()` 同步
 - [x] 背包裝/卸裝備 — InventoryPanel equip/unequip 按鈕 + 英雄選擇 popup + equipItem/unequipItem/getHeroEquipment
 - [x] 新手引導 — TutorialOverlay.tsx + useTutorial() hook + 5 步引導 + localStorage 追蹤
 
@@ -91,6 +91,12 @@
 - [x] `src/hooks/useLogout.ts` — auth logout + 9 個服務快取 clear，接收 `onResetState` 回呼
 - [x] `SettingsPanel.tsx` 改用 `useLogout(onLogout)` 取代手寫登出邏輯
 - [x] `App.tsx` `handleFullLogout` 簡化為 `handleLogoutResetState`（純 React state reset），移除 9 個 cache clearing import
+
+### 2026-03-03 背包 UI 改善 + 裝備稀有度強化 + 記憶更新
+- [x] **「全部」分頁包含裝備** — 背包「全部」tab 現在同時顯示道具 + 裝備，不再只顯示道具
+- [x] **英雄碎片中文名稱修復** — `asc_fragment_X` 一律使用 `resolveFallbackName()`（英雄名+碎片），不再被 DB 定義的原始 key 覆蓋
+- [x] **裝備「使用中」稀有度視覺** — `.inv-equip-in-use` 外框光暈 + `.inv-equip-badge` 徽章顏色跟隨 `--cell-border`（稀有度色）
+- [x] **記憶檔案全面更新** — decisions.md ADR-000/002/006 清理 GAS 引用；dev-status.md 補全最新變更
 
 ### Spec 狀態
 
@@ -107,7 +113,7 @@
 | stage-system.md | v2.2 | 🟢 EXP 資源獎勵（取代 exp_core 掉落） |
 | gacha.md | v1.1 | 🟢 stardust/fragments + 本地池 |
 | element-system.md | v1.0 | 🟢 7 屬性 + 倍率矩陣 |
-| inventory.md | v2.4 | 🟢 移除 exp_core / reroll + 星塵兌換商店 |
+| inventory.md | v2.5 | 🟢 移除 exp_core / reroll + 星塵兌換商店 + 「全部」分頁含裝備 + 碎片中文名 |
 | optimistic-queue.md | v1.0 | 🟢 3 種套用模式 |
 | local-storage-migration.md | v1.0 | 🟢 版本化遷移鏈 |
 | buff-debuff-icons.md | v1.0 | 🟢 3D 狀態圖示（綠底/紅底 + 疊層數） |
@@ -127,13 +133,13 @@
 - [x] ~~能量系統 + 大招（1000 門檻）~~ ✅ `src/domain/energySystem.ts`
 - [x] ~~4 被動技能 / 星級解鎖~~ ✅ `src/domain/battleEngine.ts`（被動觸發 + 星級限制）
 - [x] ~~Buff/Debuff 系統~~ ✅ `src/domain/buffSystem.ts`
-- [x] ~~帳號系統~~ ✅ Phase 1 完成（GAS auth API + authService + useAuth + LoginScreen）
-- [x] ~~存檔系統~~ ✅ Phase 2 完成（GAS save API 6 端點 + saveService + useSave + 資源計時器 + HUD 資源顯示）
+- [x] ~~帳號系統~~ ✅ Phase 1 完成（Workers auth API + authService + useAuth + LoginScreen）
+- [x] ~~存檔系統~~ ✅ Phase 2 完成（Workers save API 6 端點 + saveService + useSave + 資源計時器 + HUD 資源顯示）
 - [x] ~~等級/突破/星級/裝備/套裝~~ ✅ Phase 4 Domain 完成（`src/domain/progressionSystem.ts` + `src/services/progressionService.ts` + `src/services/inventoryService.ts`）
 - [x] ~~抽卡系統~~ ✅ Phase 6 Domain 完成（`src/domain/gachaSystem.ts`）
 - [x] ~~關卡系統（5 模式）~~ ✅ Phase 5 Domain 完成（`src/domain/stageSystem.ts`）
-- [x] ~~item_definitions Google Sheet~~ ✅ 22 道具定義已建立
-- [x] ~~GAS 20+ 新 API~~ ✅ 已部署 v@13（inventory/progression/stage/gacha handlers）
+- [x] ~~item_definitions D1 表~~ ✅ 22+ 道具定義已建立（含 14 英雄碎片）
+- [x] ~~Workers 55+ API 端點~~ ✅ 已部署（inventory/progression/stage/gacha/auth/save/battle/mail/arena/checkin/sheet）
 - [x] ~~Buff/Debuff 3D 圖標~~ ✅ Phase 7 完成（BattleHUD 2D overlay — buff/debuff icons + energy bar + skill toasts + element hints）
 - [x] ~~Phase 3: 主選單 UI~~ ✅ 完成（MainMenu + HeroListPanel + InventoryPanel + GachaScreen + StageSelect）
 - [x] ~~Phase 7: 戰鬥 UI 強化~~ ✅ 完成（BattleHUD — Buff 圖標/能量條/技能彈幕/屬性相剋指示）

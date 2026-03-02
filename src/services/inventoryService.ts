@@ -18,10 +18,7 @@ const STORAGE_KEY_INVENTORY = 'globalganlan_inventory_cache'
     */
 
 export type ItemCategory =
-  | 'exp_material'
   | 'ascension_material'
-  | 'equipment_material'
-  | 'forge_material'
   | 'general_material'
   | 'equipment'
   | 'chest'
@@ -117,6 +114,8 @@ export async function loadInventory(): Promise<InventoryState> {
     const map = new Map<string, number>()
     for (const it of serverItems) map.set(it.itemId, it.quantity)
     for (const it of localItems) {
+      // 只保留伺服器端已知的道具（避免 localStorage 殘留已刪除的道具）
+      if (!map.has(it.itemId)) continue
       const sv = map.get(it.itemId) ?? 0
       if (it.quantity > sv) map.set(it.itemId, it.quantity)
     }

@@ -7,29 +7,29 @@
 ### ADR-000: AI 團隊全自主執行原則
 
 - **狀態**：✅ 永久生效
-- **日期**：2026-02-26
+- **日期**：2026-02-26（2026-03-03 更新：GAS → Workers）
 - **決定**：
   - **AI 團隊必須自行完成所有實作，不可要求使用者手動操作**
   - **完成功能後必須執行完整測試，確認遊戲可正常運行再回報完成**：
     - `npx tsc --noEmit`（零 TS 錯誤）
     - `npx vite build`（編譯成功）
-    - API 端點測試（若有改 GAS）
+    - `cd workers && npx tsc --noEmit`（Workers 零錯誤）
     - 確認遊戲流程：登入 → 載入 → 選英雄 → 戰鬥 → 結果 → 重啟
     - 有 bug 就修，不能把壞掉的狀態交給使用者
   - **任務完成時必須播放提示音通知使用者**：
     - 指令：`[console]::beep(800,300); Start-Sleep -ms 100; [console]::beep(1000,300); Start-Sleep -ms 100; [console]::beep(1200,400)`
     - 時機：每次任務全部完成、測試通過、回報結果之前
     - **絕對不可忘記，這是使用者明確要求的**
-  - Google Apps Script（GAS）修改 → 直接改 `gas/程式碼.js` → `clasp push` → `clasp deploy -i <ID>`
-  - Google Sheets 資料操作 → 用 POST API（createSheet / updateSheet / appendRows / deleteRows）
+  - Workers 後端修改 → 直接改 `workers/src/` → `cd workers && npx wrangler deploy`
+  - D1 資料庫操作 → Workers 路由（CRUD）或 `wrangler d1 execute` 直接操作
   - 前端 / 後端 / 部署 / 測試全部自動化
   - 使用者只負責提需求，AI 團隊負責全部實現
 - **技術細節**：
-  - clasp 設定：`gas/.clasp.json`（scriptId: `1nTjW3rZftAlH3XcbYvg3fP5nrm3TeAkEXFpWDmdcRqbgKEm6HQg7BU5J`）
-  - POST deployment: `AKfycbzy3EHTCyTYjA9j1CvJGvWwDM_RrkCuzNYkMhP7T9DTJ6V6g7Sodrlo4uv3h9yx0HLdsg`
-  - GET deployment: `AKfycbxXdy3QCvgX7knCCnxfmVY0CMqmUgcG422nVgFDlx5l9CsyldFZ4bwLVHPHxbtXp0LaTw`
-  - 部署指令：`cd gas && npx @google/clasp push && npx @google/clasp deploy -i <deploymentId> --description "描述"`
-  - clasp 已登入，API 已啟用（`~/.clasprc.json` 存在）
+  - Workers 入口：`workers/src/index.ts`（Hono 路由 + CORS + Cron Triggers）
+  - API 基底：`https://globalganlan-api.s971153.workers.dev/api/`
+  - D1 資料庫：15+ 張表（schema 見 `workers/schema.sql`）
+  - 部署指令：`cd workers && npx wrangler deploy`
+  - ~~GAS / clasp 已廢棄，`gas/` 目錄僅供歷史參考~~
 
 ---
 
@@ -52,23 +52,11 @@
 
 ---
 
-### ADR-002: Google Sheets 中文亂碼防護與資料格式校驗
+### ADR-002: ~~Google Sheets 中文亂碼防護~~ （已廢棄）
 
-- **狀態**：✅ 永久生效
+- **狀態**：🗄️ 已廢棄（2026-03-03）
 - **日期**：2026-02-27
-- **背景**：專案使用 Google Sheets 作為後端資料庫，透過 PowerShell POST API 寫入資料。在 Windows Big5 環境下，若未正確使用 UTF-8 編碼，中文字會變成亂碼（如 `撣賊???`、`?銋?`、`甇餃???`）。Google Sheets 也會自動把 "1-1" 格式的字串轉為日期。
-- **受影響的表（已修復）**：progression_config、gacha_banners、stage_configs、daily_dungeons
-- **決定**：
-  1. **寫入規範**：所有 POST 請求 body 必須用 `[System.Text.Encoding]::UTF8.GetBytes()` 編碼
-  2. **寫入後驗證**：每次 createSheet / updateSheet / appendRows 後，立即用 GET API 讀回，抽樣檢查中文欄位
-  3. **亂碼修復 SOP**：deleteSheet → createSheet 用正確 UTF-8 資料重建
-  4. **日期轉換防護**：GAS `handleCreateSheet` 新增 `textColumns` 參數，指定的欄位會在資料寫入前設為純文字格式（`setNumberFormat('@')`），防止 "1-1" 被自動解讀為日期
-  5. **適用範圍**：所有 Google Sheets 的新增、修改、刪除操作
-- **技術細節**：
-  - GAS `handleCreateSheet(sheetName, headers, data, textColumns)` — textColumns 為字串陣列，對應 headers 中需要純文字格式的欄位名
-  - PowerShell 範例：`$bytes = [System.Text.Encoding]::UTF8.GetBytes($jsonBody); Invoke-WebRequest -Body $bytes -ContentType 'text/plain; charset=utf-8'`
-  - 亂碼特徵：`?` 問號、不成詞的方塊字（如 `撣賊`、`銋`、`璉格`、`甇餃`）
-  - 日期誤轉特徵：stageId 值變成 ISO 日期字串（如 `2025-12-31T16:00:00.000Z`）
+- **廢棄原因**：後端已完全從 GAS + Google Sheets 遷移至 Cloudflare Workers + D1 SQLite。D1 原生支援 UTF-8，不存在 Big5 亂碼和日期自動轉換問題。此 ADR 僅供歷史參考。
 
 ---
 
@@ -99,16 +87,16 @@
 
 ### ADR-006: 戰鬥引擎前後端同步修改原則
 
-- **狀態**：✅ 永久生效
+- **狀態**：✅ 永久生效（2026-03-03 更新：GAS → Workers）
 - **日期**：2026-03-01
 - **決定**：
-  - **任何涉及戰鬥邏輯的修改，必須同時修改前端（`src/domain/battleEngine.ts`）和 GAS 後端（`gas/battleEngine.js`）**
-  - 實際戰鬥計算由 GAS 後端執行，前端僅負責 3D 動畫回放（Phase B）
+  - **任何涉及戰鬥邏輯的修改，必須同時修改前端（`src/domain/battleEngine.ts`）和 Workers 後端（`workers/src/routes/battle.ts`）**
+  - 實際戰鬥計算由 Workers 後端執行，前端僅負責 3D 動畫回放（Phase B）
   - 前端 `battleEngine.ts` 僅在後端呼叫失敗時作為 fallback（降級本地計算）
-  - 改前端引擎卻漏改 GAS → 線上行為不變，只有降級時才生效 = 等同沒改
-  - 修改後必須 `clasp push` + `clasp deploy` 部署 GAS
+  - 改前端引擎卻漏改 Workers → 線上行為不變，只有降級時才生效 = 等同沒改
+  - 修改後必須 `cd workers && npx wrangler deploy` 部署 Workers
 - **適用範圍**：能量系統、傷害計算、目標選擇、被動觸發、大招中斷、回合流程等所有戰鬥邏輯
-- **理由**：v2.6 後戰鬥計算已移到 GAS，前端只是動畫播放器。曾因只改前端未改 GAS 導致「能量滿未立即施放大招」的 bug
+- **理由**：戰鬥計算已移到後端（Workers），前端只是動畫播放器。曾因只改前端未改後端導致「能量滿未立即施放大招」的 bug
 
 ---
 

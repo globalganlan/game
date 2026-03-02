@@ -153,19 +153,19 @@ const THEMES: Record<SceneMode, SceneTheme> = {
 
   /* ── 爬塔：冰封高塔 ── */
   tower: {
-    fogColor: '#0c1525', fogNear: 10, fogFar: 38,
+    fogColor: '#1a2540', fogNear: 12, fogFar: 42,
     sparkleColor: '#88ccff', sparkleCount: 100,
-    skyConfig: { sunY: -0.3, rayleigh: 0.6, turbidity: 5 },
-    hemiArgs: ['#4488cc', '#081020'], hemiIntensity: 1.0,
-    ambientIntensity: 2.0,
+    skyConfig: { sunY: -0.15, rayleigh: 0.6, turbidity: 5 },
+    hemiArgs: ['#6699dd', '#182040'], hemiIntensity: 1.8,
+    ambientIntensity: 3.5,
     pointLights: [
-      { pos: [12, 12, 8], color: '#6699ff', intensity: 35 },
-      { pos: [-12, 10, -8], color: '#4466cc', intensity: 25 },
-      { pos: [0, 18, 0], color: '#aaccff', intensity: 20 },
+      { pos: [12, 12, 8], color: '#88aaff', intensity: 55 },
+      { pos: [-12, 10, -8], color: '#6688dd', intensity: 40 },
+      { pos: [0, 18, 0], color: '#ccddff', intensity: 35 },
     ],
     dirLights: [
-      { pos: [6, 25, 12], color: '#ccddff', intensity: 4 },
-      { pos: [-4, 20, 8], color: '#6688bb', intensity: 2.5 },
+      { pos: [6, 25, 12], color: '#ddeeff', intensity: 6 },
+      { pos: [-4, 20, 8], color: '#88aacc', intensity: 4 },
     ],
     particleType: 'snow', particleColor: '#ddeeff', particleOpacity: 0.5,
     groundColorFn: (v, bm) => [
@@ -190,19 +190,19 @@ const THEMES: Record<SceneMode, SceneTheme> = {
 
   /* ── 每日副本：熔岩地獄 ── */
   daily: {
-    fogColor: '#1a0800', fogNear: 7, fogFar: 32,
+    fogColor: '#2a1208', fogNear: 9, fogFar: 36,
     sparkleColor: '#ff4400', sparkleCount: 120,
-    skyConfig: { sunY: -0.05, rayleigh: 0.1, turbidity: 30 },
-    hemiArgs: ['#ff2200', '#100000'], hemiIntensity: 1.5,
-    ambientIntensity: 2.2,
+    skyConfig: { sunY: 0.0, rayleigh: 0.1, turbidity: 30 },
+    hemiArgs: ['#ff6633', '#1a0800'], hemiIntensity: 2.2,
+    ambientIntensity: 3.5,
     pointLights: [
-      { pos: [10, 8, 8], color: '#ff4400', intensity: 50 },
-      { pos: [-10, 10, -6], color: '#ff2200', intensity: 40 },
-      { pos: [0, 12, 0], color: '#ffaa44', intensity: 30 },
+      { pos: [10, 8, 8], color: '#ff6633', intensity: 65 },
+      { pos: [-10, 10, -6], color: '#ff4422', intensity: 50 },
+      { pos: [0, 12, 0], color: '#ffcc66', intensity: 40 },
     ],
     dirLights: [
-      { pos: [4, 22, 14], color: '#ff8844', intensity: 4 },
-      { pos: [-6, 18, 8], color: '#ff4422', intensity: 3 },
+      { pos: [4, 22, 14], color: '#ffaa66', intensity: 6 },
+      { pos: [-6, 18, 8], color: '#ff6644', intensity: 4.5 },
     ],
     particleType: 'ash', particleColor: '#ff6633', particleOpacity: 0.4,
     groundColorFn: (v, bm) => [

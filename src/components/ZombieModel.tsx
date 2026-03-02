@@ -73,6 +73,9 @@ export function ZombieModel({
     cloned.traverse((child) => {
       if ((child as THREE.Mesh).isMesh) {
         const mesh = child as THREE.Mesh
+        // 啟用投射陰影
+        mesh.castShadow = true
+        mesh.receiveShadow = true
         const cloneMat = (m: THREE.Material): THREE.MeshStandardMaterial => {
           const cloned = m.clone() as THREE.MeshStandardMaterial
           // 確保 emissive 乾淨

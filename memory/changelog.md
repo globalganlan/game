@@ -3,6 +3,54 @@
 > 按時間倒序排列，最新的在最上面。
 
 ---
+### [2026-03-03] 背包 UI 改善 + 裝備稀有度強化 + 記憶更新
+
+- **觸發者**：使用者
+- **執行角色**：🔧 CODING + 🎨 UI_DESIGN
+- **變更摘要**：
+  1. **「全部」分頁包含裝備** — 背包「全部」tab 同時顯示道具 + 裝備（原本只顯示道具），修改 `equipmentList` memo 條件 + JSX 渲染邏輯
+  2. **英雄碎片中文名稱修復** — `asc_fragment_X` 道具在 `ItemCell` / `ItemDetail` 中一律使用 `resolveFallbackName()`（英雄名+碎片），不被 DB `item_definitions.name` 原始 key 覆蓋
+  3. **裝備「使用中」稀有度視覺** — `.inv-equip-in-use` 改用稀有度色 `var(--cell-border)` box-shadow 外框光暈 + `.inv-equip-badge` 徽章背景跟隨稀有度色（金/紫/藍/灰）
+  4. **記憶檔案全面更新** — `decisions.md` ADR-000 改為 Workers（移除 GAS/clasp 細節）、ADR-002 標記已廢棄、ADR-006 改為 Workers；`dev-status.md` 清理 GAS 引用 + 補全最新變更
+- **影響檔案**：
+  - `src/components/InventoryPanel.tsx` — 全部 tab 含裝備、碎片名稱 fallback 優先
+  - `src/App.css` — `.inv-equip-in-use` / `.inv-equip-badge` 稀有度色樣式
+  - `memory/decisions.md` — ADR-000/002/006 更新
+  - `memory/dev-status.md` — 第 48 次更新
+  - `memory/changelog.md` — 新增本條紀錄
+
+---
+### [2025-07-16] 背包清理 — 移除過時道具 + 裝備排序 + 已裝備標記
+
+- **觸發者**：使用者
+- **執行角色**：🔧 CODING + 🎨 UI_DESIGN
+- **變更摘要**：
+  1. **移除過時道具定義** — DB 刪除 `exp_core_*`（經驗核心大中小）、`forge_*`（鍛造材料 4 種）、`potion_*`（藥水 2 種），共 9 筆；同步清理 inventory 殘留
+  2. **移除「經驗」分頁** — 背包 TABS 移除 `exp_material` tab；「通用」改名為「素材」
+  3. **ItemCategory 型別精簡** — 移除 `exp_material`、`equipment_material`、`forge_material`
+  4. **裝備列表排序** — 已裝備的裝備排最前面，同組內依稀有度高→低排序
+  5. **已裝備視覺區別** — 裝備格子加上綠色半透明背景 + 右上角「使用中」badge
+- **影響檔案**：
+  - `src/components/InventoryPanel.tsx` — TABS、equipmentList sort、equip-in-use badge
+  - `src/services/inventoryService.ts` — ItemCategory 精簡
+  - `src/App.css` — `.inv-equip-in-use` + `.inv-equip-badge` 樣式
+  - DB: item_definitions 刪 9 筆、inventory 清理
+
+---
+### [2025-07-16] 背包分頁分類修正 — DB category 對齊前端 tab
+
+- **觸發者**：使用者（背包分頁都是空的）
+- **執行角色**：🔧 CODING
+- **變更摘要**：
+  1. **DB item_definitions category 修正** — `extra.category` 原本所有素材都是 `material`，前端 tab 期望 `exp_material` / `ascension_material` / `general_material`，導致經驗/突破/通用三個分頁全空
+     - `exp_core_*` → `exp_material`
+     - `asc_class_*` → `ascension_material`
+     - `eqm_enhance_*` / `forge_*` / `potion_*` → `general_material`
+  2. **新增 14 個英雄碎片定義** — `asc_fragment_1`~`asc_fragment_14` 加入 `item_definitions`，category = `ascension_material`，前端用 `resolveFallbackName()` 顯示中文名
+- **影響**：純 DB 修改，無前端程式碼變更
+- **驗證**：tsc 零錯誤、vite build 成功
+
+---
 ### [2025-07-16] 召喚結果 UI 改進 — 金框 + 統一尺寸 + 資訊彈窗
 
 - **觸發者**：使用者
