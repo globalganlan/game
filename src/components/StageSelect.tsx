@@ -55,7 +55,7 @@ const MODE_TABS: ModeTab[] = [
   { key: 'tower', icon: '🗼', label: '爬塔', unlockMode: 'tower' },
   { key: 'daily', icon: '📅', label: '每日副本', unlockMode: 'daily' },
   { key: 'pvp', icon: '⚔️', label: '競技場', unlockMode: 'pvp' },
-  { key: 'boss', icon: '👹', label: 'Boss', unlockMode: 'boss' },
+  { key: 'boss', icon: '👹', label: '首領', unlockMode: 'boss' },
 ]
 
 /* ────────────────────────────
@@ -219,7 +219,7 @@ function StoryStages({
                 {/* Header */}
                 <div className="sc-card-header">
                   <span className="sc-card-id">{cfg.stageId}</span>
-                  {isBoss && <span className="sc-card-boss-badge">BOSS</span>}
+                  {isBoss && <span className="sc-card-boss-badge">首領</span>}
                   {locked && <span className="sc-card-lock">🔒</span>}
                   {current && <span className="sc-card-current">📍</span>}
                   {is3Star && <span className="sc-card-complete">✅</span>}
@@ -290,7 +290,7 @@ function TowerPanel({
           <span>{floorConfig.enemies.length}</span>
         </div>
         <div className="tower-info-row">
-          <span>Boss 層</span>
+          <span>首領層</span>
           <span>{floorConfig.isBoss ? '✅ 是' : '否'}</span>
         </div>
         <div className="tower-info-row">
@@ -451,9 +451,9 @@ function BossPanel2({
                 {!unlocked && <span className="boss-card-lock">🔒</span>}
               </div>
               <div className="boss-card-stats">
-                <span>HP {boss.hp.toLocaleString()}</span>
-                <span>ATK {boss.atk}</span>
-                <span>SPD {boss.speed}</span>
+                <span>生命 {boss.hp.toLocaleString()}</span>
+                <span>攻擊 {boss.atk}</span>
+                <span>速度 {boss.speed}</span>
               </div>
               <div className="boss-card-thresholds">
                 <span className="rank-s">S ≥{boss.damageThresholds.S.toLocaleString()}</span>

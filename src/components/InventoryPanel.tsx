@@ -25,8 +25,9 @@ import type { EquipmentInstance } from '../domain/progressionSystem'
 import { enhancedMainStat } from '../domain/progressionSystem'
 import { emitAcquire } from '../services/acquireToastBus'
 import { emitToast } from '../services/acquireToastBus'
-import { openEquipmentChest, getEquipDisplayName } from '../domain/equipmentGacha'
+import { openEquipmentChest, getEquipDisplayName, SET_NAMES } from '../domain/equipmentGacha'
 import { addEquipmentLocally, equipItem, unequipItem, getHeroEquipment } from '../services/inventoryService'
+import { statZh } from '../constants/statNames'
 
 /* ────────────────────────────
    Props
@@ -153,7 +154,8 @@ function ItemDetail({ item, definition, onClose, heroMap }: ItemDetailProps & { 
   const fallback = resolveFallbackName(item.itemId, heroMap)
   const isFragment = item.itemId.startsWith('asc_fragment_')
   const name = isFragment ? fallback.name : (definition?.name || fallback.name)
-  const desc = definition?.description || '無描述'
+  const rawDesc = definition?.description || '無描述'
+  const desc = isFragment ? '可用於英雄突破升星的專屬碎片' : rawDesc
   const rarity = definition?.rarity || 'N'
   const sellPrice = definition?.sellPrice || 0
   const qty = Math.round(item.quantity)
@@ -405,7 +407,7 @@ function EquipmentDetail({ equip, onClose, heroInstances, heroNameMap }: Equipme
         </div>
         {/* 主屬性 */}
         <div className="inv-equip-main-stat">
-          <span>{equip.mainStat ?? '?'}</span>
+          <span>{statZh(equip.mainStat ?? '?')}</span>
           <span className="inv-equip-stat-val">+{enhancedMainStat(equip.mainStatValue ?? 0, equip.enhanceLevel ?? 0)}</span>
         </div>
         {/* 副屬性 */}
@@ -413,7 +415,7 @@ function EquipmentDetail({ equip, onClose, heroInstances, heroNameMap }: Equipme
           <div className="inv-equip-sub-stats">
             {(equip.subStats ?? []).map((sub, i) => (
               <div key={i} className="inv-equip-sub-row">
-                <span>{sub.stat}</span>
+                <span>{statZh(sub.stat)}</span>
                 <span>+{sub.value}{sub.isPercent ? '%' : ''}</span>
               </div>
             ))}
@@ -421,7 +423,7 @@ function EquipmentDetail({ equip, onClose, heroInstances, heroNameMap }: Equipme
         )}
         {/* 套裝 */}
         {equip.setId && (
-          <div className="inv-equip-set-tag">套裝：{equip.setId}</div>
+          <div className="inv-equip-set-tag">套裝：{SET_NAMES[equip.setId] || equip.setId}</div>
         )}
         {/* 裝備狀態 */}
         {equip.equippedBy && (
@@ -596,7 +598,7 @@ export function InventoryPanel({ onBack, heroesList, heroInstances }: InventoryP
             <option value="default">預設排序</option>
             <option value="rarity-desc">稀有度↓</option>
             <option value="quantity-desc">數量↓</option>
-            <option value="name-asc">名稱 A-Z</option>
+            <option value="name-asc">名稱排序</option>
           </select>
         </div>
 

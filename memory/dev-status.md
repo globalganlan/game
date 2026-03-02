@@ -1,6 +1,6 @@
 # 開發狀態快照 — Dev Status
 
-> 最後更新：2026-03-03（第四十八次更新 — 記憶檔案全面更新 + 背包「全部」分頁含裝備 + 英雄碎片名稱修復 + 裝備稀有度強化）
+> 最後更新：2026-03-03（第四十九次更新 — UI 全面中文化：~61 處英文翻譯為繁中 + 共用 statZh/statusZh 映射）
 
 ## 截至 2026-03-03 的開發狀態
 
@@ -92,11 +92,12 @@
 - [x] `SettingsPanel.tsx` 改用 `useLogout(onLogout)` 取代手寫登出邏輯
 - [x] `App.tsx` `handleFullLogout` 簡化為 `handleLogoutResetState`（純 React state reset），移除 9 個 cache clearing import
 
-### 2026-03-03 背包 UI 改善 + 裝備稀有度強化 + 記憶更新
-- [x] **「全部」分頁包含裝備** — 背包「全部」tab 現在同時顯示道具 + 裝備，不再只顯示道具
-- [x] **英雄碎片中文名稱修復** — `asc_fragment_X` 一律使用 `resolveFallbackName()`（英雄名+碎片），不再被 DB 定義的原始 key 覆蓋
-- [x] **裝備「使用中」稀有度視覺** — `.inv-equip-in-use` 外框光暈 + `.inv-equip-badge` 徽章顏色跟隨 `--cell-border`（稀有度色）
-- [x] **記憶檔案全面更新** — decisions.md ADR-000/002/006 清理 GAS 引用；dev-status.md 補全最新變更
+### 2026-03-03 背包 UI 改善 + 裝備稀有度強化 + UI 全面中文化
+- [x] **UI 全面中文化** — 掃描 15 個檔案共 ~61 處英文 UI，全翻繁中；新增 `src/constants/statNames.ts`（STAT_ZH + STATUS_ZH 共用映射）
+- [x] **「全部」分頁包含裝備** — 背包「全部」tab 同時顯示道具 + 裝備
+- [x] **英雄碎片中文名稱修復** — `asc_fragment_X` 一律使用 `resolveFallbackName()`
+- [x] **裝備「使用中」稀有度視覺** — 稀有度色 box-shadow + 徽章
+- [x] **記憶檔案全面更新** — decisions/dev-status 清理 GAS 引用
 
 ### Spec 狀態
 

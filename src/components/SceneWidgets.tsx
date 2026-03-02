@@ -90,7 +90,7 @@ export function DamagePopup({ value, position, textScale = 1 }: DamagePopupProps
 
   const isHeal = value < 0
   const displayValue = Math.abs(value)
-  const displayText = isHeal ? `+${displayValue}` : value === 0 ? 'MISS' : `-${displayValue}`
+  const displayText = isHeal ? `+${displayValue}` : value === 0 ? '閃避' : `-${displayValue}`
   const textColor = isHeal ? '#00ff88' : value === 0 ? '#aaaaaa' : '#ff0000'
 
   return (

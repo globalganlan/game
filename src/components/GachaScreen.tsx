@@ -13,6 +13,7 @@ import {
   STANDARD_BANNER,
   type GachaRarity,
 } from '../domain/gachaSystem'
+import { STAT_ZH } from '../constants/statNames'
 import {
   equipSinglePull,
   equipTenPull,
@@ -95,7 +96,7 @@ function ResultCard({ result, hero, onClick }: { result: PullResult; hero?: RawH
       style={{ borderColor: cfg.color, boxShadow: cfg.glow }}
       onClick={onClick}
     >
-      {result.isNew && <span className="gacha-new-badge">NEW!</span>}
+      {result.isNew && <span className="gacha-new-badge">新！</span>}
       {!result.isNew && <span className="gacha-dupe-badge">重複</span>}
       {result.isFeatured && <span className="gacha-featured-badge">UP</span>}
       <div className="gacha-result-portrait">
@@ -189,12 +190,12 @@ function HeroInfoPopup({ hero, rarity, onClose }: { hero: RawHeroData; rarity: s
           </div>
         </div>
 
-        <div className="gacha-info-section-title">Lv.1 屬性</div>
+        <div className="gacha-info-section-title">Lv.1 基礎屬性</div>
         <div className="gacha-info-stats-grid">
-          <div className="gacha-info-stat"><span className="gacha-info-stat-label">HP</span><span className="gacha-info-stat-val">{calcStat(hero.HP as number)}</span></div>
-          <div className="gacha-info-stat"><span className="gacha-info-stat-label">ATK</span><span className="gacha-info-stat-val">{calcStat(hero.ATK as number)}</span></div>
-          <div className="gacha-info-stat"><span className="gacha-info-stat-label">DEF</span><span className="gacha-info-stat-val">{calcStat(heroAny.DEF as number)}</span></div>
-          <div className="gacha-info-stat"><span className="gacha-info-stat-label">SPD</span><span className="gacha-info-stat-val">{String(heroAny.Speed ?? heroAny.SPD ?? '?')}</span></div>
+          <div className="gacha-info-stat"><span className="gacha-info-stat-label">生命</span><span className="gacha-info-stat-val">{calcStat(hero.HP as number)}</span></div>
+          <div className="gacha-info-stat"><span className="gacha-info-stat-label">攻擊</span><span className="gacha-info-stat-val">{calcStat(hero.ATK as number)}</span></div>
+          <div className="gacha-info-stat"><span className="gacha-info-stat-label">防禦</span><span className="gacha-info-stat-val">{calcStat(heroAny.DEF as number)}</span></div>
+          <div className="gacha-info-stat"><span className="gacha-info-stat-label">速度</span><span className="gacha-info-stat-val">{String(heroAny.Speed ?? heroAny.SPD ?? '?')}</span></div>
           <div className="gacha-info-stat"><span className="gacha-info-stat-label">暴擊率</span><span className="gacha-info-stat-val">{String(heroAny.CritRate ?? '?')}%</span></div>
           <div className="gacha-info-stat"><span className="gacha-info-stat-label">暴擊傷害</span><span className="gacha-info-stat-val">{String(heroAny.CritDmg ?? '?')}%</span></div>
         </div>
@@ -207,11 +208,7 @@ function HeroInfoPopup({ hero, rarity, onClose }: { hero: RawHeroData; rarity: s
    Equipment Info Popup（唯讀 — 裝備結果點擊查看）
    ──────────────────────────── */
 
-const STAT_ZH: Record<string, string> = {
-  HP: '生命', ATK: '攻擊', DEF: '防禦', SPD: '速度',
-  CritRate: '暴擊率', CritDmg: '暴擊傷害',
-  HP_percent: '生命%', ATK_percent: '攻擊%', DEF_percent: '防禦%',
-}
+// STAT_ZH 已移至 src/constants/statNames.ts 共用
 
 function EquipInfoPopup({ eq, onClose }: { eq: EquipmentInstance; onClose: () => void }) {
   const cfg = RARITY_CONFIG[eq.rarity] || RARITY_CONFIG.N

@@ -105,7 +105,7 @@ export function CheckinPanel({ onBack, saveData, onCheckin }: CheckinPanelProps)
                 key={dayNum}
                 className={`checkin-day-card ${isClaimed ? 'checkin-claimed' : ''} ${isToday ? 'checkin-today' : ''} ${isCurrent && localChecked ? 'checkin-current-done' : ''}`}
               >
-                <div className="checkin-day-label">Day {dayNum}</div>
+                <div className="checkin-day-label">第 {dayNum} 天</div>
                 <div className="checkin-day-rewards">
                   {reward.gold && (
                     <span className="checkin-reward-line"><CurrencyIcon type="gold" /> {reward.gold.toLocaleString()}</span>

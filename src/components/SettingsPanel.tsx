@@ -226,7 +226,7 @@ export function SettingsPanel({ onBack, onLogout, displayName, isBound: initialB
             </div>
             <div className="settings-audio-row">
               <label className="settings-audio-label">
-                <span>BGM</span>
+                <span>背景音樂</span>
                 <input
                   type="range"
                   min={0} max={100} step={1}
@@ -239,7 +239,7 @@ export function SettingsPanel({ onBack, onLogout, displayName, isBound: initialB
             </div>
             <div className="settings-audio-row">
               <label className="settings-audio-label">
-                <span>SFX</span>
+                <span>音效</span>
                 <input
                   type="range"
                   min={0} max={100} step={1}
@@ -318,7 +318,7 @@ export function SettingsPanel({ onBack, onLogout, displayName, isBound: initialB
                 <input
                   className="settings-input"
                   type="email"
-                  placeholder="Email"
+                  placeholder="電子信箱"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                 />

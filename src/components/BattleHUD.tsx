@@ -10,6 +10,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import type { StatusEffect, StatusType, Element } from '../domain/types'
+import { statusZh } from '../constants/statNames'
 
 /* ════════════════════════════════════
    型別
@@ -148,7 +149,7 @@ function BuffBar({ effects }: { effects: StatusEffect[] }) {
           <span
             key={`${eff.type}-${i}`}
             className={`bhud-buff-icon ${cfg.isBuff ? 'bhud-buff' : 'bhud-debuff'}`}
-            title={`${eff.type} (${eff.duration}t)`}
+            title={`${statusZh(eff.type)} (${eff.duration}回合)`}
             style={{ '--buff-color': cfg.color } as React.CSSProperties}
           >
             {cfg.icon}

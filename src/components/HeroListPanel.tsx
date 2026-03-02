@@ -34,7 +34,7 @@ import {
   equipItem, unequipItem,
   removeItemsLocally, enhanceEquipment,
 } from '../services/inventoryService'
-import { getEquipDisplayName } from '../domain/equipmentGacha'
+import { getEquipDisplayName, SET_NAMES } from '../domain/equipmentGacha'
 import { getGlbForSuspense } from '../loaders/glbLoader'
 // 3D idle animation is the hero detail showcase; Thumbnail3D kept for grid cards only
 import { Thumbnail3D } from './UIOverlay'
@@ -44,6 +44,7 @@ import { Thumbnail3D } from './UIOverlay'
    ──────────────────────────── */
 
 import { RARITY_CONFIG } from '../constants/rarity'
+import { statZh } from '../constants/statNames'
 type RarityLabel = 'SSR' | 'SR' | 'R' | 'N'
 
 function numToRarity(n: number | string | unknown): RarityLabel {
@@ -506,10 +507,10 @@ function HeroDetail({ hero, instance, onClose, skills, heroSkills }: HeroDetailP
         {/* ── 屬性 ── */}
         <div className="hd2-section-title">屬性</div>
         <div className="hd2-stats-grid">
-          <div className="hd2-stat"><span className="hd2-stat-label">HP</span><span className="hd2-stat-val">{calcStat(hero.HP as number)}</span></div>
-          <div className="hd2-stat"><span className="hd2-stat-label">ATK</span><span className="hd2-stat-val">{calcStat(hero.ATK as number)}</span></div>
-          <div className="hd2-stat"><span className="hd2-stat-label">DEF</span><span className="hd2-stat-val">{calcStat(heroAny.DEF as number)}</span></div>
-          <div className="hd2-stat"><span className="hd2-stat-label">SPD</span><span className="hd2-stat-val">{String(heroAny.Speed ?? heroAny.SPD ?? '?')}</span></div>
+          <div className="hd2-stat"><span className="hd2-stat-label">生命</span><span className="hd2-stat-val">{calcStat(hero.HP as number)}</span></div>
+          <div className="hd2-stat"><span className="hd2-stat-label">攻擊</span><span className="hd2-stat-val">{calcStat(hero.ATK as number)}</span></div>
+          <div className="hd2-stat"><span className="hd2-stat-label">防禦</span><span className="hd2-stat-val">{calcStat(heroAny.DEF as number)}</span></div>
+          <div className="hd2-stat"><span className="hd2-stat-label">速度</span><span className="hd2-stat-val">{String(heroAny.Speed ?? heroAny.SPD ?? '?')}</span></div>
           <div className="hd2-stat"><span className="hd2-stat-label">暴擊率</span><span className="hd2-stat-val">{String(heroAny.CritRate ?? '?')}%</span></div>
           <div className="hd2-stat"><span className="hd2-stat-label">暴擊傷害</span><span className="hd2-stat-val">{String(heroAny.CritDmg ?? '?')}%</span></div>
         </div>
@@ -579,7 +580,7 @@ function HeroDetail({ hero, instance, onClose, skills, heroSkills }: HeroDetailP
                   <div className="hd2-equip-detail">
                     <span className="hd2-equip-name">{getEquipDisplayName(eq)}</span>
                     <span className="hd2-equip-stats">
-                      {eq.mainStat ?? '?'} +{enhancedMainStat(eq.mainStatValue ?? 0, eq.enhanceLevel ?? 0, eq.rarity ?? 'SR')}
+                      {statZh(eq.mainStat ?? '?')} +{enhancedMainStat(eq.mainStatValue ?? 0, eq.enhanceLevel ?? 0, eq.rarity ?? 'SR')}
                       {(eq.enhanceLevel ?? 0) > 0 && <span className="hd2-equip-lv">+{eq.enhanceLevel}</span>}
                     </span>
                     {isOwned && (eq.enhanceLevel ?? 0) < getMaxEnhanceLevel(eq.rarity || 'N') && (
@@ -768,14 +769,14 @@ function HeroDetail({ hero, instance, onClose, skills, heroSkills }: HeroDetailP
                         {(eq.enhanceLevel ?? 0) > 0 && <span className="hd2-equip-lv">+{eq.enhanceLevel}</span>}
                       </div>
                       <div className="hd2-equip-option-stats">
-                        <span>{eq.mainStat ?? '?'} +{enhancedMainStat(eq.mainStatValue ?? 0, eq.enhanceLevel ?? 0, eq.rarity ?? 'N')}</span>
+                        <span>{statZh(eq.mainStat ?? '?')} +{enhancedMainStat(eq.mainStatValue ?? 0, eq.enhanceLevel ?? 0, eq.rarity ?? 'N')}</span>
                         {(Array.isArray(eq.subStats) ? eq.subStats : []).map((sub, i) => (
                           <span key={i} className="hd2-sub-stat">
-                            {sub.stat} +{sub.value}{sub.isPercent ? '%' : ''}
+                            {statZh(sub.stat)} +{sub.value}{sub.isPercent ? '%' : ''}
                           </span>
                         ))}
                       </div>
-                      {eq.setId && <span className="hd2-equip-set">{eq.setId}</span>}
+                      {eq.setId && <span className="hd2-equip-set">{SET_NAMES[eq.setId] || eq.setId}</span>}
                     </button>
                   ))}
                 </div>
@@ -802,7 +803,7 @@ function HeroDetail({ hero, instance, onClose, skills, heroSkills }: HeroDetailP
                   <div><strong>{getEquipDisplayName(enhanceTarget)}</strong> <span className={`hd2-equip-rarity rarity-${(enhanceTarget.rarity || 'N').toLowerCase()}`}>{enhanceTarget.rarity || 'N'}</span></div>
                   <div>+{enhanceTarget.enhanceLevel} / {maxLvl}</div>
                   <div style={{ marginTop: 6 }}>
-                    {enhanceTarget.mainStat}: {currentMain}
+                    {statZh(enhanceTarget.mainStat)}: {currentMain}
                     {!isMax && <span style={{ color: '#4ade80' }}> → {nextMain}</span>}
                   </div>
                 </div>

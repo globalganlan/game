@@ -25,7 +25,7 @@ interface Props {
 export function VictoryPanel({ battleResult, victoryRewards, stageMode, stageId }: Props) {
   return (
     <div className={`battle-result-banner ${battleResult}`}>
-      <span className="banner-text">{battleResult === 'victory' ? 'VICTORY' : 'DEFEAT'}</span>
+      <span className="banner-text">{battleResult === 'victory' ? '勝利' : '敗北'}</span>
       <span className="banner-sub">{battleResult === 'victory' ? '你生存了下來' : '你淪為了它們的一員'}</span>
 
       {/* 勝利獎勵面板 */}

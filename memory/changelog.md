@@ -3,21 +3,38 @@
 > 按時間倒序排列，最新的在最上面。
 
 ---
-### [2026-03-03] 背包 UI 改善 + 裝備稀有度強化 + 記憶更新
+### [2026-03-03] UI 全面中文化 + 背包 UI 改善 + 裝備稀有度強化
 
 - **觸發者**：使用者
 - **執行角色**：🔧 CODING + 🎨 UI_DESIGN
 - **變更摘要**：
-  1. **「全部」分頁包含裝備** — 背包「全部」tab 同時顯示道具 + 裝備（原本只顯示道具），修改 `equipmentList` memo 條件 + JSX 渲染邏輯
-  2. **英雄碎片中文名稱修復** — `asc_fragment_X` 道具在 `ItemCell` / `ItemDetail` 中一律使用 `resolveFallbackName()`（英雄名+碎片），不被 DB `item_definitions.name` 原始 key 覆蓋
-  3. **裝備「使用中」稀有度視覺** — `.inv-equip-in-use` 改用稀有度色 `var(--cell-border)` box-shadow 外框光暈 + `.inv-equip-badge` 徽章背景跟隨稀有度色（金/紫/藍/灰）
-  4. **記憶檔案全面更新** — `decisions.md` ADR-000 改為 Workers（移除 GAS/clasp 細節）、ADR-002 標記已廢棄、ADR-006 改為 Workers；`dev-status.md` 清理 GAS 引用 + 補全最新變更
+  1. **UI 全面中文化** — 掃描全專案 15 個檔案共 ~61 處英文 UI 文字，全部翻譯為繁體中文：
+     - 新增 `src/constants/statNames.ts` — 共用屬性名稱映射（STAT_ZH + STATUS_ZH）
+     - 屬性標籤 HP→生命 / ATK→攻擊 / DEF→防禦 / SPD→速度（GachaScreen / HeroListPanel / StageSelect）
+     - 裝備主副屬性 key 全部走 `statZh()` 中文映射（HeroListPanel / InventoryPanel / GachaScreen）
+     - 裝備套裝 ID 使用 `SET_NAMES` 中文映射（HeroListPanel / InventoryPanel）
+     - 戰鬥文字：ROUND→回合 / VICTORY→勝利 / DEFEAT→敗北 / MISS→閃避
+     - Buff tooltip 使用 `statusZh()` 中文映射（BattleHUD）
+     - Boss 標籤 BOSS→首領、Boss 層→首領層（StageSelect）
+     - 簽到 Day→第N天（CheckinPanel）
+     - 設定 BGM→背景音樂 / SFX→音效 / Email→電子信箱（SettingsPanel）
+     - 抽卡 NEW!→新！（GachaScreen）
+     - 排序 A-Z→名稱排序（InventoryPanel）
+  2. **「全部」分頁包含裝備** — 背包「全部」tab 同時顯示道具 + 裝備
+  3. **英雄碎片中文名稱修復** — `asc_fragment_X` 一律使用 `resolveFallbackName()`
+  4. **裝備「使用中」稀有度視覺** — 稀有度色 box-shadow + 徽章
 - **影響檔案**：
-  - `src/components/InventoryPanel.tsx` — 全部 tab 含裝備、碎片名稱 fallback 優先
-  - `src/App.css` — `.inv-equip-in-use` / `.inv-equip-badge` 稀有度色樣式
-  - `memory/decisions.md` — ADR-000/002/006 更新
-  - `memory/dev-status.md` — 第 48 次更新
-  - `memory/changelog.md` — 新增本條紀錄
+  - `src/constants/statNames.ts`（新增）— STAT_ZH / STATUS_ZH 共用映射
+  - `src/components/GachaScreen.tsx` — 屬性標籤中文化 + 引用共用 STAT_ZH + NEW!→新！
+  - `src/components/HeroListPanel.tsx` — 屬性/裝備屬性中文化 + statZh() + SET_NAMES
+  - `src/components/InventoryPanel.tsx` — 裝備屬性中文化 + statZh() + SET_NAMES + 排序選項
+  - `src/components/StageSelect.tsx` — Boss→首領 + 屬性標籤中文化
+  - `src/App.tsx` — ROUND→第N回合
+  - `src/components/VictoryPanel.tsx` — VICTORY→勝利 / DEFEAT→敗北
+  - `src/components/SceneWidgets.tsx` — MISS→閃避
+  - `src/components/BattleHUD.tsx` — Buff tooltip 中文化
+  - `src/components/CheckinPanel.tsx` — Day→第N天
+  - `src/components/SettingsPanel.tsx` — BGM→背景音樂 / SFX→音效 / Email→電子信箱
 
 ---
 ### [2025-07-16] 背包清理 — 移除過時道具 + 裝備排序 + 已裝備標記
