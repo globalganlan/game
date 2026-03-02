@@ -2,44 +2,38 @@
  * Service Worker — 全球感染 PWA
  *
  * 快取策略：
- *   HTML / JS / CSS → Network First（確保每次拿到最新版本）
- *   GLB / 圖片 / WASM → Cache First（大檔案優先快取，hash 不同時自動更新）
+ *   ★ Navigation（HTML）→ 不攔截，讓瀏覽器原生處理（避免 iOS standalone reload 迴圈）
+ *   JS / CSS → Network First（Vite hash 檔名確保更新）
+ *   GLB / 圖片 / WASM → Cache First（大檔案優先快取）
  *
- * 版本更新機制：
- *   每次 build 會產生不同的 asset hash（如 index-BjVK6_Nq.css）
- *   SW 版號變更 → install → activate → 清除舊快取 → clients.claim()
- *   前端 main.tsx 偵測到新 SW 等待中 → 彈出「有新版本」提示 → 使用者點擊時 skipWaiting
+ * 重要：
+ *   - 跨域請求一律不攔截（避免快取 API 回應）
+ *   - 不預快取 HTML（防止版本不一致造成資源 404）
+ *   - install 不呼叫 skipWaiting、activate 不呼叫 clients.claim
+ *     （避免 iOS standalone 冷啟動 controllerchange → reload 迴圈）
  */
 
-const CACHE_VERSION = 'v5'
+const CACHE_VERSION = 'v6'
 const CACHE_NAME = `globalganlan-${CACHE_VERSION}`
 const STATIC_CACHE = `globalganlan-static-${CACHE_VERSION}`
-
-// 預快取核心檔案
-const PRECACHE_URLS = [
-  '/game/',
-  '/game/index.html',
-]
 
 // 大型靜態資源（Cache First — 透過檔名 hash 自然失效）
 const STATIC_EXTENSIONS = ['.glb', '.png', '.jpg', '.jpeg', '.svg', '.wasm', '.woff', '.woff2', '.ttf']
 
 /* ── Install ── */
 self.addEventListener('install', (event) => {
-  // 不在這裡呼叫 self.skipWaiting()。
+  // 不呼叫 skipWaiting()。
   // 讓新 SW 進入 waiting 狀態，由前端顯示更新提示後
   // 再透過 message('SKIP_WAITING') 觸發接管。
-  // 這避免 iOS standalone 冷啟動時觸發 controllerchange → 整頁 reload。
+  // 不預快取 HTML — 避免陳舊 HTML 引用錯誤 hash 的資源。
   event.waitUntil(
-    caches.open(CACHE_NAME)
-      .then((cache) => cache.addAll(PRECACHE_URLS))
+    caches.open(CACHE_NAME) // 只建立快取桶，不預載任何檔案
   )
 })
 
 /* ── Activate ── */
 self.addEventListener('activate', (event) => {
   // 只清除舊版快取，不呼叫 clients.claim()。
-  // 讓 SW 在下一次導航時自然接管（避免 iOS standalone 觸發 controllerchange → reload 迴圈）。
   event.waitUntil(
     caches.keys().then((names) =>
       Promise.all(
@@ -55,17 +49,23 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url)
 
-  // 不快取 GAS API 呼叫
-  if (url.hostname === 'script.google.com') return
+  // ★ 導航請求（HTML 頁面）→ 完全不攔截，讓瀏覽器原生處理
+  // 這是防止 iOS standalone reload 迴圈的關鍵
+  if (event.request.mode === 'navigate') return
+
+  // 跨域請求一律不攔截（API、CDN 等）
+  if (url.origin !== self.location.origin) return
 
   // 不快取 POST 請求
   if (event.request.method !== 'GET') return
 
-  // manifest.json 不快取（避免殘留壞檔導致 Syntax error）
+  // manifest.json 不快取
   if (url.pathname.endsWith('manifest.json')) return
 
+  // service worker 本身不快取
+  if (url.pathname.endsWith('sw.js')) return
+
   // 大型靜態資源（GLB/圖片/WASM/字型）→ Cache First
-  // Vite 產出的 JS/CSS 有 hash 檔名，但仍走 Network First 確保最新
   const isLargeStatic = STATIC_EXTENSIONS.some((ext) => url.pathname.endsWith(ext))
   if (isLargeStatic) {
     event.respondWith(
@@ -75,22 +75,28 @@ self.addEventListener('fetch', (event) => {
           return fetch(event.request).then((response) => {
             if (response.ok) cache.put(event.request, response.clone())
             return response
-          })
+          }).catch(() => cached || new Response('', { status: 503 }))
         })
       )
     )
     return
   }
 
-  // HTML / JS / CSS / 其他 → Network First（確保每次部署都能拿到最新版本）
+  // JS / CSS / 其他同域子資源 → Network First
   event.respondWith(
     fetch(event.request)
       .then((response) => {
-        const clone = response.clone()
-        caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone))
+        if (response.ok) {
+          const clone = response.clone()
+          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone))
+        }
         return response
       })
-      .catch(() => caches.match(event.request))
+      .catch(() =>
+        caches.match(event.request).then((cached) =>
+          cached || new Response('', { status: 503 })
+        )
+      )
   )
 })
 
