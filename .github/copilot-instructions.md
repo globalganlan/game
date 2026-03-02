@@ -73,11 +73,13 @@
 - `orientationchange` 事件需 `setTimeout(150ms)` 才能拿到正確尺寸
 - **Google Sheets 寫入後必須驗證中文不是亂碼**（讀回抽查），發現亂碼立即 deleteSheet → createSheet 修復（僅限 GAS 路徑仍在使用時）
 - **stageId "1-1" 格式會被 Sheets 自動轉日期** — createSheet 時用 `textColumns:["stageId"]` 參數防護
-- **⚠️ PWA Service Worker — Standalone 模式完全禁用（ADR-009）** — 修過三次，絕對不可再改壞：
-  - `src/main.tsx` 偵測 `display-mode: standalone` → `getRegistrations()` unregister 所有 SW + `caches.keys()` 清除快取
-  - Standalone 模式下**絕對不註冊** `/game/sw.js`
-  - Browser 模式正常註冊 SW，但禁止監聽 `controllerchange` 自動 reload
+- **⚠️ PWA Service Worker — iOS 全面禁用 + Standalone 禁用（ADR-009）** — 修過四次，絕對不可再改壞：
+  - `src/main.tsx` 偵測 iOS（`/iPhone|iPad|iPod/`）→ **無條件** unregister 所有 SW + 清除快取
+  - `src/main.tsx` 偵測 `display-mode: standalone` → 同上，完全禁用 SW
+  - **僅非 iOS + 非 Standalone 的 browser 模式**才註冊 `/game/sw.js`
+  - 禁止監聽 `controllerchange` 自動 reload
   - `public/sw.js` install 可呼叫 `skipWaiting()`，但禁止 `clients.claim()` / 預快取 HTML
+  - iOS Chrome「加入主畫面」不會觸發 `display-mode: standalone`，故必須靠 UA 偵測
   - 詳見 `memory/decisions.md` ADR-009
 
 ## 後端架構（Cloudflare Workers + D1）

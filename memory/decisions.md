@@ -152,24 +152,26 @@
 
 ---
 
-### ADR-009: PWA — Standalone 模式完全禁用 Service Worker
+### ADR-009: PWA — iOS 全面禁用 + Standalone 禁用 Service Worker
 
-- **狀態**：✅ 已定案 — **修過三次，絕對不可再改壞**
-- **日期**：2026-03-03（第三次修正）
-- **背景**：PWA 加入主畫面（iOS/Android standalone）後，遊戲載入到一半就重新開始。前兩次修復（導航不攔截 + 跨域排除）未根治，因為舊版 SW 仍在裝置上活躍，新 SW 停在 waiting 狀態。
-- **根因**：舊版 SW (v5) 在 standalone webview 中持續攔截請求、預快取過期 HTML、觸發 controllerchange，而新 SW (v6) 因不呼叫 skipWaiting 永遠無法接管。
-- **最終方案（v7）**：
-  1. **Standalone 模式完全不使用 SW** — `main.tsx` 偵測 `display-mode: standalone` → 直接 unregister 所有 SW + 清除所有 caches
-  2. **Browser 模式正常使用 SW** — 註冊 `/game/sw.js`，提供快取加速 + 版本更新通知
-  3. **SW install 呼叫 `skipWaiting()`** — 強制取代有 bug 的舊版 SW，因 main.tsx 已無 controllerchange 監聽器所以不會造成迴圈
+- **狀態**：✅ 已定案 — **修過四次，絕對不可再改壞**
+- **日期**：2026-03-03（第四次修正）
+- **背景**：PWA 加入主畫面後遊戲反覆 reload 直至白屏。前三次只處理 standalone 模式，但忽略了 **iOS Chrome「加入主畫面」不觸發 `display-mode: standalone`** 的情況。iOS Chrome 在非 standalone 狀態下註冊 SW，WKWebView 對 SW skipWaiting/controllerchange 生命週期有 bug，導致連續 crash。Safari 因走 standalone 分支故正常。
+- **根因（第四次）**：iOS Chrome「加入主畫面」在 Chrome 內開啟（非 standalone webview），`display-mode: standalone` = false、`navigator.standalone` = false → 掉進 browser 分支 → 註冊 SW → Chrome iOS WKWebView SW bug → reload 迴圈 → 白屏「重複發生問題」。
+- **最終方案（v8）**：
+  1. **iOS 全面禁用 SW** — `main.tsx` 偵測 `/iPhone|iPad|iPod/` → 不論 Safari/Chrome/任何 browser，一律 unregister SW + 清除 caches
+  2. **非 iOS Standalone 模式也禁用 SW** — `display-mode: standalone` 或 `navigator.standalone` 為 true 時同理
+  3. **僅非 iOS + 非 Standalone 的 browser 模式才註冊 SW** — 提供快取加速 + 版本更新通知
+  4. **SW install 呼叫 `skipWaiting()`** — 強制取代有 bug 的舊版 SW
 - **`public/sw.js` 規則**：
-  - ✅ install 可呼叫 `self.skipWaiting()`（因為 standalone 已不註冊 SW，browser 已移除 controllerchange）
+  - ✅ install 可呼叫 `self.skipWaiting()`
   - ❌ **禁止** activate 呼叫 `clients.claim()`
   - ❌ **禁止**預快取 HTML
   - ❌ 導航請求（`mode: 'navigate'`）→ 直接 `return`
   - ❌ 跨域請求 → 直接 `return`
 - **`src/main.tsx` 規則**：
-  - Standalone 模式：`getRegistrations()` → `unregister()` + `caches.keys()` → `delete()`
-  - Browser 模式：正常註冊 + 5 分鐘輪詢 + sessionStorage 3 秒 reload 冷卻 + 更新 bar 去重
+  - **iOS（所有瀏覽器）**：`getRegistrations()` → `unregister()` + `caches.keys()` → `delete()`
+  - **非 iOS Standalone**：同上，完全禁用
+  - **非 iOS Browser**：正常註冊 + 5 分鐘輪詢 + sessionStorage 3 秒 reload 冷卻 + 更新 bar 去重
   - ❌ **絕對禁止**監聽 `controllerchange` 事件
-- **理由**：遊戲需要網路（auth/save/battle），SW 的離線快取在 standalone 模式下無實質幫助，但 SW 生命週期在 standalone webview 中行為異常，是所有問題的根源。徹底移除是最可靠的解法。
+- **理由**：iOS 的所有瀏覽器底層都是 WKWebView，SW 生命週期在其中行為異常。遊戲需要網路（auth/save/battle），iOS 原生已有 HTTP 快取，額外 SW 快取效益低但風險極高。Android 正常、Desktop 正常，僅 iOS 有此問題。
