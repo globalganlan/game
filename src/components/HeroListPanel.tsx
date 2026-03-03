@@ -13,7 +13,7 @@ import * as SkeletonUtils from 'three/examples/jsm/utils/SkeletonUtils'
 import * as THREE from 'three'
 import type { RawHeroData } from '../types'
 import type { HeroInstance } from '../services/saveService'
-import { updateHeroLocally, getSaveState, updateProgress } from '../services/saveService'
+import { updateHeroLocally, getSaveState, updateProgress, applyCurrenciesFromServer } from '../services/saveService'
 import type { SkillTemplate, HeroSkillConfig } from '../domain/types'
 import { getHeroSkillSet } from '../services/dataService'
 import {
@@ -327,14 +327,15 @@ function HeroDetail({ hero, instance, onClose, skills, heroSkills }: HeroDetailP
     setIsProcessing(true)
     try {
       const useAmount = Math.min(cost, availableExp)
-      const preview = consumeExpMaterials(lvl, instance.exp, levelCap, useAmount)
-      // 樂觀更新本地
-      updateHeroLocally(heroId, { level: preview.level, exp: preview.exp })
-      // 樂觀扣除 EXP 資源
-      updateProgress({ exp: (getSaveState()?.save.exp ?? 0) - useAmount })
-      // 背景 API
-      apiUpgradeHero(instance.instanceId, useAmount).catch(console.warn)
-      setResultMsg(`升級成功！Lv.${lvl} → Lv.${preview.level}`)
+      // 先呼叫後端
+      const res = await apiUpgradeHero(instance.instanceId, useAmount)
+      if (res.success) {
+        updateHeroLocally(heroId, { level: res.newLevel, exp: res.newExp })
+        if (res.currencies) applyCurrenciesFromServer(res.currencies)
+        setResultMsg(`升級成功！Lv.${lvl} → Lv.${res.newLevel}`)
+      } else {
+        setResultMsg('升級失敗')
+      }
       setTimeout(() => setModalMode('none'), 1200)
     } catch (e) {
       setResultMsg('升級失敗：' + String(e))
@@ -365,18 +366,21 @@ function HeroDetail({ hero, instance, onClose, skills, heroSkills }: HeroDetailP
     if (!instance || !canDoAscend || !hasAscMaterials || isProcessing) return
     setIsProcessing(true)
     try {
-      const newAsc = asc + 1
-      updateHeroLocally(heroId, { ascension: newAsc })
-      if (ascCost) {
-        updateProgress({ gold: currentGold - ascCost.gold })
-        // 樂觀扣除突破素材（碎片 + 職業石）
-        const matDeductions: { itemId: string; quantity: number }[] = []
-        if (ascCost.fragments > 0) matDeductions.push({ itemId: fragmentId, quantity: ascCost.fragments })
-        if (ascCost.classStones > 0) matDeductions.push({ itemId: classStoneId, quantity: ascCost.classStones })
-        if (matDeductions.length > 0) removeItemsLocally(matDeductions)
+      const res = await apiAscendHero(instance.instanceId)
+      if (res.success) {
+        updateHeroLocally(heroId, { ascension: res.newAscension })
+        if (res.currencies) applyCurrenciesFromServer(res.currencies)
+        // 扣除突破素材（伺服器已扣，本地同步）
+        if (ascCost) {
+          const matDeductions: { itemId: string; quantity: number }[] = []
+          if (ascCost.fragments > 0) matDeductions.push({ itemId: fragmentId, quantity: ascCost.fragments })
+          if (ascCost.classStones > 0) matDeductions.push({ itemId: classStoneId, quantity: ascCost.classStones })
+          if (matDeductions.length > 0) removeItemsLocally(matDeductions)
+        }
+        setResultMsg(`突破成功！突破 ${asc} → ${res.newAscension}，等級上限 ${getLevelCap(res.newAscension)}`)
+      } else {
+        setResultMsg('突破失敗')
       }
-      apiAscendHero(instance.instanceId).catch(console.warn)
-      setResultMsg(`突破成功！突破 ${asc} → ${newAsc}，等級上限 ${getLevelCap(newAsc)}`)
       setTimeout(() => setModalMode('none'), 1200)
     } catch (e) {
       setResultMsg('突破失敗：' + String(e))
@@ -577,12 +581,14 @@ function HeroDetail({ hero, instance, onClose, skills, heroSkills }: HeroDetailP
               >
                 <span className="hd2-equip-icon">{icon}</span>
                 {eq ? (
-                  <div className="hd2-equip-detail">
-                    <span className="hd2-equip-name">{getEquipDisplayName(eq)}</span>
-                    <span className="hd2-equip-stats">
-                      {statZh(eq.mainStat ?? '?')} +{enhancedMainStat(eq.mainStatValue ?? 0, eq.enhanceLevel ?? 0, eq.rarity ?? 'SR')}
-                      {(eq.enhanceLevel ?? 0) > 0 && <span className="hd2-equip-lv">+{eq.enhanceLevel}</span>}
-                    </span>
+                  <>
+                    <div className="hd2-equip-detail">
+                      <span className="hd2-equip-name">{getEquipDisplayName(eq)}</span>
+                      <span className="hd2-equip-stats">
+                        {statZh(eq.mainStat ?? '?')} +{enhancedMainStat(eq.mainStatValue ?? 0, eq.enhanceLevel ?? 0, eq.rarity ?? 'SR')}
+                        {(eq.enhanceLevel ?? 0) > 0 && <span className="hd2-equip-lv">+{eq.enhanceLevel}</span>}
+                      </span>
+                    </div>
                     {isOwned && (eq.enhanceLevel ?? 0) < getMaxEnhanceLevel(eq.rarity || 'N') && (
                       <button
                         className="hd2-equip-enhance-btn"
@@ -590,7 +596,7 @@ function HeroDetail({ hero, instance, onClose, skills, heroSkills }: HeroDetailP
                         title="強化裝備"
                       >⚒️</button>
                     )}
-                  </div>
+                  </>
                 ) : (
                   <span className="hd2-equip-text">{label}：空</span>
                 )}

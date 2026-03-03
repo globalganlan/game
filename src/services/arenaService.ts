@@ -126,6 +126,7 @@ export async function completeArenaChallenge(
   newRank?: number
   rewards?: ArenaReward
   milestoneReward?: ArenaReward | null
+  currencies?: { gold?: number; diamond?: number; exp?: number }
   error?: string
 }> {
   try {
@@ -134,6 +135,7 @@ export async function completeArenaChallenge(
       rewards: ArenaReward
       milestoneReward: ArenaReward | null
       challengesLeft: number
+      currencies?: { gold?: number; diamond?: number; exp?: number }
     }>('arena-challenge-complete', { targetRank, won })
     if (result.success) {
       if (won && typeof result.newRank === 'number') {
@@ -150,6 +152,7 @@ export async function completeArenaChallenge(
         newRank: result.newRank,
         rewards: result.rewards,
         milestoneReward: result.milestoneReward ?? null,
+        currencies: result.currencies,
       }
     }
     return { success: false, error: result.error }

@@ -154,19 +154,13 @@ export function MenuScreenRouter(props: MenuScreenRouterProps) {
         <MailboxPanel
           onBack={onBack}
           onRewardsClaimed={(rewards) => {
-            let diamondDelta = 0
-            let goldDelta = 0
-            let expDelta = 0
+            // 道具類寫入本地背包（貨幣已由 MailboxPanel 透過 applyCurrenciesFromServer 同步）
             const inventoryItems: { itemId: string; quantity: number }[] = []
             for (const r of rewards) {
-              if (r.itemId === 'diamond') diamondDelta += r.quantity
-              else if (r.itemId === 'gold') goldDelta += r.quantity
-              else if (r.itemId === 'exp') expDelta += r.quantity
-              else inventoryItems.push({ itemId: r.itemId, quantity: r.quantity })
+              if (r.itemId !== 'diamond' && r.itemId !== 'gold' && r.itemId !== 'exp') {
+                inventoryItems.push({ itemId: r.itemId, quantity: r.quantity })
+              }
             }
-            if (diamondDelta > 0) onDiamondChange(diamondDelta)
-            if (goldDelta > 0) onGoldChange(goldDelta)
-            if (expDelta > 0) updateProgress({ exp: (getSaveState()?.save.exp ?? 0) + expDelta })
             if (inventoryItems.length > 0) addItemsLocally(inventoryItems)
             const toastItems: AcquireItem[] = rewards.map(r => ({
               type: r.itemId === 'diamond' || r.itemId === 'gold' || r.itemId === 'exp' ? 'currency' as const : 'item' as const,

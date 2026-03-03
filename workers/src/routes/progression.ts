@@ -4,7 +4,7 @@
 import { Hono } from 'hono';
 import type { Env, HonoVars, SaveDataRow, HeroInstanceRow, HeroRow, EquipmentInstanceRow } from '../types.js';
 import { getBody } from '../middleware/auth.js';
-import { upsertItem, upsertItemStmt } from './save.js';
+import { upsertItem, upsertItemStmt, getCurrencies } from './save.js';
 import { isoNow } from '../utils/helpers.js';
 
 const progression = new Hono<{ Bindings: Env; Variables: HonoVars }>();
@@ -88,6 +88,7 @@ progression.post('/upgrade-hero', async (c) => {
     newLevel: level,
     newExp: exp,
     expConsumed: usableExp,
+    currencies: await getCurrencies(db, playerId),
   });
 });
 
@@ -155,6 +156,7 @@ progression.post('/ascend-hero', async (c) => {
     success: true,
     newAscension,
     newLevelCap: ASCENSION_LEVEL_CAP[newAscension] ?? 20,
+    currencies: await getCurrencies(db, playerId),
   });
 });
 
@@ -236,6 +238,7 @@ progression.post('/enhance-equipment', async (c) => {
     newLevel,
     newMainStatValue,
     goldConsumed: goldCost,
+    currencies: await getCurrencies(db, playerId),
   });
 });
 

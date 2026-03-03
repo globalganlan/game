@@ -36,6 +36,8 @@ const ITEM_DESCRIPTIONS: Record<string, string> = {
   gold_pack_10k: '使用後獲得 10,000 金幣。',
   gold: '基礎遊戲貨幣，用於購買道具與強化裝備。',
   diamond: '高級貨幣，用於召喚、購買稀有道具。',
+  gacha_ticket_hero: '英雄召喚專用券，每張可抵扣一次單抽的鑽石費用。透過簽到、活動或商店取得。',
+  gacha_ticket_equip: '裝備鍛造專用券，每張可抵扣一次鍛造的鑽石費用。透過簽到、活動或商店取得。',
 }
 
 /** 道具稀有度兜底推斷 */

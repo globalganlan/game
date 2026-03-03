@@ -73,6 +73,13 @@ export async function grantRewards(
   if (stmts.length > 0) await db.batch(stmts);
 }
 
+/** 共用：讀取玩家當前貨幣（後端唯一權威，所有資源變更 API 必須回傳） */
+export async function getCurrencies(db: D1Database, playerId: string): Promise<{ gold: number; diamond: number; exp: number }> {
+  const row = await db.prepare('SELECT gold, diamond, exp FROM save_data WHERE playerId = ?')
+    .bind(playerId).first<{ gold: number; diamond: number; exp: number }>();
+  return row ?? { gold: 0, diamond: 0, exp: 0 };
+}
+
 // ── 載入存檔 ──────────────────────────────────
 save.post('/load-save', async (c) => {
   const playerId = c.get('playerId');

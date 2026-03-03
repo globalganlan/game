@@ -1,7 +1,7 @@
 # 技術架構 Spec
 
-> 版本：v1.9 ｜ 狀態：🟢 定稿（含 Domain Engine + Services 層 + Optimistic Queue + Audio Engine + CurrencyIcon 統一 icon + PWA + App 模組化拆分 + D1 原子批次寫入）
-> 最後更新：2025-07-14
+> 版本：v2.0 ｜ 狀態：🟢 定稿（含 Domain Engine + Services 層 + Optimistic Queue + Audio Engine + CurrencyIcon 統一 icon + PWA + App 模組化拆分 + D1 原子批次寫入 + InfoTip/RedDot 新元件）
+> 最後更新：2026-03-03
 > 負責角色：🔧 CODING → 🏗️ ARCHITECT
 
 ## 概述
@@ -71,7 +71,7 @@ src/
     saveService.ts          存檔服務（儲存陣型/收集資源）
 
  components/
-    Arena.tsx               場景（地面/碎片/雨/天空/霧）
+    Arena.tsx               場景（地面/碎片/雨/天空/霧，13 種 SceneMode 主題）
     Hero.tsx                英雄容器（移動/動畫狀態機）
     ZombieModel.tsx         GLB 模型 + 受擊閃光
     SceneWidgets.tsx        血條/飄字/鏡頭/控制/SkillToast3D/ElementHint3D
@@ -93,6 +93,8 @@ src/
     VictoryPanel.tsx        勝利/敗北標語與獎勵面板
     GameOverButtons.tsx     GAMEOVER 按鈕群組（下一關/重試/回放/統計/回大廳）
     BattleSpeedControls.tsx 戰鬥倍速 + 跳過按鈕
+    InfoTip.tsx             資源說明 Tooltip（min 300px / max 380px）
+    RedDot.tsx              通知紅點 badge 元件
 
  hooks/
     useResponsive.ts        RWD 偵測 hook
@@ -607,3 +609,4 @@ POST { "action": "invalidate-cache" }
 | v1.7 | 2026-03-01 | 同步實際程式碼：完整更新 services/（16 檔）、domain/（13 檔）、components/（16 檔）、hooks/（3 檔）目錄列表；Optimistic Queue 操作數更新（mailService 4 ops、saveService 2 ops、新增 gachaLocalPool）；orientationchange timeout 修正為 100ms |
 | v1.8 | 2026-06-15 | **配合裝備模板制 v2**：inventoryService Optimistic Queue 操作數 5→1（移除 equip/unequip/lock/expand）；progressionService 操作數 8+→7+（移除 forge/dismantle，新增 enhanceEquipment/equipGachaPull）；不快取資料表移除 equipment |
 | v1.9 | 2026-03-02 | **useLogout hook**：hooks/ 目錄新增 `useLogout.ts`（auth logout + 9 快取清除）；新增 App.tsx Phase 4 抽出的 12 個 hooks 完整列表（useCurtain/useBattleHUD/useAnimationPromises/useDragFormation/useSlots/useGameInit/useBattleFlow/useStageHandlers/useMail/useBattleState/useBgm） |
+| v2.0 | 2026-03-03 | **新元件 + Arena 擴展**：新增 `InfoTip.tsx`（資源說明 Tooltip，min 300px / max 380px）、`RedDot.tsx`（通知紅點 badge）；Arena.tsx SceneMode 從 5 擴展至 13 種（新增 8 個章節專屬場景主題：ruins/forest/desert/glacier/volcano/abyss/sky_temple/doomsday）；sceneTheme 與 stageMode 分離 |

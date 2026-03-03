@@ -6,7 +6,7 @@ import type { Env, HonoVars, MailboxRow } from '../types.js';
 import { getBody } from '../middleware/auth.js';
 import { isoNow, uuid, safeJsonParse } from '../utils/helpers.js';
 import { pushToPlayer } from '../utils/pusher.js';
-import { grantRewardsStmts } from './save.js';
+import { grantRewardsStmts, getCurrencies } from './save.js';
 
 const mail = new Hono<{ Bindings: Env; Variables: HonoVars }>();
 
@@ -114,8 +114,9 @@ mail.post('/claim-mail-reward', async (c) => {
   const stmts = grantRewardsMailStmts(db, playerId, rewards);
   stmts.push(db.prepare('UPDATE mailbox SET claimed = 1, read = 1 WHERE mailId = ?').bind(mailId));
   await db.batch(stmts);
+  const currencies = await getCurrencies(db, playerId);
 
-  return c.json({ success: true, rewards });
+  return c.json({ success: true, rewards, currencies });
 });
 
 // ════════════════════════════════════════════
@@ -147,7 +148,8 @@ mail.post('/claim-all-mail', async (c) => {
   if (allStmts.length > 0) await db.batch(allStmts);
 
   const totalRewards = Object.entries(totalMap).map(([itemId, quantity]) => ({ itemId, quantity }));
-  return c.json({ success: true, claimedCount, totalRewards });
+  const currencies = await getCurrencies(db, playerId);
+  return c.json({ success: true, claimedCount, totalRewards, currencies });
 });
 
 // ════════════════════════════════════════════

@@ -14,11 +14,15 @@ import type { BattleHero } from '../domain/types'
    英雄養成
     */
 
+/** 後端回傳的貨幣絕對值 */
+export type ServerCurrencies = { gold?: number; diamond?: number; exp?: number }
+
 export interface UpgradeHeroResult {
   success: boolean
   newLevel: number
   newExp: number
   expConsumed: number
+  currencies?: ServerCurrencies
 }
 
 /** 英雄升級（使用 EXP 資源） */
@@ -34,6 +38,7 @@ export async function upgradeHero(
     newLevel: res.newLevel || 0,
     newExp: res.newExp || 0,
     expConsumed: res.expConsumed || 0,
+    currencies: res.currencies,
   }
 }
 
@@ -41,6 +46,7 @@ export interface AscendHeroResult {
   success: boolean
   newAscension: number
   newLevelCap: number
+  currencies?: ServerCurrencies
 }
 
 /** 英雄突破 */
@@ -52,6 +58,7 @@ export async function ascendHero(instanceId: string): Promise<AscendHeroResult> 
     success: res.success,
     newAscension: res.newAscension || 0,
     newLevelCap: res.newLevelCap || 20,
+    currencies: res.currencies,
   }
 }
 
@@ -83,6 +90,7 @@ export interface EnhanceEquipmentResult {
   newMainStatValue: number
   materialsConsumed: { itemId: string; quantity: number }[]
   goldConsumed: number
+  currencies?: ServerCurrencies
 }
 
 /** 裝備強化 */
@@ -99,6 +107,7 @@ export async function enhanceEquipment(
     newMainStatValue: res.newMainStatValue || 0,
     materialsConsumed: res.materialsConsumed || [],
     goldConsumed: res.goldConsumed || 0,
+    currencies: res.currencies,
   }
 }
 
@@ -136,6 +145,7 @@ export interface CompleteBattleResult {
   leveledUp?: boolean
   newStoryProgress?: { chapter: number; stage: number }
   newFloor?: number
+  currencies?: ServerCurrencies
 }
 
 /**
@@ -172,6 +182,7 @@ export async function completeBattle(params: CompleteBattleParams): Promise<Comp
     leveledUp: res.leveledUp,
     newStoryProgress: res.newStoryProgress,
     newFloor: res.newFloor,
+    currencies: res.currencies,
   }
 }
 

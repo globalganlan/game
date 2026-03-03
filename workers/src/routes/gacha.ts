@@ -1,17 +1,19 @@
 /**
  * Gacha Routes — 英雄抽卡、裝備抽卡
  *
- * v3: 召喚券 + 每日免費單抽 + 鍛造券
+ * v4: 召喚券 + 每日免費單抽（英雄 & 裝備） + 鍛造券 + 十連無折扣
  *   - gacha_ticket_hero: 英雄召喚券，可抵扣鑽石
  *   - gacha_ticket_equip: 裝備鍛造券，可抵扣鑽石池費用
  *   - 每日免費英雄單抽一次（lastHeroFreePull 追蹤）
- *   - 十連：券不足時剩餘以鑽石補差
+ *   - 每日免費裝備鑽石池單抽一次（lastEquipFreePull 追蹤）
+ *   - 十連：券不足時剩餘以鑽石補差（無折扣，= 10 × 單抽）
+ *   - 所有回應返回 currencies（後端唯一權威）
  */
 import { Hono } from 'hono';
 import type { Env, HonoVars, SaveDataRow } from '../types.js';
 import { getBody } from '../middleware/auth.js';
 import { isoNow, safeJsonParse } from '../utils/helpers.js';
-import { upsertItemStmt } from './save.js';
+import { upsertItemStmt, getCurrencies } from './save.js';
 
 const gacha = new Hono<{ Bindings: Env; Variables: HonoVars }>();
 
@@ -20,11 +22,11 @@ const RATE_SSR = 0.015;
 const RATE_SR = 0.10;
 const RATE_R = 0.35;
 
-// 費用常數
+// 費用常數（十連無折扣，= 10 × 單抽）
 const HERO_SINGLE_DIAMOND = 160;
-const HERO_TEN_DIAMOND = 1440; // 九折
+const HERO_TEN_DIAMOND = 1600;
 const EQUIP_DIAMOND_SINGLE = 200;
-const EQUIP_DIAMOND_TEN = 1800;
+const EQUIP_DIAMOND_TEN = 2000;
 
 /** 取得 UTC+8 日期字串（YYYY-MM-DD） */
 function getTaipeiDateStr(): string {
@@ -43,8 +45,6 @@ async function getItemQuantity(db: D1Database, playerId: string, itemId: string)
     .bind(playerId, itemId).first<{ quantity: number }>();
   return row?.quantity ?? 0;
 }
-const RATE_SR = 0.10;
-const RATE_R = 0.35;
 
 interface GachaEntry { h: number; r: string; f: boolean }
 interface PityState { pullsSinceLastSSR: number; guaranteedFeatured: boolean }
@@ -213,9 +213,10 @@ gacha.post('/gacha-pull', async (c) => {
   }
 
   await db.batch(writeStmts);
+  const currencies = await getCurrencies(db, playerId);
 
   return c.json({
-    success: true, results, diamondCost, ticketsUsed, freePullUsed, newPityState,
+    success: true, results, diamondCost, ticketsUsed, freePullUsed, newPityState, currencies,
   });
 });
 
@@ -246,16 +247,26 @@ gacha.post('/equip-gacha-pull', async (c) => {
   if (count !== 1 && count !== 10) return c.json({ success: false, error: 'invalid_count' });
   const poolType = body.poolType as string;
   if (poolType !== 'gold' && poolType !== 'diamond') return c.json({ success: false, error: 'invalid_pool_type' });
+  const isFree = body.isFree === true;  // 每日免費單抽
 
-  const saveData = await db.prepare('SELECT gold, diamond FROM save_data WHERE playerId = ?')
-    .bind(playerId).first<Pick<SaveDataRow, 'gold' | 'diamond'>>();
+  const saveData = await db.prepare('SELECT gold, diamond, lastEquipFreePull FROM save_data WHERE playerId = ?')
+    .bind(playerId).first<Pick<SaveDataRow, 'gold' | 'diamond'> & { lastEquipFreePull?: string }>();
   if (!saveData) return c.json({ success: false, error: 'save_not_found' });
 
   let cost: number;
   let currencyField: 'gold' | 'diamond';
   let ticketsUsed = 0;
+  let freePullUsed = false;
 
-  if (poolType === 'gold') {
+  if (isFree && count === 1 && poolType === 'diamond') {
+    // 每日免費裝備單抽（限鑽石池）
+    const today = getTaipeiDateStr();
+    const lastFree = (saveData as any).lastEquipFreePull || '';
+    if (lastFree === today) return c.json({ success: false, error: 'free_pull_already_used' });
+    freePullUsed = true;
+    cost = 0;
+    currencyField = 'diamond';
+  } else if (poolType === 'gold') {
     // 金幣池：不用券，直接扣金幣
     cost = count === 10 ? 90000 : 10000;
     currencyField = 'gold';
@@ -299,6 +310,11 @@ gacha.post('/equip-gacha-pull', async (c) => {
   if (ticketsUsed > 0) {
     eqStmts.push(upsertItemStmt(db, playerId, 'gacha_ticket_equip', -ticketsUsed));
   }
+  if (freePullUsed) {
+    eqStmts.push(db.prepare(
+      `UPDATE save_data SET lastEquipFreePull = ? WHERE playerId = ?`
+    ).bind(getTaipeiDateStr(), playerId));
+  }
 
   // 持久化 client 給的裝備
   const rawEquip = body.equipment;
@@ -320,10 +336,11 @@ gacha.post('/equip-gacha-pull', async (c) => {
   }
 
   await db.batch(eqStmts);
+  const currencies = await getCurrencies(db, playerId);
 
   return c.json({
     success: true, poolType, count: newEquips.length,
-    currencyCost: cost, ticketsUsed,
+    currencyCost: cost, ticketsUsed, freePullUsed, currencies,
   });
 });
 

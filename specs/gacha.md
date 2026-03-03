@@ -1,7 +1,7 @@
 # 抽卡系統 Spec
 
-> 版本：v2.0 ｜ 狀態：🟢 已實作
-> 最後更新：2026-06-16
+> 版本：v2.2 ｜ 狀態：🟢 已實作
+> 最後更新：2026-06-17
 > 負責角色：🎯 GAME_DESIGN → 🔧 CODING
 
 ## 概述
@@ -9,6 +9,8 @@
 定義英雄招募（抽卡/Gacha）的機率、保底機制、卡池類型與經濟成本。  
 核心架構：**前端呼叫 `gacha-pull` API → 後端即時生成結果 → 回傳前端顯示**。  
 v2.0 移除了舊版 GAS 時代的 400 筆預生成池機制，改為每次抽卡即時產生結果。
+v2.1 新增每日免費單抽 + 抽卡券系統，降低新手門檻。
+v2.2 十連折扣移除、免費單抽合併至單抽按鈕、裝備鍛造免費單抽、後端貨幣唯一權威。
 
 ## 依賴
 
@@ -61,7 +63,10 @@ interface GachaPullResponse {
   success: boolean;
   results: GachaPullResult[];
   diamondCost: number;
+  ticketsUsed: number;
+  freePullUsed: boolean;
   newPityState: PityState;
+  currencies: { gold?: number; diamond?: number; exp?: number };
   error?: string;
 }
 
@@ -93,7 +98,33 @@ interface PityState {
 | 操作 | 消耗 |
 |------|------|
 | 單抽 | 160 鑽石 |
-| 十連 | 1,440 鑽石（九折） |
+| 十連 | 1,600 鑽石（無折扣 = 10 × 160） |
+
+### 免費每日抽卡（v2.1 新增，v2.2 改版）
+
+每位玩家每日可免費單抽一次英雄召喚及一次裝備鍛造（鑽石池），重置時間為 UTC+8 午夜 00:00。
+免費單抽已合併至單抽按鈕：可用時顯示「🎁 免費」，使用後顯示倒數計時至下次免費。
+
+| 項目 | 英雄召喚 | 裝備鍛造 |
+|------|---------|---------|
+| 免費次數 | 每日 1 次 | 每日 1 次（限鑽石池） |
+| 適用卡池 | 英雄常駐池 | 鑽石裝備池 |
+| 保底計數 | 正常累計 | N/A（無 pity） |
+| D1 欄位 | `save_data.lastHeroFreePull` | `save_data.lastEquipFreePull` |
+| 重置時區 | UTC+8 | UTC+8 |
+
+### 抽卡券系統（v2.1 新增）
+
+抽卡券為背包道具，使用時等同一次單抽（不消耗鑽石）。
+
+| 抽卡券 itemId | 適用卡池 | 來源 |
+|-----------------|---------|------|
+| `gacha_ticket_hero` | 英雄抽卡 | 簽到獎勵、活動信件、商店購買 |
+| `gacha_ticket_equip` | 裝備抽卡 | 簽到獎勵、活動信件、商店購買 |
+
+- 使用抽卡券時保底計數正常累計
+- 十連抽也支援抽卡券（券不足以鑽石補差）
+- 前端透過 `callApi('gacha-pull', { count, isFree })` 呼叫
 
 ### 重複角色處理
 - 重複獲得 → 轉換為「星塵」+ 角色碎片
@@ -131,6 +162,8 @@ interface PityState {
 |------|------|------|
 | `gachaPity` | JSON text | 保底狀態 `PityState` |
 | `diamond` | INTEGER | 鑽石餘額 |
+| `lastHeroFreePull` | TEXT | 英雄免費單抽最後使用日期 (YYYY-MM-DD, UTC+8) |
+| `lastEquipFreePull` | TEXT | 裝備免費單抽最後使用日期 (YYYY-MM-DD, UTC+8) |
 
 > ⚠️ `gachaPool`、`gachaPoolEndPity` 欄位仍存在於 D1 但不再使用（僅歷史資料）
 
@@ -143,16 +176,17 @@ interface PityState {
 #### `gacha-pull` API 流程
 
 ```
-POST /api/gacha-pull  { guestToken, count: 1|10 }
-1. 驗證鑽石 ≥ cost
+POST /api/gacha-pull  { guestToken, count: 1|10, isFree? }
+1. 免費抽：驗證 lastHeroFreePull ≠ 今日 UTC+8
+   付費抽：驗證鑽石（券優先，不足以鑽石補差）
 2. 讀取 gachaPity（保底狀態）
 3. 載入 heroes 表取得英雄池
 4. generateGachaEntries(heroPool, pity, count)  — 即時生成
 5. 遍歷結果：
    a. isNew → INSERT hero_instances
    b. 重複 → INSERT stardust + fragments 到 inventory
-6. UPDATE save_data: diamond - cost, gachaPity = newPity
-7. 回傳 { results, diamondCost, newPityState }
+6. UPDATE save_data: diamond - cost, gachaPity = newPity, lastHeroFreePull
+7. 回傳 { results, diamondCost, ticketsUsed, freePullUsed, newPityState, currencies }
 ```
 
 ### 3.2 前端整合
@@ -162,14 +196,15 @@ POST /api/gacha-pull  { guestToken, count: 1|10 }
 #### `doPull()` 流程
 
 ```typescript
-async function doPull(count: 1 | 10) {
-  // 1. 前端預檢鑽石
+async function doPull(count: 1 | 10, isFree = false) {
+  // 1. 前端預檢鑽石（免費抽跳過）
   // 2. 開始動畫 (setIsPulling)
-  // 3. const res = await callApi('gacha-pull', { count })
-  // 4. 處理結果：更新鑽石、保底計數
-  // 5. 動畫完成後顯示結果卡片
-  // 6. 本地同步：addItemsLocally(重複碎片+星塵)
-  // 7. emitAcquire(toast 動畫)
+  // 3. const res = await callApi('gacha-pull', { count, isFree })
+  // 4. applyCurrenciesFromServer(res.currencies) — 後端唯一權威
+  // 5. 更新保底計數、扣券
+  // 6. 動畫完成後顯示結果卡片
+  // 7. 本地同步：addItemsLocally(重複碎片+星塵)
+  // 8. emitAcquire(toast 動畫)
 }
 ```
 
@@ -207,7 +242,7 @@ async function doPull(count: 1 | 10) {
 | 池 | 貨幣 | 單抽成本 | 十連成本 | SSR | SR | R | N |
 |----|------|---------|---------|-----|----|----|---|
 | 金幣裝備池 | 金幣 | 10,000 | 90,000 | 2% | 13% | 35% | 50% |
-| 鑽石裝備池 | 鑽石 | 200 | 1,800 | 8% | 20% | 40% | 32% |
+| 鑽石裝備池 | 鑽石 | 200 | 2,000 | 8% | 20% | 40% | 32% |
 
 ### 規則
 
@@ -223,8 +258,9 @@ async function doPull(count: 1 | 10) {
 equipSinglePull(pool) / equipTenPull(pool)
 // 本地入帳
 addEquipmentLocally(equipment)
-// 背景同步
-callApi('equip-gacha-pull', { poolType, count, equipment })
+// 等待後端扣款 + 取得權威 currencies
+const res = await callApi('equip-gacha-pull', { poolType, count, isFree, equipment })
+applyCurrenciesFromServer(res.currencies)
 ```
 
 ---
@@ -265,3 +301,5 @@ callApi('equip-gacha-pull', { poolType, count, equipment })
 | v1.5 | 2026-06-15 | 裝備抽卡完整實作：equipmentGacha.ts Domain 層 |
 | v1.6 | 2026-03-01 | 抽卡動畫 + 結果卡片入場；裝備寶箱 |
 | **v2.0** | **2026-06-16** | **重大改版**：移除 400 筆預生成池機制，改為即時 API 生成。刪除 `gachaLocalPool.ts`、`gachaPreloadService.ts`。移除 `refill-pool`、`gacha-pool-status` 端點。前端 `doPull()` 改為 async API 呼叫。後端 `gacha-pull` 回傳 stardust/fragments 欄位。 |
+| v2.1 | 2026-03-03 | **免費抽卡 + 抽卡券**：新增每日免費單抽（`lastFreeGachaDate` D1 欄位）；新增抽卡券系統（`gacha_ticket_hero`、`gacha_ticket_equip` 背包道具）；GachaScreen UI 改為三按鈕布局（免費/券抽、單抽、十連） |
+| **v2.2** | **2026-06-17** | **十連折扣移除 + 免費抽合併 + 裝備免費抽 + 後端貨幣權威**：十連抽不再折扣（英雄 1600、裝備鑽石池 2000）；免費單抽合併至單抽按鈕（可用時顯示「🎁 免費」，用完顯示倒數）；新增裝備鍛造鑽石池每日免費單抽（`lastEquipFreePull`）；所有抽卡 API 回傳 `currencies`，前端用 `applyCurrenciesFromServer` 覆蓋本地、移除 `onDiamondChange`/`onGoldChange` 前端預扣模式。 |

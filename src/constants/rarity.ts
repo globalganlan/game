@@ -62,6 +62,9 @@ export const ITEM_ICONS: Record<string, string> = {
   // 其他
   stamina_potion: '⚡',
   gold_pack_10k: '💰',
+  // 召喚券
+  gacha_ticket_hero: '🎟️',
+  gacha_ticket_equip: '🔧',
 }
 
 /** 根據 itemId 取得顯示 icon（碎片用 🧩，未知用 🎁） */
@@ -104,6 +107,9 @@ export const ITEM_NAMES: Record<string, string> = {
   // 其他
   stamina_potion: '體力藥水',
   gold_pack_10k: '金幣禮包',
+  // 召喚券
+  gacha_ticket_hero: '英雄召喚券',
+  gacha_ticket_equip: '裝備鍛造券',
 }
 
 /** 根據 itemId 取得中文名稱（碎片顯示「突破碎片」，未知回傳 itemId） */

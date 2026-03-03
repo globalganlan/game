@@ -32,6 +32,8 @@ export interface SaveData {
   stageStars: Record<string, number> // stageId  best star (1-3)
   lastSaved: string
   gachaPity?: { pullsSinceLastSSR: number; guaranteedFeatured: boolean }
+  lastHeroFreePull?: string
+  lastEquipFreePull?: string
   pwaRewardClaimed?: boolean
   checkinDay?: number
   checkinLastDate?: string
@@ -458,11 +460,24 @@ export function updateLocalCurrency(field: 'gold' | 'diamond', delta: number) {
 }
 
 /**
+ * 以後端回傳的 currencies 絕對值覆蓋本地 gold / diamond / exp。
+ * 所有會變動貨幣的 API 都應在 response 內帶回 currencies，前端一律用此函式同步。
+ */
+export function applyCurrenciesFromServer(
+  currencies: { gold?: number; diamond?: number; exp?: number } | null | undefined,
+) {
+  if (!currencies || !currentData) return
+  if (typeof currencies.gold === 'number') currentData.save.gold = currencies.gold
+  if (typeof currencies.diamond === 'number') currentData.save.diamond = currencies.diamond
+  if (typeof currencies.exp === 'number') currentData.save.exp = currencies.exp
+  saveToLocal(currentData)
+  notify()
+}
+
+/**
  * 領取計時器累積資源
  *
- * 1. 本地計算累積資源（公式與伺服器一致）
- * 2. 立即更新本地 state + localStorage
- * 3. 背景呼叫 API  伺服器回傳若金幣不同則校正
+ * 呼叫 API，以伺服器回傳的 currencies 絕對值覆蓋本地
  */
 export async function collectResources(): Promise<AccumulatedResources | null> {
   if (!currentData) return null
@@ -477,32 +492,39 @@ export async function collectResources(): Promise<AccumulatedResources | null> {
   )
   if (resources.gold <= 0 && resources.exp <= 0) return null
 
-  //  樂觀本地更新 
-  currentData.save.gold += resources.gold
-  currentData.save.exp = (currentData.save.exp ?? 0) + resources.exp
+  // 更新收集時間（避免重複領取）
   currentData.save.resourceTimerLastCollect = new Date().toISOString()
   saveToLocal(currentData)
-  notify()
 
-  //  背景 API（不阻塞） 
-  callApi<{
-    gold: number
-    exp: number
-    newGoldTotal: number
-    newExpTotal: number
-    hoursElapsed: number
-  }>('collect-resources', {}).then(result => {
+  // 呼叫 API → 以伺服器權威值覆蓋
+  try {
+    const result = await callApi<{
+      gold: number
+      exp: number
+      newGoldTotal: number
+      newExpTotal: number
+      hoursElapsed: number
+      currencies?: { gold?: number; diamond?: number; exp?: number }
+    }>('collect-resources', {})
     if (result.success && currentData) {
-      if (result.newGoldTotal !== undefined && result.newGoldTotal !== currentData.save.gold) {
-        currentData.save.gold = result.newGoldTotal
+      if (result.currencies) {
+        applyCurrenciesFromServer(result.currencies)
+      } else {
+        // 舊版相容
+        if (result.newGoldTotal !== undefined) currentData.save.gold = result.newGoldTotal
+        if (result.newExpTotal !== undefined) currentData.save.exp = result.newExpTotal
+        saveToLocal(currentData)
+        notify()
       }
-      if (result.newExpTotal !== undefined) {
-        currentData.save.exp = result.newExpTotal
-      }
-      saveToLocal(currentData)
-      notify()
     }
-  }).catch(e => console.warn('[save] collect-resources error:', e))
+  } catch (e) {
+    console.warn('[save] collect-resources error:', e)
+    // 離線時使用本地預估值
+    currentData.save.gold += resources.gold
+    currentData.save.exp = (currentData.save.exp ?? 0) + resources.exp
+    saveToLocal(currentData)
+    notify()
+  }
 
   return resources
 }
@@ -580,48 +602,52 @@ export async function doDailyCheckin(): Promise<DailyCheckinResult> {
 
   const reward = CHECKIN_REWARDS[newDay - 1] || CHECKIN_REWARDS[0]
 
-  //  本地樂觀更新 
-  currentData.save.checkinDay = newDay
-  currentData.save.checkinLastDate = todayStr
-  if (reward.gold) currentData.save.gold += reward.gold
-  if (reward.diamond) currentData.save.diamond += reward.diamond
-  saveToLocal(currentData)
-  notify()
-
-  localStorage.setItem('gg_checkin_date', todayStr)
-
-  // 道具寫入背包（exp 直接加到 save.exp，其餘進背包）
-  if (reward.items && reward.items.length > 0) {
-    const expItems = reward.items.filter(i => i.itemId === 'exp')
-    const otherItems = reward.items.filter(i => i.itemId !== 'exp')
-    if (expItems.length > 0 && currentData) {
-      const totalExp = expItems.reduce((acc, i) => acc + i.quantity, 0)
-      currentData.save.exp += totalExp
-      saveToLocal(currentData)
-      notify()
-    }
-    if (otherItems.length > 0) {
-      try {
-        const { addItemsLocally } = await import('./inventoryService')
-        addItemsLocally(otherItems.map(i => ({ itemId: i.itemId, quantity: i.quantity })))
-      } catch { /* silent */ }
-    }
-  }
-
-  //  背景同步伺服器 
-  callApi<DailyCheckinResult>('daily-checkin', {}).then(serverRes => {
+  // 呼叫伺服器簽到（不再本地樂觀更新貨幣）
+  try {
+    const serverRes = await callApi<DailyCheckinResult & { currencies?: { gold?: number; diamond?: number; exp?: number } }>('daily-checkin', {})
     if (serverRes.success && currentData) {
       if (serverRes.checkinDay !== undefined) currentData.save.checkinDay = serverRes.checkinDay
       if (serverRes.checkinLastDate) currentData.save.checkinLastDate = serverRes.checkinLastDate
-      saveToLocal(currentData)
-      notify()
-    }
-  }).catch(e => console.warn('[save] daily-checkin error:', e))
+      if (serverRes.currencies) {
+        applyCurrenciesFromServer(serverRes.currencies)
+      }
+      localStorage.setItem('gg_checkin_date', todayStr)
 
-  return {
-    success: true,
-    checkinDay: newDay,
-    checkinLastDate: todayStr,
-    reward,
+      // 道具寫入背包（伺服器已處理貨幣，此處只處理背包道具的本地快取同步）
+      if (reward.items && reward.items.length > 0) {
+        const otherItems = reward.items.filter(i => i.itemId !== 'exp')
+        if (otherItems.length > 0) {
+          try {
+            const { addItemsLocally } = await import('./inventoryService')
+            addItemsLocally(otherItems.map(i => ({ itemId: i.itemId, quantity: i.quantity })))
+          } catch { /* silent */ }
+        }
+      }
+
+      return {
+        success: true,
+        checkinDay: serverRes.checkinDay ?? newDay,
+        checkinLastDate: serverRes.checkinLastDate ?? todayStr,
+        reward,
+      }
+    }
+    return { success: false, error: serverRes.error || 'server_error' }
+  } catch (e) {
+    console.warn('[save] daily-checkin error:', e)
+    // 離線備援：本地樂觀更新
+    currentData.save.checkinDay = newDay
+    currentData.save.checkinLastDate = todayStr
+    if (reward.gold) currentData.save.gold += reward.gold
+    if (reward.diamond) currentData.save.diamond += reward.diamond
+    if (reward.items) {
+      const expItems = reward.items.filter(i => i.itemId === 'exp')
+      if (expItems.length > 0) {
+        currentData.save.exp += expItems.reduce((acc, i) => acc + i.quantity, 0)
+      }
+    }
+    saveToLocal(currentData)
+    notify()
+    localStorage.setItem('gg_checkin_date', todayStr)
+    return { success: true, checkinDay: newDay, checkinLastDate: todayStr, reward }
   }
 }

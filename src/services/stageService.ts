@@ -16,7 +16,7 @@ export interface StageExtra {
   chapterName: string
   stageName: string
   description: string
-  bgTheme: 'city' | 'forest' | 'wasteland'
+  bgTheme: 'city' | 'forest' | 'wasteland' | 'factory' | 'hospital' | 'residential' | 'underground' | 'core'
   difficulty: number        // 1~5
   recommendedLevel: number
   isBoss: boolean

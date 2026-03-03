@@ -150,7 +150,7 @@ export async function removeItems(items: { itemId: string; quantity: number }[])
   return true
 }
 
-export function sellItems(items: { itemId: string; quantity: number }[]): number {
+export async function sellItems(items: { itemId: string; quantity: number }[]): Promise<number> {
   let estimatedGold = 0
   if (inventoryState) {
     for (const sold of items) {
@@ -164,10 +164,17 @@ export function sellItems(items: { itemId: string; quantity: number }[]): number
     saveInventoryToLocal()
     notify()
   }
-  callApi<{ goldGained: number }>('sell-items', { items }).catch(e =>
-    console.warn('[inventory] sell-items error:', e),
-  )
-  return estimatedGold
+  try {
+    const res = await callApi<{ goldGained: number; currencies?: { gold?: number; diamond?: number; exp?: number } }>('sell-items', { items })
+    if (res.success && res.currencies) {
+      const { applyCurrenciesFromServer } = await import('./saveService')
+      applyCurrenciesFromServer(res.currencies)
+    }
+    return res.goldGained ?? estimatedGold
+  } catch (e) {
+    console.warn('[inventory] sell-items error:', e)
+    return estimatedGold
+  }
 }
 
 export async function useItem(
@@ -175,7 +182,7 @@ export async function useItem(
   quantity: number,
   targetId?: string,
   extra?: Record<string, unknown>,
-): Promise<{ success: boolean; result?: unknown }> {
+): Promise<{ success: boolean; result?: unknown; currencies?: { gold?: number; diamond?: number; exp?: number } }> {
   if (inventoryState) {
     const existing = inventoryState.items.find(i => i.itemId === itemId)
     if (existing) {
@@ -184,10 +191,10 @@ export async function useItem(
       notify()
     }
   }
-  const res = await callApi<{ result: unknown }>(
+  const res = await callApi<{ result: unknown; currencies?: { gold?: number; diamond?: number; exp?: number } }>(
     'use-item', { itemId, quantity, ...(targetId ? { targetId } : {}), ...(extra || {}) },
   )
-  return { success: res.success, result: res.result }
+  return { success: res.success, result: res.result, currencies: res.currencies }
 }
 
 /* 

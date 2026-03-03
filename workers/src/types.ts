@@ -49,6 +49,8 @@ export interface SaveDataRow {
   arenaChallengesLeft: number;
   arenaHighestRank: number;
   arenaLastReset: string;
+  lastHeroFreePull: string;
+  lastEquipFreePull: string;
   pwaRewardClaimed: number;
 }
 

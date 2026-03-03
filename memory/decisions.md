@@ -177,3 +177,25 @@
   - ❌ **絕對禁止**監聽 `controllerchange` 事件
 - **`index.html` 規則**：head 內 preflight script，iOS 或 standalone 一律 unregister SW + 刪除 caches，確保第一時間清乾淨
 - **理由**：iOS 的所有瀏覽器底層都是 WKWebView，SW 生命週期在其中行為異常。遊戲需要網路（auth/save/battle），iOS 原生已有 HTTP 快取，額外 SW 快取效益低但風險極高。Android 正常、Desktop 正常，僅 iOS 有此問題。
+
+---
+
+### ADR-010: 測試一律使用 Chrome DevTools MCP
+
+- **狀態**：✅ 永久生效
+- **日期**：2026-03-04
+- **決定**：
+  - **所有功能測試、UI 測試、流程測試一律使用 Chrome DevTools MCP 工具在實際瀏覽器中操作**
+  - 不能只靠 `tsc --noEmit` + `vite build` 就宣稱測試通過
+  - 測試流程：啟動 `npx vite --host` → 用 MCP 開啟頁面 → 實際操作 UI（點擊、輸入、截圖驗證）
+  - MCP 設定檔：`.vscode/mcp.json`（已 portable 化，不含硬編碼路徑）
+  - 可用工具：`navigate_page` / `click` / `take_screenshot` / `take_snapshot` / `list_console_messages` / `evaluate_script` 等 30 個工具
+- **QA 測試帳號**：
+  - playerId: `PQA_001`
+  - guestToken: `qa-test-token-001`
+  - displayName: `QA測試官`
+  - localStorage key: `globalganlan_guest_token` = `qa-test-token-001`
+  - 資源：💎 ~996K / 💰 ~9.9M / stardust 99,999 / exp 999,999
+  - 進度：chapter 9, stage 1（全 8 章通關）
+  - 英雄：3 隻（heroId 6, 1, 9）Lv60 / 突破 5 / 星級 5
+- **理由**：tsc 和 vite build 只能驗證靜態型別和打包，無法發現 API 通訊問題（如缺少 DB 欄位導致 500）、UI 排版問題（如大數字溢出）、或互動邏輯 bug。實際瀏覽器測試是唯一可靠的驗收方式。

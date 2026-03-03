@@ -3,6 +3,63 @@
 > 按時間倒序排列，最新的在最上面。
 
 ---
+### [2026-06-18] 場景道具品質升級 + 英雄裝備 2×2 佈局 + 背包容量 + 召喚券描述
+
+- **觸發者**：使用者（4 項 UI/3D 品質需求）
+- **執行角色**：🔧 CODING + 🎨 3D_ASSET
+- **變更摘要**：
+  1. **場景道具品質全面升級**：SceneProps.tsx 20+ 道具全部增加末日風化細節 — 鏽斑(RustMark)、血漬(BloodStain)、碎石堆(RubblePile)、垃圾散落(ScatteredLitter) 4 種共用氛圍元件；每個主題道具加入碎玻璃/油漬/裂縫等微型裝飾；`generateSceneElements` 為全 8 主題加入獨立散佈的氛圍元素
+  2. **英雄裝備 2×2 佈局**：HeroListPanel 裝備區改為 `grid 1fr 1fr` 兩行兩列；每格 `flex-direction: row; align-items: flex-start`（icon 左上、裝備名居中、強化按鈕右上同行）
+  3. **背包容量顯示**：InventoryPanel 改為 `{items+equipment}/{capacity} 背包`（含所有道具+裝備總數）
+  4. **召喚券描述**：D1 新增 gacha_ticket_hero / gacha_ticket_equip 道具定義（含描述文字）
+- **影響檔案**：
+  - `src/components/SceneProps.tsx`（20+ 道具元件增強 + 8 主題 generator 加氛圍元素）
+  - `src/components/HeroListPanel.tsx`（裝備區塊 JSX 結構調整）
+  - `src/components/InventoryPanel.tsx`（背包容量顯示）
+  - `src/App.css`（`.hd2-equip-row/slot/detail/enhance-btn` 樣式重構）
+  - D1 database（item_definitions 表新增 2 筆記錄）
+- **Spec 更新**：`stage-system.md` v2.7、`ui-flow.md` v2.0
+
+---
+### [2026-06-17] 後端貨幣唯一權威 + 抽卡系統 v2.2 改版
+
+- **觸發者**：使用者（要求消除所有前端自行更新數值的情形）
+- **執行角色**：🔧 CODING
+- **變更摘要**：
+  1. **後端貨幣唯一權威**：所有資源修改 API（battle, inventory, progression, checkin, gacha, mail, arena）統一回傳 `currencies`，前端用 `applyCurrenciesFromServer()` 覆蓋本地，消除 20 處前端自行更新數值的情形
+  2. **十連折扣移除**：英雄十連 1440→1600、裝備鑽石十連 1800→2000（= 10 × 單抽）
+  3. **免費單抽合併至單抽按鈕**：可用時顯示「🎁 免費」，使用後顯示倒數計時至 UTC+8 午夜
+  4. **裝備鍛造免費單抽**：鑽石池每日免費單抽一次（新增 `lastEquipFreePull` D1 欄位）
+  5. **InfoTip 改版**：不透明背景 + 金色邊框 + 窄寬度 + 邊緣防裁切
+- **影響檔案**：
+  - 後端 9 個路由（save, battle, inventory, progression, checkin, gacha, mail, arena）
+  - 前端 12 個檔案（GachaScreen, ShopPanel, HeroListPanel, InventoryPanel, MailboxPanel, MenuScreenRouter, runBattleLoop, saveService, inventoryService, mailService, arenaService, progressionService）
+  - Domain: gachaSystem.ts, equipmentGacha.ts（成本常數）
+  - 類型: workers/types.ts, SaveData interface
+  - CSS: InfoTip 樣式 + gacha-free-countdown
+- **Spec 更新**：`specs/gacha.md` v2.1 → v2.2
+
+---
+### [2026-03-04] 修復雙重獎勵 Bug — 關卡通關後重新整理資源再增一次
+
+- **觸發者**：使用者回報（通關→資源+1次→重新整理→資源+第2次）
+- **執行角色**：🔧 CODING
+- **根因**：
+  - 後端 `complete-battle` 用 hardcoded 公式（`gold = 100+ch*50+st*20`）寫入 DB（incremental `gold = gold + ?`）
+  - 前端獨立用 `stage_configs` 算出不同數字寫入 localStorage
+  - 兩邊公式不同 → localStorage ≠ DB
+  - 重新整理時 `loadSave()` 拉 DB 值覆蓋 localStorage → 資源二度跳變
+- **修復**：
+  1. **前端（`runBattleLoop.ts`）**：不再獨立計算獎勵；改為 `await completeBattle` 回應，使用 `serverResult.rewards` → localStorage 數值與 DB 完全一致
+  2. **後端（`battle.ts`）**：Story 模式改從 D1 `stage_configs` 表讀取 rewards（取代 hardcoded 公式）；首通：基礎×2, diamond≥30；fallback 保留舊公式
+  3. **前端離線 fallback**：伺服器不可用時才使用本地 `getCachedStageConfig` 計算
+  4. **舊版相容**：`complete-stage` 路由同步改用 stage_configs
+- **影響檔案**：
+  - `src/game/runBattleLoop.ts` — 獎勵來源改為 await 後端回應
+  - `workers/src/routes/battle.ts` — Story 模式改讀 stage_configs
+- **Spec 更新**：`specs/stage-system.md` v2.3 → v2.4
+
+---
 ### [2026-03-03] PWA Standalone Reload 迴圈修復
 
 - **觸發者**：使用者（PWA 加入主畫面後遊戲一直 reload）

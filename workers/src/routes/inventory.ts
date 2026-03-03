@@ -4,7 +4,7 @@
 import { Hono } from 'hono';
 import type { Env, HonoVars, SaveDataRow, InventoryRow, EquipmentInstanceRow, ItemDefinitionRow } from '../types.js';
 import { getBody } from '../middleware/auth.js';
-import { upsertItem, upsertItemStmt } from './save.js';
+import { upsertItem, upsertItemStmt, getCurrencies } from './save.js';
 import { isoNow, safeJsonParse } from '../utils/helpers.js';
 
 const inventory = new Hono<{ Bindings: Env; Variables: HonoVars }>();
@@ -168,7 +168,8 @@ inventory.post('/sell-items', async (c) => {
 
   if (stmts.length > 0) await db.batch(stmts);
 
-  return c.json({ success: true, goldGained: totalGold });
+  const currencies = await getCurrencies(db, playerId);
+  return c.json({ success: true, goldGained: totalGold, currencies });
 });
 
 // ── 商店購買 ──────────────────────────────────
@@ -251,12 +252,15 @@ inventory.post('/shop-buy', async (c) => {
 
   await db.batch(stmts);
 
+  const currencies = await getCurrencies(db, playerId);
+
   return c.json({
     success: true,
     spent: catalog.price,
     currency: catalog.currency,
     rewards: catalog.rewards,
     newBalance: currentBalance - catalog.price,
+    currencies,
   });
 });
 
@@ -313,9 +317,11 @@ inventory.post('/use-item', async (c) => {
       chestStmts.push(upsertItemStmt(db, playerId, ri.itemId, ri.quantity));
     }
     await db.batch(chestStmts);
+    const currencies = await getCurrencies(db, playerId);
     return c.json({
       success: true,
       result: { used: itemId, quantity: qty, type: 'chest', ...chestRewards },
+      currencies,
     });
   }
 

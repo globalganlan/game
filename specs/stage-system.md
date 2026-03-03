@@ -1,7 +1,7 @@
 # 關卡系統 Spec
 
-> 版本：v2.2 ｜ 狀態：🟢 已實作
-> 最後更新：2026-03-02
+> 版本：v2.7 ｜ 狀態：🟢 已實作
+> 最後更新：2026-03-06
 > 負責角色：🎯 GAME_DESIGN → 🔧 CODING
 
 ## 概述
@@ -28,16 +28,18 @@
 | `src/services/stageService.ts` | 前端關卡服務 — fetchStageConfigs / getCachedStageConfig / getStageConfig |
 | `src/domain/stageSystem.ts` | 核心邏輯 — 爬塔/副本/PvP/Boss 配置生成 / 星級計算 / 掉落擲骰（主線部分已移至 D1） |
 | `src/components/StageSelect.tsx` | 關卡選擇 UI — 5 個分頁，主線改用 API 驅動的章節主題卡片 |
+| `src/components/SceneProps.tsx` | 章節專屬 3D 場景道具（8 主題 × 3-5 種道具，seeded 散佈，stageId 參與 seed 計算使每小關佈局不同）；4 種共用氛圍元件（RubblePile/BloodStain/ScatteredLitter/RustMark）；每個道具含精細末日風化細節（鏽斑、血漬、裂縫、碎玻璃、掉落物等） |
+| `src/components/Arena.tsx` | 場景環境（地面 + 碎片 + 粒子 + 燈光 + 天空 + SceneProps），接收 stageId 傳給 SceneProps |
 | `src/game/helpers.ts` | buildEnemySlotsFromStage — 接受 injectedEnemies 參數（story 模式從 API 取得）+ defMultiplier 縮放敵方 DEF |
 | `src/game/runBattleLoop.ts` | 戰鬥結算 — 使用 getCachedStageConfig 取得獎勵 |
-| `scripts/seed_stage_configs.sql` | D1 種子資料 — 24 筆關卡配置 |
+| `scripts/seed_stage_configs.sql` | D1 種子資料 — 64 筆關卡配置 |
 
 ---
 
 ## 核心常數
 
 ```typescript
-const MAX_CHAPTER = 3
+const MAX_CHAPTER = 8
 const STAGES_PER_CHAPTER = 8
 const ZOMBIE_IDS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]
 ```
@@ -77,12 +79,15 @@ function seededRandom(seed: number): () => number {
 
 章節 3（通關 2-8 後解鎖）
 └── 3-1 ~ 3-8
+
+章節 4~8（依序通關前章最後一關後解鎖）
+└── 4-1 ~ 8-8
 ```
 
 | 項目 | 值 |
 |------|-----|
 | 每章關卡數 | 8 關 |
-| 章節數 | 3 章（共 24 關） |
+| 章節數 | 8 章（共 64 關） |
 | 體力消耗 | **無**（免費無限挑戰） |
 | stageId 格式 | `"{chapter}-{stage}"`（如 `"2-5"`） |
 | 星級評價 | ★★★（全員存活）、★★（≤2 人陣亡）、★（通關即可） |
@@ -123,21 +128,27 @@ CREATE TABLE stage_configs (
 
 **章節主題：**
 
-| 章節 | 名稱 | 主題色 | 圖示 | 推薦等級範圍 |
-|------|------|--------|------|-------------|
-| 1 | 廢墟之城 | 灰色 (#a0aec0) | 🏙️ | Lv.1~18 |
-| 2 | 暗夜森林 | 綠色 (#68d391) | 🌲 | Lv.20~38 |
-| 3 | 死寂荒原 | 橘色 (#ed8936) | 🏜️ | Lv.40~60 |
+| 章節 | 名稱 | 主題色 | 圖示 | bgTheme | 推薦等級範圍 |
+|------|------|--------|------|---------|-------------|
+| 1 | 廢墟之城 | 灰色 (#a0aec0) | 🏙️ | `ruins` | Lv.1~18 |
+| 2 | 暗夜森林 | 綠色 (#68d391) | 🌲 | `forest` | Lv.20~38 |
+| 3 | 死寂荒原 | 橘色 (#ed8936) | 🏜️ | `desert` | Lv.40~60 |
+| 4 | 冰封峽谷 | 冰藍 (#63b3ed) | 🏔️ | `glacier` | Lv.62~78 |
+| 5 | 熔岩地獄 | 赤紅 (#fc8181) | 🌋 | `volcano` | Lv.80~98 |
+| 6 | 深淵墓穴 | 暗紫 (#b794f4) | 💀 | `abyss` | Lv.100~118 |
+| 7 | 天空神殿 | 金色 (#f6e05e) | ⛩️ | `sky_temple` | Lv.120~138 |
+| 8 | 末日核心 | 黑紅 (#e53e3e) | ☢️ | `doomsday` | Lv.140~160 |
 
-**每關最後一關為 Boss 關**（1-8, 2-8, 3-8），有金色邊框、BOSS 徽章、更高倍率。
+**每關最後一關為 Boss 關**（1-8, 2-8, ... 8-8），有金色邊框、BOSS 徽章、更高倍率。
 
 **前端流程：**
-1. StageSelect 載入時呼叫 `fetchStageConfigs()` 取得 24 筆資料（快取於記憶體）
+1. StageSelect 載入時呼叫 `fetchStageConfigs()` 取得 64 筆資料（快取於記憶體）
 2. 選關時 `handleStageSelect` → `getStageConfig(stageId)` → 取得 enemies
 3. 傳入 `buildEnemySlotsFromStage(mode, sid, heroesList, injectedEnemies)` 生成 SlotHero[]
-4. 戰鬥結算用 `getCachedStageConfig(stageId)` 同步取得獎勵
+4. 戰鬥結算：**後端為唯一獎勵來源** — 前端 await `completeBattle` 回應，使用 `serverResult.rewards` 寫入 localStorage + 顯示
+5. Fallback：伺服器不可用時，前端才用 `getCachedStageConfig(stageId)` 本地計算
 
-**Fallback：** 若快取未命中，結算時使用公式計算獎勵：`exp = 30 + li*15, gold = 50 + li*30`
+**Fallback：** 若伺服器不可用且快取未命中，結算時使用公式計算獎勵：`exp = 30 + li*15, gold = 50 + li*30`
 
 ### 獎勵公式
 
@@ -459,12 +470,16 @@ mergeDrops(items: InventoryItem[]): InventoryItem[]   // 合併同 itemId
 
 #### Story 模式
 
+> **v2.4 變更**：後端（Workers `battle.ts`）改為從 D1 `stage_configs` 表讀取獎勵，不再使用 hardcoded 公式。
+> 前端不再獨立計算獎勵，而是 await 後端 `completeBattle` 回應取得 `rewards` 欄位，確保 localStorage 與 DB 完全一致。
+
 | 類型 | gold | exp | diamond |
 |------|------|-----|---------|
-| 普通通關 | `100 + ch×50 + st×20` | `50 + ch×30 + st×10` | 0 |
-| 首通加碼 | +200 | +100 | 30（固定，非線性） |
+| 普通通關 | `stage_configs.rewards.gold` | `stage_configs.rewards.exp` | `stage_configs.rewards.diamond` |
+| 首通加碼 | 基礎 × 2 | 基礎 × 2 | max(基礎, 30) |
 
 - 首通判定：`stageStars[stageId]` 無值 = 首通
+- **Fallback**（stage_configs 缺失時）：`gold = 100 + ch×50 + st×20 + (首通?200:0)`
 
 #### Tower 模式
 
@@ -544,3 +559,8 @@ mergeDrops(items: InventoryItem[]): InventoryItem[]   // 合併同 itemId
 | v1.4 | 2026-06-15 | **配合裝備模板制 v2**：移除所有 `chest_equipment` 獎勵（Boss 層/Boss 戰 S/A 段位）改為 `exp_core_l`；每日副本掉落移除強化石（`eqm_enhance_*`）改為經驗核心 |
 | v2.1 | 2026-03-02 | **遊戲平衡修正**：新增 `defMultiplier` 敵方 DEF 乘數（StageEnemy 介面 + buildEnemySlotsFromStage）；Chapter 1 關卡重新平衡 — 1-2 從 3 敵→2 敵（解決新手死鎖）+ 保底 exp_core_s；全 Ch1 加入 defMultiplier = atkMultiplier（DEF 與 ATK 連動）；D1 seed 已更新 |
 | v2.2 | 2026-03-02 | **EXP 資源重構**：所有模式（story/tower/daily/pvp/boss）的 exp 獎勵改為直接發放至 `save_data.exp` 頂層資源；移除所有 exp_core_s/m/l 掉落物；Boss 段位獎勵 items 欄清空；每日副本獎勵表移除經驗核心 |
+| v2.3 | 2026-03-03 | **八章擴展**：MAX_CHAPTER 3→8（共 64 關）；新增 5 個章節（Ch4 冰封峽谷/Ch5 熔岩地獄/Ch6 深淵墓穴/Ch7 天空神殿/Ch8 末日核心）；bgTheme 新增 `glacier`/`volcano`/`abyss`/`sky_temple`/`doomsday` 值；Arena SceneMode 擴展至 13 種（新增 8 個章節專屬場景主題）；整體難度曲線降低（配合較多章節的漸進式成長） |
+| v2.4 | 2026-03-04 | **修復雙重獎勵 Bug**：前端不再獨立計算獎勵寫入 localStorage（與後端 DB 產生不一致）；改為 await `completeBattle` 後端回應，使用 `serverResult.rewards` 作為唯一來源；後端 Story 模式改從 D1 `stage_configs` 表讀取 rewards（取代 hardcoded 公式 `100+ch*50+st*20`）；首通邏輯：基礎翻倍 + diamond≥30；離線 fallback 保留本地計算 |
+| v2.5 | 2026-03-05 | **章節專屬 3D 場景道具**：新增 `SceneProps.tsx` 元件（8 個章節主題各有獨特 3D 道具）；city=路牌＋建築殘骸＋街燈＋路障、forest=樹幹＋倒木＋蘑菇、wasteland=購物車＋破架子＋油桶、factory=齒輪機構＋管線架＋輸送帶、hospital=病床＋點滴架＋醫療櫃、residential=桌椅＋書架＋電視、underground=汽車殘骸＋交通錐＋水泥柱＋停車欄杆、core=能量水晶(浮動動畫)＋科技主機＋發光管；使用 seeded PRNG 確定性散佈避開中央戰鬥區域；Arena.tsx 導入 SceneProps；StageSelect CHAPTER_THEMES 擴展至 8 章（新增 factory/hospital/residential/underground/core 色彩主題） |
+| v2.6 | 2026-03-04 | **每小關場景道具佈局差異化**：SceneProps seed 計算加入 stageId（`chapter*100+stage`），同章不同小關道具種類相同但位置分佈不同；Arena 新增 `stageId` prop 傳遞給 SceneProps；App.tsx 傳遞 stageId 給 Arena |
+| v2.7 | 2026-03-06 | **場景道具品質全面升級**：4 種共用氛圍元件（RubblePile/BloodStain/ScatteredLitter/RustMark）；全部 8 主題 20+ 道具逐一增加末日風化細節 — city(掛線/碎玻璃/鏽斑)、forest(樹皮剝落/菌絲/爪痕/蘑菇發光)、wasteland(缺輪/散落貨物/油漬)、factory(傳送帶殘片/管線洩漏)、hospital(血漬床墊/點滴管/藥瓶散落)、residential(桌面汙漬/碎盤/椅裂縫/灰塵/書籍掉落/電視碎屏)、underground(火損車身/碎玻璃/少輪/鋼筋外露/水漬)、core(碎片衛星增多/地裂光環/螢幕裂紋/管線洩漏)；`generateSceneElements` 為所有 8 主題加入獨立散佈的 RubblePile/BloodStain/ScatteredLitter 氛圍元素 |

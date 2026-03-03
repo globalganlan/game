@@ -88,22 +88,26 @@ export function MailboxPanel({
     }
   }, [mails, setMails])
 
-  /* ── 領取單封（樂觀更新 — 零等待） ── */
+  /* ── 領取單封 ── */
   const handleClaim = useCallback(async () => {
     if (!selected || selected.claimed || selected.rewards.length === 0) return
 
-    // 樂觀：直接用已知 rewards 顯示結果 + 立即更新 UI
+    // 樂觀 UI 更新
     const rewards = selected.rewards
     const text = rewards.map(rewardLabel).join('、')
     setActionMsg({ ok: true, text: `已領取：${text}` })
     setMails(mails.map(m => m.mailId === selected.mailId ? { ...m, claimed: true, read: true } : m))
 
-    // 背景 API
-    claimMailReward(selected.mailId).catch(() => { /* 網路失敗時靜默 */ })
+    // 呼叫 API → 以伺服器回傳的 currencies 覆蓋本地
+    const res = await claimMailReward(selected.mailId)
+    if (res.currencies) {
+      const { applyCurrenciesFromServer } = await import('../services/saveService')
+      applyCurrenciesFromServer(res.currencies)
+    }
     onRewardsClaimed?.(rewards)
   }, [selected, mails, setMails, onRewardsClaimed])
 
-  /* ── 一鍵領取（樂觀更新 — 零等待） ── */
+  /* ── 一鍵領取 ── */
   const handleClaimAll = useCallback(async () => {
     // 計算本地可領取數
     const claimable = mails.filter(m => !m.claimed && m.rewards.length > 0)
@@ -112,7 +116,7 @@ export function MailboxPanel({
       return
     }
 
-    // 樂觀：立即匯總獎勵 + 更新 UI
+    // 樂觀 UI 更新
     const allRewards: { itemId: string; quantity: number }[] = []
     for (const m of claimable) {
       for (const r of m.rewards) {
@@ -127,8 +131,12 @@ export function MailboxPanel({
       !m.claimed && m.rewards.length > 0 ? { ...m, claimed: true, read: true } : m,
     ))
 
-    // 背景 API
-    claimAllMail().catch(() => { /* localStorage 備份 */ })
+    // 呼叫 API → 以伺服器回傳的 currencies 覆蓋本地
+    const res = await claimAllMail()
+    if (res.currencies) {
+      const { applyCurrenciesFromServer } = await import('../services/saveService')
+      applyCurrenciesFromServer(res.currencies)
+    }
     onRewardsClaimed?.(allRewards)
   }, [mails, setMails, onRewardsClaimed])
 

@@ -81,24 +81,31 @@ export function readMail(mailId: string): { success: boolean } {
   return { success: true }
 }
 
-export async function claimMailReward(mailId: string): Promise<{ success: boolean; rewards: MailReward[] }> {
+export async function claimMailReward(mailId: string): Promise<{ success: boolean; rewards: MailReward[]; currencies?: { gold?: number; diamond?: number; exp?: number } }> {
   invalidateMailCache()
-  callApi<{ rewards: MailReward[] }>('claim-mail-reward', { mailId }).catch(e =>
-    console.warn('[mail] claim-mail-reward error:', e),
-  )
-  return { success: true, rewards: [] }
+  try {
+    const res = await callApi<{ rewards: MailReward[]; currencies?: { gold?: number; diamond?: number; exp?: number } }>('claim-mail-reward', { mailId })
+    return { success: res.success, rewards: res.rewards ?? [], currencies: res.currencies }
+  } catch (e) {
+    console.warn('[mail] claim-mail-reward error:', e)
+    return { success: true, rewards: [] }
+  }
 }
 
 export async function claimAllMail(): Promise<{
   success: boolean
   claimedCount: number
   totalRewards: MailReward[]
+  currencies?: { gold?: number; diamond?: number; exp?: number }
 }> {
   invalidateMailCache()
-  callApi<{ claimedCount: number; totalRewards: MailReward[] }>('claim-all-mail', {}).catch(e =>
-    console.warn('[mail] claim-all-mail error:', e),
-  )
-  return { success: true, claimedCount: 0, totalRewards: [] }
+  try {
+    const res = await callApi<{ claimedCount: number; totalRewards: MailReward[]; currencies?: { gold?: number; diamond?: number; exp?: number } }>('claim-all-mail', {})
+    return { success: res.success, claimedCount: res.claimedCount ?? 0, totalRewards: res.totalRewards ?? [], currencies: res.currencies }
+  } catch (e) {
+    console.warn('[mail] claim-all-mail error:', e)
+    return { success: true, claimedCount: 0, totalRewards: [] }
+  }
 }
 
 export async function deleteMail(mailId: string): Promise<{ success: boolean; error?: string }> {

@@ -83,6 +83,36 @@ const CHAPTER_THEMES: Record<number, {
     accentColor: '#ed8936',
     borderColor: 'rgba(237,137,54,0.35)',
   },
+  4: {
+    icon: '🏭',
+    gradient: 'linear-gradient(135deg, rgba(74,74,90,0.40), rgba(50,50,65,0.15))',
+    accentColor: '#a0a4b8',
+    borderColor: 'rgba(160,164,184,0.35)',
+  },
+  5: {
+    icon: '🏥',
+    gradient: 'linear-gradient(135deg, rgba(200,210,220,0.30), rgba(160,175,190,0.12))',
+    accentColor: '#b2d8e8',
+    borderColor: 'rgba(178,216,232,0.35)',
+  },
+  6: {
+    icon: '🏘️',
+    gradient: 'linear-gradient(135deg, rgba(180,140,80,0.35), rgba(140,100,50,0.15))',
+    accentColor: '#e8c872',
+    borderColor: 'rgba(232,200,114,0.35)',
+  },
+  7: {
+    icon: '🅿️',
+    gradient: 'linear-gradient(135deg, rgba(30,40,70,0.45), rgba(20,28,50,0.20))',
+    accentColor: '#6888b0',
+    borderColor: 'rgba(104,136,176,0.35)',
+  },
+  8: {
+    icon: '☢️',
+    gradient: 'linear-gradient(135deg, rgba(120,30,60,0.45), rgba(80,20,50,0.20))',
+    accentColor: '#d86090',
+    borderColor: 'rgba(216,96,144,0.35)',
+  },
 }
 
 /* ────────────────────────────

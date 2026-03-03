@@ -92,9 +92,11 @@ export default function App() {
   const [menuScreen, setMenuScreen] = useState<MenuScreen>('none')
   const [heroesList, setHeroesList] = useState<RawHeroData[]>([])
   const heroesListRef = useRef<RawHeroData[]>([])
-  /** 目前選定的關卡模式（影響場景外觀） */
+  /** 目前選定的關卡模式（story/tower/daily/pvp/boss） */
   const [stageMode, setStageMode] = useState<'story' | 'tower' | 'daily' | 'pvp' | 'boss'>('story')
   const [stageId, setStageId] = useState<string>('1-1')
+  /** 場景視覺主題 — 由 bgTheme 驅動 */
+  const [sceneTheme, setSceneTheme] = useState<import('./components/Arena').SceneMode>('story')
   /** 競技場挑戰目標排名（用於結算上報） */
   const arenaTargetRankRef = useRef<number>(0)
   const ownedHeroesList = useMemo(() => {
@@ -191,7 +193,7 @@ export default function App() {
     mail.resetMail()
     battleHUD.fullResetBattleHUD()
     resetBattleRefs()
-    setStageId('1-1'); setStageMode('story')
+    setStageId('1-1'); setStageMode('story'); setSceneTheme('story')
     setDamagePopups([]); setHitFlashSignals({})
     clearAllPromises()
 
@@ -315,7 +317,7 @@ export default function App() {
 
   /* ── 關卡/選單 handlers（hook） ── */
   const stageHandlers = useStageHandlers({
-    setStageMode, setStageId, setMenuScreen, setGameState,
+    setStageMode, setSceneTheme, setStageId, setMenuScreen, setGameState,
     setCurtainVisible, setCurtainFading, setCurtainText, curtainClosePromiseRef, closeCurtain,
     updateEnemySlots, restoreFormationFromSave,
     showToast, acquireShow: acquireToast.show,
@@ -387,7 +389,7 @@ export default function App() {
             }}
           >
             <Suspense fallback={null}>
-              <Arena sceneMode={stageMode} />
+              <Arena sceneMode={sceneTheme} stageId={stageId} />
 
               {/* 格子標記 */}
               {PLAYER_SLOT_POSITIONS.map((pos, i) => (

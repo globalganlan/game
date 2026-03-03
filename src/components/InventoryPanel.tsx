@@ -46,6 +46,7 @@ interface InventoryPanelProps {
 
 import { getItemIcon, getItemName } from '../constants/rarity'
 import { CurrencyIcon } from './CurrencyIcon'
+import { InfoTip } from './InfoTip'
 
 /** 根據 itemId pattern 推導中文名稱 */
 function resolveFallbackName(
@@ -212,22 +213,23 @@ function ItemDetail({ item, definition, onClose, heroMap }: ItemDetailProps & { 
           setActionMsg('使用失敗')
           return
         }
-        // 伺服器回傳實際獎勵 → 寫入本地
+        // 以伺服器回傳的 currencies 絕對值覆蓋本地
+        if (result.currencies) {
+          const { applyCurrenciesFromServer } = await import('../services/saveService')
+          applyCurrenciesFromServer(result.currencies)
+        }
+        // 伺服器回傳實際獎勵 → Toast 動畫 + 道具同步
         if (result.result && typeof result.result === 'object') {
           const r = result.result as Record<string, unknown>
           const { addItemsLocally } = await import('../services/inventoryService')
-          const { updateLocalCurrency, updateProgress, getSaveState } = await import('../services/saveService')
           const acquireItems: { type: 'currency' | 'item'; id: string; name: string; quantity: number; rarity?: 'N' | 'R' | 'SR' | 'SSR' }[] = []
           if (typeof r.gold === 'number' && r.gold > 0) {
-            updateLocalCurrency('gold', r.gold)
             acquireItems.push({ type: 'currency', id: 'gold', name: '金幣', quantity: r.gold })
           }
           if (typeof r.diamond === 'number' && r.diamond > 0) {
-            updateLocalCurrency('diamond', r.diamond)
             acquireItems.push({ type: 'currency', id: 'diamond', name: '鑽石', quantity: r.diamond, rarity: 'SR' })
           }
           if (typeof r.exp === 'number' && r.exp > 0) {
-            updateProgress({ exp: (getSaveState()?.save.exp ?? 0) + r.exp })
             acquireItems.push({ type: 'currency', id: 'exp', name: '經驗', quantity: r.exp })
           }
           if (Array.isArray(r.items)) {
@@ -248,6 +250,11 @@ function ItemDetail({ item, definition, onClose, heroMap }: ItemDetailProps & { 
       // 一般道具
       const result = await useItem(item.itemId, 1)
       if (result.success) {
+        // 以伺服器回傳的 currencies 絕對值覆蓋本地
+        if (result.currencies) {
+          const { applyCurrenciesFromServer } = await import('../services/saveService')
+          applyCurrenciesFromServer(result.currencies)
+        }
         if (result.result && typeof result.result === 'object') {
           const r = result.result as Record<string, unknown>
           const items: { type: 'currency' | 'item'; id: string; name: string; quantity: number; rarity?: 'N' | 'R' | 'SR' | 'SSR' }[] = []
@@ -261,11 +268,7 @@ function ItemDetail({ item, definition, onClose, heroMap }: ItemDetailProps & { 
           if (items.length > 0) {
             emitAcquire(items)
             try {
-              const { updateLocalCurrency, updateProgress, getSaveState } = await import('../services/saveService')
               const { addItemsLocally } = await import('../services/inventoryService')
-              if (typeof r.gold === 'number' && r.gold > 0) updateLocalCurrency('gold', r.gold as number)
-              if (typeof r.diamond === 'number' && r.diamond > 0) updateLocalCurrency('diamond', r.diamond as number)
-              if (typeof r.exp === 'number' && r.exp > 0) updateProgress({ exp: (getSaveState()?.save.exp ?? 0) + (r.exp as number) })
               // 同步道具到本地背包
               if (Array.isArray(r.items)) {
                 const toAdd = (r.items as { itemId?: string; quantity?: number }[])
@@ -285,15 +288,9 @@ function ItemDetail({ item, definition, onClose, heroMap }: ItemDetailProps & { 
     } catch { setActionMsg('使用失敗') }
   }, [item.itemId, canUse, loading])
 
-  const handleSell = useCallback(() => {
+  const handleSell = useCallback(async () => {
     if (!canSell) return
-    const gold = sellItems([{ itemId: item.itemId, quantity: 1 }])
-    // 本地金幣同步（sellItems 已樂觀扣背包，金幣需 saveService 更新）
-    if (gold > 0) {
-      import('../services/saveService').then(({ updateLocalCurrency }) => {
-        updateLocalCurrency('gold', gold)
-      })
-    }
+    const gold = await sellItems([{ itemId: item.itemId, quantity: 1 }])
     setActionMsg(`出售獲得 ${gold} 金幣`)
   }, [item.itemId, canSell])
 
@@ -579,12 +576,12 @@ export function InventoryPanel({ onBack, heroesList, heroInstances }: InventoryP
           <button className="panel-back-btn" onClick={onBack}>← 返回</button>
           <h2 className="panel-title">🎒 背包</h2>
           <div className="inv-currency-bar">
-            <span className="inv-currency"><CurrencyIcon type="gold" /> {gold.toLocaleString()}</span>
-            <span className="inv-currency"><CurrencyIcon type="diamond" /> {diamond.toLocaleString()}</span>
+            <InfoTip icon={<CurrencyIcon type="gold" />} value={gold.toLocaleString()} label="金幣" description="升級、購買、強化所需的通用貨幣" className="menu-gold" />
+            <InfoTip icon={<CurrencyIcon type="diamond" />} value={diamond.toLocaleString()} label="鑽石" description="召喚、加速、購買稀有道具" className="menu-diamond" />
           </div>
           {invState && (
             <span className="inv-capacity">
-              {invState.equipment.length}/{invState.equipmentCapacity} 裝備
+              {invState.items.length + invState.equipment.length}/{invState.equipmentCapacity} 背包
             </span>
           )}
         </div>

@@ -6,7 +6,7 @@
  */
 
 import { useState, useMemo, useCallback, useEffect } from 'react'
-import { getSaveState, updateProgress } from '../services/saveService'
+import { getSaveState, updateProgress, applyCurrenciesFromServer } from '../services/saveService'
 import { addItemsLocally, getItemQuantity, removeItemsLocally } from '../services/inventoryService'
 import { callApi } from '../services/apiClient'
 import { emitAcquire } from '../services/acquireToastBus'
@@ -151,6 +151,7 @@ const SHOP_ITEMS: ShopItem[] = [
 
 import { getItemIcon, getItemName } from '../constants/rarity'
 import { CurrencyIcon } from './CurrencyIcon'
+import { InfoTip } from './InfoTip'
 import { ItemInfoPopup } from './ItemInfoPopup'
 
 /* (CURRENCY_ICON removed — now using CurrencyIcon component) */
@@ -207,7 +208,7 @@ export function ShopPanel({ onBack }: ShopPanelProps) {
     return Math.max(0, item.dailyLimit - bought)
   }, [purchasedToday])
 
-  const handlePurchase = useCallback((item: ShopItem) => {
+  const handlePurchase = useCallback(async (item: ShopItem) => {
     const remaining = getRemainingPurchases(item)
     if (remaining !== null && remaining <= 0) {
       setPurchaseMsg('今日已達購買上限')
@@ -219,27 +220,14 @@ export function ShopPanel({ onBack }: ShopPanelProps) {
       return
     }
 
-    // 樂觀扣款
-    if (item.currency === 'gold') {
-      updateProgress({ gold: gold - item.price })
-    } else if (item.currency === 'diamond') {
-      updateProgress({ diamond: diamond - item.price })
-    } else if (item.currency === 'stardust') {
+    // 星塵扣款（非 save 貨幣，需本地扣）
+    if (item.currency === 'stardust') {
       removeItemsLocally([{ itemId: 'currency_stardust', quantity: item.price }])
     }
 
-    // 樂觀發放獎勵 — 資源類走 updateProgress，物品類走 addItemsLocally
+    // 非資源類獎勵本地加背包（伺服器也會同步）
     const RESOURCE_REWARDS = ['exp', 'gold', 'diamond', 'stardust'] as const
-    const resourceItems = item.rewards.filter(r => (RESOURCE_REWARDS as readonly string[]).includes(r.itemId))
     const inventoryItems = item.rewards.filter(r => !(RESOURCE_REWARDS as readonly string[]).includes(r.itemId))
-    if (resourceItems.length > 0) {
-      const patch: Record<string, number> = {}
-      const save = getSaveState()?.save
-      for (const r of resourceItems) {
-        patch[r.itemId] = (save?.[r.itemId as keyof typeof save] as number ?? 0) + r.quantity
-      }
-      updateProgress(patch as any)
-    }
     if (inventoryItems.length > 0) addItemsLocally(inventoryItems)
 
     // 獲得物品動畫
@@ -251,8 +239,15 @@ export function ShopPanel({ onBack }: ShopPanelProps) {
       quantity: r.quantity,
     })))
 
-    // 背景 API
-    callApi('shop-buy', { shopItemId: item.id }).catch(console.warn)
+    // 呼叫後端 → 以伺服器權威值覆蓋貨幣
+    try {
+      const res = await callApi<{ currencies?: { gold?: number; diamond?: number; exp?: number } }>('shop-buy', { shopItemId: item.id })
+      if (res.success && res.currencies) {
+        applyCurrenciesFromServer(res.currencies)
+      }
+    } catch (e) {
+      console.warn('[shop] shop-buy error:', e)
+    }
 
     // 更新購買計數
     setPurchasedToday(prev => ({
@@ -273,9 +268,9 @@ export function ShopPanel({ onBack }: ShopPanelProps) {
           <button className="panel-back-btn" onClick={onBack}>← 返回</button>
           <h2 className="panel-title">🏪 商店</h2>
           <div className="shop-currency-bar">
-            <span className="shop-currency gold"><CurrencyIcon type="gold" /> {gold.toLocaleString()}</span>
-            <span className="shop-currency diamond"><CurrencyIcon type="diamond" /> {diamond.toLocaleString()}</span>
-            <span className="shop-currency stardust"><CurrencyIcon type="stardust" /> {stardust.toLocaleString()}</span>
+            <InfoTip icon={<CurrencyIcon type="gold" />} value={gold.toLocaleString()} label="金幣" description="購買道具、強化裝備所需" className="menu-gold" />
+            <InfoTip icon={<CurrencyIcon type="diamond" />} value={diamond.toLocaleString()} label="鑽石" description="購買稀有商品、禮包" className="menu-diamond" />
+            <InfoTip icon={<CurrencyIcon type="stardust" />} value={stardust.toLocaleString()} label="星塵" description="重複英雄轉化而來，可在商店兑換稀有道具" className="menu-stardust" />
           </div>
         </div>
 

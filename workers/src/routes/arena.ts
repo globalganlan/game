@@ -5,7 +5,7 @@ import { Hono } from 'hono';
 import type { Env, HonoVars, ArenaRankingRow, SaveDataRow } from '../types.js';
 import { getBody } from '../middleware/auth.js';
 import { isoNow, todayUTC8 } from '../utils/helpers.js';
-import { upsertItemStmt } from './save.js';
+import { upsertItemStmt, getCurrencies } from './save.js';
 
 const arena = new Hono<{ Bindings: Env; Variables: HonoVars }>();
 
@@ -251,8 +251,9 @@ arena.post('/arena-challenge-complete', async (c) => {
 
   // 原子批次寫入
   await db.batch(writeStmts);
+  const currencies = await getCurrencies(db, playerId);
 
-  return c.json({ success: true, won, newRank, challengesLeft, rewards, milestoneReward });
+  return c.json({ success: true, won, newRank, challengesLeft, rewards, milestoneReward, currencies });
 });
 
 // ════════════════════════════════════════════

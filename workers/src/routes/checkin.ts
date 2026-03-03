@@ -5,7 +5,7 @@ import { Hono } from 'hono';
 import type { Env, HonoVars, SaveDataRow } from '../types.js';
 import { getBody } from '../middleware/auth.js';
 import { isoNow, todayUTC8 } from '../utils/helpers.js';
-import { upsertItemStmt } from './save.js';
+import { upsertItemStmt, getCurrencies } from './save.js';
 
 const checkin = new Hono<{ Bindings: Env; Variables: HonoVars }>();
 
@@ -80,10 +80,13 @@ checkin.post('/daily-checkin', async (c) => {
 
   await db.batch(stmts);
 
+  const currencies = await getCurrencies(db, playerId);
+
   return c.json({
     success: true,
     checkinDay: newDay, checkinLastDate: today,
     reward: { gold: goldGain, diamond: diamondGain, items: rewardItems },
+    currencies,
   });
 });
 

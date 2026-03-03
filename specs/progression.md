@@ -182,6 +182,8 @@ function canAscend(level: number, ascension: number): boolean {
 
 所有英雄不論稀有度，獲得時一律從 **★0** 開始培養。
 
+> **設計意圖**：★0 自帶 ×0.90 屬性懲罰（HP/ATK/DEF −10%），作為養成引導——激勵玩家收集碎片升至 ★1 以解鎖完整基礎數值。★0 仍保有 1 個被動技能槽位（與 `battleEngine.createBattleHero` 一致）。
+
 | 原始稀有度 | 初始星級 |
 |-----------|---------|
 | ★1 (N) | ★0 |

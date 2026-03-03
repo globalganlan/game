@@ -963,17 +963,24 @@ export async function executeBattleLoop(ctx: BattleLoopContext, replayActions?: 
   }
   setBattleStats(stats)
 
-  // ── 伺服器端結算 ──
+  // ── 伺服器端結算 — 等待後端回應，作為獎勵唯一來源 ──
+  let serverResult: CompleteBattleResult | null = null
   if (!isReplay && completeBattleRef.current) {
     const bgPromise = completeBattleRef.current
     completeBattleRef.current = null
-    bgPromise.then(cbResult => {
-      if (cbResult?.success && cbResult.winner !== winner) {
-        console.warn(
-          `[Battle] 伺服器判定不一致：本地=${winner} → 伺服器=${cbResult.winner}`
-        )
+    try {
+      const cbResult = await bgPromise
+      if (cbResult?.success) {
+        if (cbResult.winner !== winner) {
+          console.warn(
+            `[Battle] 伺服器判定不一致：本地=${winner} → 伺服器=${cbResult.winner}`
+          )
+        }
+        serverResult = cbResult
       }
-    }).catch(() => { /* 網路錯誤，靜默處理 */ })
+    } catch (err) {
+      console.warn('[Battle] complete-battle 請求失敗，將使用本地計算:', err)
+    }
   }
 
   // ── 結算 ──
@@ -987,36 +994,58 @@ export async function executeBattleLoop(ctx: BattleLoopContext, replayActions?: 
       let resourceSpeed: { goldPerHour: number; expPerHour: number } | null = null
       let rewards: StageReward = { exp: 0, gold: 0, diamond: 0 }
 
+      // ★ 優先使用伺服器回傳的獎勵（後端已寫入 DB，前端必須與 DB 一致）
+      if (serverResult) {
+        rewards = {
+          exp: serverResult.rewards.exp,
+          gold: serverResult.rewards.gold,
+          diamond: serverResult.rewards.diamond,
+        }
+        first = serverResult.isFirstClear
+        stars = Math.max(1, Math.min(3, serverResult.starsEarned)) as 1 | 2 | 3
+      }
+
       if (stageMode === 'story') {
-        const cachedCfg = getCachedStageConfig(stageId)
-        const progress = saveData?.storyProgress ?? { chapter: 1, stage: 1 }
-        first = isFirstClear(stageId, progress)
-        if (cachedCfg) {
-          rewards = first
-            ? { exp: cachedCfg.rewards.exp * 2, gold: cachedCfg.rewards.gold * 2, diamond: 30, items: cachedCfg.rewards.items }
-            : cachedCfg.rewards
-        } else {
-          // fallback 公式（快取未命中時）
-          const parts = stageId.split('-').map(Number)
-          const li = ((parts[0] || 1) - 1) * 8 + (parts[1] || 1)
-          rewards = first
-            ? { exp: 60 + li * 20, gold: 100 + li * 50, diamond: 30 }
-            : { exp: 30 + li * 15, gold: 50 + li * 30, diamond: (parts[1] || 1) === 8 ? 20 : 0 }
+        if (!serverResult) {
+          // Fallback：伺服器不可用時使用本地計算
+          const cachedCfg = getCachedStageConfig(stageId)
+          const progress = saveData?.storyProgress ?? { chapter: 1, stage: 1 }
+          first = isFirstClear(stageId, progress)
+          if (cachedCfg) {
+            rewards = first
+              ? { exp: cachedCfg.rewards.exp * 2, gold: cachedCfg.rewards.gold * 2, diamond: 30, items: cachedCfg.rewards.items }
+              : cachedCfg.rewards
+          } else {
+            const parts = stageId.split('-').map(Number)
+            const li = ((parts[0] || 1) - 1) * 8 + (parts[1] || 1)
+            rewards = first
+              ? { exp: 60 + li * 20, gold: 100 + li * 50, diamond: 30 }
+              : { exp: 30 + li * 15, gold: 50 + li * 30, diamond: (parts[1] || 1) === 8 ? 20 : 0 }
+          }
         }
         const timerStage = first ? stageId : (saveData?.resourceTimerStage || stageId)
         resourceSpeed = getTimerYield(timerStage)
       } else if (stageMode === 'tower') {
-        const floor = Number(stageId) || 1
-        const cfg = getTowerFloorConfig(floor)
-        rewards = cfg.rewards
+        if (!serverResult) {
+          const floor = Number(stageId) || 1
+          const cfg = getTowerFloorConfig(floor)
+          rewards = cfg.rewards
+        }
       } else if (stageMode === 'pvp') {
-        const progress = saveData?.storyProgress ?? { chapter: 1, stage: 1 }
-        const linearProgress = (progress.chapter - 1) * 8 + progress.stage
-        rewards = getPvPReward(linearProgress)
+        if (!serverResult) {
+          const progress = saveData?.storyProgress ?? { chapter: 1, stage: 1 }
+          const linearProgress = (progress.chapter - 1) * 8 + progress.stage
+          rewards = getPvPReward(linearProgress)
+        }
         // 競技場結算上報
         if (arenaTargetRankRef.current > 0) {
-          completeArenaChallenge(arenaTargetRankRef.current, true).then(arenaRes => {
+          completeArenaChallenge(arenaTargetRankRef.current, true).then(async arenaRes => {
             if (arenaRes.success) {
+              // 以伺服器 currencies 覆蓋本地
+              if (arenaRes.currencies) {
+                const { applyCurrenciesFromServer } = await import('../services/saveService')
+                applyCurrenciesFromServer(arenaRes.currencies)
+              }
               const r = arenaRes.rewards
               if (r) {
                 showToast(`🏆 排名提升至 #${arenaRes.newRank ?? '?'}！獲得 ${r.diamond} 鑽石 + ${r.gold} 金幣`)
@@ -1025,13 +1054,6 @@ export async function executeBattleLoop(ctx: BattleLoopContext, replayActions?: 
                 if (r.gold > 0) arenaItems.push({ type: 'currency', id: 'gold', name: '金幣', quantity: r.gold })
                 if (r.pvpCoin > 0) arenaItems.push({ type: 'item', id: 'pvp_coin', name: '競技幣', quantity: r.pvpCoin })
                 if (arenaItems.length > 0) acquireShow(arenaItems)
-                if (r.diamond > 0 || r.gold > 0) {
-                  addItemsLocally([])  // trigger refresh
-                  doUpdateProgress({
-                    diamond: (saveData?.diamond ?? 0) + r.diamond,
-                    gold: (saveData?.gold ?? 0) + r.gold,
-                  })
-                }
               }
               // 排名里程碑獎勵動畫
               const mr = arenaRes.milestoneReward
@@ -1049,46 +1071,62 @@ export async function executeBattleLoop(ctx: BattleLoopContext, replayActions?: 
           }).catch(console.warn)
         }
       } else if (stageMode === 'boss') {
-        const totalDamage = Object.values(stats)
-          .filter((_, i) => i < playerSlots.filter(Boolean).length)
-          .reduce((sum, s) => sum + s.damageDealt, 0)
-        rewards = getBossReward(stageId, totalDamage)
+        if (!serverResult) {
+          const totalDamage = Object.values(stats)
+            .filter((_, i) => i < playerSlots.filter(Boolean).length)
+            .reduce((sum, s) => sum + s.damageDealt, 0)
+          rewards = getBossReward(stageId, totalDamage)
+        }
       } else {
-        const cfg = getDailyDungeonConfig(stageId)
-        rewards = cfg ? cfg.difficulty.rewards : { exp: 0, gold: 0 }
+        if (!serverResult) {
+          const cfg = getDailyDungeonConfig(stageId)
+          rewards = cfg ? cfg.difficulty.rewards : { exp: 0, gold: 0 }
+        }
       }
 
       rewardGold = rewards.gold
       rewardDiamond = rewards.diamond ?? 0
 
-      // 計算星級
-      const totalHeroes = playerSlots.filter(Boolean).length
-      const survivingHeroes = playerSlots.filter(s => s && (s.currentHP ?? 0) > 0).length
-      stars = calculateStarRating(totalHeroes, survivingHeroes) as 1 | 2 | 3
+      // 計算星級（伺服器可用時已在上面取得，否則本地計算）
+      if (!serverResult) {
+        const totalHeroes = playerSlots.filter(Boolean).length
+        const survivingHeroes = playerSlots.filter(s => s && (s.currentHP ?? 0) > 0).length
+        stars = calculateStarRating(totalHeroes, survivingHeroes) as 1 | 2 | 3
+      }
 
-      // 抽取掉落物
+      // 抽取掉落物（仍由前端處理）
       const allDrops = mergeDrops(rollDrops(rewards))
       // 分離經驗資源掉落與一般道具掉落
       const expDropTotal = allDrops.filter(d => d.itemId === 'exp').reduce((s, d) => s + d.quantity, 0)
       const drops = allDrops.filter(d => d.itemId !== 'exp')
       const rewardExp = (rewards.exp ?? 0) + expDropTotal
 
-      // ── 本地狀態同步 ──
-      const progressChanges: Record<string, number> = {
-        gold: (saveData?.gold ?? 0) + rewardGold,
-        diamond: (saveData?.diamond ?? 0) + rewardDiamond,
-        exp: (saveData?.exp ?? 0) + rewardExp,
+      // ── 本地狀態同步（優先使用伺服器 currencies 絕對值） ──
+      if (serverResult?.currencies) {
+        const { applyCurrenciesFromServer } = await import('../services/saveService')
+        applyCurrenciesFromServer(serverResult.currencies)
+      } else {
+        // 離線備援：用本地計算
+        const progressChanges: Record<string, number> = {
+          gold: (saveData?.gold ?? 0) + rewardGold,
+          diamond: (saveData?.diamond ?? 0) + rewardDiamond,
+          exp: (saveData?.exp ?? 0) + rewardExp,
+        }
+        doUpdateProgress(progressChanges)
       }
-      doUpdateProgress(progressChanges)
 
       // 推進劇情進度
       if (stageMode === 'story' && first) {
-        const nextId = getNextStageId(stageId)
-        if (nextId) {
-          const np = nextId.split('-').map(Number)
-          doUpdateStory(np[0] || 1, np[1] || 1)
+        if (serverResult?.newStoryProgress) {
+          doUpdateStory(serverResult.newStoryProgress.chapter, serverResult.newStoryProgress.stage)
         } else {
-          doUpdateStory(4, 1)
+          const nextId = getNextStageId(stageId)
+          if (nextId) {
+            const np = nextId.split('-').map(Number)
+            doUpdateStory(np[0] || 1, np[1] || 1)
+          } else {
+            doUpdateStory(4, 1)
+          }
         }
         doUpdateProgress({ resourceTimerStage: stageId })
       }

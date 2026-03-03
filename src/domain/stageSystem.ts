@@ -447,7 +447,7 @@ export function mergeDrops(drops: { itemId: string; quantity: number }[]): { ite
    ════════════════════════════════════ */
 
 /** 最大章節數 */
-export const MAX_CHAPTER = 3
+export const MAX_CHAPTER = 8
 /** 每章關卡數 */
 export const STAGES_PER_CHAPTER = 8
 

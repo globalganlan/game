@@ -10,6 +10,8 @@ import type { MenuScreen } from '../types'
 import type { SaveData } from '../services/saveService'
 import { getTimerYield } from '../services/saveService'
 import { CurrencyIcon } from './CurrencyIcon'
+import { RedDot } from './RedDot'
+import { InfoTip } from './InfoTip'
 
 /* ────────────────────────────
    Props
@@ -47,7 +49,7 @@ interface MenuItem {
 const MENU_ITEMS: MenuItem[] = [
   { key: 'stages', icon: '🗺️', label: '關卡', sub: '主線·爬塔·副本', color: '#457b9d' },
   { key: 'heroes', icon: '🧟', label: '英雄', sub: '養成·突破·升星', color: '#2a9d8f', unlock: { chapter: 1, stage: 2, hint: '通關 1-1 後解鎖' } },
-  { key: 'gacha', icon: '🎰', label: '召喚', sub: '招募新同伴', color: '#e9c46a', unlock: { chapter: 1, stage: 3, hint: '通關 1-2 後解鎖' } },
+  { key: 'gacha', icon: '🎰', label: '召喚', sub: '英雄招募·裝備鍛造', color: '#e9c46a', unlock: { chapter: 1, stage: 3, hint: '通關 1-2 後解鎖' } },
   { key: 'inventory', icon: '🎒', label: '背包', sub: '道具·裝備', color: '#f4a261', unlock: { chapter: 1, stage: 2, hint: '通關 1-1 後解鎖' } },
   { key: 'arena', icon: '⚔️', label: '競技場', sub: '排名·對戰·獎勵', color: '#e74c3c', unlock: { chapter: 2, stage: 1, hint: '通關 1-8 後解鎖' } },
   { key: 'shop', icon: '🏪', label: '商店', sub: '購買素材·禮包', color: '#72b01d', unlock: { chapter: 1, stage: 3, hint: '通關 1-2 後解鎖' } },
@@ -88,6 +90,15 @@ export function MainMenu({
   const storyText = story ? `${story.chapter}-${story.stage}` : '1-1'
   const storyProgress = story ?? { chapter: 1, stage: 1 }
 
+  // 判斷今天是否尚未簽到（UTC+8）
+  const checkinNeeded = (() => {
+    const now = new Date()
+    const utc = now.getTime() + now.getTimezoneOffset() * 60000
+    const taipei = new Date(utc + 8 * 3600000)
+    const todayStr = `${taipei.getFullYear()}-${String(taipei.getMonth() + 1).padStart(2, '0')}-${String(taipei.getDate()).padStart(2, '0')}`
+    return (saveData?.checkinLastDate ?? '') !== todayStr
+  })()
+
   const [lockToast, setLockToast] = useState<string | null>(null)
 
   const handleClick = (item: MenuItem) => {
@@ -122,10 +133,10 @@ export function MainMenu({
           <span className="menu-player-name">{name}</span>
         </div>
         <div className="menu-resources">
-          <span className="menu-res-item menu-gold" title="金幣 — 升級、購買、強化"><CurrencyIcon type="gold" />{gold.toLocaleString()}</span>
-          <span className="menu-res-item menu-diamond" title="鑽石 — 召喚、加速、購買稀有道具"><CurrencyIcon type="diamond" />{diamond.toLocaleString()}</span>
-          <span className="menu-res-item menu-exp" title="經驗 — 英雄升級用"><CurrencyIcon type="exp" />{exp.toLocaleString()}</span>
-          <span className="menu-res-item menu-cp" title="隊伍戰力"><CurrencyIcon type="cp" />{combatPower.toLocaleString()}</span>
+          <InfoTip icon={<CurrencyIcon type="gold" />} value={gold.toLocaleString()} label="金幣" description="升級、購買、強化所需的通用貨幣" className="menu-gold" />
+          <InfoTip icon={<CurrencyIcon type="diamond" />} value={diamond.toLocaleString()} label="鑽石" description="召喚、加速、購買稀有道具" className="menu-diamond" />
+          <InfoTip icon={<CurrencyIcon type="exp" />} value={exp.toLocaleString()} label="經驗" description="英雄升級所需的經驗值" className="menu-exp" />
+          <InfoTip icon={<CurrencyIcon type="cp" />} value={combatPower.toLocaleString()} label="戰力" description="隊伍的整體戰鬥力指標" className="menu-cp" />
         </div>
       </div>
 
@@ -194,7 +205,10 @@ export function MainMenu({
               <span className="menu-card-label">{item.label}</span>
               <span className="menu-card-sub">{locked ? item.unlock!.hint : item.sub}</span>
               {item.key === 'mailbox' && !locked && mailUnclaimedCount > 0 && (
-                <span className="menu-card-badge">{mailUnclaimedCount > 99 ? '99+' : mailUnclaimedCount}</span>
+                <RedDot count={mailUnclaimedCount} />
+              )}
+              {item.key === 'checkin' && !locked && checkinNeeded && (
+                <RedDot size="sm" />
               )}
             </button>
           )

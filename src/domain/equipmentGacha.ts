@@ -20,7 +20,7 @@ export const EQUIP_GOLD_TEN = 90_000
 
 /** 鑽石池費用 */
 export const EQUIP_DIAMOND_SINGLE = 200
-export const EQUIP_DIAMOND_TEN = 1_800
+export const EQUIP_DIAMOND_TEN = 2_000
 
 /** 8 套裝 */
 export const SET_IDS = [

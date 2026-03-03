@@ -7,6 +7,7 @@ import { getBody } from '../middleware/auth.js';
 import { isoNow, safeJsonParse } from '../utils/helpers.js';
 import { runBattle } from '../domain/battleEngine.js';
 import type { BattleHero } from '../domain/battleEngine.js';
+import { getCurrencies } from './save.js';
 
 const battle = new Hono<{ Bindings: Env; Variables: HonoVars }>();
 
@@ -62,9 +63,24 @@ battle.post('/complete-battle', async (c) => {
     if (prevBest === 0) isFirstClear = true;
     if (starsEarned > prevBest) stageStars[stageId] = starsEarned;
 
-    rewards.gold = 100 + ch * 50 + st * 20 + (isFirstClear ? 200 : 0);
-    rewards.exp = 50 + ch * 30 + st * 10 + (isFirstClear ? 100 : 0);
-    rewards.diamond = isFirstClear ? 30 : 0;
+    // 從 stage_configs 讀取獎勵（優先），fallback 到公式
+    const cfgRow = await db.prepare('SELECT rewards FROM stage_configs WHERE stageId = ?')
+      .bind(stageId).first<{ rewards: string }>();
+    if (cfgRow) {
+      const cfgRewards = safeJsonParse<{ gold?: number; exp?: number; diamond?: number }>(cfgRow.rewards, {});
+      const baseGold = cfgRewards.gold ?? 0;
+      const baseExp = cfgRewards.exp ?? 0;
+      const baseDiamond = cfgRewards.diamond ?? 0;
+      // 首次通關：獎勵翻倍 + 固定鑽石
+      rewards.gold = isFirstClear ? baseGold * 2 : baseGold;
+      rewards.exp = isFirstClear ? baseExp * 2 : baseExp;
+      rewards.diamond = isFirstClear ? Math.max(baseDiamond, 30) : baseDiamond;
+    } else {
+      // fallback 公式（stage_configs 缺失時）
+      rewards.gold = 100 + ch * 50 + st * 20 + (isFirstClear ? 200 : 0);
+      rewards.exp = 50 + ch * 30 + st * 10 + (isFirstClear ? 100 : 0);
+      rewards.diamond = isFirstClear ? 30 : 0;
+    }
 
     const currentProgress = safeJsonParse<{ chapter: number; stage: number }>(saveData.storyProgress, { chapter: 1, stage: 1 });
     const newProg = (ch - 1) * 8 + st;
@@ -134,11 +150,14 @@ battle.post('/complete-battle', async (c) => {
     ).bind(rewards.gold, rewards.exp, isoNow(), playerId).run();
   }
 
+  const currencies = await getCurrencies(db, playerId);
+
   return c.json({
     success: true, winner, rewards,
     isFirstClear, starsEarned,
     newStoryProgress, newFloor,
     actions: battleResult.actions,
+    currencies,
   });
 });
 
@@ -164,11 +183,24 @@ battle.post('/complete-stage', async (c) => {
   const isFirstClear = prevBest === 0;
   if (starsEarned > prevBest) stageStars[stageId] = starsEarned;
 
-  const rewards = {
-    gold: 100 + ch * 50 + st * 20 + (isFirstClear ? 200 : 0),
-    exp: 50 + ch * 30 + st * 10 + (isFirstClear ? 100 : 0),
-    diamond: isFirstClear ? 30 : 0,
-  };
+  const rewards = { gold: 0, exp: 0, diamond: 0 };
+
+  // 從 stage_configs 讀取獎勵（優先），fallback 到公式
+  const cfgRow = await db.prepare('SELECT rewards FROM stage_configs WHERE stageId = ?')
+    .bind(stageId).first<{ rewards: string }>();
+  if (cfgRow) {
+    const cfgRewards = safeJsonParse<{ gold?: number; exp?: number; diamond?: number }>(cfgRow.rewards, {});
+    const baseGold = cfgRewards.gold ?? 0;
+    const baseExp = cfgRewards.exp ?? 0;
+    const baseDiamond = cfgRewards.diamond ?? 0;
+    rewards.gold = isFirstClear ? baseGold * 2 : baseGold;
+    rewards.exp = isFirstClear ? baseExp * 2 : baseExp;
+    rewards.diamond = isFirstClear ? Math.max(baseDiamond, 30) : baseDiamond;
+  } else {
+    rewards.gold = 100 + ch * 50 + st * 20 + (isFirstClear ? 200 : 0);
+    rewards.exp = 50 + ch * 30 + st * 10 + (isFirstClear ? 100 : 0);
+    rewards.diamond = isFirstClear ? 30 : 0;
+  }
 
   const currentProgress = safeJsonParse<{ chapter: number; stage: number }>(saveData.storyProgress, { chapter: 1, stage: 1 });
   let newStoryProgress2: { chapter: number; stage: number } | undefined;

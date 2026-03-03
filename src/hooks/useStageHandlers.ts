@@ -7,6 +7,7 @@
 import { useCallback } from 'react'
 import type { GameState, MenuScreen, SlotHero, RawHeroData } from '../types'
 import type { AcquireItem } from '../hooks/useAcquireToast'
+import type { SceneMode } from '../components/Arena'
 import { getDailyDungeonDisplayName } from '../domain/stageSystem'
 import { startArenaChallenge } from '../services/arenaService'
 import { getItemName } from '../constants/rarity'
@@ -16,6 +17,7 @@ import { waitFrames } from '../game/constants'
 
 export interface StageHandlerDeps {
   setStageMode: (m: 'story' | 'tower' | 'daily' | 'pvp' | 'boss') => void
+  setSceneTheme: (m: SceneMode) => void
   setStageId: (id: string) => void
   setMenuScreen: (m: MenuScreen) => void
   setGameState: (s: GameState) => void
@@ -35,7 +37,7 @@ export interface StageHandlerDeps {
 
 export function useStageHandlers(deps: StageHandlerDeps) {
   const {
-    setStageMode, setStageId, setMenuScreen, setGameState,
+    setStageMode, setSceneTheme, setStageId, setMenuScreen, setGameState,
     setCurtainVisible, setCurtainFading, setCurtainText, curtainClosePromiseRef, closeCurtain,
     updateEnemySlots, restoreFormationFromSave,
     showToast, acquireShow, heroesList, stageMode, arenaTargetRankRef,
@@ -68,13 +70,22 @@ export function useStageHandlers(deps: StageHandlerDeps) {
     setStageMode(mode)
     setStageId(sid)
 
-    // story mode: 從 API 快取取得敵方陣容
+    // story mode: 從 API 快取取得敵方陣容 + 場景主題
     let injectedEnemies: { heroId: number; slot: number; hpMultiplier: number; atkMultiplier: number; speedMultiplier: number }[] | undefined
     if (mode === 'story') {
       try {
         const cfg = await getStageConfig(sid)
-        if (cfg) injectedEnemies = cfg.enemies
+        if (cfg) {
+          injectedEnemies = cfg.enemies
+          // 設定章節對應的場景視覺主題
+          const bgTheme = cfg.extra?.bgTheme
+          if (bgTheme) setSceneTheme(bgTheme as SceneMode)
+          else setSceneTheme('story')
+        }
       } catch { /* fallback: injectedEnemies stays undefined */ }
+    } else {
+      // 非 story 模式：直接用模式名當場景主題
+      setSceneTheme(mode as SceneMode)
     }
 
     updateEnemySlots(() => buildEnemySlotsFromStage(mode, sid, heroesList, injectedEnemies))
@@ -84,7 +95,7 @@ export function useStageHandlers(deps: StageHandlerDeps) {
 
     if (needsCurtain) closeCurtain()
     showToast(`已選擇: ${displayName}`)
-  }, [stageMode, heroesList, setStageMode, setStageId, updateEnemySlots, restoreFormationFromSave, setMenuScreen, setGameState, setCurtainVisible, setCurtainFading, setCurtainText, curtainClosePromiseRef, closeCurtain, showToast])
+  }, [stageMode, heroesList, setStageMode, setSceneTheme, setStageId, updateEnemySlots, restoreFormationFromSave, setMenuScreen, setGameState, setCurtainVisible, setCurtainFading, setCurtainText, curtainClosePromiseRef, closeCurtain, showToast])
 
   /* ── 競技場挑戰 ── */
   const handleArenaStartBattle = useCallback(async (
@@ -132,6 +143,7 @@ export function useStageHandlers(deps: StageHandlerDeps) {
       }
       arenaTargetRankRef.current = targetRank
       setStageMode('pvp')
+      setSceneTheme('pvp')
       setStageId(`arena-${targetRank}`)
       updateEnemySlots(() => enemySlotsArr)
       restoreFormationFromSave()
@@ -140,7 +152,7 @@ export function useStageHandlers(deps: StageHandlerDeps) {
     } catch (e) {
       showToast('挑戰載入失敗：' + String(e))
     }
-  }, [heroesList, showToast, updateEnemySlots, restoreFormationFromSave, setStageMode, setStageId, setMenuScreen, setGameState]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [heroesList, showToast, updateEnemySlots, restoreFormationFromSave, setStageMode, setSceneTheme, setStageId, setMenuScreen, setGameState]) // eslint-disable-line react-hooks/exhaustive-deps
 
   /* ── 每日簽到 ── */
   const handleCheckin = useCallback(async () => {
