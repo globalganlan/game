@@ -29,10 +29,11 @@ progression.post('/upgrade-hero', async (c) => {
   const body = getBody(c);
   const instanceId = body.instanceId as string;
   const expAmount = Number(body.expAmount) || 0;
-  // 兼容舊版 materials 格式：轉換為 expAmount
+  // 舊版 materials 格式已廢棄（exp_core 已移除），僅保留參數解析以防舊版客戶端
   const materials = body.materials as Array<{ itemId: string; quantity: number }> | undefined;
   let totalExpInput = expAmount;
   if ((!totalExpInput || totalExpInput <= 0) && materials?.length) {
+    // legacy: exp_core_s/m/l 已於 v2.4 移除，此映射僅供極舊客戶端相容
     const EXP_MATERIALS: Record<string, number> = { exp_core_s: 100, exp_core_m: 500, exp_core_l: 2000 };
     for (const mat of materials) {
       totalExpInput += (EXP_MATERIALS[mat.itemId] || 0) * (Number(mat.quantity) || 0);

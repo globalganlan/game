@@ -38,6 +38,7 @@ CREATE TABLE IF NOT EXISTS save_data (
   gachaPool               TEXT NOT NULL DEFAULT '[]',
   gachaPity               TEXT NOT NULL DEFAULT '{"pullsSinceLastSSR":0,"guaranteedFeatured":false}',
   gachaPoolEndPity        INTEGER NOT NULL DEFAULT 0,
+  lastHeroFreePull        TEXT NOT NULL DEFAULT '',
   -- 裝備（JSON 陣列，裝備抽卡寫入）
   equipment               TEXT NOT NULL DEFAULT '[]',
   equipmentCapacity       INTEGER NOT NULL DEFAULT 200,

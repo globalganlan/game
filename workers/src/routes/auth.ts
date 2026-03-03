@@ -58,6 +58,8 @@ auth.post('/register-guest', async (c) => {
         { itemId: 'diamond', quantity: 300 },
         { itemId: 'gold', quantity: 10000 },
         { itemId: 'exp', quantity: 6500 },
+        { itemId: 'gacha_ticket_hero', quantity: 10 },
+        { itemId: 'gacha_ticket_equip', quantity: 10 },
       ],
     ),
   ]);

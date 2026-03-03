@@ -1,7 +1,11 @@
 /**
  * Gacha Routes — 英雄抽卡、裝備抽卡
  *
- * v2: 移除預生成 pool 機制，每次抽卡即時生成結果
+ * v3: 召喚券 + 每日免費單抽 + 鍛造券
+ *   - gacha_ticket_hero: 英雄召喚券，可抵扣鑽石
+ *   - gacha_ticket_equip: 裝備鍛造券，可抵扣鑽石池費用
+ *   - 每日免費英雄單抽一次（lastHeroFreePull 追蹤）
+ *   - 十連：券不足時剩餘以鑽石補差
  */
 import { Hono } from 'hono';
 import type { Env, HonoVars, SaveDataRow } from '../types.js';
@@ -13,6 +17,32 @@ const gacha = new Hono<{ Bindings: Env; Variables: HonoVars }>();
 
 // 抽卡機率
 const RATE_SSR = 0.015;
+const RATE_SR = 0.10;
+const RATE_R = 0.35;
+
+// 費用常數
+const HERO_SINGLE_DIAMOND = 160;
+const HERO_TEN_DIAMOND = 1440; // 九折
+const EQUIP_DIAMOND_SINGLE = 200;
+const EQUIP_DIAMOND_TEN = 1800;
+
+/** 取得 UTC+8 日期字串（YYYY-MM-DD） */
+function getTaipeiDateStr(): string {
+  const now = new Date();
+  const utc = now.getTime() + now.getTimezoneOffset() * 60000;
+  const taipei = new Date(utc + 8 * 3600000);
+  const y = taipei.getFullYear();
+  const m = String(taipei.getMonth() + 1).padStart(2, '0');
+  const d = String(taipei.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+/** 讀取玩家某道具數量 */
+async function getItemQuantity(db: D1Database, playerId: string, itemId: string): Promise<number> {
+  const row = await db.prepare('SELECT quantity FROM inventory WHERE playerId = ? AND itemId = ?')
+    .bind(playerId, itemId).first<{ quantity: number }>();
+  return row?.quantity ?? 0;
+}
 const RATE_SR = 0.10;
 const RATE_R = 0.35;
 
@@ -68,13 +98,46 @@ gacha.post('/gacha-pull', async (c) => {
 
   const count = Number(body.count) || 1;
   if (count !== 1 && count !== 10) return c.json({ success: false, error: 'invalid_count' });
+  const isFree = body.isFree === true;  // 每日免費單抽
 
-  const saveData = await db.prepare('SELECT diamond, gachaPity FROM save_data WHERE playerId = ?')
-    .bind(playerId).first<Pick<SaveDataRow, 'diamond' | 'gachaPity'>>();
+  const saveData = await db.prepare('SELECT diamond, gachaPity, lastHeroFreePull FROM save_data WHERE playerId = ?')
+    .bind(playerId).first<Pick<SaveDataRow, 'diamond' | 'gachaPity'> & { lastHeroFreePull?: string }>();
   if (!saveData) return c.json({ success: false, error: 'save_not_found' });
 
-  const cost = count === 10 ? 1440 : 160;
-  if ((saveData.diamond || 0) < cost) return c.json({ success: false, error: 'insufficient_diamond' });
+  // ── 計算費用：免費 / 召喚券 / 鑽石混合 ──
+  let diamondCost = 0;
+  let ticketsUsed = 0;
+  let freePullUsed = false;
+
+  if (isFree && count === 1) {
+    // 每日免費單抽
+    const today = getTaipeiDateStr();
+    const lastFree = (saveData as any).lastHeroFreePull || '';
+    if (lastFree === today) return c.json({ success: false, error: 'free_pull_already_used' });
+    freePullUsed = true;
+    // 免費不消耗任何資源
+  } else {
+    // 查詢召喚券數量
+    const tickets = await getItemQuantity(db, playerId, 'gacha_ticket_hero');
+
+    if (count === 1) {
+      if (tickets >= 1) {
+        ticketsUsed = 1;
+      } else {
+        diamondCost = HERO_SINGLE_DIAMOND;
+      }
+    } else {
+      // 十連：券不足以鑽石補（每張券抵 160 鑽）
+      const use = Math.min(tickets, 10);
+      ticketsUsed = use;
+      const remaining = 10 - use;
+      diamondCost = remaining > 0 ? (remaining === 10 ? HERO_TEN_DIAMOND : remaining * HERO_SINGLE_DIAMOND) : 0;
+    }
+
+    if (diamondCost > 0 && (saveData.diamond || 0) < diamondCost) {
+      return c.json({ success: false, error: 'insufficient_diamond' });
+    }
+  }
 
   // 讀取保底狀態
   const pityState = safeJsonParse<PityState>(saveData.gachaPity, { pullsSinceLastSSR: 0, guaranteedFeatured: false });
@@ -129,14 +192,30 @@ gacha.post('/gacha-pull', async (c) => {
   }
 
   const newPityState = gen.endPity;
-  writeStmts.push(db.prepare(
-    `UPDATE save_data SET diamond = diamond - ?, gachaPity = ?, lastSaved = ? WHERE playerId = ?`
-  ).bind(cost, JSON.stringify(newPityState), isoNow(), playerId));
+
+  // 扣款：鑽石 + 券 + 免費標記
+  if (diamondCost > 0) {
+    writeStmts.push(db.prepare(
+      `UPDATE save_data SET diamond = diamond - ?, gachaPity = ?, lastSaved = ? WHERE playerId = ?`
+    ).bind(diamondCost, JSON.stringify(newPityState), isoNow(), playerId));
+  } else {
+    writeStmts.push(db.prepare(
+      `UPDATE save_data SET gachaPity = ?, lastSaved = ? WHERE playerId = ?`
+    ).bind(JSON.stringify(newPityState), isoNow(), playerId));
+  }
+  if (ticketsUsed > 0) {
+    writeStmts.push(upsertItemInternal(db, playerId, 'gacha_ticket_hero', -ticketsUsed));
+  }
+  if (freePullUsed) {
+    writeStmts.push(db.prepare(
+      `UPDATE save_data SET lastHeroFreePull = ? WHERE playerId = ?`
+    ).bind(getTaipeiDateStr(), playerId));
+  }
 
   await db.batch(writeStmts);
 
   return c.json({
-    success: true, results, diamondCost: cost, newPityState,
+    success: true, results, diamondCost, ticketsUsed, freePullUsed, newPityState,
   });
 });
 
@@ -174,22 +253,52 @@ gacha.post('/equip-gacha-pull', async (c) => {
 
   let cost: number;
   let currencyField: 'gold' | 'diamond';
+  let ticketsUsed = 0;
+
   if (poolType === 'gold') {
+    // 金幣池：不用券，直接扣金幣
     cost = count === 10 ? 90000 : 10000;
     currencyField = 'gold';
     if ((saveData.gold || 0) < cost) return c.json({ success: false, error: 'insufficient_gold' });
   } else {
-    cost = count === 10 ? 1800 : 200;
+    // 鑽石池：優先使用鍛造券
+    const tickets = await getItemQuantity(db, playerId, 'gacha_ticket_equip');
     currencyField = 'diamond';
-    if ((saveData.diamond || 0) < cost) return c.json({ success: false, error: 'insufficient_diamond' });
+
+    if (count === 1) {
+      if (tickets >= 1) {
+        ticketsUsed = 1;
+        cost = 0;
+      } else {
+        cost = EQUIP_DIAMOND_SINGLE;
+      }
+    } else {
+      const use = Math.min(tickets, 10);
+      ticketsUsed = use;
+      const remaining = 10 - use;
+      cost = remaining > 0 ? (remaining === 10 ? EQUIP_DIAMOND_TEN : remaining * EQUIP_DIAMOND_SINGLE) : 0;
+    }
+
+    if (cost > 0 && (saveData.diamond || 0) < cost) {
+      return c.json({ success: false, error: 'insufficient_diamond' });
+    }
   }
 
   // 扣款 + 持久化裝備（原子交易）
-  const eqStmts: D1PreparedStatement[] = [
-    db.prepare(
+  const eqStmts: D1PreparedStatement[] = [];
+
+  if (cost > 0) {
+    eqStmts.push(db.prepare(
       `UPDATE save_data SET ${currencyField} = ${currencyField} - ?, lastSaved = ? WHERE playerId = ?`
-    ).bind(cost, isoNow(), playerId),
-  ];
+    ).bind(cost, isoNow(), playerId));
+  } else {
+    eqStmts.push(db.prepare(
+      `UPDATE save_data SET lastSaved = ? WHERE playerId = ?`
+    ).bind(isoNow(), playerId));
+  }
+  if (ticketsUsed > 0) {
+    eqStmts.push(upsertItemStmt(db, playerId, 'gacha_ticket_equip', -ticketsUsed));
+  }
 
   // 持久化 client 給的裝備
   const rawEquip = body.equipment;
@@ -214,7 +323,7 @@ gacha.post('/equip-gacha-pull', async (c) => {
 
   return c.json({
     success: true, poolType, count: newEquips.length,
-    currencyCost: cost,
+    currencyCost: cost, ticketsUsed,
   });
 });
 

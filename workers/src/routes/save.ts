@@ -133,7 +133,7 @@ save.post('/init-save', async (c) => {
   // 贈送初始英雄（3 隻）：無名活屍(6/N) + 女喪屍(1/R) + 倖存者(9/R)
   const starterHeroIds = [6, 1, 9];
   const starterInstanceIds: string[] = [];
-  const autoFormation = [starterHeroIds[0], starterHeroIds[1], starterHeroIds[2], null, null, null];
+  const autoFormation = [String(starterHeroIds[0]), String(starterHeroIds[1]), String(starterHeroIds[2]), null, null, null];
 
   const stmts: D1PreparedStatement[] = [];
 

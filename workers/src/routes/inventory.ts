@@ -408,7 +408,7 @@ inventory.post('/lock-equipment', async (c) => {
   return c.json({ success: true });
 });
 
-// ── 擴展背包容量 ──────────────────────────────
+// ── 擴展背包容量（格數 = 道具種類 + 裝備件數）──────────────────────────────
 inventory.post('/expand-inventory', async (c) => {
   const playerId = c.get('playerId');
   const db = c.env.DB;
