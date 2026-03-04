@@ -30,12 +30,12 @@ import { getStatAtLevel, getAscensionMultiplier, getStarMultiplier, RARITY_INITI
 import type { RawHeroData } from '../types'
 import { translateError } from '../utils/errorMessages'
 import { Thumbnail3D } from './UIOverlay'
-import { addItemsLocally, addEquipmentLocally, getItemQuantity } from '../services/inventoryService'
+import { addItemsLocally, removeItemsLocally, addEquipmentLocally, getItemQuantity } from '../services/inventoryService'
 import { emitAcquire } from '../services/acquireToastBus'
 import { getItemName } from '../constants/rarity'
 import type { AcquireItem } from '../hooks/useAcquireToast'
 import { callApi } from '../services/apiClient'
-import { applyCurrenciesFromServer, getSaveState } from '../services/saveService'
+import { applyCurrenciesFromServer, getSaveState, updateFreePullLocally, updateGachaPityLocally } from '../services/saveService'
 
 /** 將原始英雄資料的 ID 正規化為 `zombie_N` 格式 */
 function resolveModelId(h: RawHeroData): string {
@@ -60,7 +60,7 @@ interface GachaScreenProps {
   onBack: () => void
   onDiamondChange?: (delta: number) => void   // 保留向後相容但不再使用
   onGoldChange?: (delta: number) => void       // 保留向後相容但不再使用
-  onPullSuccess?: (newHeroIds: number[]) => void
+  onPullSuccess?: (newHeroes: { heroId: number; instanceId: string }[]) => void
   initialPity?: number
 }
 
@@ -385,6 +385,7 @@ export function GachaScreen({
         freePullUsed: boolean
         newPityState: { pullsSinceLastSSR: number; guaranteedFeatured: boolean }
         currencies: { gold?: number; diamond?: number; exp?: number }
+        newHeroes?: { heroId: number; instanceId: string }[]
       }>('gacha-pull', { bannerId: banner.id, count, isFree })
 
       if (!res.success) {
@@ -401,11 +402,15 @@ export function GachaScreen({
       // 後端唯一權威：用 server 回傳的 currencies 覆蓋本地
       if (res.currencies) applyCurrenciesFromServer(res.currencies)
       setPityCount(res.newPityState.pullsSinceLastSSR)
+      updateGachaPityLocally(res.newPityState)
       if (res.ticketsUsed > 0) {
         setHeroTickets(prev => Math.max(0, prev - res.ticketsUsed))
-        addItemsLocally([{ itemId: 'gacha_ticket_hero', quantity: -res.ticketsUsed }])
+        removeItemsLocally([{ itemId: 'gacha_ticket_hero', quantity: res.ticketsUsed }])
       }
-      if (res.freePullUsed) setFreePullUsedToday(true)
+      if (res.freePullUsed) {
+        setFreePullUsedToday(true)
+        updateFreePullLocally('lastHeroFreePull', getTaipeiDateStr())
+      }
 
       const pullResults: PullResult[] = res.results.map(r => ({
         heroId: r.heroId,
@@ -423,8 +428,9 @@ export function GachaScreen({
         setRevealPhase(true)
       }, PULL_ANIM_MS)
 
-      const newIds = pullResults.filter(r => r.isNew).map(r => r.heroId)
-      if (newIds.length > 0) onPullSuccess?.(newIds)
+      // 使用 server 回傳的真實 instanceId（而非前端自行生成 local_ ID）
+      const newHeroes: { heroId: number; instanceId: string }[] = res.newHeroes || []
+      if (newHeroes.length > 0) onPullSuccess?.(newHeroes)
 
       const dupeItems: { itemId: string; quantity: number }[] = []
       let totalStardust = 0
@@ -491,13 +497,10 @@ export function GachaScreen({
     setRevealPhase(false)
 
     const pullResults = count === 10 ? equipTenPull(equipPool) : [equipSinglePull(equipPool)]
-
-    // 裝備寫入本地背包
     const newEquipment = pullResults.map(r => r.equipment)
-    addEquipmentLocally(newEquipment)
 
     try {
-      // 同步到 server 並取得權威 currencies
+      // 先確認 server 成功再寫入本地（避免 server 失敗但本地已加入，refresh 後消失）
       const res = await callApi<{
         success: boolean
         error?: string
@@ -522,13 +525,19 @@ export function GachaScreen({
         return
       }
 
+      // Server 確認成功 → 寫入本地背包
+      addEquipmentLocally(newEquipment)
+
       // 後端唯一權威
       if (res.currencies) applyCurrenciesFromServer(res.currencies)
       if (res.ticketsUsed && res.ticketsUsed > 0) {
         setEquipTickets(prev => Math.max(0, prev - res.ticketsUsed!))
-        addItemsLocally([{ itemId: 'gacha_ticket_equip', quantity: -res.ticketsUsed! }])
+        removeItemsLocally([{ itemId: 'gacha_ticket_equip', quantity: res.ticketsUsed! }])
       }
-      if (res.freePullUsed) setFreeEquipPullUsedToday(true)
+      if (res.freePullUsed) {
+        setFreeEquipPullUsedToday(true)
+        updateFreePullLocally('lastEquipFreePull', getTaipeiDateStr())
+      }
 
       // Delay reveal for animation
       const captured = pullResults

@@ -2,17 +2,14 @@
  * saveService  存檔系統前端服務
  *
  * 負責：
- *  - 載入 / 初始化 / 寫入存檔
+ *  - 載入 / 初始化 / 寫入存檔（後端權威）
  *  - 資源產出計時器計算
- *  - 本地快取 (localStorage)
- *  - 寫入佇列（debounce 2s 合併）
+ *  - 內存快取（不使用 localStorage，後端為唯一資料來源）
  *
- * 對應 Spec: specs/save-system.md v0.2
+ * 對應 Spec: specs/save-system.md v0.3
  */
 
 import { callApi } from './apiClient'
-
-const STORAGE_KEY_SAVE = 'globalganlan_save_cache'
 
 /* 
    型別
@@ -83,7 +80,7 @@ type SaveListener = (data: PlayerData | null) => void
 const listeners: SaveListener[] = []
 
 function notify() {
-  const snapshot = currentData ? { ...currentData, save: { ...currentData.save } } : null
+  const snapshot = currentData ? { ...currentData, heroes: [...currentData.heroes], save: { ...currentData.save } } : null
   for (const fn of listeners) fn(snapshot)
 }
 
@@ -120,42 +117,34 @@ export function getAccumulatedResources(
 }
 
 /* 
-   本地快取
+   內存快取（不使用 localStorage）
     */
 
-function saveToLocal(data: PlayerData) {
-  try {
-    localStorage.setItem(STORAGE_KEY_SAVE, JSON.stringify(data))
-  } catch {
-    // localStorage 滿了  忽略
-  }
-}
-
-function loadFromLocal(): PlayerData | null {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY_SAVE)
-    if (!raw) return null
-    return JSON.parse(raw) as PlayerData
-  } catch {
-    return null
-  }
-}
-
 export function clearLocalSaveCache(): void {
-  localStorage.removeItem(STORAGE_KEY_SAVE)
+  // 清除舊版 localStorage 殘留（向下相容清理）
+  try {
+    localStorage.removeItem('globalganlan_save_cache')
+    localStorage.removeItem('globalganlan_inventory_cache')
+    localStorage.removeItem('gg_equipment_cache')
+    localStorage.removeItem('gg_checkin_date')
+    localStorage.removeItem('globalganlan_schema_version')
+    localStorage.removeItem('globalganlan_gacha_pity')
+    localStorage.removeItem('globalganlan_gacha_pool')
+    localStorage.removeItem('globalganlan_owned_heroes')
+    localStorage.removeItem('globalganlan_pending_pulls')
+    localStorage.removeItem('globalganlan_pending_ops')
+  } catch { /* ignore */ }
   currentData = null
 }
 
-/** 即時更新本地 state + localStorage（不打 API，各功能由專用路由負責寫入伺服器） */
+/** 即時更新內存 state（不寫 localStorage，後端為唯一資料來源） */
 function updateLocal(changes: Record<string, unknown>) {
   if (!currentData) return
   for (const [key, val] of Object.entries(changes)) {
-    if (key in currentData.save) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      ;(currentData.save as any)[key] = val
-    }
+    // 允許設定所有 SaveData 欄位（含 optional）
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ;(currentData.save as any)[key] = val
   }
-  saveToLocal(currentData)
   notify()
 }
 
@@ -215,6 +204,9 @@ function sanitizeSaveData(sd: SaveData): SaveData {
   if (!sd.gachaPity || typeof sd.gachaPity !== 'object') {
     sd.gachaPity = { pullsSinceLastSSR: 0, guaranteedFeatured: false }
   }
+  // 確保 optional 欄位存在，避免 updateLocal 無法設定
+  if (sd.lastHeroFreePull === undefined) sd.lastHeroFreePull = ''
+  if (sd.lastEquipFreePull === undefined) sd.lastEquipFreePull = ''
   return sd
 }
 
@@ -226,82 +218,73 @@ function sanitizeSaveData(sd: SaveData): SaveData {
  * 3. 失敗時使用本地快取
  */
 export async function loadSave(): Promise<PlayerData> {
-  try {
-    const res = await callApi<{
+  // 首次載入時清除舊版 localStorage 殘留
+  clearLegacyLocalStorage()
+
+  const res = await callApi<{
+    saveData: SaveData
+    heroes: HeroInstance[]
+    inventory?: InventoryItem[]
+    isNew: boolean
+  }>('load-save')
+
+  if (!res.success) throw new Error(res.error || 'load-save failed')
+
+  if (res.isNew) {
+    // 新玩家  初始化存檔
+    const initRes = await callApi<{ starterHeroInstanceId?: string }>('init-save')
+    if (!initRes.success) throw new Error(initRes.error || 'init-save failed')
+    // 重新載入
+    const reload = await callApi<{
       saveData: SaveData
       heroes: HeroInstance[]
       inventory?: InventoryItem[]
-      isNew: boolean
     }>('load-save')
+    if (!reload.success) throw new Error(reload.error || 'reload failed')
 
-    if (!res.success) throw new Error(res.error || 'load-save failed')
+    const reloadSave = sanitizeSaveData(reload.saveData)
 
-    if (res.isNew) {
-      // 新玩家  初始化存檔
-      const initRes = await callApi<{ starterHeroInstanceId?: string }>('init-save')
-      if (!initRes.success) throw new Error(initRes.error || 'init-save failed')
-      // 重新載入
-      const reload = await callApi<{
-        saveData: SaveData
-        heroes: HeroInstance[]
-        inventory?: InventoryItem[]
-      }>('load-save')
-      if (!reload.success) throw new Error(reload.error || 'reload failed')
-
-      const reloadSave = sanitizeSaveData(reload.saveData)
-
-      currentData = {
-        save: reloadSave,
-        heroes: (reload.heroes || []).map(stripPlayerId),
-        inventory: reload.inventory || [],
-        isDirty: false,
-      }
-    } else {
-      const cleanSave = sanitizeSaveData(res.saveData)
-
-      currentData = {
-        save: cleanSave,
-        heroes: (res.heroes || []).map(stripPlayerId),
-        inventory: res.inventory || [],
-        isDirty: false,
-      }
+    currentData = {
+      save: reloadSave,
+      heroes: (reload.heroes || []).map(stripPlayerId),
+      inventory: reload.inventory || [],
+      isDirty: false,
     }
+  } else {
+    const cleanSave = sanitizeSaveData(res.saveData)
 
-    //  合併本地樂觀英雄進度 
-    // 若本地有較新的 level/ascension/stars（單調遞增），取 MAX
-    const localCache = loadFromLocal()
-    if (localCache?.heroes?.length) {
-      const localMap = new Map<string, HeroInstance>()
-      for (const h of localCache.heroes) localMap.set(h.instanceId, h)
-      for (const sh of currentData.heroes) {
-        const lh = localMap.get(sh.instanceId)
-        if (!lh) continue
-        if ((lh.level ?? 1) > (sh.level ?? 1)) {
-          sh.level = lh.level
-          sh.exp = lh.exp
-        }
-        if ((lh.ascension ?? 0) > (sh.ascension ?? 0)) {
-          sh.ascension = lh.ascension
-        }
-        if ((lh.stars ?? 0) > (sh.stars ?? 0)) {
-          sh.stars = lh.stars
-        }
-      }
+    currentData = {
+      save: cleanSave,
+      heroes: (res.heroes || []).map(stripPlayerId),
+      inventory: res.inventory || [],
+      isDirty: false,
     }
-
-    saveToLocal(currentData)
-    notify()
-    return currentData
-  } catch (err) {
-    console.warn('[save] load from server failed, trying local cache:', err)
-    const local = loadFromLocal()
-    if (local) {
-      currentData = local
-      notify()
-      return currentData
-    }
-    throw err
   }
+
+  // 後端為唯一權威來源，不再從 localStorage 合併
+  notify()
+  return currentData
+}
+
+/** 清除舊版 localStorage 遊戲資料殘留（一次性） */
+function clearLegacyLocalStorage(): void {
+  try {
+    const legacyKeys = [
+      'globalganlan_save_cache',
+      'globalganlan_inventory_cache',
+      'gg_equipment_cache',
+      'gg_checkin_date',
+      'globalganlan_schema_version',
+      'globalganlan_gacha_pity',
+      'globalganlan_gacha_pool',
+      'globalganlan_owned_heroes',
+      'globalganlan_pending_pulls',
+      'globalganlan_pending_ops',
+    ]
+    for (const key of legacyKeys) {
+      localStorage.removeItem(key)
+    }
+  } catch { /* ignore */ }
 }
 
 /** 從 HeroInstance 移除 playerId、補全缺少的欄位（前端不需要 playerId） */
@@ -354,7 +337,6 @@ export function updateStageStars(stageId: string, stars: number): void {
     const prev = currentData.save.stageStars[stageId] || 0
     if (stars > prev) {
       currentData.save.stageStars[stageId] = stars
-      saveToLocal(currentData)
       notify()
       updateLocal({ stageStars: JSON.stringify(currentData.save.stageStars) })
     }
@@ -367,7 +349,6 @@ export function updateStageStars(stageId: string, stars: number): void {
 export function saveFormation(formation: (string | null)[]): boolean {
   if (currentData) {
     currentData.save.formation = formation
-    saveToLocal(currentData)
     notify()
   }
   callApi('save-formation', { formation }).catch(e =>
@@ -379,15 +360,21 @@ export function saveFormation(formation: (string | null)[]): boolean {
 /**
  * 樂觀新增英雄到本地（不呼叫 API）
  * 用於抽卡後即時更新英雄列表，server 入帳由 gacha-pull 背景處理。
+ *
+ * 支援兩種格式：
+ *  - number[] — 舊版（自動產生 local_ instanceId，不建議）
+ *  - { heroId, instanceId }[] — 新版（使用 server 回傳的真實 instanceId）
  */
-export function addHeroesLocally(heroIds: number[]): void {
+export function addHeroesLocally(heroes: number[] | { heroId: number; instanceId: string }[]): void {
   if (!currentData) return
   const now = new Date().toISOString()
   let changed = false
-  for (const heroId of heroIds) {
+  for (const entry of heroes) {
+    const heroId = typeof entry === 'number' ? entry : entry.heroId
+    const instanceId = typeof entry === 'number' ? `local_${entry}_${Date.now()}` : entry.instanceId
     if (currentData.heroes.some(h => h.heroId === heroId)) continue
     currentData.heroes.push({
-      instanceId: `local_${heroId}_${Date.now()}`,
+      instanceId,
       heroId,
       level: 1,
       exp: 0,
@@ -399,7 +386,6 @@ export function addHeroesLocally(heroIds: number[]): void {
     changed = true
   }
   if (changed) {
-    saveToLocal(currentData)
     notify()
   }
 }
@@ -418,7 +404,6 @@ export function updateHeroLocally(
   if (changes.exp !== undefined) hero.exp = changes.exp
   if (changes.ascension !== undefined) hero.ascension = changes.ascension
   if (changes.stars !== undefined) hero.stars = changes.stars
-  saveToLocal(currentData)
   notify()
 }
 
@@ -441,7 +426,6 @@ export async function addHero(heroId: number): Promise<HeroInstance | null> {
     }
     if (currentData) {
       currentData.heroes.push(newHero)
-      saveToLocal(currentData)
       notify()
     }
     return newHero
@@ -455,8 +439,17 @@ export async function addHero(heroId: number): Promise<HeroInstance | null> {
 export function updateLocalCurrency(field: 'gold' | 'diamond', delta: number) {
   if (!currentData || delta === 0) return
   currentData.save[field] = (currentData.save[field] ?? 0) + delta
-  saveToLocal(currentData)
   notify()
+}
+
+/** 更新免費抽狀態到本地（樂觀更新，server 已記錄） */
+export function updateFreePullLocally(field: 'lastHeroFreePull' | 'lastEquipFreePull', dateStr: string): void {
+  updateLocal({ [field]: dateStr })
+}
+
+/** 更新抽卡保底進度到本地（樂觀更新，server 已記錄） */
+export function updateGachaPityLocally(pity: { pullsSinceLastSSR: number; guaranteedFeatured: boolean }): void {
+  updateLocal({ gachaPity: pity })
 }
 
 /**
@@ -470,7 +463,6 @@ export function applyCurrenciesFromServer(
   if (typeof currencies.gold === 'number') currentData.save.gold = currencies.gold
   if (typeof currencies.diamond === 'number') currentData.save.diamond = currencies.diamond
   if (typeof currencies.exp === 'number') currentData.save.exp = currencies.exp
-  saveToLocal(currentData)
   notify()
 }
 
@@ -494,7 +486,6 @@ export async function collectResources(): Promise<AccumulatedResources | null> {
 
   // 更新收集時間（避免重複領取）
   currentData.save.resourceTimerLastCollect = new Date().toISOString()
-  saveToLocal(currentData)
 
   // 呼叫 API → 以伺服器權威值覆蓋
   try {
@@ -513,7 +504,6 @@ export async function collectResources(): Promise<AccumulatedResources | null> {
         // 舊版相容
         if (result.newGoldTotal !== undefined) currentData.save.gold = result.newGoldTotal
         if (result.newExpTotal !== undefined) currentData.save.exp = result.newExpTotal
-        saveToLocal(currentData)
         notify()
       }
     }
@@ -522,7 +512,6 @@ export async function collectResources(): Promise<AccumulatedResources | null> {
     // 離線時使用本地預估值
     currentData.save.gold += resources.gold
     currentData.save.exp = (currentData.save.exp ?? 0) + resources.exp
-    saveToLocal(currentData)
     notify()
   }
 
@@ -579,12 +568,8 @@ export async function doDailyCheckin(): Promise<DailyCheckinResult> {
   const todayStr = getTaipeiDate()
   const lastDate = currentData.save.checkinLastDate ?? ''
 
-  // 防重複
+  // 防重複（由後端判斷為主，前端只做內存快速檢查）
   if (lastDate === todayStr) {
-    return { success: false, error: 'already_checked_in' }
-  }
-  const CHECKIN_LS_KEY = 'gg_checkin_date'
-  if (localStorage.getItem(CHECKIN_LS_KEY) === todayStr) {
     return { success: false, error: 'already_checked_in' }
   }
 
@@ -611,9 +596,8 @@ export async function doDailyCheckin(): Promise<DailyCheckinResult> {
       if (serverRes.currencies) {
         applyCurrenciesFromServer(serverRes.currencies)
       }
-      localStorage.setItem('gg_checkin_date', todayStr)
 
-      // 道具寫入背包（伺服器已處理貨幣，此處只處理背包道具的本地快取同步）
+      // 道具寫入背包（伺服器已處理貨幣，此處只處理背包道具的內存同步）
       if (reward.items && reward.items.length > 0) {
         const otherItems = reward.items.filter(i => i.itemId !== 'exp')
         if (otherItems.length > 0) {
@@ -634,7 +618,7 @@ export async function doDailyCheckin(): Promise<DailyCheckinResult> {
     return { success: false, error: serverRes.error || 'server_error' }
   } catch (e) {
     console.warn('[save] daily-checkin error:', e)
-    // 離線備援：本地樂觀更新
+    // 離線備援：本地更新內存
     currentData.save.checkinDay = newDay
     currentData.save.checkinLastDate = todayStr
     if (reward.gold) currentData.save.gold += reward.gold
@@ -645,9 +629,7 @@ export async function doDailyCheckin(): Promise<DailyCheckinResult> {
         currentData.save.exp += expItems.reduce((acc, i) => acc + i.quantity, 0)
       }
     }
-    saveToLocal(currentData)
     notify()
-    localStorage.setItem('gg_checkin_date', todayStr)
     return { success: true, checkinDay: newDay, checkinLastDate: todayStr, reward }
   }
 }

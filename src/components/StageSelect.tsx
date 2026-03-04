@@ -23,6 +23,7 @@ import {
   type BossConfig,
 } from '../domain/stageSystem'
 import { fetchStageConfigs, type StageConfigFromAPI } from '../services/stageService'
+import { CurrencyIcon } from './CurrencyIcon'
 
 /* ────────────────────────────
    Props
@@ -118,10 +119,11 @@ const CHAPTER_THEMES: Record<number, {
    ──────────────────────────── */
 
 function DifficultyStars({ level }: { level: number }) {
+  const labels = ['', '簡單', '普通', '中等', '困難', '極難']
   return (
-    <span className="sc-difficulty">
+    <span className="sc-difficulty" title={`難度：${labels[level] || level}`}>
       {[1, 2, 3, 4, 5].map(i => (
-        <span key={i} className={i <= level ? 'sc-diff-filled' : 'sc-diff-empty'}>💀</span>
+        <span key={i} className={i <= level ? 'sc-diff-filled' : 'sc-diff-empty'}>⭐</span>
       ))}
     </span>
   )
@@ -259,6 +261,15 @@ function StoryStages({
                   <span className="sc-card-rec">Lv.{cfg.extra?.recommendedLevel || 1}</span>
                   <span className="sc-card-enemy-count">👾×{cfg.enemies.length}</span>
                 </div>
+
+                {/* 獎勵預覽 */}
+                {cfg.rewards && (
+                  <div className="sc-card-rewards">
+                    {cfg.rewards.exp > 0 && <span className="sc-reward-tag"><CurrencyIcon type="exp" /> {cfg.rewards.exp}</span>}
+                    {cfg.rewards.gold > 0 && <span className="sc-reward-tag"><CurrencyIcon type="gold" /> {cfg.rewards.gold}</span>}
+                    {cfg.rewards.diamond && cfg.rewards.diamond > 0 && <span className="sc-reward-tag"><CurrencyIcon type="diamond" /> {cfg.rewards.diamond}</span>}
+                  </div>
+                )}
               </button>
             )
           })}

@@ -3,6 +3,166 @@
 > 按時間倒序排列，最新的在最上面。
 
 ---
+### [2026-03-05] 裝備暴擊屬性修正 + 裝備欄完整資訊 + 關卡選擇佈局修正
+
+- **觸發者**：使用者回報 3 項問題（裝備暴擊無反映、裝備欄缺稀有度/副屬、關卡選擇橫向捲軸）
+- **執行角色**：🔧 CODING
+
+**1. 裝備暴擊屬性修正（progressionSystem.ts）**
+- **根因**：CritRate/CritDmg 副屬性皆為 `isPercent: true`，`getFinalStats()` 以乘算處理（`Math.floor(5 * 1.05) = 5`），floor 消除小數導致加成歸零
+- **修正**：CritRate/CritDmg 的「%」副屬性改為 **加算百分點**（`addStatFlat()`），例：CritRate=5 + 5% → CritRate=10
+- Step 3（裝備百分比副屬收集）：CritRate/CritDmg percent subs → `addStatFlat()`
+- Step 4（套裝效果）：CritRate_percent/CritDmg_percent set bonuses → `addStatFlat()`
+- 加註設計註解說明加算 vs 乘算原因
+
+**2. 裝備欄顯示完整資訊（HeroListPanel.tsx + App.css）**
+- 舊版：僅顯示裝備名稱 + 主屬性 + 強化等級
+- 新版：
+  - 稀有度標籤（SSR/SR/R/N，帶對應顏色）
+  - 裝備名稱 + 強化等級（+N 徽章）
+  - 主屬性（含強化加成數值）
+  - 所有副屬性列表（名稱 + 數值 + %標記）
+- 新增 CSS：`hd2-equip-header` / `hd2-equip-rarity-tag` / `hd2-equip-main-stat` / `hd2-equip-sub-list` / `hd2-equip-sub-item`
+
+**3. 關卡選擇佈局修正（App.css）**
+- **根因 1**：`sc-stage-grid` 使用 `repeat(4, 1fr)`，1fr 的隱含最小寬度為 `min-content`，第 4 欄溢出容器
+- **根因 2**：`sc-chapter-tabs` 使用 `flex-wrap: nowrap` + `overflow-x: auto`，8 章節在窄面板產生橫向捲軸
+- **修正**：
+  - `sc-stage-grid`：改為 `repeat(4, minmax(0, 1fr))` 強制列寬收縮
+  - `sc-chapter-tabs`：改為 `flex-wrap: wrap`，移除 `overflow-x: auto` 及所有捲軸隱藏 CSS
+  - `sc-chapter-tab`：`flex: 0 1 auto`（允許收縮），`min-width: 0`
+  - `stage-content`：加 `overflow-x: hidden` 防溢出
+  - `sc-stage-card`：加 `overflow: hidden; min-width: 0`
+  - `sc-card-name`：加 `text-overflow: ellipsis` 防名稱溢位
+  - `sc-card-rewards`：加 `flex-wrap: wrap` 防獎勵溢位
+  - 移動端 RWD：移除已不需要的捲軸隱藏 CSS
+
+- **Playwright MCP 測試**：
+  - 關卡選擇畫面：8 章節 tab 自動換行（2 行 × 4 個），8 關在 4×2 網格完整顯示，無橫向捲軸 ✅
+
+- **影響檔案**：
+  - `src/domain/progressionSystem.ts`
+  - `src/components/HeroListPanel.tsx`
+  - `src/App.css`
+
+---
+### [2026-03-04] 抽卡前端狀態刷新修復（4 Bug 修復）
+
+- **觸發者**：使用者回報 4 個 Bug（召喚券不消失、免費抽狀態不更新、新英雄不在上陣列表、套裝效果確認）
+- **執行角色**：🔧 CODING
+- **根本原因**：抽卡後前端 in-memory state 未即時更新，需重整頁面才反映正確值
+- **變更摘要**：
+
+  **1. GachaScreen.tsx — 即時本地狀態同步**
+  - 召喚券扣除：改用 `removeItemsLocally()` 取代 `addItemsLocally({ quantity: -N })`（後者 `if (quantity <= 0) continue` 會靜默跳過負數）
+  - 免費抽狀態：抽卡成功後呼叫 `updateFreePullLocally('lastHeroFreePull' | 'lastEquipFreePull', dateStr)`
+  - 保底計數器：抽卡成功後呼叫 `updateGachaPityLocally(res.newPityState)`
+  - 英雄抽卡 + 裝備鍛造皆已修復
+
+  **2. saveService.ts — 5 項修復**
+  - `notify()` 改為深複製 heroes 陣列：`{ ...currentData, heroes: [...currentData.heroes], save: { ...currentData.save } }`（修復 `useMemo` 偵測 reference 不變而不重算 `ownedHeroesList`）
+  - `updateLocal()` 移除 `if (key in currentData.save)` 防護（修復 optional fields 如 `lastHeroFreePull` / `gachaPity` 因不在物件上而被靜默跳過）
+  - `sanitizeSaveData()` 新增 optional fields 初始化（`lastHeroFreePull` / `lastEquipFreePull` 預設 `''`）
+  - 新增 `updateFreePullLocally(field, dateStr)` 匯出函式
+  - 新增 `updateGachaPityLocally(pity)` 匯出函式
+
+- **Bug 修復清單**：
+  - ✅ Bug 2：新抽到英雄不在上陣列表（heroes array reference mutation → useMemo 不更新）
+  - ✅ Bug 3：召喚券使用後不消失（addItemsLocally 負數靜默跳過）
+  - ✅ Bug 4：免費抽使用後狀態不更新（optional field 寫入被 `in` 檢查跳過）
+  - ✅ Bonus：保底計數器重返抽卡畫面歸零（同 Bug 4 根因）
+  - ✅ Bug 1：套裝效果顯示正常（已驗證 2 件套觸發 UI）
+
+- **Playwright MCP 測試**：
+  - 英雄召喚：免費抽 → 十連抽（券扣除）→ 返回大廳 → 重入抽卡 → 狀態持久化確認
+  - 裝備鍛造：免費鍛造 → 十連鍛造（券扣除）→ 返回大廳 → 重入抽卡 → 狀態持久化確認
+  - 英雄面板：新英雄出現在列表 + 裝備穿戴 + 套裝效果顯示
+
+- **影響檔案**：
+  - `src/components/GachaScreen.tsx`
+  - `src/services/saveService.ts`
+
+---
+### [2026-03-04] localStorage 技術債清理 — 後端權威模式全面落實
+
+- **觸發者**：使用者（「為什麼前端還有存 localStorage？後端換架構後應該全部改成後端權威」）
+- **執行角色**：🔧 CODING + 🏗️ TECH_LEAD
+- **背景**：GAS → Workers 遷移是功能導向（逐路由搬移），未回頭清理前端 localStorage 快取邏輯，導致大量技術債殘留（88 處 localStorage 引用）
+- **變更摘要**：
+
+  **1. saveService.ts 全面重構**
+  - 移除 `STORAGE_KEY_SAVE` 常數、`saveToLocal()` / `loadFromLocal()` 函式
+  - `loadSave()` 改為純 server-only（無本地 fallback、無本地 hero 合併）
+  - `updateLocal()` 僅更新內存 state，不寫 localStorage
+  - `clearLocalSaveCache()` 改為清除所有舊版 key 的一次性清理
+  - 新增 `clearLegacyLocalStorage()` helper，在首次 `loadSave()` 時清除 10 個舊版 key
+  - 移除所有 11 處 `saveToLocal(currentData)` 呼叫
+  - 移除簽到 `gg_checkin_date` localStorage 防重複邏輯
+
+  **2. inventoryService.ts 全面重構**
+  - 移除 `STORAGE_KEY_INVENTORY` 常數、`saveInventoryToLocal()` / `loadInventoryFromLocal()` 函式
+  - `loadInventory()` 移除本地合併邏輯（不再 merge localStorage items 與 server items）
+  - 移除 6 處 `saveInventoryToLocal()` 呼叫（addItems/removeItems/sellItems/useItem/addItemsLocally/removeItemsLocally）
+  - `addItemsLocally/removeItemsLocally/addEquipmentLocally` 不再 fallback 到 `loadInventoryFromLocal()`，改為空 state 初始化
+  - 移除 `gg_equipment_cache` localStorage 寫入
+  - `clearInventoryCache()` 移除 `localStorage.removeItem` 呼叫
+
+  **3. localStorageMigration.ts 全面重寫**
+  - 從 216 行 GAS 時代遷移引擎 → 55 行清除器
+  - `runMigrations()` 改為一次性清除 10 個舊版 localStorage key
+  - 不再寫入 `globalganlan_schema_version`（版本追蹤已無意義）
+  - 保留匯出介面（`CURRENT_SCHEMA_VERSION` / `runMigrations`）確保 main.tsx / index.ts 不需改動
+
+- **保留的 localStorage key**（純前端偏好/認證）：
+  - `globalganlan_guest_token`（登入 token）
+  - `globalganlan_logged_out`（登出旗標）
+  - `globalganlan_tutorial_step`（教學進度）
+  - `battleSpeed`（戰鬥速度偏好）
+  - `gg_audio_settings`（音效設定）
+
+- **影響檔案**：
+  - `src/services/saveService.ts`（重構 v0.3）
+  - `src/services/inventoryService.ts`（重構）
+  - `src/services/localStorageMigration.ts`（重寫 v2.0）
+
+- **Spec 更新**：
+  - `specs/local-storage-migration.md` v1.0 → v2.0（已廢棄遷移引擎，改為清除器）
+
+- **驗證**：
+  - `tsc --noEmit`：零錯誤
+  - `vite build`：成功（691 modules）
+  - Playwright 測試：登入→1-1 戰鬥→勝利→回大廳→資源正確更新→localStorage 零遊戲資料
+
+---
+### [2026-06-20] 前後端公式一致性對齊 + UI 強化 12 項
+
+- **觸發者**：使用者（綜合 UI/數值/公式修正需求）
+- **執行角色**：🔧 CODING + 🎯 GAME_DESIGN + 🎨 UI_DESIGN
+- **變更摘要**：
+  1. **英雄面板裝備屬性顯示**：HeroListPanel 改用 `getFinalStats` 顯示含裝備+套裝的最終數值（綠色 +bonus）
+  2. **升級 UI 重做**：左右按鈕（升1級/升N級）+ HP/ATK/DEF 預覽 + 關閉後保持模態
+  3. **難度圖示改星星**：StageSelect DifficultyStars 💀→⭐ + 難度等級 tooltip
+  4. **降低 1-1/1-2 關難度**：D1 stage_configs hpMult/atkMult 減半、speedMult 降至 0.6
+  5. **移除強化石**：ShopPanel 移除所有強化石商品（小/中/大型）
+  6. **分解確認面板**：InventoryPanel 分解增加二階段確認 UI（顯示金幣+碎片預估返還）
+  7. **統一券類圖示**：ShopPanel 英雄券 🎫→🎟️、裝備券 🔨→🔧（對齊 rarity.ts）
+  8. **關卡獎勵預覽**：StageSelect 關卡卡片新增 EXP/金幣/鑽石獎勵標籤
+  9. **強化費用對齊**：前端 getEnhanceCost 倍率 0.5→0.3（對齊後端）
+  10. **經驗公式對齊**：前端 expToNextLevel 改為 `level * 100`（對齊後端）
+  11. **突破數值對齊**：等級上限 {20,40,60,80,90,100}、碎片/職業石/金幣消耗全面對齊後端
+  12. **裝備主屬性修正**：後端 enhance 不再修改 mainStatValue（消除 compound vs linear 衝突）
+- **影響檔案**：
+  - `src/components/HeroListPanel.tsx`（getFinalStats 整合 + 升級 UI）
+  - `src/components/StageSelect.tsx`（⭐星星 + 獎勵預覽 + CurrencyIcon import）
+  - `src/components/InventoryPanel.tsx`（分解確認面板）
+  - `src/components/ShopPanel.tsx`（移除強化石 + 券圖示統一）
+  - `src/domain/progressionSystem.ts`（4 項公式/常數對齊）
+  - `workers/src/routes/progression.ts`（enhance 不再修改 mainStatValue）
+  - `src/App.css`（升級 UI + 分解確認 CSS）
+  - `scripts/seed_stage_configs.sql`（1-1/1-2 敵方數值降低）
+  - `specs/progression.md`（v2.4→v2.5 全面更新）
+
+---
 ### [2026-06-19] 9 項系統簡化 — 星級/鎖定/容量移除 + 分解/碎片兌換/背包強化 新增
 
 - **觸發者**：使用者（9 項系統簡化與功能新增需求）

@@ -1,7 +1,7 @@
 # 抽卡系統 Spec
 
-> 版本：v2.3 ｜ 狀態：🟢 已實作
-> 最後更新：2026-06-19
+> 版本：v2.4 ｜ 狀態：🟢 已實作
+> 最後更新：2026-03-04
 > 負責角色：🎯 GAME_DESIGN → 🔧 CODING
 
 ## 概述
@@ -304,3 +304,4 @@ applyCurrenciesFromServer(res.currencies)
 | v2.1 | 2026-03-03 | **免費抽卡 + 抽卡券**：新增每日免費單抽（`lastFreeGachaDate` D1 欄位）；新增抽卡券系統（`gacha_ticket_hero`、`gacha_ticket_equip` 背包道具）；GachaScreen UI 改為三按鈕布局（免費/券抽、單抽、十連） |
 | **v2.2** | **2026-06-17** | **十連折扣移除 + 免費抽合併 + 裝備免費抽 + 後端貨幣權威**：十連抽不再折扣（英雄 1600、裝備鑽石池 2000）；免費單抽合併至單抽按鈕（可用時顯示「🎁 免費」，用完顯示倒數）；新增裝備鍛造鑽石池每日免費單抽（`lastEquipFreePull`）；所有抽卡 API 回傳 `currencies`，前端用 `applyCurrenciesFromServer` 覆蓋本地、移除 `onDiamondChange`/`onGoldChange` 前端預扣模式。 |
 | v2.3 | 2026-06-19 | **抽卡券取得管道擴充**：英雄召喚券（`gacha_ticket_hero`）與裝備鍛造券（`gacha_ticket_equip`）新增取得途徑——簽到獎勵（Day 3, 5, 6, 7）及特殊商店（50 鑽石/張，每日限購 3 張）。 |
+| v2.4 | 2026-03-04 | **前端狀態即時刷新修復**：召喚券/鍛造券扣除改用 `removeItemsLocally()`；新增 `updateFreePullLocally()` / `updateGachaPityLocally()` 本地同步函式；`saveService.notify()` 深複製 heroes 陣列修復 useMemo 偵測；`updateLocal()` 移除 `in` guard 允許寫入 optional fields。 |

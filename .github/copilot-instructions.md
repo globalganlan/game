@@ -12,7 +12,7 @@
    - `npx vite build`（編譯成功）
    - `cd workers && npx tsc --noEmit`（Workers 零錯誤）
    - 確認遊戲流程不會壞：登入 → 載入 → 選英雄 → 戰鬥 → 結果 → 重啟
-   - **⚠️ 必須實際開瀏覽器測試**：啟動 `npx vite --host`，在瀏覽器打開遊戲，走一遍完整流程（登入→大廳→點擊相關功能→確認無白屏/報錯），不能只靠 tsc 和 vite build 就宣稱測試通過
+   - **⚠️ 必須使用 Playwright MCP 進行瀏覽器自動化測試**：啟動 `npx vite --host`，透過 Playwright MCP 工具打開遊戲頁面，自動走一遍完整流程（登入→大廳→點擊相關功能→確認無白屏/報錯），不能只靠 tsc 和 vite build 就宣稱測試通過。Playwright MCP 已配置於 `.vscode/mcp.json`。
    - 有 bug 就修，不能把壞掉的狀態交給使用者
    - **測試通過後、回報完成前，必須播放提示音**：`[console]::beep(800,300); Start-Sleep -ms 100; [console]::beep(1000,300); Start-Sleep -ms 100; [console]::beep(1200,400)`
    - **需要使用者參與才能繼續時，也必須播放提示音**（例如：詢問需求細節、等待確認選項、需要使用者手動測試回報結果等）

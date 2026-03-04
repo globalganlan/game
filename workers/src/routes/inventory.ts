@@ -93,10 +93,44 @@ inventory.post('/load-inventory', async (c) => {
     'SELECT equipmentCapacity FROM save_data WHERE playerId = ?'
   ).bind(playerId).first<Pick<SaveDataRow, 'equipmentCapacity'>>();
 
+  // 自動修復 equippedBy 含 local_ 開頭的陳舊參照
+  const heroRows = await db.prepare(
+    'SELECT instanceId, heroId FROM hero_instances WHERE playerId = ?'
+  ).bind(playerId).all<{ instanceId: string; heroId: number }>();
+  const heroIdToInstanceId = new Map<number, string>();
+  for (const hr of heroRows.results) {
+    heroIdToInstanceId.set(hr.heroId, hr.instanceId);
+  }
+
+  const fixStmts: D1PreparedStatement[] = [];
+  const fixedEquipment = equipment.results.map((eq: EquipmentInstanceRow) => {
+    if (eq.equippedBy && eq.equippedBy.startsWith('local_')) {
+      const parts = eq.equippedBy.split('_');
+      const heroId = Number(parts[1]);
+      const realId = heroIdToInstanceId.get(heroId);
+      if (realId) {
+        fixStmts.push(db.prepare(
+          'UPDATE equipment_instances SET equippedBy = ? WHERE equipId = ? AND playerId = ?'
+        ).bind(realId, eq.equipId, playerId));
+        return { ...eq, equippedBy: realId };
+      } else {
+        // 英雄不存在，清除裝備綁定
+        fixStmts.push(db.prepare(
+          'UPDATE equipment_instances SET equippedBy = \'\' WHERE equipId = ? AND playerId = ?'
+        ).bind(eq.equipId, playerId));
+        return { ...eq, equippedBy: '' };
+      }
+    }
+    return eq;
+  });
+  if (fixStmts.length > 0) {
+    await db.batch(fixStmts).catch(() => { /* best-effort */ });
+  }
+
   return c.json({
     success: true,
     items: items.results,
-    equipment: equipment.results,
+    equipment: fixedEquipment,
     equipmentCapacity: saveData?.equipmentCapacity ?? 200,
   });
 });
@@ -374,10 +408,26 @@ inventory.post('/equip-item', async (c) => {
   const playerId = c.get('playerId');
   const body = getBody(c);
   const equipId = body.equipId as string;
-  const heroInstanceId = body.heroInstanceId as string;
+  let heroInstanceId = body.heroInstanceId as string;
   if (!equipId || !heroInstanceId) return c.json({ success: false, error: 'missing params' });
 
   const db = c.env.DB;
+
+  // 解析 local_ 開頭的前端暫時 ID → 查找真正的 server instanceId
+  if (heroInstanceId.startsWith('local_')) {
+    const parts = heroInstanceId.split('_');
+    const heroId = Number(parts[1]);
+    if (heroId > 0) {
+      const realHero = await db.prepare(
+        'SELECT instanceId FROM hero_instances WHERE playerId = ? AND heroId = ? LIMIT 1'
+      ).bind(playerId, heroId).first<{ instanceId: string }>();
+      if (realHero) {
+        heroInstanceId = realHero.instanceId;
+      } else {
+        return c.json({ success: false, error: 'hero_not_found' });
+      }
+    }
+  }
   const equip = await db.prepare(
     'SELECT slot FROM equipment_instances WHERE equipId = ? AND playerId = ?'
   ).bind(equipId, playerId).first<Pick<EquipmentInstanceRow, 'slot'>>();
@@ -393,7 +443,7 @@ inventory.post('/equip-item', async (c) => {
     ).bind(heroInstanceId, equipId, playerId),
   ]);
 
-  return c.json({ success: true });
+  return c.json({ success: true, heroInstanceId });
 });
 
 // ── 卸下裝備 ──────────────────────────────

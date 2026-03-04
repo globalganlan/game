@@ -352,6 +352,7 @@ function EquipmentDetail({ equip, onClose, heroInstances, heroNameMap }: Equipme
   const [showHeroSelect, setShowHeroSelect] = useState(false)
   const [isProcessing, setIsProcessing] = useState(false)
   const [localEquip, setLocalEquip] = useState(equip)
+  const [showDecomposeConfirm, setShowDecomposeConfirm] = useState(false)
   const slotLabel = localEquip.slot === 'weapon' ? '武器' : localEquip.slot === 'armor' ? '護甲'
     : localEquip.slot === 'ring' ? '戒指' : '鞋子'
   const slotIcon = localEquip.slot === 'weapon' ? '⚔️' : localEquip.slot === 'armor' ? '🛡️'
@@ -383,6 +384,7 @@ function EquipmentDetail({ equip, onClose, heroInstances, heroNameMap }: Equipme
   const handleDecompose = useCallback(async () => {
     if (isProcessing) return
     if (localEquip.equippedBy) { setActionMsg('請先卸下裝備再分解'); return }
+    if (!showDecomposeConfirm) { setShowDecomposeConfirm(true); return }
     setIsProcessing(true)
     const res = await decomposeEquipment([localEquip.equipId])
     setIsProcessing(false)
@@ -395,8 +397,22 @@ function EquipmentDetail({ equip, onClose, heroInstances, heroNameMap }: Equipme
       onClose()
     } else {
       setActionMsg(`分解失敗：${res.error === 'cannot_decompose_equipped' ? '請先卸下裝備' : res.error}`)
+      setShowDecomposeConfirm(false)
     }
-  }, [localEquip, isProcessing, onClose])
+  }, [localEquip, isProcessing, onClose, showDecomposeConfirm])
+
+  // 分解預覽獎勵
+  const DECOMPOSE_REWARDS: Record<string, { gold: number; scrap: number }> = {
+    N: { gold: 100, scrap: 1 }, R: { gold: 300, scrap: 2 },
+    SR: { gold: 800, scrap: 5 }, SSR: { gold: 2000, scrap: 10 },
+  }
+  const decomposePreview = useMemo(() => {
+    const reward = DECOMPOSE_REWARDS[localEquip.rarity] || DECOMPOSE_REWARDS['N']
+    return {
+      gold: reward.gold + (localEquip.enhanceLevel ?? 0) * 50,
+      scrap: reward.scrap,
+    }
+  }, [localEquip.rarity, localEquip.enhanceLevel])
 
   const handleEnhance = useCallback(async () => {
     if (isProcessing || !canEnhance) return
@@ -475,12 +491,33 @@ function EquipmentDetail({ equip, onClose, heroInstances, heroNameMap }: Equipme
               {isProcessing ? '強化中...' : `⚒️ 強化（${enhanceCost} 金）`}
             </button>
           )}
-          {!localEquip.equippedBy && (
+          {!localEquip.equippedBy && !showDecomposeConfirm && (
             <button className="inv-action-btn inv-decompose-btn" onClick={handleDecompose} disabled={isProcessing}>
               {isProcessing ? '分解中...' : '♻️ 分解'}
             </button>
           )}
         </div>
+        {/* 分解確認面板 */}
+        {showDecomposeConfirm && (
+          <div className="inv-decompose-confirm">
+            <div className="inv-decompose-confirm-title">確定要分解此裝備？</div>
+            <div className="inv-decompose-confirm-rewards">
+              <span>返還：<CurrencyIcon type="gold" /> {decomposePreview.gold} 金幣</span>
+              {localEquip.enhanceLevel > 0 && (
+                <span className="inv-decompose-enhance-note">（含強化補償 +{localEquip.enhanceLevel * 50}）</span>
+              )}
+              <span>返還：🔩 {decomposePreview.scrap} 裝備碎片</span>
+            </div>
+            <div className="inv-decompose-confirm-btns">
+              <button className="inv-action-btn inv-decompose-btn" onClick={handleDecompose} disabled={isProcessing}>
+                {isProcessing ? '分解中...' : '確認分解'}
+              </button>
+              <button className="inv-action-btn inv-cancel-btn" onClick={() => setShowDecomposeConfirm(false)}>
+                取消
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* 英雄選擇彈窗 */}
         {showHeroSelect && heroInstances && heroInstances.length > 0 && (

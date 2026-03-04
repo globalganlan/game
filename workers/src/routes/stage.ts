@@ -6,6 +6,7 @@
  */
 import { Hono } from 'hono';
 import type { Env, HonoVars } from '../types.js';
+import { getBody } from '../middleware/auth.js';
 
 const stage = new Hono<{ Bindings: Env; Variables: HonoVars }>();
 
@@ -30,13 +31,22 @@ stage.post('/list-stages', async (c) => {
     'SELECT stageId, chapter, stage, enemies, rewards, extra FROM stage_configs ORDER BY chapter, stage'
   ).all<StageConfigRow>();
 
+  const safeParse = (val: string | null | undefined, fallback: string): unknown => {
+    try {
+      return JSON.parse(val || fallback);
+    } catch (e) {
+      console.error('[list-stages] JSON.parse failed for value:', val, e);
+      return JSON.parse(fallback);
+    }
+  };
+
   const stages = (rows.results ?? []).map(r => ({
     stageId: r.stageId,
     chapter: r.chapter,
     stage: r.stage,
-    enemies: JSON.parse(r.enemies || '[]'),
-    rewards: JSON.parse(r.rewards || '{}'),
-    extra: JSON.parse(r.extra || '{}'),
+    enemies: safeParse(r.enemies, '[]'),
+    rewards: safeParse(r.rewards, '{}'),
+    extra: safeParse(r.extra, '{}'),
   }));
 
   return c.json({ success: true, stages });
@@ -49,7 +59,7 @@ stage.post('/list-stages', async (c) => {
  */
 stage.post('/stage-config', async (c) => {
   const db = c.env.DB;
-  const body = await c.req.json<{ stageId?: string }>();
+  const body = getBody(c) as { stageId?: string };
   const stageId = body.stageId;
   if (!stageId) return c.json({ success: false, error: 'missing stageId' });
 
@@ -59,15 +69,19 @@ stage.post('/stage-config', async (c) => {
 
   if (!row) return c.json({ success: false, error: 'stage_not_found' });
 
+  const safeParse = (val: string | null | undefined, fb: string): unknown => {
+    try { return JSON.parse(val || fb); } catch { return JSON.parse(fb); }
+  };
+
   return c.json({
     success: true,
     config: {
       stageId: row.stageId,
       chapter: row.chapter,
       stage: row.stage,
-      enemies: JSON.parse(row.enemies || '[]'),
-      rewards: JSON.parse(row.rewards || '{}'),
-      extra: JSON.parse(row.extra || '{}'),
+      enemies: safeParse(row.enemies, '[]'),
+      rewards: safeParse(row.rewards, '{}'),
+      extra: safeParse(row.extra, '{}'),
     },
   });
 });

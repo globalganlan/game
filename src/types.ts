@@ -69,10 +69,13 @@ export interface SlotHero extends RawHeroData {
    傷害彈窗
    ──────────────────────────── */
 
+export type DamageDisplayType = 'normal' | 'crit' | 'weakness' | 'heal' | 'dot' | 'reflect'
+
 export interface DamagePopupData {
   id: number
   uid: string
   value: number
+  damageType?: DamageDisplayType
 }
 
 /* ────────────────────────────

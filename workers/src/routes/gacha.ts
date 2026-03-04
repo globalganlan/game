@@ -159,6 +159,7 @@ gacha.post('/gacha-pull', async (c) => {
   const heroRarityMap = new Map(heroPool.map(h => [h.heroId, h.rarity]));
 
   const results: { heroId: number; rarity: string; isNew: boolean; isFeatured: boolean; stardust: number; fragments: number }[] = [];
+  const newHeroes: { heroId: number; instanceId: string }[] = [];
   const writeStmts: D1PreparedStatement[] = [];
 
   for (let p = 0; p < gen.entries.length; p++) {
@@ -178,6 +179,7 @@ gacha.post('/gacha-pull', async (c) => {
          VALUES (?, ?, ?, 1, 0, 0, '{}', ?, 0)`
       ).bind(playerId, instId, heroId, isoNow()));
       ownedSet.add(heroId);
+      newHeroes.push({ heroId, instanceId: instId });
     } else {
       const dustMap: Record<string, number> = { SSR: 25, SR: 5, R: 1, N: 1 };
       const fragMap: Record<string, number> = { N: 5, R: 5, SR: 15, SSR: 40 };
@@ -216,7 +218,7 @@ gacha.post('/gacha-pull', async (c) => {
   const currencies = await getCurrencies(db, playerId);
 
   return c.json({
-    success: true, results, diamondCost, ticketsUsed, freePullUsed, newPityState, currencies,
+    success: true, results, diamondCost, ticketsUsed, freePullUsed, newPityState, currencies, newHeroes,
   });
 });
 

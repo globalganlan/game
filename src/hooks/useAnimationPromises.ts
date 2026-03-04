@@ -8,7 +8,7 @@
  *   - clearAllPromises（清除殘留 Promise，避免 stale timeout）
  */
 import { useState, useRef, useCallback } from 'react'
-import type { DamagePopupData, ActionResolveEntry, AnimationState } from '../types'
+import type { DamagePopupData, DamageDisplayType, ActionResolveEntry, AnimationState } from '../types'
 
 export function useAnimationPromises(skipBattleRef: React.MutableRefObject<boolean>) {
   const [damagePopups, setDamagePopups] = useState<DamagePopupData[]>([])
@@ -84,11 +84,11 @@ export function useAnimationPromises(skipBattleRef: React.MutableRefObject<boole
   const handleModelReady = useCallback(() => { /* 保留介面 */ }, [])
 
   /** 新增傷害彈窗 + 觸發受擊閃光（支援複數目標） */
-  const addDamage = useCallback((targetUids: string | string[], value: number) => {
+  const addDamage = useCallback((targetUids: string | string[], value: number, damageType?: DamageDisplayType) => {
     const uids = Array.isArray(targetUids) ? targetUids : [targetUids]
     for (const uid of uids) {
       const id = Math.random()
-      setDamagePopups((prev) => [...prev, { id, uid, value }])
+      setDamagePopups((prev) => [...prev, { id, uid, value, damageType }])
       setTimeout(() => setDamagePopups((prev) => prev.filter((p) => p.id !== id)), 1500)
     }
     // 觸發受擊閃光

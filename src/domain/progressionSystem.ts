@@ -76,14 +76,14 @@ export interface EquipmentSetBonus {
    常數
    ════════════════════════════════════ */
 
-/** 突破階段等級上限 */
+/** 突破階段等級上限（與後端 progression.ts 一致） */
 export const ASCENSION_LEVEL_CAP: Record<number, number> = {
   0: 20,
-  1: 30,
-  2: 40,
-  3: 50,
-  4: 60,
-  5: 60,
+  1: 40,
+  2: 60,
+  3: 80,
+  4: 90,
+  5: 100,
 }
 
 /** 突破屬性加成（乘算）— ★3 預設，向下相容 */
@@ -155,13 +155,13 @@ export const STAR_UP_COST: Record<number, number> = {
   5: 160,   // ★5→★6
 }
 
-/** 突破素材消耗 */
+/** 突破素材消耗（與後端 progression.ts 一致） */
 export const ASCENSION_COSTS: Record<number, AscensionCost> = {
-  0: { fragments: 5,  classStones: 3,  gold: 5000 },
-  1: { fragments: 10, classStones: 8,  gold: 15000 },
-  2: { fragments: 20, classStones: 15, gold: 40000 },
-  3: { fragments: 40, classStones: 25, gold: 80000 },
-  4: { fragments: 60, classStones: 40, gold: 150000 },
+  0: { fragments: 10, classStones: 5,  gold: 5000 },
+  1: { fragments: 20, classStones: 10, gold: 10000 },
+  2: { fragments: 30, classStones: 15, gold: 20000 },
+  3: { fragments: 50, classStones: 20, gold: 40000 },
+  4: { fragments: 80, classStones: 30, gold: 80000 },
 }
 
 /** 裝備強化等級上限（依稀有度） */
@@ -230,11 +230,9 @@ export const SUB_STAT_POOL: { stat: string; minFlat: number; maxFlat: number; mi
    等級系統
    ════════════════════════════════════ */
 
-/** 升級所需經驗值 */
+/** 升級所需經驗值（與後端 progression.ts expForLevel 一致） */
 export function expToNextLevel(level: number): number {
-  const base = 100
-  const tier = Math.floor((level - 1) / 10) // 0-5
-  return Math.floor(base * Math.pow(1.8, tier) * (1 + (level % 10) * 0.15))
+  return level * 100
 }
 
 /** 某等級到下一級的累計所需經驗 */
@@ -361,10 +359,10 @@ export function getMaxEnhanceLevel(rarity: Rarity): number {
   return EQUIPMENT_MAX_ENHANCE[rarity]
 }
 
-/** 強化費用（僅金幣，v2） */
+/** 強化費用（僅金幣，v2 — 與後端 progression.ts 一致） */
 export function getEnhanceCost(currentLevel: number, rarity: Rarity): number {
   const baseCost: Record<Rarity, number> = { N: 200, R: 500, SR: 1000, SSR: 2000 }
-  return Math.floor(baseCost[rarity] * (1 + currentLevel * 0.5))
+  return Math.floor(baseCost[rarity] * (1 + currentLevel * 0.3))
 }
 
 /** 計算裝備容量上限 */
@@ -410,19 +408,17 @@ export function getSetBonus(setId: string): EquipmentSetBonus | undefined {
   return EQUIPMENT_SETS.find(s => s.setId === setId)
 }
 
-/** 計算已激活的套裝效果（同 setId + 同 rarity 才算一組） */
+/** 計算已激活的套裝效果（同 setId 即可，不限稀有度） */
 export function getActiveSetBonuses(equipment: EquipmentInstance[]): EquipmentSetBonus[] {
-  // 依 setId + rarity 分組計數
+  // 依 setId 分組計數（向上兼容：不同稀有度混搭仍觸發套裝）
   const setCounts: Record<string, number> = {}
   for (const eq of equipment) {
     if (eq.setId) {
-      const key = `${eq.setId}:${eq.rarity}`
-      setCounts[key] = (setCounts[key] || 0) + 1
+      setCounts[eq.setId] = (setCounts[eq.setId] || 0) + 1
     }
   }
   const active: EquipmentSetBonus[] = []
-  for (const [compositeKey, count] of Object.entries(setCounts)) {
-    const setId = compositeKey.split(':')[0]
+  for (const [setId, count] of Object.entries(setCounts)) {
     // 查找所有符合該 setId 的 bonus（2pc 和 4pc）
     const bonuses = EQUIPMENT_SETS.filter(s => s.setId === setId)
     for (const bonus of bonuses) {
@@ -468,11 +464,17 @@ export function getFinalStats(base: BaseStats, hero: HeroInstanceData, rarity: n
   }
 
   // Step 3: Equipment percent stats
+  // 注意：CritRate / CritDmg 的「%」副屬性代表加算百分點（+5% = +5），
+  //       而非乘算（×1.05），因為這兩個屬性本身就是百分比數值。
   const pctBonuses: Record<string, number> = {}
   for (const eq of hero.equipment) {
     for (const sub of (eq.subStats ?? [])) {
       if (sub.isPercent) {
-        pctBonuses[sub.stat] = (pctBonuses[sub.stat] || 0) + sub.value
+        if (sub.stat === 'CritRate' || sub.stat === 'CritDmg') {
+          addStatFlat(stats, sub.stat, sub.value)
+        } else {
+          pctBonuses[sub.stat] = (pctBonuses[sub.stat] || 0) + sub.value
+        }
       }
     }
   }
@@ -482,14 +484,18 @@ export function getFinalStats(base: BaseStats, hero: HeroInstanceData, rarity: n
   for (const set of activeSets) {
     if (set.bonusType.endsWith('_percent')) {
       const statName = set.bonusType.replace('_percent', '')
-      pctBonuses[statName] = (pctBonuses[statName] || 0) + set.bonusValue
+      if (statName === 'CritRate' || statName === 'CritDmg') {
+        addStatFlat(stats, statName, set.bonusValue)
+      } else {
+        pctBonuses[statName] = (pctBonuses[statName] || 0) + set.bonusValue
+      }
     } else if (set.bonusType === 'SPD_flat') {
       stats.SPD += set.bonusValue
     }
     // lifesteal / counter are handled in battle engine, not stats
   }
 
-  // Apply percent bonuses
+  // Apply percent bonuses（僅 HP/ATK/DEF/SPD 為乘算）
   for (const [stat, pct] of Object.entries(pctBonuses)) {
     applyStatPercent(stats, stat, pct)
   }

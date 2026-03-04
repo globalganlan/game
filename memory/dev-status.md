@@ -1,8 +1,8 @@
 # 開發狀態快照 — Dev Status
 
-> 最後更新：2026-03-03（第五十一次更新 — PWA standalone reload 迴圈修復：導航不攔截 + 跨域排除 + reload 防護）
+> 最後更新：2026-03-05（第五十四次更新 — 裝備暴擊修正+裝備欄完整資訊+關卡選擇佈局修正）
 
-## 截至 2026-03-03 的開發狀態
+## 截至 2026-03-05 的開發狀態
 
 ### 已完成
 - [x] 3D 喪屍對戰場景（React 19 + Vite 5 + R3F 9 + Three.js 0.183 + TypeScript 5.9）
@@ -13,6 +13,14 @@
 - [x] 提示詞模板集（`agents/prompt-playbook.md`，P-01~P-07）
 - [x] 模組化規格系統（specs/）
 - [x] 記憶持久化系統（memory/）
+- [x] **裝備暴擊屬性加算修正** — CritRate/CritDmg percent subs 改為加算百分點（+5% = +5），修復乘算 floor 歸零問題
+- [x] **裝備欄完整資訊顯示** — 英雄資訊裝備欄顯示稀有度標籤（SSR/SR/R/N）、主屬性、所有副屬性、強化等級
+- [x] **關卡選擇佈局修正** — 移除橫向捲軸，章節 tab 自動換行，4×2 網格完整顯示 8 關
+- [x] **抽卡前端狀態即時刷新** — 4 Bug 修復：召喚券/鍛造券即時扣除、免費抽狀態持久化、保底計數器持久化、新英雄即時加入列表
+  - `removeItemsLocally()` 取代 `addItemsLocally({ quantity: -N })`
+  - `updateFreePullLocally()` / `updateGachaPityLocally()` 新增匯出
+  - `notify()` 深複製 heroes + save（修復 useMemo reference 偵測）
+  - `updateLocal()` 移除 `in` guard（允許寫入 optional fields）
 - [x] **裝備圖鑑系統** — 背包「📖 圖鑑」tab，128 種裝備百科（8 套裝 × 4 部位 × 4 稀有度）
   - `src/components/CodexPanel.tsx` — 可擴展 CodexCategory 架構
   - 收集進度條 + 套裝效果展示 + 稀有度篩選 + 擁有/鎖定視覺狀態
@@ -113,13 +121,13 @@
 | progression.md | v2.3 | 🟢 EXP 資源重構（頂層資源 + 滑桿升級 UI） |
 | tech-architecture.md | v1.5 | 🟢 CurrencyIcon 統一 icon + constants 層 |
 | auth-system.md | v0.1 | 🟡 草案 |
-| save-system.md | v1.7 | 🟢 checkinDay/checkinLastDate + daily-checkin API |
+| save-system.md | v2.2 | 🟢 saveService 狀態刷新修復 + updateFreePullLocally/updateGachaPityLocally |
 | stage-system.md | v2.2 | 🟢 EXP 資源獎勵（取代 exp_core 掉落） |
-| gacha.md | v1.1 | 🟢 stardust/fragments + 本地池 |
+| gacha.md | v2.4 | 🟢 前端狀態即時刷新修復（removeItemsLocally + optional fields） |
 | element-system.md | v1.0 | 🟢 7 屬性 + 倍率矩陣 |
 | inventory.md | v2.5 | 🟢 移除 exp_core / reroll + 星塵兌換商店 + 「全部」分頁含裝備 + 碎片中文名 |
 | optimistic-queue.md | v1.0 | 🟢 3 種套用模式 |
-| local-storage-migration.md | v1.0 | 🟢 版本化遷移鏈 |
+| local-storage-migration.md | v2.0 | 🟢 舊版 key 清除器（後端權威模式） |
 | buff-debuff-icons.md | v1.0 | 🟢 3D 狀態圖示（綠底/紅底 + 疊層數） |
 | buff-apply-toast.md | v1.0 | 🟢 施加漂浮文字（DOT 中文名稱） |
 
@@ -251,11 +259,11 @@
 ### 測試
 - Vitest 1.6.1: **594 tests pass**
 - `tsc --noEmit`: 零錯誤
-- `vite build`: 成功（686 modules）
+- `vite build`: 成功（691 modules）
 
 ### 技術債
 - ~~敵方陣型隨機生成較簡陋（隨機 1~6 隻）— 需串接 stage_configs D1 表~~ ✅ 已修復（v2.0）
-- 無已知技術債
+- ~~localStorage 遊戲資料快取殘留（GAS→Workers 遷移未清理）~~ ✅ 已修復（2026-03-04）
 - heroes 表 Element 用中文（闇/毒/火/冰/雷/光），domain 用英文 — `toElement()` 橋接
 - Narrative 劇情系統（specs/narrative.md v0.1）— 已擱置
 - ESLint 殘餘 42 問題（28 errors + 14 warnings），多為 unused-vars / prefer-const / Math.random purity

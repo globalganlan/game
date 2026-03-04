@@ -9,10 +9,10 @@ DELETE FROM stage_configs;
 -- ═══════════════════════════════════════════════════════════
 
 INSERT INTO stage_configs (stageId, chapter, stage, enemies, rewards, extra)
-VALUES ('1-1', 1, 1, '[{"heroId":1,"slot":1,"levelMultiplier":1,"hpMultiplier":0.12,"atkMultiplier":0.08,"defMultiplier":0.08,"speedMultiplier":0.8}]', '{"exp":45,"gold":80,"diamond":0}', '{"chapterName":"🏙️ 廢墟之城","stageName":"城市入口","description":"傾斜的路牌指向死寂的高樓群","bgTheme":"city","difficulty":1,"recommendedLevel":1,"isBoss":false,"chapterIcon":"🏙️"}');
+VALUES ('1-1', 1, 1, '[{"heroId":1,"slot":1,"levelMultiplier":1,"hpMultiplier":0.06,"atkMultiplier":0.04,"defMultiplier":0.04,"speedMultiplier":0.6}]', '{"exp":45,"gold":80,"diamond":0}', '{"chapterName":"🏙️ 廢墟之城","stageName":"城市入口","description":"傾斜的路牌指向死寂的高樓群","bgTheme":"city","difficulty":1,"recommendedLevel":1,"isBoss":false,"chapterIcon":"🏙️"}');
 
 INSERT INTO stage_configs (stageId, chapter, stage, enemies, rewards, extra)
-VALUES ('1-2', 1, 2, '[{"heroId":1,"slot":1,"levelMultiplier":1,"hpMultiplier":0.15,"atkMultiplier":0.10,"defMultiplier":0.10,"speedMultiplier":0.8},{"heroId":2,"slot":2,"levelMultiplier":1,"hpMultiplier":0.15,"atkMultiplier":0.10,"defMultiplier":0.10,"speedMultiplier":0.8}]', '{"exp":57,"gold":98,"diamond":0}', '{"chapterName":"🏙️ 廢墟之城","stageName":"廢棄商場","description":"散落的購物車間迴盪著低沉嘶吼","bgTheme":"city","difficulty":2,"recommendedLevel":2,"isBoss":false,"chapterIcon":"🏙️"}');
+VALUES ('1-2', 1, 2, '[{"heroId":1,"slot":1,"levelMultiplier":1,"hpMultiplier":0.08,"atkMultiplier":0.05,"defMultiplier":0.05,"speedMultiplier":0.6},{"heroId":2,"slot":2,"levelMultiplier":1,"hpMultiplier":0.08,"atkMultiplier":0.05,"defMultiplier":0.05,"speedMultiplier":0.6}]', '{"exp":57,"gold":98,"diamond":0}', '{"chapterName":"🏙️ 廢墟之城","stageName":"廢棄商場","description":"散落的購物車間迴盪著低沉嘶吼","bgTheme":"city","difficulty":2,"recommendedLevel":2,"isBoss":false,"chapterIcon":"🏙️"}');
 
 INSERT INTO stage_configs (stageId, chapter, stage, enemies, rewards, extra)
 VALUES ('1-3', 1, 3, '[{"heroId":1,"slot":1,"levelMultiplier":1,"hpMultiplier":0.20,"atkMultiplier":0.15,"defMultiplier":0.15,"speedMultiplier":0.9},{"heroId":2,"slot":2,"levelMultiplier":1,"hpMultiplier":0.20,"atkMultiplier":0.15,"defMultiplier":0.15,"speedMultiplier":0.9}]', '{"exp":69,"gold":116,"diamond":0}', '{"chapterName":"🏙️ 廢墟之城","stageName":"地下車庫","description":"暗處的車輛間閃爍著不明光源","bgTheme":"city","difficulty":3,"recommendedLevel":3,"isBoss":false,"chapterIcon":"🏙️"}');

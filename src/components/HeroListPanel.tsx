@@ -21,7 +21,7 @@ import {
   getStatAtLevel, getLevelCap, consumeExpMaterials, expToNextLevel,
   canAscend, canStarUp, getAscensionCost, getStarUpCost,
   getInitialStars, enhancedMainStat, getEnhanceCost, getMaxEnhanceLevel,
-  getActiveSetBonuses,
+  getActiveSetBonuses, getFinalStats,
 } from '../domain/progressionSystem'
 import type { EquipmentInstance } from '../domain/progressionSystem'
 import {
@@ -252,7 +252,7 @@ function HeroDetail({ hero, instance, onClose, skills, heroSkills }: HeroDetailP
   const minStars = initialStars((hero as Record<string, unknown>).Rarity)
   const stars = Math.max(instance?.stars ?? minStars, minStars)
   const starMult = getStarMultiplier(stars, rarityNum)
-  const calcStat = (base: number | undefined) =>
+  const calcStatBase = (base: number | undefined) =>
     base != null ? Math.floor(getStatAtLevel(Number(base), lvl, rarityNum) * ascMult * starMult) : '?'
 
   const rarity = numToRarity(heroAny.Rarity)
@@ -337,7 +337,7 @@ function HeroDetail({ hero, instance, onClose, skills, heroSkills }: HeroDetailP
       } else {
         setResultMsg('升級失敗')
       }
-      setTimeout(() => setModalMode('none'), 1200)
+      // 升級後不關閉 Modal，讓玩家可以繼續升級
     } catch (e) {
       setResultMsg('升級失敗：' + String(e))
     } finally {
@@ -509,16 +509,57 @@ function HeroDetail({ hero, instance, onClose, skills, heroSkills }: HeroDetailP
           </div>
         </div>
 
-        {/* ── 屬性 ── */}
+        {/* ── 屬性（含裝備+套裝效果） ── */}
         <div className="hd2-section-title">屬性</div>
-        <div className="hd2-stats-grid">
-          <div className="hd2-stat"><span className="hd2-stat-label">生命</span><span className="hd2-stat-val">{calcStat(hero.HP as number)}</span></div>
-          <div className="hd2-stat"><span className="hd2-stat-label">攻擊</span><span className="hd2-stat-val">{calcStat(hero.ATK as number)}</span></div>
-          <div className="hd2-stat"><span className="hd2-stat-label">防禦</span><span className="hd2-stat-val">{calcStat(heroAny.DEF as number)}</span></div>
-          <div className="hd2-stat"><span className="hd2-stat-label">速度</span><span className="hd2-stat-val">{String(heroAny.Speed ?? heroAny.SPD ?? '?')}</span></div>
-          <div className="hd2-stat"><span className="hd2-stat-label">暴擊率</span><span className="hd2-stat-val">{String(heroAny.CritRate ?? '?')}%</span></div>
-          <div className="hd2-stat"><span className="hd2-stat-label">暴擊傷害</span><span className="hd2-stat-val">{String(heroAny.CritDmg ?? '?')}%</span></div>
-        </div>
+        {(() => {
+          const baseHP = Number(hero.HP ?? 0)
+          const baseATK = Number(hero.ATK ?? 0)
+          const baseDEF = Number(heroAny.DEF ?? 0)
+          const baseSPD = Number(heroAny.Speed ?? heroAny.SPD ?? 0)
+          const baseCR = Number(heroAny.CritRate ?? 0)
+          const baseCD = Number(heroAny.CritDmg ?? 0)
+          const baseOnly = {
+            HP: calcStatBase(baseHP) as number,
+            ATK: calcStatBase(baseATK) as number,
+            DEF: calcStatBase(baseDEF) as number,
+            SPD: baseSPD,
+            CritRate: baseCR,
+            CritDmg: baseCD,
+          }
+          // 如果有裝備，計算完整最終數值
+          const hasEquip = heroEquipment.length > 0
+          const finalStats = hasEquip ? getFinalStats(
+            { HP: baseHP, ATK: baseATK, DEF: baseDEF, SPD: baseSPD, CritRate: baseCR, CritDmg: baseCD },
+            { heroId, level: lvl, exp: instance?.exp ?? 0, ascension: asc, stars, equipment: heroEquipment },
+            rarityNum,
+          ) : null
+          const statRows: { label: string; key: keyof typeof baseOnly; suffix?: string }[] = [
+            { label: '生命', key: 'HP' },
+            { label: '攻擊', key: 'ATK' },
+            { label: '防禦', key: 'DEF' },
+            { label: '速度', key: 'SPD' },
+            { label: '暴擊率', key: 'CritRate', suffix: '%' },
+            { label: '暴擊傷害', key: 'CritDmg', suffix: '%' },
+          ]
+          return (
+            <div className="hd2-stats-grid">
+              {statRows.map(({ label, key, suffix }) => {
+                const base = baseOnly[key]
+                const final = finalStats ? finalStats[key] : base
+                const bonus = final - base
+                return (
+                  <div key={key} className="hd2-stat">
+                    <span className="hd2-stat-label">{label}</span>
+                    <span className="hd2-stat-val">
+                      {final}{suffix ?? ''}
+                      {bonus > 0 && <span style={{ color: '#4ade80', fontSize: '0.8em', marginLeft: 4 }}>(+{bonus}{suffix ?? ''})</span>}
+                    </span>
+                  </div>
+                )
+              })}
+            </div>
+          )
+        })()}
 
         {/* ── 技能 ── */}
         <div className="hd2-section-title">技能</div>
@@ -584,11 +625,23 @@ function HeroDetail({ hero, instance, onClose, skills, heroSkills }: HeroDetailP
                 {eq ? (
                   <>
                     <div className="hd2-equip-detail">
-                      <span className="hd2-equip-name">{getEquipDisplayName(eq)}</span>
-                      <span className="hd2-equip-stats">
-                        {statZh(eq.mainStat ?? '?')} +{enhancedMainStat(eq.mainStatValue ?? 0, eq.enhanceLevel ?? 0, eq.rarity ?? 'SR')}
+                      <div className="hd2-equip-header">
+                        <span className={`hd2-equip-rarity-tag rarity-${(eq.rarity || 'N').toLowerCase()}`}>{eq.rarity || 'N'}</span>
+                        <span className="hd2-equip-name">{getEquipDisplayName(eq)}</span>
                         {(eq.enhanceLevel ?? 0) > 0 && <span className="hd2-equip-lv">+{eq.enhanceLevel}</span>}
+                      </div>
+                      <span className="hd2-equip-main-stat">
+                        {statZh(eq.mainStat ?? '?')} +{enhancedMainStat(eq.mainStatValue ?? 0, eq.enhanceLevel ?? 0, eq.rarity ?? 'SR')}
                       </span>
+                      {(eq.subStats ?? []).length > 0 && (
+                        <div className="hd2-equip-sub-list">
+                          {(eq.subStats ?? []).map((sub, si) => (
+                            <span key={si} className="hd2-equip-sub-item">
+                              {statZh(sub.stat)} +{sub.value}{sub.isPercent ? '%' : ''}
+                            </span>
+                          ))}
+                        </div>
+                      )}
                     </div>
                     {isOwned && (eq.enhanceLevel ?? 0) < getMaxEnhanceLevel(eq.rarity || 'N') && (
                       <button
@@ -670,11 +723,32 @@ function HeroDetail({ hero, instance, onClose, skills, heroSkills }: HeroDetailP
         {/* ═══════ 升級 Modal ═══════ */}
         {modalMode === 'upgrade' && (
           <div className="hd2-modal-backdrop" onClick={() => setModalMode('none')}>
-            <div className="hd2-modal" onClick={e => e.stopPropagation()}>
+            <div className="hd2-modal hd2-modal-upgrade" onClick={e => e.stopPropagation()}>
               <h4 className="hd2-modal-title">📈 英雄升級</h4>
               <div className="hd2-modal-info">
-                Lv.{lvl} → 等級上限 Lv.{levelCap}
+                <strong>Lv.{lvl}</strong> / 等級上限 Lv.{levelCap}
               </div>
+
+              {/* 當前數值預覽 */}
+              <div className="hd2-upgrade-stats">
+                {[
+                  { label: '生命', base: Number(hero.HP ?? 0) },
+                  { label: '攻擊', base: Number(hero.ATK ?? 0) },
+                  { label: '防禦', base: Number(heroAny.DEF ?? 0) },
+                ].map(({ label, base }) => {
+                  const current = Math.floor(getStatAtLevel(base, lvl, rarityNum) * ascMult * starMult)
+                  const next = lvl < levelCap ? Math.floor(getStatAtLevel(base, lvl + 1, rarityNum) * ascMult * starMult) : current
+                  return (
+                    <div key={label} className="hd2-upgrade-stat-row">
+                      <span className="hd2-upgrade-stat-label">{label}</span>
+                      <span className="hd2-upgrade-stat-val">{current}</span>
+                      {lvl < levelCap && <span className="hd2-upgrade-stat-arrow">→</span>}
+                      {lvl < levelCap && <span className="hd2-upgrade-stat-next">{next}</span>}
+                    </div>
+                  )
+                })}
+              </div>
+
               <div className="hd2-material-list">
                 <div className="hd2-material-row">
                   <span className="hd2-mat-icon"><CurrencyIcon type="exp" /></span>
@@ -682,27 +756,31 @@ function HeroDetail({ hero, instance, onClose, skills, heroSkills }: HeroDetailP
                   <span className="hd2-mat-exp">可用：{availableExp.toLocaleString()}</span>
                 </div>
               </div>
-              <div className="hd2-upgrade-btns">
+
+              {resultMsg && <div className="hd2-result-msg">{resultMsg}</div>}
+
+              {/* 左右對稱按鈕 */}
+              <div className="hd2-upgrade-btn-row">
                 <button
-                  className="hd2-modal-confirm"
+                  className="hd2-modal-confirm hd2-upgrade-left"
                   disabled={!can1 || isProcessing}
                   onClick={() => handleUpgradeByLevels(1)}
                 >
-                  {isProcessing ? '處理中...' : `升 1 級（${cost1.toLocaleString()} 💚）`}
+                  {isProcessing ? '...' : <>升 1 級<br /><span className="hd2-cost-hint">{cost1.toLocaleString()} <CurrencyIcon type="exp" /></span></>}
                 </button>
-                {levelsToMax10 > 1 && (
-                  <button
-                    className="hd2-modal-confirm"
-                    disabled={!canN || isProcessing}
-                    onClick={() => handleUpgradeByLevels(levelsToMax10)}
-                  >
-                    {isProcessing ? '處理中...' : `升 ${levelsToMax10} 級（${costN.toLocaleString()} 💚）`}
-                  </button>
-                )}
+                <button
+                  className="hd2-modal-confirm hd2-upgrade-right"
+                  disabled={(!canN && levelsToMax10 > 1) || isProcessing || levelsToMax10 <= 1}
+                  onClick={() => handleUpgradeByLevels(levelsToMax10)}
+                >
+                  {isProcessing ? '...' : levelsToMax10 > 1
+                    ? <>升 {levelsToMax10} 級<br /><span className="hd2-cost-hint">{costN.toLocaleString()} <CurrencyIcon type="exp" /></span></>
+                    : '已達上限'}
+                </button>
               </div>
-              {resultMsg && <div className="hd2-result-msg">{resultMsg}</div>}
+
               <div className="hd2-modal-btns">
-                <button className="hd2-modal-cancel" onClick={() => setModalMode('none')}>取消</button>
+                <button className="hd2-modal-cancel" onClick={() => setModalMode('none')}>關閉</button>
               </div>
             </div>
           </div>

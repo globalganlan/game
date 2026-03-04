@@ -61,13 +61,7 @@ const SHOP_ITEMS: ShopItem[] = [
     rewards: [{ itemId: 'exp', quantity: 2000 }],
     dailyLimit: 3, category: 'daily',
   },
-  {
-    id: 'daily_enhance_s', name: '小型強化石 ×5', icon: '🔨',
-    description: '裝備強化用基礎素材',
-    price: 2000, currency: 'gold',
-    rewards: [{ itemId: 'eqm_enhance_s', quantity: 5 }],
-    dailyLimit: 10, category: 'daily',
-  },
+  // （強化石已移除 — 強化僅消耗金幣）
   // ── 素材商店 ──
   {
     id: 'mat_class_power', name: '力量職業石 ×1', icon: '🗡️',
@@ -120,13 +114,6 @@ const SHOP_ITEMS: ShopItem[] = [
     dailyLimit: 0, category: 'stardust',
   },
   {
-    id: 'sd_enhance_l', name: '大型強化石 ×3', icon: '🔨',
-    description: '裝備強化用高級素材',
-    price: 25, currency: 'stardust',
-    rewards: [{ itemId: 'eqm_enhance_l', quantity: 3 }],
-    dailyLimit: 0, category: 'stardust',
-  },
-  {
     id: 'sd_chest_gold', name: '金級寶箱 ×1', icon: '🥇',
     description: '頂級獎勵，含大量資源與經驗',
     price: 50, currency: 'stardust',
@@ -149,14 +136,14 @@ const SHOP_ITEMS: ShopItem[] = [
     dailyLimit: 5, category: 'special',
   },
   {
-    id: 'special_ticket_hero', name: '英雄召喚券 ×1', icon: '🎫',
+    id: 'special_ticket_hero', name: '英雄召喚券 ×1', icon: '�️',
     description: '可用於英雄召喚，免費抽取一次',
     price: 50, currency: 'diamond',
     rewards: [{ itemId: 'gacha_ticket_hero', quantity: 1 }],
     dailyLimit: 3, category: 'special',
   },
   {
-    id: 'special_ticket_equip', name: '裝備鍛造券 ×1', icon: '🔨',
+    id: 'special_ticket_equip', name: '裝備鍛造券 ×1', icon: '�',
     description: '可用於裝備鍛造，免費鍛造一次',
     price: 50, currency: 'diamond',
     rewards: [{ itemId: 'gacha_ticket_equip', quantity: 1 }],
@@ -164,14 +151,14 @@ const SHOP_ITEMS: ShopItem[] = [
   },
   // ── 星塵兌換店（召喚券） ──
   {
-    id: 'sd_ticket_hero', name: '英雄召喚券 ×1', icon: '🎫',
+    id: 'sd_ticket_hero', name: '英雄召喚券 ×1', icon: '�️',
     description: '用星塵兌換英雄召喚券',
     price: 30, currency: 'stardust',
     rewards: [{ itemId: 'gacha_ticket_hero', quantity: 1 }],
     dailyLimit: 0, category: 'stardust',
   },
   {
-    id: 'sd_ticket_equip', name: '裝備鍛造券 ×1', icon: '🔨',
+    id: 'sd_ticket_equip', name: '裝備鍛造券 ×1', icon: '�',
     description: '用星塵兌換裝備鍛造券',
     price: 30, currency: 'stardust',
     rewards: [{ itemId: 'gacha_ticket_equip', quantity: 1 }],
@@ -183,27 +170,6 @@ const SHOP_ITEMS: ShopItem[] = [
     description: '用裝備碎片兌換隨機裝備寶箱',
     price: 10, currency: 'equip_scrap',
     rewards: [{ itemId: 'chest_equipment', quantity: 1 }],
-    dailyLimit: 0, category: 'scrap',
-  },
-  {
-    id: 'scrap_enhance_s', name: '小型強化石 ×5', icon: '🔨',
-    description: '用碎片兌換裝備強化素材',
-    price: 3, currency: 'equip_scrap',
-    rewards: [{ itemId: 'eqm_enhance_s', quantity: 5 }],
-    dailyLimit: 0, category: 'scrap',
-  },
-  {
-    id: 'scrap_enhance_m', name: '中型強化石 ×3', icon: '🔨',
-    description: '用碎片兌換中級強化素材',
-    price: 8, currency: 'equip_scrap',
-    rewards: [{ itemId: 'eqm_enhance_m', quantity: 3 }],
-    dailyLimit: 0, category: 'scrap',
-  },
-  {
-    id: 'scrap_enhance_l', name: '大型強化石 ×2', icon: '🔨',
-    description: '用碎片兌換高級強化素材',
-    price: 15, currency: 'equip_scrap',
-    rewards: [{ itemId: 'eqm_enhance_l', quantity: 2 }],
     dailyLimit: 0, category: 'scrap',
   },
 ]

@@ -11,8 +11,6 @@ import type { InventoryItem } from './saveService'
 import type { EquipmentInstance, EquipmentSlot, Rarity, SubStat } from '../domain/progressionSystem'
 import { getEnhanceCost, getMaxEnhanceLevel, enhancedMainStat } from '../domain/progressionSystem'
 
-const STORAGE_KEY_INVENTORY = 'globalganlan_inventory_cache'
-
 /* 
    型別
     */
@@ -58,21 +56,6 @@ function notify(): void {
   for (const fn of listeners) fn(snapshot)
 }
 
-function saveInventoryToLocal(): void {
-  if (!inventoryState) return
-  try {
-    localStorage.setItem(STORAGE_KEY_INVENTORY, JSON.stringify(inventoryState.items))
-  } catch { /* 容量不足忽略 */ }
-}
-
-function loadInventoryFromLocal(): InventoryItem[] | null {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY_INVENTORY)
-    if (raw) return JSON.parse(raw) as InventoryItem[]
-  } catch { /* 損壞忽略 */ }
-  return null
-}
-
 /* 
    道具定義（靜態資料）
     */
@@ -108,22 +91,8 @@ export async function loadInventory(): Promise<InventoryState> {
 
   const equipment = (res.equipment || []).map(parseEquipment)
   const serverItems = res.items || []
-  const localItems = loadInventoryFromLocal()
-  let mergedItems = serverItems
-  if (localItems) {
-    const map = new Map<string, number>()
-    for (const it of serverItems) map.set(it.itemId, it.quantity)
-    for (const it of localItems) {
-      // 只保留伺服器端已知的道具（避免 localStorage 殘留已刪除的道具）
-      if (!map.has(it.itemId)) continue
-      const sv = map.get(it.itemId) ?? 0
-      if (it.quantity > sv) map.set(it.itemId, it.quantity)
-    }
-    mergedItems = [...map.entries()].map(([itemId, quantity]) => ({ itemId, quantity }))
-  }
 
-  inventoryState = { items: mergedItems, equipment, equipmentCapacity: res.equipmentCapacity || 200, definitions }
-  saveInventoryToLocal()
+  inventoryState = { items: serverItems, equipment, equipmentCapacity: res.equipmentCapacity || 200, definitions }
   notify()
   return inventoryState
 }
@@ -133,7 +102,6 @@ export async function addItems(items: { itemId: string; quantity: number }[]): P
   if (!res.success) return false
   if (inventoryState && res.inventory) {
     inventoryState.items = res.inventory
-    saveInventoryToLocal()
     notify()
   }
   return true
@@ -144,7 +112,6 @@ export async function removeItems(items: { itemId: string; quantity: number }[])
   if (!res.success) return false
   if (inventoryState && res.inventory) {
     inventoryState.items = res.inventory
-    saveInventoryToLocal()
     notify()
   }
   return true
@@ -161,7 +128,6 @@ export async function sellItems(items: { itemId: string; quantity: number }[]): 
       const existing = inventoryState.items.find(i => i.itemId === sold.itemId)
       if (existing) existing.quantity = Math.max(0, existing.quantity - sold.quantity)
     }
-    saveInventoryToLocal()
     notify()
   }
   try {
@@ -187,7 +153,6 @@ export async function useItem(
     const existing = inventoryState.items.find(i => i.itemId === itemId)
     if (existing) {
       existing.quantity = Math.max(0, existing.quantity - quantity)
-      saveInventoryToLocal()
       notify()
     }
   }
@@ -207,7 +172,15 @@ export async function equipItem(equipId: string, heroInstanceId: string): Promis
     if (eq) eq.equippedBy = heroInstanceId
     notify()
   }
-  const res = await callApi('equip-item', { equipId, heroInstanceId })
+  const res = await callApi<{ success: boolean; heroInstanceId?: string }>('equip-item', { equipId, heroInstanceId })
+  // 後端可能將 local_ ID 解析為真實 instanceId，同步回本地
+  if (res.success && res.heroInstanceId && res.heroInstanceId !== heroInstanceId) {
+    if (inventoryState) {
+      const eq = inventoryState.equipment.find(e => e.equipId === equipId)
+      if (eq) eq.equippedBy = res.heroInstanceId
+      notify()
+    }
+  }
   return res.success
 }
 
@@ -349,14 +322,12 @@ export function getInventoryState(): InventoryState | null {
 export function clearInventoryCache(): void {
   inventoryState = null
   cachedDefinitions = null
-  localStorage.removeItem(STORAGE_KEY_INVENTORY)
   notify()
 }
 
 export function addItemsLocally(items: { itemId: string; quantity: number }[]): void {
   if (!inventoryState) {
-    const localItems = loadInventoryFromLocal() ?? []
-    inventoryState = { items: localItems, equipment: [], equipmentCapacity: 200, definitions: cachedDefinitions ?? new Map() }
+    inventoryState = { items: [], equipment: [], equipmentCapacity: 200, definitions: cachedDefinitions ?? new Map() }
   }
   let changed = false
   for (const { itemId, quantity } of items) {
@@ -365,13 +336,12 @@ export function addItemsLocally(items: { itemId: string; quantity: number }[]): 
     if (existing) { existing.quantity += quantity } else { inventoryState.items.push({ itemId, quantity }) }
     changed = true
   }
-  if (changed) { saveInventoryToLocal(); notify() }
+  if (changed) { notify() }
 }
 
 export function removeItemsLocally(items: { itemId: string; quantity: number }[]): void {
   if (!inventoryState) {
-    const localItems = loadInventoryFromLocal() ?? []
-    inventoryState = { items: localItems, equipment: [], equipmentCapacity: 200, definitions: cachedDefinitions ?? new Map() }
+    inventoryState = { items: [], equipment: [], equipmentCapacity: 200, definitions: cachedDefinitions ?? new Map() }
   }
   let changed = false
   for (const { itemId, quantity } of items) {
@@ -379,19 +349,17 @@ export function removeItemsLocally(items: { itemId: string; quantity: number }[]
     const existing = inventoryState.items.find(i => i.itemId === itemId)
     if (existing) { existing.quantity = Math.max(0, existing.quantity - quantity); changed = true }
   }
-  if (changed) { saveInventoryToLocal(); notify() }
+  if (changed) { notify() }
 }
 
 export function addEquipmentLocally(equipment: EquipmentInstance[]): void {
   if (!inventoryState) {
-    const localItems = loadInventoryFromLocal() ?? []
-    inventoryState = { items: localItems, equipment: [], equipmentCapacity: 200, definitions: cachedDefinitions ?? new Map() }
+    inventoryState = { items: [], equipment: [], equipmentCapacity: 200, definitions: cachedDefinitions ?? new Map() }
   }
   if (equipment.length === 0) return
   // 透過 parseEquipment 正規化，避免 rarity/subStats 為 undefined 或字串導致崩潰
   const normalized = equipment.map(eq => parseEquipment(eq))
   inventoryState.equipment.push(...normalized)
-  try { localStorage.setItem('gg_equipment_cache', JSON.stringify(inventoryState.equipment)) } catch { /* ignore */ }
   notify()
 }
 

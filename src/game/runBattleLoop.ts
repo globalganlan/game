@@ -102,7 +102,7 @@ export interface BattleLoopContext {
   setBuffApplyHints: Dispatch<SetStateAction<BuffApplyHint[]>>
 
   /* ── Animation promise callbacks ── */
-  addDamage: (targetUids: string | string[], value: number) => void
+  addDamage: (targetUids: string | string[], value: number, damageType?: import('../types').DamageDisplayType) => void
   waitForAction: (uid: string, expectedState?: AnimationState | null) => Promise<void>
   waitForMove: (uid: string) => Promise<void>
   clearAllPromises: () => void
@@ -317,13 +317,13 @@ export async function executeBattleLoop(ctx: BattleLoopContext, replayActions?: 
   }
 
   /** 播放單一目標受擊/死亡動畫 */
-  const playHitOrDeath = async (targetUid: string, dmg: number, killed: boolean, isDodge: boolean) => {
+  const playHitOrDeath = async (targetUid: string, dmg: number, killed: boolean, isDodge: boolean, damageType?: import('../types').DamageDisplayType) => {
     if (isDodge) {
       addDamage(targetUid, 0) // MISS
       await delay(350)
       return
     }
-    addDamage(targetUid, dmg)
+    addDamage(targetUid, dmg, damageType)
     if (!skipBattleRef.current) audioManager.playSfx('hit_normal')
     const hero = heroMap.get(targetUid)
     if (!hero) return
@@ -418,7 +418,11 @@ export async function executeBattleLoop(ctx: BattleLoopContext, replayActions?: 
         if (actorStatesRef.current[action.attackerUid] === 'DEAD') break
         // ★ 目標已死 → 只顯傷害數字
         if (actorStatesRef.current[action.targetUid] === 'DEAD') {
-          if (!action.result.isDodge) addDamage(action.targetUid, action.result.damage)
+          if (!action.result.isDodge) {
+            const deadDmgType: import('../types').DamageDisplayType = action.result.isCrit ? 'crit'
+              : (action.result.elementMult && action.result.elementMult > 1.0) ? 'weakness' : 'normal'
+            addDamage(action.targetUid, action.result.damage, deadDmgType)
+          }
           break
         }
 
@@ -459,14 +463,16 @@ export async function executeBattleLoop(ctx: BattleLoopContext, replayActions?: 
         if (action.result.isCrit && !skipBattleRef.current) audioManager.playSfx('hit_critical')
 
         // 3+4) 受傷/死亡 與 攻擊者後退 同時並行
-        const hitPromise = playHitOrDeath(action.targetUid, action.result.damage, action.killed, action.result.isDodge)
+        const hitDmgType: import('../types').DamageDisplayType = action.result.isCrit ? 'crit'
+          : (action.result.elementMult && action.result.elementMult > 1.0) ? 'weakness' : 'normal'
+        const hitPromise = playHitOrDeath(action.targetUid, action.result.damage, action.killed, action.result.isDodge, hitDmgType)
 
         const retreatPromise = (async () => {
           await atkDone
           if ((heroMap.get(action.attackerUid)?.currentHP ?? 0) > 0) {
             // ★ 反彈傷害但存活
             if (action.result.reflectDamage > 0) {
-              addDamage(action.attackerUid, action.result.reflectDamage)
+              addDamage(action.attackerUid, action.result.reflectDamage, 'reflect')
               const atkHero = heroMap.get(action.attackerUid)
               if (atkHero) syncHpToSlot(atkHero)
             }
@@ -477,7 +483,7 @@ export async function executeBattleLoop(ctx: BattleLoopContext, replayActions?: 
             // ★ 攻擊者被反彈傷害致死
             const atkHero = heroMap.get(action.attackerUid)
             if (atkHero) {
-              if (action.result.reflectDamage > 0) addDamage(action.attackerUid, action.result.reflectDamage)
+              if (action.result.reflectDamage > 0) addDamage(action.attackerUid, action.result.reflectDamage, 'reflect')
               syncHpToSlot(atkHero)
               if (!skipBattleRef.current) audioManager.playSfx('death')
               const deadDone = waitForAction(action.attackerUid, 'DEAD')
@@ -591,12 +597,17 @@ export async function executeBattleLoop(ctx: BattleLoopContext, replayActions?: 
             })
           }
           if (m.damage > 0 || m.isDodge) {
-            const p = playHitOrDeath(uid, m.damage, m.killed, m.isDodge)
+            // 技能多目標：從 action.targets 取該 uid 的暴擊/屬性資訊
+            const tgtResult = action.targets.find((t: { uid: string; result: DamageResult | { heal: number } }) => t.uid === uid && 'damage' in t.result)
+            const dr = tgtResult?.result as DamageResult | undefined
+            const skillDmgType: import('../types').DamageDisplayType = dr?.isCrit ? 'crit'
+              : (dr?.elementMult && dr.elementMult > 1.0) ? 'weakness' : 'normal'
+            const p = playHitOrDeath(uid, m.damage, m.killed, m.isDodge, skillDmgType)
             if (m.killed) deathPromises.push(p)
             else hurtPromises.push(p)
           }
           if (m.heal > 0) {
-            addDamage(uid, -m.heal) // 負值 = 治療
+            addDamage(uid, -m.heal, 'heal') // 負值 = 治療
             const hero = heroMap.get(uid)
             if (hero) syncHpToSlot(hero)
           }
@@ -615,7 +626,7 @@ export async function executeBattleLoop(ctx: BattleLoopContext, replayActions?: 
               return sum
             }, 0)
             if (totalReflect > 0) {
-              addDamage(action.attackerUid, totalReflect)
+              addDamage(action.attackerUid, totalReflect, 'reflect')
               const atkHeroAlive = heroMap.get(action.attackerUid)
               if (atkHeroAlive) syncHpToSlot(atkHeroAlive)
             }
@@ -645,7 +656,7 @@ export async function executeBattleLoop(ctx: BattleLoopContext, replayActions?: 
 
       case 'DOT_TICK': {
         if (action.damage > 0) {
-          addDamage(action.targetUid, action.damage)
+          addDamage(action.targetUid, action.damage, 'dot')
           const hero = heroMap.get(action.targetUid)
           if (hero) {
             syncHpToSlot(hero)
@@ -666,7 +677,7 @@ export async function executeBattleLoop(ctx: BattleLoopContext, replayActions?: 
 
       case 'PASSIVE_DAMAGE': {
         if (action.damage > 0) {
-          addDamage(action.targetUid, action.damage)
+          addDamage(action.targetUid, action.damage, 'normal')
           const hero = heroMap.get(action.targetUid)
           if (hero) {
             syncHpToSlot(hero)

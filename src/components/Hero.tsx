@@ -240,7 +240,7 @@ export function Hero({
         </Suspense>
 
         {damagePopups.map((pop) => (
-          <DamagePopup key={pop.id} value={pop.value} position={[0, 2.5, 0]} textScale={textScale} />
+          <DamagePopup key={pop.id} value={pop.value} damageType={pop.damageType} position={[0, 2.5, 0]} textScale={textScale} />
         ))}
 
         {/* 技能名稱浮動標示（身體位置） */}

@@ -72,17 +72,22 @@ interface DamagePopupProps {
   value: number
   position: Vector3Tuple
   textScale?: number
+  damageType?: import('../types').DamageDisplayType
 }
 
 /** 浮動傷害數字（向上飄移 + 淡出） */
-export function DamagePopup({ value, position, textScale = 1 }: DamagePopupProps) {
+export function DamagePopup({ value, position, textScale = 1, damageType }: DamagePopupProps) {
   const ref = useRef<THREE.Group>(null)
   const [opacity, setOpacity] = useState(1)
 
+  const isCrit = damageType === 'crit'
+  const isWeakness = damageType === 'weakness'
+  const fadeSpeed = isCrit ? 0.6 : 0.8  // 暴擊飄字停留更久
+
   useFrame((_state, delta) => {
     if (ref.current) {
-      ref.current.position.y += delta * 0.2
-      setOpacity((prev) => Math.max(0, prev - delta * 0.8))
+      ref.current.position.y += delta * (isCrit ? 0.25 : 0.2)
+      setOpacity((prev) => Math.max(0, prev - delta * fadeSpeed))
     }
   })
 
@@ -90,17 +95,37 @@ export function DamagePopup({ value, position, textScale = 1 }: DamagePopupProps
 
   const isHeal = value < 0
   const displayValue = Math.abs(value)
-  const displayText = isHeal ? `+${displayValue}` : value === 0 ? '閃避' : `-${displayValue}`
-  const textColor = isHeal ? '#00ff88' : value === 0 ? '#aaaaaa' : '#ff0000'
+  let displayText: string
+  let textColor: string
+  let fontSize = 1.0
+
+  if (isHeal) {
+    displayText = `+${displayValue}`
+    textColor = '#00ff88'
+  } else if (value === 0) {
+    displayText = '閃避'
+    textColor = '#aaaaaa'
+  } else if (isCrit) {
+    displayText = `💥${displayValue}`
+    textColor = '#ffaa00'
+    fontSize = 1.35  // 暴擊放大 35%
+  } else if (isWeakness) {
+    displayText = `-${displayValue}`
+    textColor = '#e63946'  // 屬性剋制：深紅
+    fontSize = 1.15
+  } else {
+    displayText = `-${displayValue}`
+    textColor = '#ff0000'
+  }
 
   return (
     <Billboard position={position} ref={ref}>
       <Text
         font={LOCAL_FONT}
-        fontSize={1.0 * textScale}
+        fontSize={fontSize * textScale}
         color={textColor}
-        outlineColor="white"
-        outlineWidth={0.05}
+        outlineColor={isCrit ? '#663300' : 'white'}
+        outlineWidth={isCrit ? 0.08 : 0.05}
         fillOpacity={opacity}
         outlineOpacity={opacity}
       >

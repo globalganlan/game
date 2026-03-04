@@ -1,14 +1,39 @@
-# LocalStorage Schema Migration Spec
+# LocalStorage 清除 Spec（原 Schema Migration）
 
-> 版本：v1.0 ｜ 狀態：🟢 已實作
-> 最後更新：2026-02-27
+> 版本：v2.0 ｜ 狀態：🟢 已實作
+> 最後更新：2026-03-04
 > 負責角色：🔧 CODING
 
 ## 概述
 
-前端透過 localStorage 儲存 7 組資料（guest token、存檔快取、樂觀佇列、抽卡池、保底狀態、擁有英雄、待同步抽卡）。當功能迭代導致資料結構變更時，舊用戶的 localStorage 與新程式碼不匹配，會引發 runtime 錯誤（例如 `Cannot create property on string`、`undefined-undefined` 顯示異常）。
+後端已從 GAS + Google Sheets 遷移至 Cloudflare Workers + D1，**遊戲資料不再存 localStorage**。
+後端為唯一權威資料來源（backend-authoritative）。
 
-本 spec 定義一套 **版本化 + 自動遷移** 機制，確保任何 localStorage schema 變更都能平滑處理。
+本模組已從「版本化遷移引擎」簡化為「舊版 key 一次性清除器」，
+在 React 渲染前同步清除所有舊版 localStorage 遊戲資料 key。
+
+### 保留的 localStorage key（純前端偏好/認證）
+| Key | 用途 |
+|-----|------|
+| `globalganlan_guest_token` | 登入 token |
+| `globalganlan_logged_out` | 登出旗標 |
+| `globalganlan_tutorial_step` | 新手教學進度（0~5） |
+| `battleSpeed` | 戰鬥速度偏好（x1/x2/x4） |
+| `gg_audio_settings` | 音效設定 |
+
+### 清除的 localStorage key（舊版遊戲資料）
+| Key | 舊用途 |
+|-----|--------|
+| `globalganlan_save_cache` | 存檔快取 |
+| `globalganlan_inventory_cache` | 背包快取 |
+| `globalganlan_pending_ops` | 樂觀佇列 |
+| `globalganlan_gacha_pool` | 抽卡池 |
+| `globalganlan_gacha_pity` | 保底狀態 |
+| `globalganlan_owned_heroes` | 擁有英雄 |
+| `globalganlan_pending_pulls` | 待同步抽卡 |
+| `globalganlan_schema_version` | 遷移版本號 |
+| `gg_equipment_cache` | 裝備快取 |
+| `gg_checkin_date` | 簽到日期 |
 
 ## 依賴
 

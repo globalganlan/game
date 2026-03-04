@@ -9,6 +9,18 @@ import { isoNow } from '../utils/helpers.js';
 
 const progression = new Hono<{ Bindings: Env; Variables: HonoVars }>();
 
+/** 解析前端暫時 local_ ID → 查找真正的 server instanceId */
+async function resolveInstanceId(db: D1Database, playerId: string, instanceId: string): Promise<string | null> {
+  if (!instanceId.startsWith('local_')) return instanceId;
+  const parts = instanceId.split('_');
+  const heroId = Number(parts[1]);
+  if (!heroId || heroId <= 0) return null;
+  const row = await db.prepare(
+    'SELECT instanceId FROM hero_instances WHERE playerId = ? AND heroId = ? LIMIT 1'
+  ).bind(playerId, heroId).first<{ instanceId: string }>();
+  return row?.instanceId ?? null;
+}
+
 // 每級所需經驗（簡化公式：level * 100）
 function expForLevel(level: number): number {
   return level * 100;
@@ -27,7 +39,7 @@ progression.post('/upgrade-hero', async (c) => {
   const playerId = c.get('playerId');
   const db = c.env.DB;
   const body = getBody(c);
-  const instanceId = body.instanceId as string;
+  const rawInstanceId = body.instanceId as string;
   const expAmount = Number(body.expAmount) || 0;
   // 舊版 materials 格式已廢棄（exp_core 已移除），僅保留參數解析以防舊版客戶端
   const materials = body.materials as Array<{ itemId: string; quantity: number }> | undefined;
@@ -39,7 +51,11 @@ progression.post('/upgrade-hero', async (c) => {
       totalExpInput += (EXP_MATERIALS[mat.itemId] || 0) * (Number(mat.quantity) || 0);
     }
   }
-  if (!instanceId || totalExpInput <= 0) return c.json({ success: false, error: 'missing params' });
+  if (!rawInstanceId || totalExpInput <= 0) return c.json({ success: false, error: 'missing params' });
+
+  // 解析 local_ 暫時 ID
+  const instanceId = await resolveInstanceId(db, playerId, rawInstanceId);
+  if (!instanceId) return c.json({ success: false, error: 'hero_not_found' });
 
   const hero = await db.prepare(
     'SELECT * FROM hero_instances WHERE instanceId = ? AND playerId = ?'
@@ -97,8 +113,11 @@ progression.post('/ascend-hero', async (c) => {
   const playerId = c.get('playerId');
   const db = c.env.DB;
   const body = getBody(c);
-  const instanceId = body.instanceId as string;
-  if (!instanceId) return c.json({ success: false, error: 'missing instanceId' });
+  const rawInstanceId = body.instanceId as string;
+  if (!rawInstanceId) return c.json({ success: false, error: 'missing instanceId' });
+
+  const instanceId = await resolveInstanceId(db, playerId, rawInstanceId);
+  if (!instanceId) return c.json({ success: false, error: 'hero_not_found' });
 
   const hero = await db.prepare(
     'SELECT * FROM hero_instances WHERE instanceId = ? AND playerId = ?'
@@ -165,8 +184,11 @@ progression.post('/star-up-hero', async (c) => {
   const playerId = c.get('playerId');
   const db = c.env.DB;
   const body = getBody(c);
-  const instanceId = body.instanceId as string;
-  if (!instanceId) return c.json({ success: false, error: 'missing instanceId' });
+  const rawInstanceId = body.instanceId as string;
+  if (!rawInstanceId) return c.json({ success: false, error: 'missing instanceId' });
+
+  const instanceId = await resolveInstanceId(db, playerId, rawInstanceId);
+  if (!instanceId) return c.json({ success: false, error: 'hero_not_found' });
 
   const hero = await db.prepare(
     'SELECT * FROM hero_instances WHERE instanceId = ? AND playerId = ?'
@@ -218,10 +240,8 @@ progression.post('/enhance-equipment', async (c) => {
   if ((saveData?.gold ?? 0) < goldCost) return c.json({ success: false, error: 'insufficient_gold' });
 
   const newLevel = equip.enhanceLevel + 1;
-  // 主屬性成長率
-  const growthMap: Record<string, number> = { N: 0.06, R: 0.08, SR: 0.10, SSR: 0.12 };
-  const growth = growthMap[equip.rarity] || 0.06;
-  const newMainStatValue = Math.round(equip.mainStatValue * (1 + growth) * 100) / 100;
+  // 主屬性由前端根據 base + enhanceLevel 計算顯示值
+  // 不再更新 mainStatValue，避免 compound growth 與前端 linear 公式不一致
 
   // 原子交易：扣金幣 + 強化
   await db.batch([
@@ -229,14 +249,14 @@ progression.post('/enhance-equipment', async (c) => {
       'UPDATE save_data SET gold = gold - ? WHERE playerId = ?'
     ).bind(goldCost, playerId),
     db.prepare(
-      'UPDATE equipment_instances SET enhanceLevel = ?, mainStatValue = ? WHERE equipId = ?'
-    ).bind(newLevel, newMainStatValue, equipId),
+      'UPDATE equipment_instances SET enhanceLevel = ? WHERE equipId = ?'
+    ).bind(newLevel, equipId),
   ]);
 
   return c.json({
     success: true,
     newLevel,
-    newMainStatValue,
+    newMainStatValue: equip.mainStatValue,  // 回傳 base 值，前端自行計算
     goldConsumed: goldCost,
     currencies: await getCurrencies(db, playerId),
   });

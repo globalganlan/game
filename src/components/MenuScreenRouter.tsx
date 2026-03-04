@@ -120,7 +120,7 @@ export function MenuScreenRouter(props: MenuScreenRouterProps) {
           onBack={onBack}
           onDiamondChange={onDiamondChange}
           onGoldChange={onGoldChange}
-          onPullSuccess={(newHeroIds) => addHeroesLocally(newHeroIds)}
+          onPullSuccess={(newHeroes) => addHeroesLocally(newHeroes)}
           initialPity={gachaPity}
         />
       )
