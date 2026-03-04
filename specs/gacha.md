@@ -1,7 +1,7 @@
 # 抽卡系統 Spec
 
-> 版本：v2.2 ｜ 狀態：🟢 已實作
-> 最後更新：2026-06-17
+> 版本：v2.3 ｜ 狀態：🟢 已實作
+> 最後更新：2026-06-19
 > 負責角色：🎯 GAME_DESIGN → 🔧 CODING
 
 ## 概述
@@ -119,8 +119,8 @@ interface PityState {
 
 | 抽卡券 itemId | 適用卡池 | 來源 |
 |-----------------|---------|------|
-| `gacha_ticket_hero` | 英雄抽卡 | 簽到獎勵、活動信件、商店購買 |
-| `gacha_ticket_equip` | 裝備抽卡 | 簽到獎勵、活動信件、商店購買 |
+| `gacha_ticket_hero` | 英雄抽卡 | 簽到獎勵（Day 3, 5, 6, 7）、特殊商店（50 鑽/張，每日限購 3 張）、活動信件 |
+| `gacha_ticket_equip` | 裝備抽卡 | 簽到獎勵（Day 3, 5, 6, 7）、特殊商店（50 鑽/張，每日限購 3 張）、活動信件 |
 
 - 使用抽卡券時保底計數正常累計
 - 十連抽也支援抽卡券（券不足以鑽石補差）
@@ -303,3 +303,4 @@ applyCurrenciesFromServer(res.currencies)
 | **v2.0** | **2026-06-16** | **重大改版**：移除 400 筆預生成池機制，改為即時 API 生成。刪除 `gachaLocalPool.ts`、`gachaPreloadService.ts`。移除 `refill-pool`、`gacha-pool-status` 端點。前端 `doPull()` 改為 async API 呼叫。後端 `gacha-pull` 回傳 stardust/fragments 欄位。 |
 | v2.1 | 2026-03-03 | **免費抽卡 + 抽卡券**：新增每日免費單抽（`lastFreeGachaDate` D1 欄位）；新增抽卡券系統（`gacha_ticket_hero`、`gacha_ticket_equip` 背包道具）；GachaScreen UI 改為三按鈕布局（免費/券抽、單抽、十連） |
 | **v2.2** | **2026-06-17** | **十連折扣移除 + 免費抽合併 + 裝備免費抽 + 後端貨幣權威**：十連抽不再折扣（英雄 1600、裝備鑽石池 2000）；免費單抽合併至單抽按鈕（可用時顯示「🎁 免費」，用完顯示倒數）；新增裝備鍛造鑽石池每日免費單抽（`lastEquipFreePull`）；所有抽卡 API 回傳 `currencies`，前端用 `applyCurrenciesFromServer` 覆蓋本地、移除 `onDiamondChange`/`onGoldChange` 前端預扣模式。 |
+| v2.3 | 2026-06-19 | **抽卡券取得管道擴充**：英雄召喚券（`gacha_ticket_hero`）與裝備鍛造券（`gacha_ticket_equip`）新增取得途徑——簽到獎勵（Day 3, 5, 6, 7）及特殊商店（50 鑽石/張，每日限購 3 張）。 |

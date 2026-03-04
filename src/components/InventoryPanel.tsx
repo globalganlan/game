@@ -16,13 +16,14 @@ import {
   onInventoryChange,
   sellItems,
   useItem,
-  lockEquipment,
+  decomposeEquipment,
+  enhanceEquipment,
   type ItemCategory,
   type ItemDefinition,
   type InventoryState,
 } from '../services/inventoryService'
 import type { EquipmentInstance } from '../domain/progressionSystem'
-import { enhancedMainStat } from '../domain/progressionSystem'
+import { enhancedMainStat, getMaxEnhanceLevel, getEnhanceCost } from '../domain/progressionSystem'
 import { emitAcquire } from '../services/acquireToastBus'
 import { emitToast } from '../services/acquireToastBus'
 import { openEquipmentChest, getEquipDisplayName, SET_NAMES } from '../domain/equipmentGacha'
@@ -349,36 +350,67 @@ interface EquipmentDetailProps {
 function EquipmentDetail({ equip, onClose, heroInstances, heroNameMap }: EquipmentDetailProps) {
   const [actionMsg, setActionMsg] = useState('')
   const [showHeroSelect, setShowHeroSelect] = useState(false)
-  const slotLabel = equip.slot === 'weapon' ? '武器' : equip.slot === 'armor' ? '護甲'
-    : equip.slot === 'ring' ? '戒指' : '鞋子'
-  const slotIcon = equip.slot === 'weapon' ? '⚔️' : equip.slot === 'armor' ? '🛡️'
-    : equip.slot === 'ring' ? '💍' : '👢'
+  const [isProcessing, setIsProcessing] = useState(false)
+  const [localEquip, setLocalEquip] = useState(equip)
+  const slotLabel = localEquip.slot === 'weapon' ? '武器' : localEquip.slot === 'armor' ? '護甲'
+    : localEquip.slot === 'ring' ? '戒指' : '鞋子'
+  const slotIcon = localEquip.slot === 'weapon' ? '⚔️' : localEquip.slot === 'armor' ? '🛡️'
+    : localEquip.slot === 'ring' ? '💍' : '👢'
 
-  const handleToggleLock = useCallback(async () => {
-    const newLocked = !equip.locked
-    await lockEquipment(equip.equipId, newLocked)
-    setActionMsg(newLocked ? '已鎖定' : '已解鎖')
-  }, [equip])
+  const maxEnhance = getMaxEnhanceLevel(localEquip.rarity || 'N')
+  const canEnhance = localEquip.enhanceLevel < maxEnhance
+  const enhanceCost = canEnhance ? getEnhanceCost(localEquip.enhanceLevel, localEquip.rarity) : 0
 
   const handleUnequip = useCallback(async () => {
     try {
-      await unequipItem(equip.equipId)
+      await unequipItem(localEquip.equipId)
       setActionMsg('已卸下裝備')
       emitToast('✅ 已卸下裝備')
     } catch { setActionMsg('卸下失敗') }
-  }, [equip.equipId])
+  }, [localEquip.equipId])
 
   const handleEquipTo = useCallback(async (heroInstId: string, heroName: string) => {
     try {
-      // 先檢查該英雄同格位是否已有裝備
       const heroEqs = getHeroEquipment(heroInstId)
-      const conflict = heroEqs.find(e => e.slot === equip.slot && e.equipId !== equip.equipId)
-      await equipItem(equip.equipId, heroInstId)
+      const conflict = heroEqs.find(e => e.slot === localEquip.slot && e.equipId !== localEquip.equipId)
+      await equipItem(localEquip.equipId, heroInstId)
       setActionMsg(`已裝備給 ${heroName}`)
       emitToast(`✅ 已裝備給 ${heroName}${conflict ? '（舊裝備已自動卸下）' : ''}`)
       setShowHeroSelect(false)
     } catch { setActionMsg('裝備失敗') }
-  }, [equip.equipId, equip.slot])
+  }, [localEquip.equipId, localEquip.slot])
+
+  const handleDecompose = useCallback(async () => {
+    if (isProcessing) return
+    if (localEquip.equippedBy) { setActionMsg('請先卸下裝備再分解'); return }
+    setIsProcessing(true)
+    const res = await decomposeEquipment([localEquip.equipId])
+    setIsProcessing(false)
+    if (res.success) {
+      emitToast(`♻️ 分解獲得 ${res.goldGained} 金幣 + ${res.scrapGained} 碎片`)
+      emitAcquire([
+        { type: 'currency', id: 'gold', name: '金幣', quantity: res.goldGained ?? 0 },
+        { type: 'item', id: 'equip_scrap', name: '裝備碎片', quantity: res.scrapGained ?? 0 },
+      ])
+      onClose()
+    } else {
+      setActionMsg(`分解失敗：${res.error === 'cannot_decompose_equipped' ? '請先卸下裝備' : res.error}`)
+    }
+  }, [localEquip, isProcessing, onClose])
+
+  const handleEnhance = useCallback(async () => {
+    if (isProcessing || !canEnhance) return
+    setIsProcessing(true)
+    const res = await enhanceEquipment(localEquip.equipId)
+    setIsProcessing(false)
+    if (res.success) {
+      setLocalEquip(prev => ({ ...prev, enhanceLevel: res.newLevel ?? prev.enhanceLevel + 1 }))
+      setActionMsg(`強化成功！+${res.newLevel}`)
+      emitToast(`⚒️ 強化成功！+${res.newLevel}`)
+    } else {
+      setActionMsg(`強化失敗：${res.error === 'insufficient_gold' ? '金幣不足' : res.error === 'max_enhance_level' ? '已達最高等級' : res.error}`)
+    }
+  }, [localEquip.equipId, isProcessing, canEnhance])
 
   // 英雄名稱解析
   const getHeroName = useCallback((instId: string) => {
@@ -394,25 +426,24 @@ function EquipmentDetail({ equip, onClose, heroInstances, heroNameMap }: Equipme
         <div className="inv-detail-header">
           <span className="inv-detail-icon">{slotIcon}</span>
           <div>
-            <h3 style={{ color: RARITY_COLORS[equip.rarity] ?? '#ddd' }}>
-              {getEquipDisplayName(equip)}
-              {equip.enhanceLevel > 0 && <span className="inv-equip-enhance"> +{equip.enhanceLevel}</span>}
+            <h3 style={{ color: RARITY_COLORS[localEquip.rarity] ?? '#ddd' }}>
+              {getEquipDisplayName(localEquip)}
+              {localEquip.enhanceLevel > 0 && <span className="inv-equip-enhance"> +{localEquip.enhanceLevel}</span>}
             </h3>
             <span className="inv-detail-rarity">
-              {equip.rarity} · {slotLabel}
-              {equip.locked && ' · 🔒'}
+              {localEquip.rarity} · {slotLabel}
             </span>
           </div>
         </div>
         {/* 主屬性 */}
         <div className="inv-equip-main-stat">
-          <span>{statZh(equip.mainStat ?? '?')}</span>
-          <span className="inv-equip-stat-val">+{enhancedMainStat(equip.mainStatValue ?? 0, equip.enhanceLevel ?? 0)}</span>
+          <span>{statZh(localEquip.mainStat ?? '?')}</span>
+          <span className="inv-equip-stat-val">+{enhancedMainStat(localEquip.mainStatValue ?? 0, localEquip.enhanceLevel ?? 0)}</span>
         </div>
         {/* 副屬性 */}
-        {(equip.subStats ?? []).length > 0 && (
+        {(localEquip.subStats ?? []).length > 0 && (
           <div className="inv-equip-sub-stats">
-            {(equip.subStats ?? []).map((sub, i) => (
+            {(localEquip.subStats ?? []).map((sub, i) => (
               <div key={i} className="inv-equip-sub-row">
                 <span>{statZh(sub.stat)}</span>
                 <span>+{sub.value}{sub.isPercent ? '%' : ''}</span>
@@ -421,25 +452,32 @@ function EquipmentDetail({ equip, onClose, heroInstances, heroNameMap }: Equipme
           </div>
         )}
         {/* 套裝 */}
-        {equip.setId && (
-          <div className="inv-equip-set-tag">套裝：{SET_NAMES[equip.setId] || equip.setId}</div>
+        {localEquip.setId && (
+          <div className="inv-equip-set-tag">套裝：{SET_NAMES[localEquip.setId] || localEquip.setId}</div>
         )}
         {/* 裝備狀態 */}
-        {equip.equippedBy && (
-          <div className="inv-equip-equipped-by">已裝備給：{getHeroName(equip.equippedBy)}</div>
+        {localEquip.equippedBy && (
+          <div className="inv-equip-equipped-by">已裝備給：{getHeroName(localEquip.equippedBy)}</div>
         )}
         {actionMsg && <div className="inv-action-msg">{actionMsg}</div>}
         <div className="inv-detail-actions">
-          <button className="inv-action-btn inv-lock-btn" onClick={handleToggleLock}>
-            {equip.locked ? '🔓 解鎖' : '🔒 鎖定'}
-          </button>
-          {equip.equippedBy ? (
+          {localEquip.equippedBy ? (
             <button className="inv-action-btn inv-sell-btn" onClick={handleUnequip}>
               ⬇️ 卸下
             </button>
           ) : (
             <button className="inv-action-btn inv-use-btn" onClick={() => setShowHeroSelect(true)}>
               ⬆️ 裝備給英雄
+            </button>
+          )}
+          {canEnhance && (
+            <button className="inv-action-btn inv-use-btn" onClick={handleEnhance} disabled={isProcessing}>
+              {isProcessing ? '強化中...' : `⚒️ 強化（${enhanceCost} 金）`}
+            </button>
+          )}
+          {!localEquip.equippedBy && (
+            <button className="inv-action-btn inv-decompose-btn" onClick={handleDecompose} disabled={isProcessing}>
+              {isProcessing ? '分解中...' : '♻️ 分解'}
             </button>
           )}
         </div>
@@ -552,17 +590,6 @@ export function InventoryPanel({ onBack, heroesList, heroInstances }: InventoryP
 
   const showEquipment = activeTab === 'all' || activeTab === 'equipment'
 
-  /** 圖鑑：已擁有的裝備 templateId 集合 */
-  const ownedEquipTemplateIds = useMemo(() => {
-    const s = new Set<string>()
-    if (invState) {
-      for (const eq of invState.equipment) {
-        if (eq.templateId) s.add(eq.templateId)
-      }
-    }
-    return s
-  }, [invState])
-
   const getDef = useCallback(
     (itemId: string): ItemDefinition | undefined => invState?.definitions.get(itemId),
     [invState],
@@ -579,11 +606,6 @@ export function InventoryPanel({ onBack, heroesList, heroInstances }: InventoryP
             <InfoTip icon={<CurrencyIcon type="gold" />} value={gold.toLocaleString()} label="金幣" description="升級、購買、強化所需的通用貨幣" className="menu-gold" />
             <InfoTip icon={<CurrencyIcon type="diamond" />} value={diamond.toLocaleString()} label="鑽石" description="召喚、加速、購買稀有道具" className="menu-diamond" />
           </div>
-          {invState && (
-            <span className="inv-capacity">
-              {invState.items.length + invState.equipment.length}/{invState.equipmentCapacity} 背包
-            </span>
-          )}
         </div>
 
         {/* Category Tabs */}
@@ -647,7 +669,6 @@ export function InventoryPanel({ onBack, heroesList, heroInstances }: InventoryP
               <span className="inv-cell-name">{getEquipDisplayName(eq)}</span>
               <span className="inv-cell-qty">
                 +{eq.enhanceLevel}
-                {eq.locked && ' 🔒'}
               </span>
               {eq.equippedBy && <span className="inv-equip-badge">使用中</span>}
             </button>
@@ -657,7 +678,7 @@ export function InventoryPanel({ onBack, heroesList, heroInstances }: InventoryP
 
       {/* 圖鑑面板 */}
       {activeTab === 'codex' && (
-        <CodexPanel ownedEquipTemplateIds={ownedEquipTemplateIds} />
+        <CodexPanel />
       )}
       </div>
 

@@ -290,7 +290,6 @@ export default function App() {
     doSaveFormation: saveHook.doSaveFormation,
     doUpdateProgress: saveHook.doUpdateProgress as (changes: Record<string, unknown>) => void,
     doUpdateStory: saveHook.doUpdateStory,
-    doUpdateStageStars: saveHook.doUpdateStageStars,
     acquireShow: acquireToast.show,
     showToast,
     playerSlots, enemySlots, stageMode, stageId,
@@ -523,7 +522,6 @@ export default function App() {
               onGoldChange={(delta) => saveHook.doUpdateProgress({ gold: (saveHook.playerData?.save.gold ?? 0) + delta })}
               storyProgress={saveHook.playerData?.save.storyProgress ?? { chapter: 1, stage: 1 }}
               towerFloor={saveHook.playerData?.save.towerFloor ?? 1}
-              stageStars={saveHook.playerData?.save.stageStars ?? {}}
               onSelectStage={handleStageSelect}
               displayName={authHook.auth.displayName || '倖存者'}
               isBound={authHook.auth.isBound}

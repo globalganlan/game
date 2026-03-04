@@ -1,7 +1,7 @@
 # 存檔系統 Spec
 
-> 版本：v2.0 ｜ 狀態：🟢 已實作
-> 最後更新：2026-03-02
+> 版本：v2.1 ｜ 狀態：🟢 已實作
+> 最後更新：2026-06-19
 > 負責角色：🎯 GAME_DESIGN → 🔧 CODING
 
 ## 概述
@@ -42,11 +42,12 @@
 | `towerFloor` | number | 爬塔最高樓層 |
 | `storyProgress` | string | 章節進度 JSON `{"chapter":1,"stage":5}` |
 | `formation` | string | 當前陣型 JSON `[heroInstanceId, null, ...]` (6 slots) |
-| `stageStars` | string | 每關最高星級 JSON `{"1-1": 3, "1-2": 2}` |
+| `stageStars` | string | 每關通關狀態 JSON `{"1-1": 1, "1-2": 1}`（值為 `1` 表已通關，不再使用 1~3 星級） |
 | `gachaPity` | string | 保底計數 JSON `{"pullsSinceLastSSR":0,"guaranteedFeatured":false}` |
 | `gachaPool` | string | 預生成抽卡池 JSON（200 組 pull results） |
 | `pwaRewardClaimed` | boolean | PWA 安裝獎勵是否已領取（`true` = 已領） |
 | `equipment` | string | **v2.0 新增** — 裝備 JSON `OwnedEquipment[]`（見 `progression.md` §四） |
+| `equipmentCapacity` | ~~number~~ | **v2.1 廢棄** — 不再限制裝備容量，欄位保留但不再使用 |
 | `checkinDay` | number | **v1.7 新增** — 每日簽到天數（1~7 循環） |
 | `checkinLastDate` | string | **v1.7 新增** — 上次簽到日期（UTC+8 格式 `YYYY-MM-DD`） |
 | `lastSaved` | string | 最後存檔時間（ISO 8601） |
@@ -76,6 +77,8 @@
 | `playerId` | string | 外鍵 |
 | `itemId` | string | 道具 ID（命名規則見 inventory.md §1.2） |
 | `quantity` | number | 數量 |
+
+> **v2.1 新增道具**：`equip_scrap`（裝備碎片）— 裝備分解產出的可堆疊素材，用於裝備強化等用途。
 
 ---
 
@@ -208,7 +211,7 @@ interface SaveData {
   towerFloor: number
   storyProgress: { chapter: number; stage: number }
   formation: (string | null)[]       // 6 slots, heroInstanceId or null
-  stageStars: Record<string, number> // stageId → best star (1-3)
+  stageStars: Record<string, number> // stageId → 1（已通關），不再使用 1~3 星級
   lastSaved: string
   gachaPity?: { pullsSinceLastSSR: number; guaranteedFeatured: boolean }
   equipment?: OwnedEquipment[]   // v2.0 新增：裝備模板制
@@ -222,6 +225,7 @@ interface OwnedEquipment {
   templateId: string    // "eq_{setId}_{slot}_{rarity}"
   enhanceLevel: number  // 0 ~ maxLevel
   equippedBy: string    // heroInstanceId 或 ''
+  locked?: boolean      // **v2.1 廢棄** — 不再使用鎖定功能，欄位保留但前端忽略
 }
 
 interface HeroInstance {
@@ -391,3 +395,4 @@ GAS handleCollectResources_:（包在 executeWithIdempotency_ 中）
 | v1.7 | 2026-03-02 | **每日簽到欄位**：`save_data` 新增 `checkinDay`（number, 1~7 循環）、`checkinLastDate`（string, UTC+8 日期）；新增 `daily-checkin` API 端點 → `handleDailyCheckin_` handler；前端 SaveData 介面新增 `checkinDay?` / `checkinLastDate?` |
 | v1.8 | 2025-07-14 | **Bug Fix: `updateStoryProgress` notify 時序**：`enqueueSave` 先設 JSON 字串再 notify，導致 React 端 `storyProgress` 為字串、`isFirstClear` 得到 `NaN`、後續關卡勝利不推進進度。修復：覆寫物件型態後再 `notify()` |
 | v2.0 | 2026-03-02 | **移除 `save-progress` 路由**：原本的 debounce 2s + retry 寫入佇列已經完全無用—— 4 個 allowedFields 均已有專用路由（change-name / save-formation / complete-battle / collect-resources）。前端 `enqueueSave` 簡化為 `updateLocal()`（僅更新本地 state + localStorage），不再發送 API 請求 |
+| v2.1 | 2026-06-19 | **欄位調整**：`stageStars` 值改為 `1`（已通關）取代舊版 `1~3` 星級；`equipmentCapacity` 欄位廢棄（不再限制裝備容量）；裝備實例 `locked` 欄位廢棄；新增 `equip_scrap` 可堆疊背包道具（裝備分解產出） |

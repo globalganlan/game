@@ -19,7 +19,6 @@ battle.post('/complete-battle', async (c) => {
 
   const stageMode = body.stageMode as string;
   const stageId = (body.stageId as string) || '';
-  const starsEarned = Math.max(1, Math.min(3, Number(body.starsEarned) || 1));
   const players = body.players as BattleHero[];
   const enemies = body.enemies as BattleHero[];
   const maxTurns = Number(body.maxTurns) || 50;
@@ -37,7 +36,7 @@ battle.post('/complete-battle', async (c) => {
     return c.json({
       success: true, winner,
       rewards: { gold: 0, exp: 0, diamond: 0, items: [] },
-      isFirstClear: false, starsEarned: 0,
+      isFirstClear: false,
       actions: battleResult.actions,
     });
   }
@@ -61,25 +60,22 @@ battle.post('/complete-battle', async (c) => {
     const stageStars = safeJsonParse<Record<string, number>>(saveData.stageStars, {});
     const prevBest = stageStars[stageId] || 0;
     if (prevBest === 0) isFirstClear = true;
-    if (starsEarned > prevBest) stageStars[stageId] = starsEarned;
+    // 標記已通過（簡化為 1 = 已過關）
+    if (!stageStars[stageId]) stageStars[stageId] = 1;
 
     // 從 stage_configs 讀取獎勵（優先），fallback 到公式
     const cfgRow = await db.prepare('SELECT rewards FROM stage_configs WHERE stageId = ?')
       .bind(stageId).first<{ rewards: string }>();
     if (cfgRow) {
       const cfgRewards = safeJsonParse<{ gold?: number; exp?: number; diamond?: number }>(cfgRow.rewards, {});
-      const baseGold = cfgRewards.gold ?? 0;
-      const baseExp = cfgRewards.exp ?? 0;
-      const baseDiamond = cfgRewards.diamond ?? 0;
-      // 首次通關：獎勵翻倍 + 固定鑽石
-      rewards.gold = isFirstClear ? baseGold * 2 : baseGold;
-      rewards.exp = isFirstClear ? baseExp * 2 : baseExp;
-      rewards.diamond = isFirstClear ? Math.max(baseDiamond, 30) : baseDiamond;
+      rewards.gold = cfgRewards.gold ?? 0;
+      rewards.exp = cfgRewards.exp ?? 0;
+      rewards.diamond = cfgRewards.diamond ?? 0;
     } else {
-      // fallback 公式（stage_configs 缺失時）
-      rewards.gold = 100 + ch * 50 + st * 20 + (isFirstClear ? 200 : 0);
-      rewards.exp = 50 + ch * 30 + st * 10 + (isFirstClear ? 100 : 0);
-      rewards.diamond = isFirstClear ? 30 : 0;
+      // fallback 公式
+      rewards.gold = 100 + ch * 50 + st * 20;
+      rewards.exp = 50 + ch * 30 + st * 10;
+      rewards.diamond = st === 8 ? 20 : 0;
     }
 
     const currentProgress = safeJsonParse<{ chapter: number; stage: number }>(saveData.storyProgress, { chapter: 1, stage: 1 });
@@ -154,7 +150,7 @@ battle.post('/complete-battle', async (c) => {
 
   return c.json({
     success: true, winner, rewards,
-    isFirstClear, starsEarned,
+    isFirstClear,
     newStoryProgress, newFloor,
     actions: battleResult.actions,
     currencies,
@@ -167,7 +163,6 @@ battle.post('/complete-stage', async (c) => {
   const db = c.env.DB;
   const body = getBody(c);
   const stageId = body.stageId as string;
-  const starsEarned = Math.max(1, Math.min(3, Number(body.starsEarned) || 1));
   if (!stageId) return c.json({ success: false, error: 'missing stageId' });
 
   const saveData = await db.prepare('SELECT * FROM save_data WHERE playerId = ?')
@@ -179,9 +174,8 @@ battle.post('/complete-stage', async (c) => {
   const st = parseInt(parts[1]) || 1;
 
   const stageStars = safeJsonParse<Record<string, number>>(saveData.stageStars, {});
-  const prevBest = stageStars[stageId] || 0;
-  const isFirstClear = prevBest === 0;
-  if (starsEarned > prevBest) stageStars[stageId] = starsEarned;
+  const isFirstClear = !stageStars[stageId];
+  if (!stageStars[stageId]) stageStars[stageId] = 1;
 
   const rewards = { gold: 0, exp: 0, diamond: 0 };
 
@@ -190,16 +184,13 @@ battle.post('/complete-stage', async (c) => {
     .bind(stageId).first<{ rewards: string }>();
   if (cfgRow) {
     const cfgRewards = safeJsonParse<{ gold?: number; exp?: number; diamond?: number }>(cfgRow.rewards, {});
-    const baseGold = cfgRewards.gold ?? 0;
-    const baseExp = cfgRewards.exp ?? 0;
-    const baseDiamond = cfgRewards.diamond ?? 0;
-    rewards.gold = isFirstClear ? baseGold * 2 : baseGold;
-    rewards.exp = isFirstClear ? baseExp * 2 : baseExp;
-    rewards.diamond = isFirstClear ? Math.max(baseDiamond, 30) : baseDiamond;
+    rewards.gold = cfgRewards.gold ?? 0;
+    rewards.exp = cfgRewards.exp ?? 0;
+    rewards.diamond = cfgRewards.diamond ?? 0;
   } else {
-    rewards.gold = 100 + ch * 50 + st * 20 + (isFirstClear ? 200 : 0);
-    rewards.exp = 50 + ch * 30 + st * 10 + (isFirstClear ? 100 : 0);
-    rewards.diamond = isFirstClear ? 30 : 0;
+    rewards.gold = 100 + ch * 50 + st * 20;
+    rewards.exp = 50 + ch * 30 + st * 10;
+    rewards.diamond = st === 8 ? 20 : 0;
   }
 
   const currentProgress = safeJsonParse<{ chapter: number; stage: number }>(saveData.storyProgress, { chapter: 1, stage: 1 });
@@ -222,7 +213,7 @@ battle.post('/complete-stage', async (c) => {
     newStoryProgress2 ? stageId : null, isoNow(), playerId
   ).run();
 
-  return c.json({ success: true, rewards, isFirstClear, starsEarned, newStoryProgress: newStoryProgress2 });
+  return c.json({ success: true, rewards, isFirstClear, newStoryProgress: newStoryProgress2 });
 });
 
 // ── 爬塔通關（舊版相容） ──────────────────

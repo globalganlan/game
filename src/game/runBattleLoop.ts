@@ -27,7 +27,7 @@ import { getHeroSkillSet, toElement } from '../services'
 import { completeBattle, type CompleteBattleResult } from '../services/progressionService'
 import {
   getTowerFloorConfig, getNextStageId, isFirstClear,
-  calculateStarRating, rollDrops, mergeDrops,
+  rollDrops, mergeDrops,
   getDailyDungeonConfig, getPvPReward, getBossReward,
 } from '../domain/stageSystem'
 import type { StageReward } from '../domain/stageSystem'
@@ -113,7 +113,6 @@ export interface BattleLoopContext {
   doSaveFormation: (heroIds: (string | null)[]) => void
   doUpdateProgress: (changes: Record<string, unknown>) => void
   doUpdateStory: (chapter: number, stage: number) => void
-  doUpdateStageStars: (stageId: string, stars: number) => void
 
   /* ── UI callbacks ── */
   acquireShow: (items: AcquireItem[]) => void
@@ -147,7 +146,7 @@ export async function executeBattleLoop(ctx: BattleLoopContext, replayActions?: 
     setElementHints, setPassiveHints, setBuffApplyHints,
     addDamage, waitForAction, waitForMove, clearAllPromises,
     actionResolveRefs, moveResolveRefs,
-    doSaveFormation, doUpdateProgress, doUpdateStory, doUpdateStageStars,
+    doSaveFormation, doUpdateProgress, doUpdateStory,
     acquireShow, showToast,
     playerSlots, enemySlots, stageMode, stageId,
     heroInstances, saveData,
@@ -783,11 +782,6 @@ export async function executeBattleLoop(ctx: BattleLoopContext, replayActions?: 
     allActions = result.actions
     winner = result.winner
 
-    // ── 計算星級 ──
-    const totalHeroCount = playerSlots.filter(Boolean).length
-    const survivingCount = playerBH.filter(h => h.currentHP > 0).length
-    const localStars = calculateStarRating(totalHeroCount, survivingCount)
-
     // ★ 重置 heroMap HP 為初始值（Phase B 播放期間漸進更新）
     for (const bh of [...playerBH, ...enemyBH]) {
       bh.currentHP = bh.maxHP
@@ -801,7 +795,6 @@ export async function executeBattleLoop(ctx: BattleLoopContext, replayActions?: 
     // ── 背景呼叫 complete-battle（後端跑戰鬥 + 計算獎勵） ──
     completeBattleRef.current = completeBattle({
       stageMode, stageId,
-      starsEarned: localStars,
       seed: battleSeed,
       players: snapshotPlayers,
       enemies: snapshotEnemies,
@@ -988,9 +981,9 @@ export async function executeBattleLoop(ctx: BattleLoopContext, replayActions?: 
     setBattleResult('victory')
 
     if (!isReplay) {
+      // 僅使用伺服器回傳的獎勵資料
       let rewardGold = 0, rewardDiamond = 0
       let first = false
-      let stars: 1 | 2 | 3 = 1
       let resourceSpeed: { goldPerHour: number; expPerHour: number } | null = null
       let rewards: StageReward = { exp: 0, gold: 0, diamond: 0 }
 
@@ -1002,7 +995,6 @@ export async function executeBattleLoop(ctx: BattleLoopContext, replayActions?: 
           diamond: serverResult.rewards.diamond,
         }
         first = serverResult.isFirstClear
-        stars = Math.max(1, Math.min(3, serverResult.starsEarned)) as 1 | 2 | 3
       }
 
       if (stageMode === 'story') {
@@ -1087,13 +1079,6 @@ export async function executeBattleLoop(ctx: BattleLoopContext, replayActions?: 
       rewardGold = rewards.gold
       rewardDiamond = rewards.diamond ?? 0
 
-      // 計算星級（伺服器可用時已在上面取得，否則本地計算）
-      if (!serverResult) {
-        const totalHeroes = playerSlots.filter(Boolean).length
-        const survivingHeroes = playerSlots.filter(s => s && (s.currentHP ?? 0) > 0).length
-        stars = calculateStarRating(totalHeroes, survivingHeroes) as 1 | 2 | 3
-      }
-
       // 抽取掉落物（仍由前端處理）
       const allDrops = mergeDrops(rollDrops(rewards))
       // 分離經驗資源掉落與一般道具掉落
@@ -1131,11 +1116,6 @@ export async function executeBattleLoop(ctx: BattleLoopContext, replayActions?: 
         doUpdateProgress({ resourceTimerStage: stageId })
       }
 
-      // 儲存關卡星級
-      if (stageMode === 'story') {
-        doUpdateStageStars(stageId, stars)
-      }
-
       // 掉落物即時寫入本地背包
       if (drops.length > 0) addItemsLocally(drops)
 
@@ -1144,8 +1124,6 @@ export async function executeBattleLoop(ctx: BattleLoopContext, replayActions?: 
         diamond: rewardDiamond,
         exp: rewardExp,
         drops,
-        stars,
-        isFirst: first,
         resourceSpeed,
       })
 

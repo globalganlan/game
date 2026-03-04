@@ -58,12 +58,7 @@ const CODEX_TABS: { key: CodexCategory; icon: string; label: string }[] = [
    裝備圖鑑子組件
    ════════════════════════════════════ */
 
-/** 玩家擁有的裝備 templateId 集合（展示收集進度） */
-interface EquipCodexProps {
-  ownedTemplateIds: Set<string>
-}
-
-function EquipmentCodex({ ownedTemplateIds }: EquipCodexProps) {
+function EquipmentCodex() {
   const [selectedSet, setSelectedSet] = useState<string>(SET_IDS[0])
   const [selectedRarity, setSelectedRarity] = useState<Rarity | 'all'>('all')
 
@@ -72,51 +67,21 @@ function EquipmentCodex({ ownedTemplateIds }: EquipCodexProps) {
     return EQUIPMENT_SETS.filter(b => b.setId === selectedSet)
   }, [selectedSet])
 
-  // 收集統計
-  const totalCount = SET_IDS.length * SLOTS.length * RARITIES.length // 128
-  const ownedCount = ownedTemplateIds.size
-
-  // 篩選要展示的裝備
+  // 篩選要展示的裝備（全部可見）
   const displayItems = useMemo(() => {
-    const items: { setId: string; slot: EquipmentSlot; rarity: Rarity; templateId: string; owned: boolean }[] = []
+    const items: { setId: string; slot: EquipmentSlot; rarity: Rarity; templateId: string }[] = []
     for (const slot of SLOTS) {
       for (const rarity of RARITIES) {
         if (selectedRarity !== 'all' && rarity !== selectedRarity) continue
         const tid = `eq_${selectedSet}_${slot}_${rarity}`
-        items.push({
-          setId: selectedSet,
-          slot,
-          rarity,
-          templateId: tid,
-          owned: ownedTemplateIds.has(tid),
-        })
+        items.push({ setId: selectedSet, slot, rarity, templateId: tid })
       }
     }
     return items
-  }, [selectedSet, selectedRarity, ownedTemplateIds])
-
-  // 該套裝收集數
-  const setOwned = useMemo(() => {
-    let count = 0
-    for (const slot of SLOTS) {
-      for (const rarity of RARITIES) {
-        if (ownedTemplateIds.has(`eq_${selectedSet}_${slot}_${rarity}`)) count++
-      }
-    }
-    return count
-  }, [selectedSet, ownedTemplateIds])
+  }, [selectedSet, selectedRarity])
 
   return (
     <div className="codex-equip">
-      {/* 收集進度 */}
-      <div className="codex-progress">
-        <span className="codex-progress-label">📚 總收集進度</span>
-        <div className="codex-progress-bar">
-          <div className="codex-progress-fill" style={{ width: `${totalCount > 0 ? (ownedCount / totalCount) * 100 : 0}%` }} />
-        </div>
-        <span className="codex-progress-text">{ownedCount} / {totalCount}</span>
-      </div>
-
       {/* 套裝選擇列 */}
       <div className="codex-set-tabs">
         {SET_IDS.map(sid => {
@@ -138,7 +103,6 @@ function EquipmentCodex({ ownedTemplateIds }: EquipCodexProps) {
       <div className="codex-set-info">
         <div className="codex-set-header">
           <span className="codex-set-name">{SET_NAMES[selectedSet]}</span>
-          <span className="codex-set-collected">{setOwned}/{SLOTS.length * RARITIES.length}</span>
         </div>
         <div className="codex-set-bonuses">
           {setBonuses.map((b, i) => (
@@ -180,7 +144,7 @@ function EquipmentCodex({ ownedTemplateIds }: EquipCodexProps) {
           return (
             <div
               key={item.templateId}
-              className={`codex-equip-card ${item.owned ? 'codex-owned' : 'codex-locked'}`}
+              className="codex-equip-card codex-owned"
               style={{ '--card-color': color } as React.CSSProperties}
             >
               <div className="codex-card-icon">{SLOT_EMOJI[item.slot] || '📦'}</div>
@@ -198,7 +162,6 @@ function EquipmentCodex({ ownedTemplateIds }: EquipCodexProps) {
                   副屬性 ×{subCount} · 強化上限 +{maxEnhance}
                 </div>
               </div>
-              {!item.owned && <div className="codex-card-lock-overlay">🔒</div>}
             </div>
           )
         })}
@@ -212,10 +175,9 @@ function EquipmentCodex({ ownedTemplateIds }: EquipCodexProps) {
    ════════════════════════════════════ */
 
 interface CodexPanelProps {
-  ownedEquipTemplateIds: Set<string>
 }
 
-export function CodexPanel({ ownedEquipTemplateIds }: CodexPanelProps) {
+export function CodexPanel({}: CodexPanelProps) {
   const [category, setCategory] = useState<CodexCategory>('equipment')
 
   return (
@@ -238,7 +200,7 @@ export function CodexPanel({ ownedEquipTemplateIds }: CodexPanelProps) {
 
       {/* 內容 */}
       {category === 'equipment' && (
-        <EquipmentCodex ownedTemplateIds={ownedEquipTemplateIds} />
+        <EquipmentCodex />
       )}
     </div>
   )

@@ -120,7 +120,6 @@ export async function enhanceEquipment(
 export interface CompleteBattleParams {
   stageMode: 'story' | 'tower' | 'daily' | 'pvp' | 'boss'
   stageId: string
-  starsEarned: number
   seed?: number
   players: BattleHero[]
   enemies: BattleHero[]
@@ -140,7 +139,6 @@ export interface CompleteBattleResult {
     items: { itemId: string; quantity: number }[]
   }
   isFirstClear: boolean
-  starsEarned: number
   newLevel?: number
   leveledUp?: boolean
   newStoryProgress?: { chapter: number; stage: number }
@@ -162,7 +160,6 @@ export async function completeBattle(params: CompleteBattleParams): Promise<Comp
     {
       stageMode: params.stageMode,
       stageId: params.stageId,
-      starsEarned: params.starsEarned,
       seed: params.seed,
       players: params.players,
       enemies: params.enemies,
@@ -177,7 +174,6 @@ export async function completeBattle(params: CompleteBattleParams): Promise<Comp
     actions: res.actions ?? [],
     rewards: res.rewards || { gold: 0, exp: 0, diamond: 0, items: [] },
     isFirstClear: res.isFirstClear || false,
-    starsEarned: res.starsEarned || 1,
     newLevel: res.newLevel,
     leveledUp: res.leveledUp,
     newStoryProgress: res.newStoryProgress,
@@ -199,20 +195,18 @@ export interface StageCompleteResult {
     items: { itemId: string; quantity: number }[]
   }
   isFirstClear: boolean
-  starsEarned: number
   newStoryProgress?: { chapter: number; stage: number }
 }
 
 /** 通關結算（主線） */
-export async function completeStage(stageId: string, starsEarned: number): Promise<StageCompleteResult> {
+export async function completeStage(stageId: string): Promise<StageCompleteResult> {
   const res = await callApi<StageCompleteResult>(
-    'complete-stage', { stageId, starsEarned },
+    'complete-stage', { stageId },
   )
   return {
     success: res.success,
     rewards: res.rewards || { gold: 0, exp: 0, diamond: 0, items: [] },
     isFirstClear: res.isFirstClear || false,
-    starsEarned: res.starsEarned || 1,
     newStoryProgress: res.newStoryProgress,
   }
 }

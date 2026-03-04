@@ -22,7 +22,6 @@ import {
   type PvPOpponent,
   type BossConfig,
 } from '../domain/stageSystem'
-import { CurrencyIcon } from './CurrencyIcon'
 import { fetchStageConfigs, type StageConfigFromAPI } from '../services/stageService'
 
 /* ────────────────────────────
@@ -32,7 +31,6 @@ import { fetchStageConfigs, type StageConfigFromAPI } from '../services/stageSer
 interface StageSelectProps {
   storyProgress: { chapter: number; stage: number }
   towerFloor: number
-  stageStars: Record<string, number>
   onBack: () => void
   onSelectStage: (mode: 'story' | 'tower' | 'daily' | 'pvp' | 'boss', stageId: string) => void
 }
@@ -135,12 +133,10 @@ function DifficultyStars({ level }: { level: number }) {
 
 function StoryStages({
   storyProgress,
-  stageStars,
   onSelect,
   onLockedClick,
 }: {
   storyProgress: { chapter: number; stage: number }
-  stageStars: Record<string, number>
   onSelect: (stageId: string) => void
   onLockedClick: (stageId: string) => void
 }) {
@@ -226,21 +222,18 @@ function StoryStages({
             const cleared = linearIdx < playerProgress
             const current = linearIdx === playerProgress
             const locked = linearIdx > playerProgress
-            const bestStars = stageStars[cfg.stageId] || 0
-            const displayStars = cleared && bestStars === 0 ? 3 : bestStars
-            const is3Star = displayStars >= 3
             const isBoss = cfg.extra?.isBoss || false
 
             return (
               <button
                 key={cfg.stageId}
-                className={`sc-stage-card ${cleared ? 'sc-cleared' : ''} ${current ? 'sc-current' : ''} ${locked ? 'sc-locked' : ''} ${is3Star ? 'sc-maxed' : ''} ${isBoss ? 'sc-boss-stage' : ''}`}
+                className={`sc-stage-card ${cleared ? 'sc-cleared sc-maxed' : ''} ${current ? 'sc-current' : ''} ${locked ? 'sc-locked' : ''} ${isBoss ? 'sc-boss-stage' : ''}`}
                 style={{
                   borderColor: current ? theme.accentColor
                     : isBoss && !locked ? 'rgba(233,196,106,0.5)'
                       : cleared ? theme.borderColor : undefined,
                 }}
-                disabled={is3Star}
+                disabled={cleared}
                 onClick={() => {
                   if (locked) { onLockedClick(cfg.stageId); return }
                   onSelect(cfg.stageId)
@@ -252,7 +245,7 @@ function StoryStages({
                   {isBoss && <span className="sc-card-boss-badge">首領</span>}
                   {locked && <span className="sc-card-lock">🔒</span>}
                   {current && <span className="sc-card-current">📍</span>}
-                  {is3Star && <span className="sc-card-complete">✅</span>}
+                  {cleared && <span className="sc-card-complete">✅</span>}
                 </div>
 
                 {/* 名稱 */}
@@ -266,25 +259,6 @@ function StoryStages({
                   <span className="sc-card-rec">Lv.{cfg.extra?.recommendedLevel || 1}</span>
                   <span className="sc-card-enemy-count">👾×{cfg.enemies.length}</span>
                 </div>
-
-                {/* 獎勵 */}
-                <div className="sc-card-rewards">
-                  <span><CurrencyIcon type="gold" />{cfg.rewards.gold}</span>
-                  {(cfg.rewards.diamond ?? 0) > 0 && (
-                    <span><CurrencyIcon type="diamond" />{cfg.rewards.diamond}</span>
-                  )}
-                </div>
-
-                {/* 星級 */}
-                {cleared && (
-                  <div className="sc-card-stars">
-                    {[1, 2, 3].map(i => (
-                      <span key={i} className={i <= displayStars ? 'sc-star-earned' : 'sc-star-empty'}>
-                        {i <= displayStars ? '⭐' : '☆'}
-                      </span>
-                    ))}
-                  </div>
-                )}
               </button>
             )
           })}
@@ -323,20 +297,6 @@ function TowerPanel({
           <span>首領層</span>
           <span>{floorConfig.isBoss ? '✅ 是' : '否'}</span>
         </div>
-        <div className="tower-info-row">
-          <span>獎勵金幣</span>
-          <span><CurrencyIcon type="gold" /> {floorConfig.rewards.gold}</span>
-        </div>
-        <div className="tower-info-row">
-          <span>獎勵經驗</span>
-          <span><CurrencyIcon type="exp" /> {floorConfig.rewards.exp}</span>
-        </div>
-        {(floorConfig.rewards.diamond ?? 0) > 0 && (
-          <div className="tower-info-row">
-            <span>獎勵鑽石</span>
-            <span><CurrencyIcon type="diamond" /> {floorConfig.rewards.diamond}</span>
-          </div>
-        )}
       </div>
 
       <button
@@ -512,7 +472,6 @@ function BossPanel2({
 export function StageSelect({
   storyProgress,
   towerFloor,
-  stageStars,
   onBack,
   onSelectStage,
 }: StageSelectProps) {
@@ -561,7 +520,6 @@ export function StageSelect({
           {activeMode === 'story' && (
             <StoryStages
               storyProgress={storyProgress}
-              stageStars={stageStars}
               onSelect={(id) => onSelectStage('story', id)}
               onLockedClick={(id) => {
                 setLockToast(`請先通關前一關再挑戰 ${id}`)

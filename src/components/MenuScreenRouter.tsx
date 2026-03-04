@@ -52,7 +52,6 @@ interface MenuScreenRouterProps {
   /* 關卡 */
   storyProgress: { chapter: number; stage: number }
   towerFloor: number
-  stageStars: Record<string, number>
   onSelectStage: (mode: 'story' | 'tower' | 'daily' | 'pvp' | 'boss', sid: string) => Promise<void>
 
   /* 設定 */
@@ -89,7 +88,7 @@ export function MenuScreenRouter(props: MenuScreenRouterProps) {
     skills, heroSkills,
     diamond, gold, gachaPity,
     onDiamondChange, onGoldChange,
-    storyProgress, towerFloor, stageStars, onSelectStage,
+    storyProgress, towerFloor, onSelectStage,
     displayName, isBound, pwaRewardClaimed, onLogout,
     mailItems, mailLoaded, onMailItemsChange, onRefreshMail,
     showAcquire,
@@ -131,7 +130,6 @@ export function MenuScreenRouter(props: MenuScreenRouterProps) {
         <StageSelect
           storyProgress={storyProgress}
           towerFloor={towerFloor}
-          stageStars={stageStars}
           onBack={onBack}
           onSelectStage={onSelectStage}
         />

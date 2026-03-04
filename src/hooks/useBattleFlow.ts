@@ -97,7 +97,6 @@ export interface BattleFlowDeps {
   doSaveFormation: (heroIds: (string | null)[]) => void
   doUpdateProgress: (changes: Record<string, unknown>) => void
   doUpdateStory: (chapter: number, stage: number) => void
-  doUpdateStageStars: (stageId: string, stars: number) => void
 
   /* ── UI callbacks ── */
   acquireShow: (items: AcquireItem[]) => void
@@ -189,7 +188,6 @@ export function useBattleFlow(deps: BattleFlowDeps) {
     doSaveFormation: deps.doSaveFormation,
     doUpdateProgress: deps.doUpdateProgress,
     doUpdateStory: deps.doUpdateStory,
-    doUpdateStageStars: deps.doUpdateStageStars,
     acquireShow: deps.acquireShow,
     showToast: deps.showToast,
     playerSlots: deps.playerSlots,
@@ -202,7 +200,7 @@ export function useBattleFlow(deps: BattleFlowDeps) {
     deps.playerSlots, deps.enemySlots, deps.stageMode, deps.stageId,
     deps.updatePlayerSlots, deps.updateEnemySlots, deps.setActorState,
     deps.addDamage, deps.waitForAction, deps.waitForMove, deps.clearAllPromises,
-    deps.doSaveFormation, deps.doUpdateProgress, deps.doUpdateStory, deps.doUpdateStageStars,
+    deps.doSaveFormation, deps.doUpdateProgress, deps.doUpdateStory,
     deps.acquireShow, deps.showToast,
     deps.setBattleBuffs, deps.setBattleEnergy, deps.setSkillToasts,
     deps.setElementHints, deps.setPassiveHints, deps.setBuffApplyHints,

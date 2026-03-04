@@ -1,7 +1,7 @@
 # 關卡系統 Spec
 
-> 版本：v2.7 ｜ 狀態：🟢 已實作
-> 最後更新：2026-03-06
+> 版本：v2.8 ｜ 狀態：🟢 已實作
+> 最後更新：2026-06-19
 > 負責角色：🎯 GAME_DESIGN → 🔧 CODING
 
 ## 概述
@@ -16,7 +16,7 @@
 
 - `specs/core-combat.md` — 戰鬥引擎
 - `specs/hero-schema.md` — 英雄數值（ZOMBIE_IDS [1-14]）
-- `specs/save-system.md` — 進度儲存（storyProgress / towerFloor / stageStars）
+- `specs/save-system.md` — 進度儲存（storyProgress / towerFloor / stageStars，stageStars 值為 `1` 表示已通關）
 - `specs/auth-system.md` — 玩家身份
 - Cloudflare Workers + D1 — 關卡配置 API
 
@@ -26,7 +26,7 @@
 |--------|------|
 | `workers/src/routes/stage.ts` | Workers API — `/list-stages`、`/stage-config` 端點 |
 | `src/services/stageService.ts` | 前端關卡服務 — fetchStageConfigs / getCachedStageConfig / getStageConfig |
-| `src/domain/stageSystem.ts` | 核心邏輯 — 爬塔/副本/PvP/Boss 配置生成 / 星級計算 / 掉落擲骰（主線部分已移至 D1） |
+| `src/domain/stageSystem.ts` | 核心邏輯 — 爬塔/副本/PvP/Boss 配置生成 / 掉落擲骰（主線部分已移至 D1；星級計算已移除） |
 | `src/components/StageSelect.tsx` | 關卡選擇 UI — 5 個分頁，主線改用 API 驅動的章節主題卡片 |
 | `src/components/SceneProps.tsx` | 章節專屬 3D 場景道具（8 主題 × 3-5 種道具，seeded 散佈，stageId 參與 seed 計算使每小關佈局不同）；4 種共用氛圍元件（RubblePile/BloodStain/ScatteredLitter/RustMark）；每個道具含精細末日風化細節（鏽斑、血漬、裂縫、碎玻璃、掉落物等） |
 | `src/components/Arena.tsx` | 場景環境（地面 + 碎片 + 粒子 + 燈光 + 天空 + SceneProps），接收 stageId 傳給 SceneProps |
@@ -90,9 +90,9 @@ function seededRandom(seed: number): () => number {
 | 章節數 | 8 章（共 64 關） |
 | 體力消耗 | **無**（免費無限挑戰） |
 | stageId 格式 | `"{chapter}-{stage}"`（如 `"2-5"`） |
-| 星級評價 | ★★★（全員存活）、★★（≤2 人陣亡）、★（通關即可） |
-| 三星鎖定 | 已獲 3 星的關卡顯示 ✅ 並禁止再挑戰（`stage-maxed` class） |
-| 星級記錄 | `save_data.stageStars` JSON，`updateStageStars()` 只升不降 |
+| 通關記錄 | 二元制：通關(1) 或 未通關（無星級評價） |
+| 通關鎖定 | 已通關的關卡顯示 ✅ 並禁止再挑戰（`stage-maxed` class） |
+| 通關記錄格式 | `save_data.stageStars` JSON，值固定為 `1`（已通關），如 `{"1-1": 1, "1-2": 1}` |
 | 首通效果 | 推進 storyProgress + 更新 resourceTimerStage + 首通獎勵 |
 
 ### 敵方配置（D1 stage_configs 表）
@@ -159,13 +159,10 @@ CREATE TABLE stage_configs (
 
 > **v2.2 變更**：exp 獎勵直接發放至 `save_data.exp`（頂層資源），不再掉落 exp_core 道具。
 
-### 星級判定（calculateStarRating）
+### 通關判定（星級已移除）
 
-```typescript
-survivingHeroes >= totalHeroes            → ⭐⭐⭐ (3)
-totalHeroes - survivingHeroes <= 2        → ⭐⭐   (2)
-otherwise                                 → ⭐     (1)
-```
+> **v2.8 變更**：`calculateStarRating` 函式已移除。不再有 1/2/3 星評價。
+> 關卡結果簡化為二元制：勝利 = 通關（`stageStars[stageId] = 1`），敗北 = 未通關。
 
 ### 下一關（getNextStageId）
 
@@ -216,6 +213,8 @@ enemies = randomFormation(enemyCount, hpMult, atkMult, speedMult)
 | 其他 | `50 + floor×10` | `100 + floor×20` | 0 | — |
 
 > **v2.2 變更**：exp 獎勵直接發放至 `save_data.exp`，不再掉落 exp_core_l / exp_core_m 道具。
+
+> **v2.8 變更**：爬塔 UI 關卡列表不再顯示金幣/經驗/鑽石獎勵行（後端仍正常發放獎勵，僅移除前端顯示）。
 
 ### 連續挑戰（goNextStage — tower）
 
@@ -425,13 +424,13 @@ handleStageSelect(mode, stageId):
 
 ### 勝利結算行為差異
 
-| 模式 | 星級 | 顯示 | 操作按鈕 |
-|------|------|------|---------|
-| 主線 | ✅ 計算並記錄 | 星級評價 + 首通 Badge + 獎勵 + 資源速度 | 返回大廳 / 下一關 |
-| 爬塔 | ❌ 不計算 | 「🗼 第 N 層通關！」+ 獎勵 | 返回大廳 / 下一層 |
-| 副本 | ❌ 不計算 | 獎勵 | 返回大廳 |
-| PvP | ❌ 不計算 | 獎勵 + 競技幣 | 返回大廳 |
-| Boss | ❌ 不計算 | 傷害段位（S/A/B/C）+ 分級獎勵 | 返回大廳 |
+| 模式 | 通關記錄 | 顯示 | 操作按鈕 |
+|------|----------|------|----------|
+| 主線 | ✅ 記錄通關 | 首通 Badge + 獎勵 + 資源速度（無星級評價） | 返回大廳 / 下一關 |
+| 爬塔 | ❌ 不記錄 | 「🗼 第 N 層通關！」+ 獎勵（UI 不顯示金幣/經驗/鑽石獎勵行） | 返回大廳 / 下一層 |
+| 副本 | ❌ 不記錄 | 獎勵 | 返回大廳 |
+| PvP | ❌ 不記錄 | 獎勵 + 競技幣 | 返回大廳 |
+| Boss | ❌ 不記錄 | 傷害段位（S/A/B/C）+ 分級獎勵 | 返回大廳 |
 
 - 勝利時不顯示「再戰一次」（僅敗北時顯示）
 
@@ -460,7 +459,7 @@ mergeDrops(items: InventoryItem[]): InventoryItem[]   // 合併同 itemId
 | `localWinner` | 前端判定的勝負 |
 | `stageMode` | `'story' \| 'tower' \| 'daily' \| 'pvp' \| 'boss'` |
 | `stageId` | 關卡 ID（格式依模式不同） |
-| `starsEarned` | 星級（僅 story 模式使用） |
+| `starsEarned` | 通關標記（僅 story 模式使用，固定為 `1`） |
 
 > 舊有 `handleCompleteStage_` / `handleCompleteTower_` / `handleCompleteDaily_` 保留供 reconcile 向下相容。
 
@@ -478,7 +477,7 @@ mergeDrops(items: InventoryItem[]): InventoryItem[]   // 合併同 itemId
 | 普通通關 | `stage_configs.rewards.gold` | `stage_configs.rewards.exp` | `stage_configs.rewards.diamond` |
 | 首通加碼 | 基礎 × 2 | 基礎 × 2 | max(基礎, 30) |
 
-- 首通判定：`stageStars[stageId]` 無值 = 首通
+- 首通判定：`stageStars[stageId]` 無值 = 首通（通關後記錄為 `1`）
 - **Fallback**（stage_configs 缺失時）：`gold = 100 + ch×50 + st×20 + (首通?200:0)`
 
 #### Tower 模式
@@ -541,7 +540,7 @@ mergeDrops(items: InventoryItem[]): InventoryItem[]   // 合併同 itemId
 - [x] **Boss 挑戰**：3 Boss + 30 回合限制 + 傷害段位獎勵 + 專屬場景
 - [ ] **PvP 排行榜**：異步 PvP 防守陣容 + 排名
 - [ ] **困難模式**：主線 Hard 難度
-- [ ] **掃蕩功能**：已三星通關的關卡跳過戰鬥直接領獎
+- [ ] **掃蕩功能**：已通關的關卡跳過戰鬥直接領獎
 - [ ] **活動關卡**：限時活動副本
 - [ ] **Stage 對話系統**：戰前/戰後劇情對話
 
@@ -564,3 +563,4 @@ mergeDrops(items: InventoryItem[]): InventoryItem[]   // 合併同 itemId
 | v2.5 | 2026-03-05 | **章節專屬 3D 場景道具**：新增 `SceneProps.tsx` 元件（8 個章節主題各有獨特 3D 道具）；city=路牌＋建築殘骸＋街燈＋路障、forest=樹幹＋倒木＋蘑菇、wasteland=購物車＋破架子＋油桶、factory=齒輪機構＋管線架＋輸送帶、hospital=病床＋點滴架＋醫療櫃、residential=桌椅＋書架＋電視、underground=汽車殘骸＋交通錐＋水泥柱＋停車欄杆、core=能量水晶(浮動動畫)＋科技主機＋發光管；使用 seeded PRNG 確定性散佈避開中央戰鬥區域；Arena.tsx 導入 SceneProps；StageSelect CHAPTER_THEMES 擴展至 8 章（新增 factory/hospital/residential/underground/core 色彩主題） |
 | v2.6 | 2026-03-04 | **每小關場景道具佈局差異化**：SceneProps seed 計算加入 stageId（`chapter*100+stage`），同章不同小關道具種類相同但位置分佈不同；Arena 新增 `stageId` prop 傳遞給 SceneProps；App.tsx 傳遞 stageId 給 Arena |
 | v2.7 | 2026-03-06 | **場景道具品質全面升級**：4 種共用氛圍元件（RubblePile/BloodStain/ScatteredLitter/RustMark）；全部 8 主題 20+ 道具逐一增加末日風化細節 — city(掛線/碎玻璃/鏽斑)、forest(樹皮剝落/菌絲/爪痕/蘑菇發光)、wasteland(缺輪/散落貨物/油漬)、factory(傳送帶殘片/管線洩漏)、hospital(血漬床墊/點滴管/藥瓶散落)、residential(桌面汙漬/碎盤/椅裂縫/灰塵/書籍掉落/電視碎屏)、underground(火損車身/碎玻璃/少輪/鋼筋外露/水漬)、core(碎片衛星增多/地裂光環/螢幕裂紋/管線洩漏)；`generateSceneElements` 為所有 8 主題加入獨立散佈的 RubblePile/BloodStain/ScatteredLitter 氛圍元素 |
+| v2.8 | 2026-06-19 | **星級簡化 + 爬塔獎勵顯示移除**：移除 `calculateStarRating` 函式，關卡評價從三星制（1/2/3）改為二元通關制（通關=1 / 未通關）；`stageStars` 值固定為 `1`（已通關）；勝利面板不再顯示星級評價或首通星級獎勵；爬塔 UI 關卡列表不再顯示金幣/經驗/鑽石獎勵行（後端仍正常發放獎勵） |

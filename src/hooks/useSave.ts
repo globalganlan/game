@@ -14,7 +14,6 @@ import {
   onSaveChange,
   updateProgress,
   updateStoryProgress,
-  updateStageStars,
   saveFormation,
   addHero,
   collectResources,
@@ -44,8 +43,6 @@ export interface UseSaveReturn {
   >>) => void
   /** 更新劇情進度 */
   doUpdateStory: (chapter: number, stage: number) => void
-  /** 更新關卡星級 */
-  doUpdateStageStars: (stageId: string, stars: number) => void
   /** 儲存陣型 */
   doSaveFormation: (formation: (string | null)[]) => Promise<boolean>
   /** 新增英雄 */
@@ -113,10 +110,6 @@ export function useSave(): UseSaveReturn {
     updateStoryProgress(chapter, stage)
   }, [])
 
-  const doUpdateStageStars = useCallback((stageId: string, stars: number) => {
-    updateStageStars(stageId, stars)
-  }, [])
-
   const doSaveFormation = useCallback(async (formation: (string | null)[]) => {
     return saveFormation(formation)
   }, [])
@@ -156,7 +149,6 @@ export function useSave(): UseSaveReturn {
     doLoadSave,
     doUpdateProgress,
     doUpdateStory,
-    doUpdateStageStars,
     doSaveFormation,
     doAddHero,
     doCollectResources,

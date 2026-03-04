@@ -10,8 +10,6 @@ export interface VictoryRewards {
   diamond: number
   exp: number
   drops: { itemId: string; quantity: number }[]
-  stars: 1 | 2 | 3
-  isFirst: boolean
   resourceSpeed: { goldPerHour: number; expPerHour: number } | null
 }
 
@@ -31,14 +29,6 @@ export function VictoryPanel({ battleResult, victoryRewards, stageMode, stageId 
       {/* 勝利獎勵面板 */}
       {battleResult === 'victory' && victoryRewards && (
         <div className="victory-rewards-panel">
-          {/* 星級（僅主線關卡） */}
-          {stageMode === 'story' && (
-            <div className="reward-stars">
-              {[1, 2, 3].map(i => (
-                <span key={i} className={`reward-star ${i <= victoryRewards.stars ? 'active' : ''}`}>★</span>
-              ))}
-            </div>
-          )}
           {stageMode === 'tower' && (
             <div className="reward-floor-clear">🗼 第 {stageId} 層通關！</div>
           )}
@@ -48,7 +38,6 @@ export function VictoryPanel({ battleResult, victoryRewards, stageMode, stageId 
           {stageMode === 'boss' && (
             <div className="reward-floor-clear">👹 Boss 討伐完成！</div>
           )}
-          {victoryRewards.isFirst && <div className="reward-first-clear">🏆 首次通關獎勵</div>}
 
           {/* 獎勵明細 */}
           <div className="reward-items-list">

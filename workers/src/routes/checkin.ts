@@ -18,11 +18,11 @@ interface CheckinReward {
 const CHECKIN_REWARDS: CheckinReward[] = [
   /* Day 1 */ { gold: 5000 },
   /* Day 2 */ { gold: 8000, items: [{ itemId: 'exp', quantity: 500 }] },
-  /* Day 3 */ { diamond: 50 },
+  /* Day 3 */ { diamond: 50, items: [{ itemId: 'gacha_ticket_hero', quantity: 1 }] },
   /* Day 4 */ { gold: 12000, items: [{ itemId: 'chest_bronze', quantity: 1 }] },
-  /* Day 5 */ { diamond: 80, items: [{ itemId: 'exp', quantity: 1500 }] },
-  /* Day 6 */ { gold: 20000, items: [{ itemId: 'chest_silver', quantity: 1 }] },
-  /* Day 7 */ { diamond: 200, items: [{ itemId: 'chest_gold', quantity: 1 }] },
+  /* Day 5 */ { diamond: 80, items: [{ itemId: 'exp', quantity: 1500 }, { itemId: 'gacha_ticket_equip', quantity: 1 }] },
+  /* Day 6 */ { gold: 20000, items: [{ itemId: 'chest_silver', quantity: 1 }, { itemId: 'gacha_ticket_hero', quantity: 1 }] },
+  /* Day 7 */ { diamond: 200, items: [{ itemId: 'chest_gold', quantity: 1 }, { itemId: 'gacha_ticket_hero', quantity: 2 }, { itemId: 'gacha_ticket_equip', quantity: 2 }] },
 ];
 
 checkin.post('/daily-checkin', async (c) => {

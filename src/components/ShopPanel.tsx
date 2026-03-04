@@ -21,20 +21,21 @@ interface ShopItem {
   icon: string
   description: string
   price: number
-  currency: 'gold' | 'diamond' | 'arena' | 'stardust'
+  currency: 'gold' | 'diamond' | 'arena' | 'stardust' | 'equip_scrap'
   rewards: { itemId: string; quantity: number }[]
   /** 每日購買上限（0=無限） */
   dailyLimit: number
   category: ShopCategory
 }
 
-type ShopCategory = 'daily' | 'material' | 'special' | 'stardust'
+type ShopCategory = 'daily' | 'material' | 'special' | 'stardust' | 'scrap'
 
 const SHOP_CATEGORIES: { key: ShopCategory; label: string; icon: string }[] = [
   { key: 'daily', label: '每日商店', icon: '🔄' },
   { key: 'material', label: '素材商店', icon: '🧪' },
   { key: 'stardust', label: '星塵兌換', icon: '✨' },
   { key: 'special', label: '特殊商店', icon: '⭐' },
+  { key: 'scrap', label: '碎片兌換', icon: '🔧' },
 ]
 
 const SHOP_ITEMS: ShopItem[] = [
@@ -147,6 +148,64 @@ const SHOP_ITEMS: ShopItem[] = [
     rewards: [{ itemId: 'gold_pack_10k', quantity: 1 }],
     dailyLimit: 5, category: 'special',
   },
+  {
+    id: 'special_ticket_hero', name: '英雄召喚券 ×1', icon: '🎫',
+    description: '可用於英雄召喚，免費抽取一次',
+    price: 50, currency: 'diamond',
+    rewards: [{ itemId: 'gacha_ticket_hero', quantity: 1 }],
+    dailyLimit: 3, category: 'special',
+  },
+  {
+    id: 'special_ticket_equip', name: '裝備鍛造券 ×1', icon: '🔨',
+    description: '可用於裝備鍛造，免費鍛造一次',
+    price: 50, currency: 'diamond',
+    rewards: [{ itemId: 'gacha_ticket_equip', quantity: 1 }],
+    dailyLimit: 3, category: 'special',
+  },
+  // ── 星塵兌換店（召喚券） ──
+  {
+    id: 'sd_ticket_hero', name: '英雄召喚券 ×1', icon: '🎫',
+    description: '用星塵兌換英雄召喚券',
+    price: 30, currency: 'stardust',
+    rewards: [{ itemId: 'gacha_ticket_hero', quantity: 1 }],
+    dailyLimit: 0, category: 'stardust',
+  },
+  {
+    id: 'sd_ticket_equip', name: '裝備鍛造券 ×1', icon: '🔨',
+    description: '用星塵兌換裝備鍛造券',
+    price: 30, currency: 'stardust',
+    rewards: [{ itemId: 'gacha_ticket_equip', quantity: 1 }],
+    dailyLimit: 0, category: 'stardust',
+  },
+  // ── 碎片兌換店 ──
+  {
+    id: 'scrap_chest_equip', name: '裝備寶箱 ×1', icon: '📦',
+    description: '用裝備碎片兌換隨機裝備寶箱',
+    price: 10, currency: 'equip_scrap',
+    rewards: [{ itemId: 'chest_equipment', quantity: 1 }],
+    dailyLimit: 0, category: 'scrap',
+  },
+  {
+    id: 'scrap_enhance_s', name: '小型強化石 ×5', icon: '🔨',
+    description: '用碎片兌換裝備強化素材',
+    price: 3, currency: 'equip_scrap',
+    rewards: [{ itemId: 'eqm_enhance_s', quantity: 5 }],
+    dailyLimit: 0, category: 'scrap',
+  },
+  {
+    id: 'scrap_enhance_m', name: '中型強化石 ×3', icon: '🔨',
+    description: '用碎片兌換中級強化素材',
+    price: 8, currency: 'equip_scrap',
+    rewards: [{ itemId: 'eqm_enhance_m', quantity: 3 }],
+    dailyLimit: 0, category: 'scrap',
+  },
+  {
+    id: 'scrap_enhance_l', name: '大型強化石 ×2', icon: '🔨',
+    description: '用碎片兌換高級強化素材',
+    price: 15, currency: 'equip_scrap',
+    rewards: [{ itemId: 'eqm_enhance_l', quantity: 2 }],
+    dailyLimit: 0, category: 'scrap',
+  },
 ]
 
 import { getItemIcon, getItemName } from '../constants/rarity'
@@ -189,6 +248,7 @@ export function ShopPanel({ onBack }: ShopPanelProps) {
   const gold = saveState?.save.gold ?? 0
   const diamond = saveState?.save.diamond ?? 0
   const stardust = getItemQuantity('currency_stardust')
+  const equipScrap = getItemQuantity('equip_scrap')
 
   const filteredItems = useMemo(
     () => SHOP_ITEMS.filter(item => item.category === activeCategory),
@@ -199,8 +259,9 @@ export function ShopPanel({ onBack }: ShopPanelProps) {
     if (item.currency === 'gold') return gold >= item.price
     if (item.currency === 'diamond') return diamond >= item.price
     if (item.currency === 'stardust') return stardust >= item.price
+    if (item.currency === 'equip_scrap') return equipScrap >= item.price
     return false
-  }, [gold, diamond, stardust])
+  }, [gold, diamond, stardust, equipScrap])
 
   const getRemainingPurchases = useCallback((item: ShopItem): number | null => {
     if (item.dailyLimit <= 0) return null
@@ -215,14 +276,16 @@ export function ShopPanel({ onBack }: ShopPanelProps) {
       return
     }
     if (!canAfford(item)) {
-      const names: Record<string, string> = { gold: '金幣', diamond: '鑽石', stardust: '星塵' }
+      const names: Record<string, string> = { gold: '金幣', diamond: '鑽石', stardust: '星塵', equip_scrap: '裝備碎片' }
       setPurchaseMsg(`${names[item.currency] ?? '貨幣'}不足`)
       return
     }
 
-    // 星塵扣款（非 save 貨幣，需本地扣）
+    // 星塵/碎片扣款（非 save 貨幣，需本地扣）
     if (item.currency === 'stardust') {
       removeItemsLocally([{ itemId: 'currency_stardust', quantity: item.price }])
+    } else if (item.currency === 'equip_scrap') {
+      removeItemsLocally([{ itemId: 'equip_scrap', quantity: item.price }])
     }
 
     // 非資源類獎勵本地加背包（伺服器也會同步）
@@ -258,7 +321,7 @@ export function ShopPanel({ onBack }: ShopPanelProps) {
     const rewardNames = item.rewards.map(r => `${getItemIcon(r.itemId)} ${getItemName(r.itemId)} ×${r.quantity}`).join('、')
     setPurchaseMsg(`購買成功！獲得 ${rewardNames}`)
     setTimeout(() => setPurchaseMsg(''), 2500)
-  }, [canAfford, getRemainingPurchases, gold, diamond, stardust])
+  }, [canAfford, getRemainingPurchases, gold, diamond, stardust, equipScrap])
 
   return (
     <div className="panel-overlay">
@@ -271,6 +334,7 @@ export function ShopPanel({ onBack }: ShopPanelProps) {
             <InfoTip icon={<CurrencyIcon type="gold" />} value={gold.toLocaleString()} label="金幣" description="購買道具、強化裝備所需" className="menu-gold" />
             <InfoTip icon={<CurrencyIcon type="diamond" />} value={diamond.toLocaleString()} label="鑽石" description="購買稀有商品、禮包" className="menu-diamond" />
             <InfoTip icon={<CurrencyIcon type="stardust" />} value={stardust.toLocaleString()} label="星塵" description="重複英雄轉化而來，可在商店兑換稀有道具" className="menu-stardust" />
+            <InfoTip icon={<span style={{fontSize:'0.85em'}}>🔧</span>} value={equipScrap.toLocaleString()} label="碎片" description="分解裝備獲得，可兌換強化素材或裝備寶箱" className="menu-stardust" />
           </div>
         </div>
 
@@ -305,7 +369,7 @@ export function ShopPanel({ onBack }: ShopPanelProps) {
                   <div className="shop-item-desc">{item.description}</div>
                   <div className="shop-item-footer">
                     <span className={`shop-price ${!affordable ? 'shop-price-insufficient' : ''}`}>
-                      {item.currency === 'gold' ? <CurrencyIcon type="gold" /> : item.currency === 'diamond' ? <CurrencyIcon type="diamond" /> : item.currency === 'stardust' ? <CurrencyIcon type="stardust" /> : '🏟️'} {item.price.toLocaleString()}
+                      {item.currency === 'gold' ? <CurrencyIcon type="gold" /> : item.currency === 'diamond' ? <CurrencyIcon type="diamond" /> : item.currency === 'stardust' ? <CurrencyIcon type="stardust" /> : item.currency === 'equip_scrap' ? <span style={{fontSize:'0.85em'}}>🔧</span> : '🏟️'} {item.price.toLocaleString()}
                     </span>
                     {remaining !== null && (
                       <span className={`shop-remaining ${soldOut ? 'sold-out' : ''}`}>

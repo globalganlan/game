@@ -11,7 +11,7 @@ const inventory = new Hono<{ Bindings: Env; Variables: HonoVars }>();
 
 // ── 商店目錄 ──
 const SHOP_CATALOG: Record<string, {
-  price: number; currency: 'gold' | 'diamond' | 'stardust'; rewards: Array<{ itemId: string; quantity: number }>; dailyLimit: number;
+  price: number; currency: 'gold' | 'diamond' | 'stardust' | 'equip_scrap'; rewards: Array<{ itemId: string; quantity: number }>; dailyLimit: number;
 }> = {
   daily_exp_s:      { price: 1000,  currency: 'gold',    rewards: [{ itemId: 'exp', quantity: 500 }], dailyLimit: 10 },
   daily_exp_m:      { price: 5000,  currency: 'gold',    rewards: [{ itemId: 'exp', quantity: 1500 }], dailyLimit: 5 },
@@ -30,6 +30,15 @@ const SHOP_CATALOG: Record<string, {
   sd_diamond_100:     { price: 80,  currency: 'stardust', rewards: [{ itemId: 'diamond', quantity: 100 }], dailyLimit: 0 },
   // ── 特殊商店 ──
   special_gold_pack: { price: 30,   currency: 'diamond', rewards: [{ itemId: 'gold_pack_10k', quantity: 1 }], dailyLimit: 5 },
+  special_ticket_hero:  { price: 50,  currency: 'diamond', rewards: [{ itemId: 'gacha_ticket_hero', quantity: 1 }], dailyLimit: 3 },
+  special_ticket_equip: { price: 50,  currency: 'diamond', rewards: [{ itemId: 'gacha_ticket_equip', quantity: 1 }], dailyLimit: 3 },
+  sd_ticket_hero:       { price: 30,  currency: 'stardust', rewards: [{ itemId: 'gacha_ticket_hero', quantity: 1 }], dailyLimit: 0 },
+  sd_ticket_equip:      { price: 30,  currency: 'stardust', rewards: [{ itemId: 'gacha_ticket_equip', quantity: 1 }], dailyLimit: 0 },
+  // ── 碎片兌換店 ──
+  scrap_chest_equip:    { price: 10,  currency: 'equip_scrap', rewards: [{ itemId: 'chest_equipment', quantity: 1 }], dailyLimit: 0 },
+  scrap_enhance_s:      { price: 3,   currency: 'equip_scrap', rewards: [{ itemId: 'eqm_enhance_s', quantity: 5 }], dailyLimit: 0 },
+  scrap_enhance_m:      { price: 8,   currency: 'equip_scrap', rewards: [{ itemId: 'eqm_enhance_m', quantity: 3 }], dailyLimit: 0 },
+  scrap_enhance_l:      { price: 15,  currency: 'equip_scrap', rewards: [{ itemId: 'eqm_enhance_l', quantity: 2 }], dailyLimit: 0 },
 };
 
 // ── 載入道具定義 ──────────────────────────────
@@ -183,12 +192,13 @@ inventory.post('/shop-buy', async (c) => {
   const catalog = SHOP_CATALOG[shopItemId];
   if (!catalog) return c.json({ success: false, error: 'invalid_shop_item' });
 
-  // 餘額檢查 — 星塵從 inventory，其他從 save_data
+  // 餘額檢查 — 星塵/碎片從 inventory，其他從 save_data
   let currentBalance = 0;
-  if (catalog.currency === 'stardust') {
+  if (catalog.currency === 'stardust' || catalog.currency === 'equip_scrap') {
+    const invItemId = catalog.currency === 'stardust' ? 'currency_stardust' : 'equip_scrap';
     const row = await db.prepare(
       'SELECT quantity FROM inventory WHERE playerId = ? AND itemId = ?'
-    ).bind(playerId, 'currency_stardust').first<{ quantity: number }>();
+    ).bind(playerId, invItemId).first<{ quantity: number }>();
     currentBalance = row?.quantity ?? 0;
   } else {
     const saveData = await db.prepare(
@@ -225,8 +235,9 @@ inventory.post('/shop-buy', async (c) => {
   }
 
   // 扣款
-  if (catalog.currency === 'stardust') {
-    stmts.push(upsertItemStmt(db, playerId, 'currency_stardust', -catalog.price));
+  if (catalog.currency === 'stardust' || catalog.currency === 'equip_scrap') {
+    const invItemId = catalog.currency === 'stardust' ? 'currency_stardust' : 'equip_scrap';
+    stmts.push(upsertItemStmt(db, playerId, invItemId, -catalog.price));
   } else {
     stmts.push(db.prepare(
       `UPDATE save_data SET ${catalog.currency} = ${catalog.currency} - ? WHERE playerId = ?`
@@ -436,6 +447,65 @@ inventory.post('/expand-inventory', async (c) => {
   ).bind(cost, newCap, playerId).run();
 
   return c.json({ success: true, newCapacity: newCap });
+});
+
+// ── 分解裝備 ──────────────────────────────
+const DECOMPOSE_REWARDS: Record<string, { gold: number; scrap: number }> = {
+  N:   { gold: 100,  scrap: 1 },
+  R:   { gold: 300,  scrap: 2 },
+  SR:  { gold: 800,  scrap: 5 },
+  SSR: { gold: 2000, scrap: 10 },
+};
+
+inventory.post('/decompose-equipment', async (c) => {
+  const playerId = c.get('playerId');
+  const db = c.env.DB;
+  const body = getBody(c);
+  const equipIds = body.equipIds as string[];
+  if (!equipIds?.length) return c.json({ success: false, error: 'missing equipIds' });
+
+  // 查詢所有待分解裝備
+  const placeholders = equipIds.map(() => '?').join(',');
+  const equipRows = await db.prepare(
+    `SELECT equipId, rarity, equippedBy, enhanceLevel FROM equipment_instances WHERE playerId = ? AND equipId IN (${placeholders})`
+  ).bind(playerId, ...equipIds).all<{ equipId: string; rarity: string; equippedBy: string; enhanceLevel: number }>();
+
+  if (equipRows.results.length === 0) return c.json({ success: false, error: 'no_valid_equipment' });
+
+  // 不能分解穿戴中的裝備
+  const wearing = equipRows.results.find(e => e.equippedBy);
+  if (wearing) return c.json({ success: false, error: 'cannot_decompose_equipped' });
+
+  let totalGold = 0;
+  let totalScrap = 0;
+  const stmts: D1PreparedStatement[] = [];
+
+  for (const eq of equipRows.results) {
+    const reward = DECOMPOSE_REWARDS[eq.rarity] || DECOMPOSE_REWARDS['N'];
+    // 強化等級額外金幣
+    totalGold += reward.gold + eq.enhanceLevel * 50;
+    totalScrap += reward.scrap;
+    stmts.push(db.prepare(
+      'DELETE FROM equipment_instances WHERE equipId = ? AND playerId = ?'
+    ).bind(eq.equipId, playerId));
+  }
+
+  // 金幣 + 碎片材料
+  stmts.push(db.prepare(
+    'UPDATE save_data SET gold = gold + ? WHERE playerId = ?'
+  ).bind(totalGold, playerId));
+  stmts.push(upsertItemStmt(db, playerId, 'equip_scrap', totalScrap));
+
+  await db.batch(stmts);
+  const currencies = await getCurrencies(db, playerId);
+
+  return c.json({
+    success: true,
+    decomposed: equipRows.results.length,
+    goldGained: totalGold,
+    scrapGained: totalScrap,
+    currencies,
+  });
 });
 
 export default inventory;

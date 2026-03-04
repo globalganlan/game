@@ -21,6 +21,7 @@ import {
   getStatAtLevel, getLevelCap, consumeExpMaterials, expToNextLevel,
   canAscend, canStarUp, getAscensionCost, getStarUpCost,
   getInitialStars, enhancedMainStat, getEnhanceCost, getMaxEnhanceLevel,
+  getActiveSetBonuses,
 } from '../domain/progressionSystem'
 import type { EquipmentInstance } from '../domain/progressionSystem'
 import {
@@ -604,6 +605,39 @@ function HeroDetail({ hero, instance, onClose, skills, heroSkills }: HeroDetailP
             )
           })}
         </div>
+
+        {/* ── 套裝效果 ── */}
+        {(() => {
+          const activeBonuses = getActiveSetBonuses(heroEquipment)
+          if (activeBonuses.length === 0) return null
+          const BONUS_ZH: Record<string, string> = {
+            ATK_percent: '攻擊%', DEF_percent: '防禦%', HP_percent: '生命%',
+            SPD_flat: '速度', CritRate_percent: '暴擊率%', CritDmg_percent: '暴擊傷害%',
+            lifesteal: '吸血', counter: '反擊率',
+          }
+          // 依套裝分組顯示
+          const setGroups = new Map<string, typeof activeBonuses>()
+          for (const b of activeBonuses) {
+            const arr = setGroups.get(b.setId) || []
+            arr.push(b)
+            setGroups.set(b.setId, arr)
+          }
+          return (
+            <div className="hd2-set-bonuses">
+              <div className="hd2-section-title">套裝效果</div>
+              {Array.from(setGroups.entries()).map(([setId, bonuses]) => (
+                <div key={setId} className="hd2-set-group">
+                  <span className="hd2-set-name">{SET_NAMES[setId] || setId}</span>
+                  {bonuses.map((b, i) => (
+                    <span key={i} className="hd2-set-bonus-tag">
+                      {b.requiredCount}件：{BONUS_ZH[b.bonusType] || b.bonusType} +{b.bonusValue}{b.bonusType.includes('flat') ? '' : '%'}
+                    </span>
+                  ))}
+                </div>
+              ))}
+            </div>
+          )
+        })()}
 
         {/* ── 操作按鈕 ── */}
         <div className="hd2-actions">

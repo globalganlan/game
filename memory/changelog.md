@@ -3,6 +3,48 @@
 > 按時間倒序排列，最新的在最上面。
 
 ---
+### [2026-06-19] 9 項系統簡化 — 星級/鎖定/容量移除 + 分解/碎片兌換/背包強化 新增
+
+- **觸發者**：使用者（9 項系統簡化與功能新增需求）
+- **執行角色**：🔧 CODING + 🎯 GAME_DESIGN + 🎨 UI_DESIGN
+- **變更摘要**：
+  1. **簽到/商店加召喚券鍛造券（Task 1）**：簽到 Day 3/5/6/7 發放英雄召喚券/裝備鍛造券；特殊商店販售（💎50/張，每日限購 3）
+  2. **圖鑑全顯示移除蒐集進度（Task 2）**：CodexPanel 顯示所有 8 套裝 × 4 部位 × 4 稀有度，無收藏進度條
+  3. **英雄資訊顯示套裝效果（Task 3）**：HeroListPanel 裝備區下方顯示已激活套裝 bonus
+  4. **移除背包數量限制（Task 4）**：InventoryPanel 不再顯示 X/Y 容量；`equipmentCapacity` 與 `/expand-inventory` 棄用
+  5. **分解功能＋碎片兌換商店（Task 5）**：背包可分解裝備得金幣+碎片（N→100金+1片 ～ SSR→2000金+8片）；商店新增碎片兌換分頁（4 種商品）
+  6. **移除裝備鎖定（Task 6）**：UI/API 完全移除 `locked` 欄位與 `/lock-equipment` 端點
+  7. **背包直接強化裝備（Task 7）**：InventoryPanel 裝備詳情彈窗新增強化按鈕（需花金幣）
+  8. **簡化關卡星級系統（Task 8）**：移除 1/2/3 星評價，改為二元通關制（cleared=1），移除 `calculateStarRating`、`starsEarned`、勝利面板星級/首通標記
+  9. **移除關卡金幣顯示（Task 9）**：爬塔面板不再顯示金幣/經驗/鑽石獎勵行（後端仍照常發放）
+- **影響檔案**：
+  - `src/components/VictoryPanel.tsx`（移除 stars/isFirst）
+  - `src/components/StageSelect.tsx`（移除 stageStars prop、星級顯示、塔獎勵行、CurrencyIcon import）
+  - `src/components/MenuScreenRouter.tsx`（移除 stageStars prop）
+  - `src/components/InventoryPanel.tsx`（新增分解/強化按鈕、移除容量顯示/鎖定按鈕）
+  - `src/components/CodexPanel.tsx`（全裝備顯示、無收藏進度）
+  - `src/components/HeroListPanel.tsx`（套裝效果顯示）
+  - `src/components/ShopPanel.tsx`（碎片兌換分頁+特殊商店召喚券）
+  - `src/components/CheckinPanel.tsx`（Day 3/5/6/7 發券）
+  - `src/App.tsx`（移除 stageStars prop 傳遞）
+  - `src/hooks/useSave.ts`（移除 doUpdateStageStars）
+  - `src/hooks/useBattleFlow.ts`（移除 doUpdateStageStars）
+  - `src/game/runBattleLoop.ts`（移除星級計算、starsEarned、doUpdateStageStars）
+  - `src/services/progressionService.ts`（移除 starsEarned 參數）
+  - `src/services/inventoryService.ts`（新增 decomposeEquipment）
+  - `workers/src/routes/battle.ts`（簡化獎勵，移除星級）
+  - `workers/src/routes/inventory.ts`（新增 /decompose-equipment）
+  - `workers/src/routes/save.ts`（碎片兌換商店路由）
+- **Spec 更新**：
+  - `stage-system.md` v2.7 → v2.8
+  - `progression.md` v2.3 → v2.4
+  - `inventory.md` v2.6 → v2.7
+  - `gacha.md` v2.2 → v2.3
+  - `ui-flow.md` v2.0 → v2.1
+  - `save-system.md` v2.0 → v2.1
+- **Workers 部署**：`npx wrangler deploy` ✅
+
+---
 ### [2026-06-18] 場景道具品質升級 + 英雄裝備 2×2 佈局 + 背包容量 + 召喚券描述
 
 - **觸發者**：使用者（4 項 UI/3D 品質需求）

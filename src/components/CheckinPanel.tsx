@@ -24,11 +24,11 @@ interface DayReward {
 const REWARDS: DayReward[] = [
   { gold: 5000 },
   { gold: 8000, items: [{ itemId: 'exp', quantity: 500 }] },
-  { diamond: 50 },
+  { diamond: 50, items: [{ itemId: 'gacha_ticket_hero', quantity: 1 }] },
   { gold: 12000, items: [{ itemId: 'chest_bronze', quantity: 1 }] },
-  { diamond: 80, items: [{ itemId: 'exp', quantity: 1500 }] },
-  { gold: 20000, items: [{ itemId: 'chest_silver', quantity: 1 }] },
-  { diamond: 200, items: [{ itemId: 'chest_gold', quantity: 1 }] },
+  { diamond: 80, items: [{ itemId: 'exp', quantity: 1500 }, { itemId: 'gacha_ticket_equip', quantity: 1 }] },
+  { gold: 20000, items: [{ itemId: 'chest_silver', quantity: 1 }, { itemId: 'gacha_ticket_hero', quantity: 1 }] },
+  { diamond: 200, items: [{ itemId: 'chest_gold', quantity: 1 }, { itemId: 'gacha_ticket_hero', quantity: 2 }, { itemId: 'gacha_ticket_equip', quantity: 2 }] },
 ]
 
 /* ────────────────────────────

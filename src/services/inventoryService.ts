@@ -240,6 +240,44 @@ export async function expandInventory(): Promise<number> {
   return res.newCapacity || inventoryState?.equipmentCapacity || 200
 }
 
+export async function decomposeEquipment(equipIds: string[]): Promise<{
+  success: boolean; decomposed?: number; goldGained?: number; scrapGained?: number; error?: string
+}> {
+  // 樂觀移除本地裝備
+  const removed: EquipmentInstance[] = []
+  if (inventoryState) {
+    inventoryState.equipment = inventoryState.equipment.filter(e => {
+      if (equipIds.includes(e.equipId)) { removed.push(e); return false }
+      return true
+    })
+    notify()
+  }
+  try {
+    const res = await callApi<{
+      decomposed: number; goldGained: number; scrapGained: number
+      currencies?: { gold?: number; diamond?: number; exp?: number }
+    }>('decompose-equipment', { equipIds })
+    if (res.success) {
+      if (res.currencies) {
+        const { applyCurrenciesFromServer } = await import('./saveService')
+        applyCurrenciesFromServer(res.currencies)
+      }
+      // 增加碎片到本地
+      if (res.scrapGained && res.scrapGained > 0) {
+        addItemsLocally([{ itemId: 'equip_scrap', quantity: res.scrapGained }])
+      }
+      return { success: true, decomposed: res.decomposed, goldGained: res.goldGained, scrapGained: res.scrapGained }
+    } else {
+      // 回滾
+      if (inventoryState) { inventoryState.equipment.push(...removed); notify() }
+      return { success: false, error: res.error ?? 'decompose_failed' }
+    }
+  } catch (e) {
+    if (inventoryState) { inventoryState.equipment.push(...removed); notify() }
+    return { success: false, error: String(e) }
+  }
+}
+
 export async function enhanceEquipment(equipId: string): Promise<{
   success: boolean; newLevel?: number; newMainStatValue?: number; goldConsumed?: number; error?: string
 }> {

@@ -2279,6 +2279,33 @@
 .hd2-equip-enhance-btn:hover {
   background: rgba(255, 180, 0, 0.55);
 }
+/* ── 套裝效果 ── */
+.hd2-set-bonuses {
+  margin-top: 6px;
+}
+.hd2-set-group {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 4px;
+  padding: 4px 8px;
+  background: rgba(255,200,50,0.06);
+  border: 1px solid rgba(255,200,50,0.15);
+  border-radius: 6px;
+}
+.hd2-set-name {
+  font-weight: 600;
+  color: #ffd700;
+  font-size: 0.85rem;
+}
+.hd2-set-bonus-tag {
+  font-size: 0.78rem;
+  color: #b8e986;
+  background: rgba(100,200,100,0.08);
+  padding: 1px 6px;
+  border-radius: 4px;
+}
 .hd2-equip-slot {
   position: relative;
 }
@@ -2610,6 +2637,14 @@
   color: #4dabf7;
 }
 .inv-lock-btn:hover { background: rgba(77,171,247,0.2); }
+
+.inv-decompose-btn {
+  border-color: rgba(200,150,50,0.4);
+  background: rgba(200,150,50,0.1);
+  color: #e8b830;
+}
+.inv-decompose-btn:hover { background: rgba(200,150,50,0.2); }
+.inv-decompose-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
 .inv-equip-cell {
   cursor: pointer;
