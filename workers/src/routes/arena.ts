@@ -15,15 +15,206 @@ const NPC_PREFIXES = ['暗影', '末日', '鐵血', '荒野', '幽靈', '狂暴'
 const NPC_SUFFIXES = ['獵人', '倖存者', '戰士', '指揮官', '護衛', '遊蕩者', '潛伏者', '收割者', '守望者', '流浪者'];
 
 const MILESTONES = [
-  { rank: 400, diamond: 20, gold: 5000, pvpCoin: 10 },
-  { rank: 300, diamond: 30, gold: 10000, pvpCoin: 20 },
-  { rank: 200, diamond: 50, gold: 20000, pvpCoin: 30 },
-  { rank: 100, diamond: 100, gold: 50000, pvpCoin: 50 },
-  { rank: 50, diamond: 150, gold: 80000, pvpCoin: 80 },
-  { rank: 20, diamond: 200, gold: 100000, pvpCoin: 100 },
-  { rank: 10, diamond: 300, gold: 150000, pvpCoin: 150 },
-  { rank: 1, diamond: 500, gold: 300000, pvpCoin: 300 },
+  { rank: 400, diamond: 20,  gold: 5000,   pvpCoin: 10,  exp: 200 },
+  { rank: 300, diamond: 30,  gold: 10000,  pvpCoin: 20,  exp: 400 },
+  { rank: 200, diamond: 50,  gold: 20000,  pvpCoin: 30,  exp: 600 },
+  { rank: 100, diamond: 100, gold: 50000,  pvpCoin: 50,  exp: 1000 },
+  { rank: 50,  diamond: 150, gold: 80000,  pvpCoin: 80,  exp: 1500 },
+  { rank: 20,  diamond: 200, gold: 100000, pvpCoin: 100, exp: 2000 },
+  { rank: 10,  diamond: 300, gold: 150000, pvpCoin: 150, exp: 3000 },
+  { rank: 1,   diamond: 500, gold: 300000, pvpCoin: 300, exp: 5000 },
 ];
+
+/* ════════════════════════════════════════════
+   後端權威戰力計算（與前端 domain/ 完全一致）
+   ════════════════════════════════════════════ */
+
+// ── 常數（與前端 progressionSystem.ts / combatPower.ts 同步） ──
+const CP_W = { HP: 0.5, ATK: 3, DEF: 2.5, SPD: 8, CritRate: 5, CritDmg: 2 } as const;
+const RARITY_NUM: Record<string, number> = { N: 1, R: 2, SR: 3, SSR: 4 };
+const RARITY_GROWTH: Record<number, number> = { 1: 0.030, 2: 0.035, 3: 0.040, 4: 0.050 };
+const ASC_MULT: Record<number, Record<number, number>> = {
+  1: { 0: 1, 1: 1.03, 2: 1.06, 3: 1.09, 4: 1.12, 5: 1.18 },
+  2: { 0: 1, 1: 1.04, 2: 1.08, 3: 1.12, 4: 1.16, 5: 1.24 },
+  3: { 0: 1, 1: 1.05, 2: 1.10, 3: 1.15, 4: 1.20, 5: 1.30 },
+  4: { 0: 1, 1: 1.07, 2: 1.14, 3: 1.22, 4: 1.30, 5: 1.42 },
+};
+const STAR_MUL: Record<number, Record<number, number>> = {
+  1: { 0: 0.90, 1: 1, 2: 1.03, 3: 1.06, 4: 1.09, 5: 1.13, 6: 1.18 },
+  2: { 0: 0.90, 1: 1, 2: 1.04, 3: 1.08, 4: 1.12, 5: 1.17, 6: 1.24 },
+  3: { 0: 0.90, 1: 1, 2: 1.05, 3: 1.10, 4: 1.15, 5: 1.20, 6: 1.30 },
+  4: { 0: 0.90, 1: 1, 2: 1.07, 3: 1.14, 4: 1.22, 5: 1.30, 6: 1.42 },
+};
+const STAR_PASSIVE: Record<number, number> = { 0: 1, 1: 1, 2: 2, 3: 2, 4: 3, 5: 3, 6: 4 };
+const ULT_BASE = 100;
+const PASSIVE_EACH = 50;
+const SET2_POWER = 80;
+const SET4_POWER = 200;
+const EQ_ENHANCE: Record<string, number> = { N: 0.06, R: 0.08, SR: 0.10, SSR: 0.12 };
+
+const EQ_SETS: { setId: string; req: number; bonusType: string; bonusValue: number }[] = [
+  { setId: 'berserker', req: 2, bonusType: 'ATK_percent',     bonusValue: 15 },
+  { setId: 'ironwall',  req: 2, bonusType: 'DEF_percent',     bonusValue: 20 },
+  { setId: 'gale',      req: 2, bonusType: 'SPD_flat',        bonusValue: 15 },
+  { setId: 'vampire',   req: 2, bonusType: 'lifesteal',       bonusValue: 12 },
+  { setId: 'critical',  req: 2, bonusType: 'CritRate_percent', bonusValue: 12 },
+  { setId: 'lethal',    req: 2, bonusType: 'CritDmg_percent',  bonusValue: 25 },
+  { setId: 'vitality',  req: 2, bonusType: 'HP_percent',      bonusValue: 20 },
+  { setId: 'counter',   req: 2, bonusType: 'counter',         bonusValue: 20 },
+  { setId: 'berserker', req: 4, bonusType: 'CritDmg_percent',  bonusValue: 20 },
+  { setId: 'ironwall',  req: 4, bonusType: 'HP_percent',      bonusValue: 15 },
+  { setId: 'gale',      req: 4, bonusType: 'ATK_percent',     bonusValue: 10 },
+  { setId: 'vampire',   req: 4, bonusType: 'lifesteal',       bonusValue: 8 },
+  { setId: 'critical',  req: 4, bonusType: 'CritDmg_percent',  bonusValue: 20 },
+  { setId: 'lethal',    req: 4, bonusType: 'ATK_percent',     bonusValue: 15 },
+  { setId: 'vitality',  req: 4, bonusType: 'DEF_percent',     bonusValue: 15 },
+  { setId: 'counter',   req: 4, bonusType: 'counter',         bonusValue: 15 },
+];
+
+interface CpStats { HP: number; ATK: number; DEF: number; SPD: number; CritRate: number; CritDmg: number }
+
+function cpAddFlat(s: CpStats, stat: string, v: number) {
+  if (stat === 'HP') s.HP += v;
+  else if (stat === 'ATK') s.ATK += v;
+  else if (stat === 'DEF') s.DEF += v;
+  else if (stat === 'SPD') s.SPD += v;
+  else if (stat === 'CritRate') s.CritRate += v;
+  else if (stat === 'CritDmg') s.CritDmg += v;
+}
+
+function cpApplyPct(s: CpStats, stat: string, pct: number) {
+  const m = pct / 100;
+  if (stat === 'HP') s.HP = Math.floor(s.HP * (1 + m));
+  else if (stat === 'ATK') s.ATK = Math.floor(s.ATK * (1 + m));
+  else if (stat === 'DEF') s.DEF = Math.floor(s.DEF * (1 + m));
+  else if (stat === 'SPD') s.SPD = Math.floor(s.SPD * (1 + m));
+  else if (stat === 'CritRate') s.CritRate = Math.floor(s.CritRate * (1 + m));
+  else if (stat === 'CritDmg') s.CritDmg = Math.floor(s.CritDmg * (1 + m));
+}
+
+/**
+ * 後端權威計算防守陣型戰力
+ * 完整考慮：等級×稀有度成長 + 突破 + 星級 + 裝備主副屬性 + 套裝效果 + 技能加成
+ */
+async function calcDefensePower(db: D1Database, playerId: string, formArr: (string | null)[]): Promise<number> {
+  const validIds = formArr.filter((id): id is string => !!id);
+  if (validIds.length === 0) return 0;
+
+  const heroIdNums = validIds.map(Number);
+
+  // 1. 查 hero_instances
+  const instRows = await db.prepare(
+    `SELECT instanceId, heroId, level, ascension, stars FROM hero_instances WHERE playerId = ? AND heroId IN (${heroIdNums.map(() => '?').join(',')})`
+  ).bind(playerId, ...heroIdNums).all();
+  const instances = (instRows.results || []) as { instanceId: string; heroId: number; level: number; ascension: number; stars: number }[];
+  if (instances.length === 0) return 0;
+
+  const instMap = new Map<number, typeof instances[0]>();
+  for (const inst of instances) instMap.set(inst.heroId, inst);
+
+  // 2. 查 heroes 基礎數值（含 rarity）
+  const hIds = [...instMap.keys()];
+  const hRows = await db.prepare(
+    `SELECT heroId, baseHP, baseATK, baseDEF, baseSPD, critRate, critDmg, rarity FROM heroes WHERE heroId IN (${hIds.map(() => '?').join(',')})`
+  ).bind(...hIds).all();
+  const heroMap = new Map<number, any>();
+  for (const h of (hRows.results || [])) heroMap.set((h as any).heroId, h);
+
+  // 3. 查所有已裝備的 equipment（equippedBy = instanceId）
+  const instanceIds = instances.map(i => i.instanceId);
+  let equipRows: any[] = [];
+  if (instanceIds.length > 0) {
+    const eqResult = await db.prepare(
+      `SELECT equipId, setId, slot, rarity, mainStat, mainStatValue, enhanceLevel, subStats, equippedBy
+       FROM equipment_instances WHERE playerId = ? AND equippedBy IN (${instanceIds.map(() => '?').join(',')})`
+    ).bind(playerId, ...instanceIds).all();
+    equipRows = (eqResult.results || []) as any[];
+  }
+  const equipByHero = new Map<string, any[]>();
+  for (const eq of equipRows) {
+    const list = equipByHero.get(eq.equippedBy) || [];
+    list.push(eq);
+    equipByHero.set(eq.equippedBy, list);
+  }
+
+  // 4. 為每個英雄計算完整戰力
+  let totalPower = 0;
+  for (const heroId of heroIdNums) {
+    const inst = instMap.get(heroId);
+    if (!inst) continue;
+    const base = heroMap.get(heroId);
+    if (!base) continue;
+
+    const rarNum = RARITY_NUM[base.rarity] ?? 3;
+    const growth = RARITY_GROWTH[rarNum] ?? 0.04;
+    const lvMult = 1 + (inst.level - 1) * growth;
+    const ascMul = ASC_MULT[rarNum]?.[inst.ascension] ?? 1;
+    const starMul = STAR_MUL[rarNum]?.[inst.stars] ?? 1;
+
+    const s: CpStats = {
+      HP:       Math.floor((base.baseHP || 100) * lvMult * ascMul * starMul),
+      ATK:      Math.floor((base.baseATK || 10) * lvMult * ascMul * starMul),
+      DEF:      Math.floor((base.baseDEF || 5) * lvMult * ascMul * starMul),
+      SPD:      base.baseSPD || 100,
+      CritRate: base.critRate ?? 5,
+      CritDmg:  base.critDmg ?? 50,
+    };
+
+    const equips = equipByHero.get(inst.instanceId) || [];
+
+    // Step 2: 裝備主屬性 + 副屬性 flat
+    for (const eq of equips) {
+      const eRate = EQ_ENHANCE[eq.rarity] ?? 0.10;
+      const mainVal = Math.floor((eq.mainStatValue || 0) * (1 + (eq.enhanceLevel || 0) * eRate));
+      cpAddFlat(s, eq.mainStat, mainVal);
+      let subs: { stat: string; value: number; isPercent: boolean }[] = [];
+      try { subs = typeof eq.subStats === 'string' ? JSON.parse(eq.subStats) : (eq.subStats || []); } catch { subs = []; }
+      for (const sub of subs) { if (!sub.isPercent) cpAddFlat(s, sub.stat, sub.value); }
+    }
+
+    // Step 3: 副屬性 percent
+    const pctBon: Record<string, number> = {};
+    for (const eq of equips) {
+      let subs: { stat: string; value: number; isPercent: boolean }[] = [];
+      try { subs = typeof eq.subStats === 'string' ? JSON.parse(eq.subStats) : (eq.subStats || []); } catch { subs = []; }
+      for (const sub of subs) {
+        if (sub.isPercent) {
+          if (sub.stat === 'CritRate' || sub.stat === 'CritDmg') cpAddFlat(s, sub.stat, sub.value);
+          else pctBon[sub.stat] = (pctBon[sub.stat] || 0) + sub.value;
+        }
+      }
+    }
+
+    // Step 4: 套裝效果
+    const setCounts: Record<string, number> = {};
+    for (const eq of equips) { if (eq.setId) setCounts[eq.setId] = (setCounts[eq.setId] || 0) + 1; }
+    const actSets: typeof EQ_SETS = [];
+    for (const [sid, cnt] of Object.entries(setCounts)) {
+      for (const def of EQ_SETS) { if (def.setId === sid && cnt >= def.req) actSets.push(def); }
+    }
+    for (const set of actSets) {
+      if (set.bonusType.endsWith('_percent')) {
+        const st = set.bonusType.replace('_percent', '');
+        if (st === 'CritRate' || st === 'CritDmg') cpAddFlat(s, st, set.bonusValue);
+        else pctBon[st] = (pctBon[st] || 0) + set.bonusValue;
+      } else if (set.bonusType === 'SPD_flat') {
+        s.SPD += set.bonusValue;
+      }
+    }
+
+    for (const [st, pct] of Object.entries(pctBon)) cpApplyPct(s, st, pct);
+
+    // Step 5: CP
+    const bp = s.HP * CP_W.HP + s.ATK * CP_W.ATK + s.DEF * CP_W.DEF + s.SPD * CP_W.SPD + s.CritRate * CP_W.CritRate + s.CritDmg * CP_W.CritDmg;
+    const skB = ULT_BASE + (STAR_PASSIVE[inst.stars] ?? 0) * PASSIVE_EACH;
+    let stB = 0;
+    for (const a of actSets) stB += a.req >= 4 ? SET4_POWER : SET2_POWER;
+
+    totalPower += Math.floor(bp + skB + stB);
+  }
+
+  return totalPower;
+}
 
 // ── 確保 arena 表有 500 NPC ────────────
 async function ensureArenaInit(db: D1Database) {
@@ -72,6 +263,8 @@ arena.post('/arena-get-rankings', async (c) => {
      WHERE rank <= 20 OR (rank >= ? AND rank <= ?) ORDER BY rank`
   ).bind(lo, hi).all<ArenaRankingRow>();
 
+  // ── 排行榜資料（直接使用 DB 儲存的 power，不再重算） ──
+
   // 挑戰次數 (daily reset)
   let challengesLeft = 5;
   let highestRank = ARENA_MAX_RANK;
@@ -97,7 +290,7 @@ arena.post('/arena-get-rankings', async (c) => {
     success: true,
     rankings: (rows.results || []).map(r => ({
       rank: r.rank, playerId: r.playerId, displayName: r.displayName,
-      isNPC: !!r.isNPC, power: r.power || 0,
+      isNPC: !!r.isNPC, power: r.power ?? 0,
     })),
     myRank, challengesLeft, highestRank,
   });
@@ -128,7 +321,7 @@ arena.post('/arena-challenge-start', async (c) => {
 
   if (defender.isNPC) {
     // NPC — 根據排名用 seed 產生確定性的隨機陣容
-    const allHeroes = await db.prepare('SELECT heroId, baseHP, baseATK, baseDEF, baseSPD, modelId, critRate, critDmg FROM heroes').all();
+    const allHeroes = await db.prepare('SELECT heroId, baseHP, baseATK, baseDEF, baseSPD, modelId, critRate, critDmg, rarity FROM heroes').all();
     const heroPool = allHeroes.results || [];
     if (heroPool.length > 0) {
       const npcPower = defender.power || 500;
@@ -145,6 +338,8 @@ arena.post('/arena-challenge-start', async (c) => {
           ATK: Math.floor((h.baseATK || 10) * scale),
           DEF: Math.floor((h.baseDEF || 5) * scale),
           Speed: h.baseSPD || 100,
+          CritRate: h.critRate ?? 5,
+          CritDmg: h.critDmg ?? 50,
           ModelID: h.modelId || String(h.heroId),
           slot: i,
         });
@@ -160,15 +355,34 @@ arena.post('/arena-challenge-start', async (c) => {
       const instMap = new Map<string, any>();
       for (const inst of (instances.results || [])) instMap.set((inst as any).instanceId, inst);
 
-      // 批量查詢英雄基礎資料
+      // 批量查詢英雄基礎資料（含 rarity）
       const heroIds = [...new Set((instances.results || []).map((r: any) => r.heroId))];
       const heroMap = new Map<number, any>();
       if (heroIds.length > 0) {
         const heroRows = await db.prepare(
-          `SELECT heroId, baseHP, baseATK, baseDEF, baseSPD, modelId, critRate, critDmg FROM heroes WHERE heroId IN (${heroIds.map(() => '?').join(',')})`
+          `SELECT heroId, baseHP, baseATK, baseDEF, baseSPD, modelId, critRate, critDmg, rarity FROM heroes WHERE heroId IN (${heroIds.map(() => '?').join(',')})`
         ).bind(...heroIds).all();
         for (const h of (heroRows.results || [])) heroMap.set((h as any).heroId, h);
       }
+
+      // 稀有度成長率（與前端 progressionSystem.ts RARITY_LEVEL_GROWTH 一致）
+      const RARITY_GROWTH: Record<string, number> = { 'N': 0.030, 'R': 0.035, 'SR': 0.040, 'SSR': 0.050 };
+      // 稀有度→數字對映（查表用）
+      const RARITY_NUM: Record<string, number> = { 'N': 1, 'R': 2, 'SR': 3, 'SSR': 4 };
+      // 突破加成（與前端 RARITY_ASC_MULT 一致）
+      const ASC_MULT: Record<number, Record<number, number>> = {
+        1: { 0:1, 1:1.03, 2:1.06, 3:1.09, 4:1.12, 5:1.18 },
+        2: { 0:1, 1:1.04, 2:1.08, 3:1.12, 4:1.16, 5:1.24 },
+        3: { 0:1, 1:1.05, 2:1.10, 3:1.15, 4:1.20, 5:1.30 },
+        4: { 0:1, 1:1.07, 2:1.14, 3:1.22, 4:1.30, 5:1.42 },
+      };
+      // 星級加成（與前端 RARITY_STAR_MULT 一致）
+      const STAR_MULT: Record<number, Record<number, number>> = {
+        1: { 0:0.90, 1:1, 2:1.03, 3:1.06, 4:1.09, 5:1.13, 6:1.18 },
+        2: { 0:0.90, 1:1, 2:1.04, 3:1.08, 4:1.12, 5:1.17, 6:1.24 },
+        3: { 0:0.90, 1:1, 2:1.05, 3:1.10, 4:1.15, 5:1.20, 6:1.30 },
+        4: { 0:0.90, 1:1, 2:1.07, 3:1.14, 4:1.22, 5:1.30, 6:1.42 },
+      };
 
       formation.forEach((instId, slot) => {
         if (!instId) return;
@@ -176,14 +390,19 @@ arena.post('/arena-challenge-start', async (c) => {
         if (!inst) return;
         const base = heroMap.get(inst.heroId);
         if (!base) return;
-        // 簡易等級加成：每級 +3% HP/ATK/DEF
-        const lvScale = 1 + (inst.level - 1) * 0.03;
+        const rn = RARITY_NUM[base.rarity] ?? 3;
+        const growth = RARITY_GROWTH[base.rarity] ?? 0.04;
+        const lvScale = 1 + (inst.level - 1) * growth;
+        const ascMult = ASC_MULT[rn]?.[inst.ascension] ?? 1.0;
+        const starMult = STAR_MULT[rn]?.[inst.stars ?? 0] ?? 1.0;
         heroes.push({
           heroId: inst.heroId,
-          HP: Math.floor((base.baseHP || 100) * lvScale),
-          ATK: Math.floor((base.baseATK || 10) * lvScale),
-          DEF: Math.floor((base.baseDEF || 5) * lvScale),
+          HP: Math.floor((base.baseHP || 100) * lvScale * ascMult * starMult),
+          ATK: Math.floor((base.baseATK || 10) * lvScale * ascMult * starMult),
+          DEF: Math.floor((base.baseDEF || 5) * lvScale * ascMult * starMult),
           Speed: base.baseSPD || 100,
+          CritRate: base.critRate ?? 5,
+          CritDmg: base.critDmg ?? 50,
           ModelID: base.modelId || String(inst.heroId),
           slot,
           level: inst.level,
@@ -227,9 +446,36 @@ arena.post('/arena-challenge-complete', async (c) => {
       'SELECT rank, playerId FROM arena_rankings WHERE isNPC = 1 ORDER BY rank DESC LIMIT 1'
     ).first<{ rank: number; playerId: string }>();
     if (lastNpc) {
+      // 計算玩家目前陣型戰力
+      let playerPower = 0;
+      try {
+        const sd = await db.prepare('SELECT formation FROM save_data WHERE playerId = ?').bind(playerId).first<{ formation: string }>();
+        const form: (string | null)[] = sd?.formation ? JSON.parse(sd.formation) : [];
+        const validIds = form.filter((id): id is string => !!id);
+        if (validIds.length > 0) {
+          const insts = await db.prepare(
+            `SELECT heroId, level FROM hero_instances WHERE playerId = ? AND instanceId IN (${validIds.map(() => '?').join(',')})`
+          ).bind(playerId, ...validIds).all();
+          const hIds = [...new Set((insts.results || []).map((r: any) => r.heroId))];
+          if (hIds.length > 0) {
+            const hRows = await db.prepare(
+              `SELECT heroId, baseHP, baseATK, baseDEF, baseSPD, critRate, critDmg FROM heroes WHERE heroId IN (${hIds.map(() => '?').join(',')})`
+            ).bind(...hIds).all();
+            const hMap = new Map<number, any>();
+            for (const h of (hRows.results || [])) hMap.set((h as any).heroId, h);
+            for (const inst of (insts.results || [])) {
+              const i = inst as any;
+              const base = hMap.get(i.heroId);
+              if (!base) continue;
+              const lvScale = 1 + (i.level - 1) * 0.03;
+              playerPower += Math.floor((base.baseHP||100)*lvScale*0.5 + (base.baseATK||10)*lvScale*3 + (base.baseDEF||5)*lvScale*2.5 + (base.baseSPD||100)*8 + (base.critRate||5)*5 + (base.critDmg||50)*2 + 100);
+            }
+          }
+        }
+      } catch { /* power 計算失敗用 0 */ }
       await db.prepare(
-        'UPDATE arena_rankings SET playerId = ?, displayName = ?, isNPC = 0, lastUpdated = ? WHERE rank = ?'
-      ).bind(playerId, displayName, isoNow(), lastNpc.rank).run();
+        'UPDATE arena_rankings SET playerId = ?, displayName = ?, isNPC = 0, power = ?, lastUpdated = ? WHERE rank = ?'
+      ).bind(playerId, displayName, playerPower, isoNow(), lastNpc.rank).run();
       challengerRow = { rank: lastNpc.rank };
     }
   }
@@ -243,10 +489,10 @@ arena.post('/arena-challenge-complete', async (c) => {
   const challengesLeft = Math.max(0, (saveData?.arenaChallengesLeft ?? 5) - 1);
 
   const rewards = won
-    ? { diamond: 0, gold: 2000, pvpCoin: 5 }
-    : { diamond: 0, gold: 500, pvpCoin: 1 };
+    ? { diamond: 0, gold: 2000, pvpCoin: 5, exp: 150 }
+    : { diamond: 0, gold: 500, pvpCoin: 1, exp: 50 };
 
-  let milestoneReward: { diamond: number; gold: number; pvpCoin: number } | null = null;
+  let milestoneReward: { diamond: number; gold: number; pvpCoin: number; exp: number } | null = null;
   let newRank = challengerRank;
 
   // ── 寫入階段 — 收集所有 stmts ──────────────
@@ -286,7 +532,7 @@ arena.post('/arena-challenge-complete', async (c) => {
     if (newRank < prevHighest) {
       for (const m of MILESTONES) {
         if (newRank <= m.rank && prevHighest > m.rank) {
-          milestoneReward = { diamond: m.diamond, gold: m.gold, pvpCoin: m.pvpCoin };
+          milestoneReward = { diamond: m.diamond, gold: m.gold, pvpCoin: m.pvpCoin, exp: m.exp };
           break;
         }
       }
@@ -305,8 +551,10 @@ arena.post('/arena-challenge-complete', async (c) => {
 
   const totalGold = rewards.gold + (milestoneReward?.gold || 0);
   const totalDiamond = rewards.diamond + (milestoneReward?.diamond || 0);
+  const totalExp = rewards.exp + (milestoneReward?.exp || 0);
   if (totalGold > 0) { setParts.push('gold = gold + ?'); bindVals.push(totalGold); }
   if (totalDiamond > 0) { setParts.push('diamond = diamond + ?'); bindVals.push(totalDiamond); }
+  if (totalExp > 0) { setParts.push('exp = exp + ?'); bindVals.push(totalExp); }
 
   setParts.push('lastSaved = ?');
   bindVals.push(now);
@@ -319,7 +567,7 @@ arena.post('/arena-challenge-complete', async (c) => {
   // pvpCoin → inventory（使用 upsertItemStmt 取代手動 SELECT+INSERT/UPDATE）
   const pvpCoinTotal = rewards.pvpCoin + (milestoneReward?.pvpCoin || 0);
   if (pvpCoinTotal > 0) {
-    writeStmts.push(upsertItemStmt(db, playerId, 'currency_pvp_coin', pvpCoinTotal));
+    writeStmts.push(upsertItemStmt(db, playerId, 'pvp_coin', pvpCoinTotal));
   }
 
   // 原子批次寫入
@@ -342,10 +590,15 @@ arena.post('/arena-set-defense', async (c) => {
 
   const now = isoNow();
 
+  // 後端權威計算防守陣型戰力
+  let formArr: (string | null)[] = [];
+  try { formArr = JSON.parse(defenseFormation); } catch { formArr = []; }
+  const power = await calcDefensePower(c.env.DB, playerId, formArr);
+
   // 先嘗試 UPDATE
   const result = await c.env.DB.prepare(
-    'UPDATE arena_rankings SET defenseFormation = ?, lastUpdated = ? WHERE playerId = ?'
-  ).bind(defenseFormation, now, playerId).run();
+    'UPDATE arena_rankings SET defenseFormation = ?, power = ?, lastUpdated = ? WHERE playerId = ?'
+  ).bind(defenseFormation, power, now, playerId).run();
 
   // 如果玩家尚未在 arena_rankings，INSERT 一筆預設資料（排在最後）
   if (result.meta.changes === 0) {
@@ -363,50 +616,11 @@ arena.post('/arena-set-defense', async (c) => {
 
     await c.env.DB.prepare(
       `INSERT INTO arena_rankings (rank, playerId, displayName, isNPC, power, defenseFormation, lastUpdated)
-       VALUES (?, ?, ?, 0, 0, ?, ?)`
-    ).bind(newRank, playerId, dName, defenseFormation, now).run();
+       VALUES (?, ?, ?, 0, ?, ?, ?)`
+    ).bind(newRank, playerId, dName, power, defenseFormation, now).run();
   }
 
-  // 計算防守陣型戰力並更新 power 欄位
-  try {
-    let formArr: (string | null)[] = [];
-    try { formArr = JSON.parse(defenseFormation); } catch { formArr = []; }
-    const validIds = formArr.filter((id): id is string => !!id);
-    if (validIds.length > 0) {
-      const instances = await c.env.DB.prepare(
-        `SELECT instanceId, heroId, level, ascension, stars FROM hero_instances WHERE playerId = ? AND instanceId IN (${validIds.map(() => '?').join(',')})`
-      ).bind(playerId, ...validIds).all();
-      const heroIds = [...new Set((instances.results || []).map((r: any) => r.heroId))];
-      let totalPower = 0;
-      if (heroIds.length > 0) {
-        const heroRows = await c.env.DB.prepare(
-          `SELECT heroId, baseHP, baseATK, baseDEF, baseSPD, critRate, critDmg FROM heroes WHERE heroId IN (${heroIds.map(() => '?').join(',')})`
-        ).bind(...heroIds).all();
-        const heroMap = new Map<number, any>();
-        for (const h of (heroRows.results || [])) heroMap.set((h as any).heroId, h);
-        for (const inst of (instances.results || [])) {
-          const i = inst as any;
-          const base = heroMap.get(i.heroId);
-          if (!base) continue;
-          const lvScale = 1 + (i.level - 1) * 0.03;
-          const hp = (base.baseHP || 100) * lvScale;
-          const atk = (base.baseATK || 10) * lvScale;
-          const def = (base.baseDEF || 5) * lvScale;
-          const spd = base.baseSPD || 100;
-          const cr = base.critRate || 5;
-          const cd = base.critDmg || 50;
-          // CP_WEIGHTS: HP*0.5 + ATK*3 + DEF*2.5 + SPD*8 + CritRate*5 + CritDmg*2 + 技能100
-          totalPower += Math.floor(hp*0.5 + atk*3 + def*2.5 + spd*8 + cr*5 + cd*2 + 100);
-        }
-      }
-      if (totalPower > 0) {
-        await c.env.DB.prepare('UPDATE arena_rankings SET power = ? WHERE playerId = ?')
-          .bind(totalPower, playerId).run();
-      }
-    }
-  } catch { /* power 計算失敗不影響儲存 */ }
-
-  return c.json({ success: true });
+  return c.json({ success: true, power });
 });
 
 // ════════════════════════════════════════════

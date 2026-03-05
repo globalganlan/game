@@ -212,3 +212,74 @@
   - 1 件 N 級狂戰士 + 1 件 SR 級狂戰士 → 觸發 2 件套 ✅
   - 2 件 N + 2 件 SSR 同套裝 → 觸發 4 件套 ✅
 - **影響檔案**：`src/domain/progressionSystem.ts` — `getActiveSetBonuses()` 移除 rarity 分組
+
+---
+
+### ADR-011: 紅點 useEffect 必須依賴 menuScreen
+
+- **狀態**：✅ 永久生效
+- **日期**：2026-03-05
+- **背景**：MainMenu 紅點（arena、stages 等）的 `useEffect` 只依賴 `[gameState, playerId]`，但進入子面板再返回大廳時 `gameState` 始終是 `'MAIN_MENU'` 不變，導致資料不重抓、紅點不更新。
+- **決定**：**所有** MainMenu 紅點的 `useEffect` 必須在依賴陣列中包含 `menuScreen`，確保從子面板返回大廳時能即時刷新狀態。
+- **已修正**：
+  - `arenaChallengesLeft`（競技場次數）— 依賴加入 `menuScreen`
+  - `cachedDailyCounts`（每日探索次數）— 依賴加入 `menuScreen`
+- **無需修正**：
+  - `mailUnclaimedCount` — 基於 `useMemo(mailItems)`，領取時直接更新 `mailItems` state ✅
+  - `gachaHasFreePull` — 基於 `useMemo(saveHook.playerData)`，抽卡後 playerData 自動重抓 ✅
+  - `checkinNeeded` — 基於 `saveData.checkinLastDate`，簽到後 saveData 自動更新 ✅
+- **未來規則**：新增紅點時，若數據來自 API 呼叫 / 快取（非 React state 直接衍生），`useEffect` 必須依賴 `menuScreen`。
+
+---
+
+### ADR-012: 任何獲得物品/英雄都必須觸發獲得動畫
+
+- **狀態**：✅ 永久生效
+- **日期**：2026-03-05
+- **決定**：凡是玩家獲得物品（貨幣、道具、碎片、裝備）或英雄的場景，**一律**必須呼叫 `acquireToast.show(items)` 觸發浮動獲得動畫。
+- **適用場景（非窮舉）**：
+  - 關卡勝利獎勵 ✅（useBattleFlow）
+  - 抽卡獲得 ✅（GachaScreen）
+  - 信箱領取 ✅（MailboxPanel → showAcquire）
+  - 簽到獎勵 ✅（CheckinPanel）
+  - 離線資源收取 ✅（MainMenu onCollectResources）
+  - **競技場掃蕩 ✅**（ArenaPanel → showAcquire，本次修正）
+  - 商店購買
+  - 任何未來新增的物品獲得途徑
+- **技術實現**：
+  - `useAcquireToast` hook（`src/hooks/useAcquireToast.ts`）提供 `show(items: AcquireItem[])` 方法
+  - 頂層 `App.tsx` 持有 hook 實例，透過 props / bus 傳遞到子元件
+  - `acquireToastBus.ts` 提供全域 `registerAcquireHandler` 供非 React 上下文使用
+- **絕對禁止**：獲得物品後只顯示靜態面板而不觸發動畫 toast
+---
+
+### ADR-013: 戰力（Combat Power）計算前後端必須同步
+
+- **狀態**：✅ 永久生效
+- **日期**：2026-03-05
+- **背景**：後端 `calcDefensePower()` 與前端 `getTeamCombatPower()` 各自實作了完整的戰力公式。曾因後端使用簡化公式（缺少稀有度成長、覺醒倍率、星級倍率、裝備屬性、套裝加成、技能加成）導致競技場排名戰力顯示（2677）與前端實際計算（4298）嚴重不一致。
+- **決定**：
+  - **任何影響戰力的新元素（新屬性、新加成機制、新套裝效果、新被動技能、新覺醒階段、新裝備詞條等），必須同時更新前端和後端的戰力計算邏輯**
+  - **前端計算位置**：`src/domain/combatPower.ts`（`getTeamCombatPower` / `getHeroCombatPower`）+ `src/domain/progressionSystem.ts`（`getFinalStats`）
+  - **後端計算位置**：`workers/src/routes/arena.ts`（`calcDefensePower()`）
+  - **公式定義（CP_WEIGHTS）**：`HP×0.5 + ATK×3 + DEF×2.5 + SPD×8 + CritRate×5 + CritDmg×2`
+  - **計算步驟（兩端必須一致）**：
+    1. 基礎屬性 × 等級成長（依稀有度）
+    2. × 覺醒倍率（`ASC_MULT`）
+    3. × 星級倍率（`STAR_MUL`）+ 星級被動加成
+    4. + 裝備主屬性（含強化等級加成）
+    5. + 裝備副屬性（flat / percent 分開處理）
+    6. + 套裝效果加成
+    7. 加權求和 → 基礎戰力
+    8. + 技能加成（100 + 被動數×50）
+    9. + 套裝 CP 加成（2件=80, 4件=200）
+  - 修改任一端後，必須確認另一端也同步更新
+  - 修改後用同一組英雄數據驗證前後端計算結果一致
+- **適用場景**：
+  - 新增屬性類型（如暴擊抵抗、治療加成等）
+  - 修改 CP_WEIGHTS 權重
+  - 新增/修改裝備套裝效果
+  - 新增/修改覺醒階段或星級倍率
+  - 新增/修改技能被動效果對戰力的影響
+  - 新增任何會改變 `getFinalStats` 輸出的機制
+- **絕對禁止**：只改一端的戰力計算而遺漏另一端

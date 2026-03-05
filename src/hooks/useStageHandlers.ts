@@ -56,6 +56,7 @@ export interface StageHandlerDeps {
   setIsDefenseSetup: (b: boolean) => void
   isDefenseSetupRef: React.MutableRefObject<boolean>
   heroesListRef: React.MutableRefObject<RawHeroData[]>
+  preBattleMenuScreenRef: React.MutableRefObject<MenuScreen>
 }
 
 export function useStageHandlers(deps: StageHandlerDeps) {
@@ -65,6 +66,7 @@ export function useStageHandlers(deps: StageHandlerDeps) {
     updateEnemySlots, updatePlayerSlots, restoreFormationFromSave,
     showToast, acquireShow, heroesList, stageMode, arenaTargetRankRef,
     setIsDefenseSetup, isDefenseSetupRef, heroesListRef,
+    preBattleMenuScreenRef,
   } = deps
 
   /* ── 主選單導航 ── */
@@ -114,12 +116,14 @@ export function useStageHandlers(deps: StageHandlerDeps) {
 
     updateEnemySlots(() => buildEnemySlotsFromStage(mode, sid, heroesList, injectedEnemies))
     restoreFormationFromSave()
+    // 記住進入戰鬥前的 menuScreen，戰後可返回
+    preBattleMenuScreenRef.current = mode === 'story' ? 'none' : 'stages'
     setMenuScreen('none')
     setGameState('IDLE')
 
     if (needsCurtain) closeCurtain()
     showToast(`已選擇: ${displayName}`)
-  }, [stageMode, heroesList, setStageMode, setSceneTheme, setStageId, updateEnemySlots, restoreFormationFromSave, setMenuScreen, setGameState, setCurtainVisible, setCurtainFading, setCurtainText, curtainClosePromiseRef, closeCurtain, showToast])
+  }, [stageMode, heroesList, setStageMode, setSceneTheme, setStageId, updateEnemySlots, restoreFormationFromSave, setMenuScreen, setGameState, setCurtainVisible, setCurtainFading, setCurtainText, curtainClosePromiseRef, closeCurtain, showToast]) // eslint-disable-line react-hooks/exhaustive-deps
 
   /* ── 競技場挑戰 ── */
   const handleArenaStartBattle = useCallback(async (
@@ -141,27 +145,39 @@ export function useStageHandlers(deps: StageHandlerDeps) {
         const heroId = Number(d.heroId ?? d.HeroID ?? 0)
         const base = heroesList.find(h => Number(h.HeroID ?? 0) === heroId)
         if (!base) return
-        const modelId = Number(base.ModelID ?? base.HeroID ?? heroId)
+        // 優先使用 API 回傳的 ModelID，正規化為 zombie_N 格式
+        const rawMid = String(d.ModelID ?? base.ModelID ?? base.HeroID ?? heroId)
+        const zm = rawMid.match(/zombie[_-]?(\d+)/i)
+        const nm = rawMid.match(/\d+/)
+        const resolvedModelId = zm ? `zombie_${zm[1]}` : nm ? `zombie_${nm[0]}` : `zombie_${heroId}`
         const hp = Number(d.HP ?? base.HP ?? 100)
         const atk = Number(d.ATK ?? base.ATK ?? 10)
+        const def = Number(d.DEF ?? base.DEF ?? 5)
         const spd = Number(d.Speed ?? base.Speed ?? 100)
+        const critRate = Number(d.CritRate ?? 5)
+        const critDmg = Number(d.CritDmg ?? 50)
         enemySlotsArr[i] = {
-          ...base, HP: hp, ATK: atk, Speed: spd, slot: i, currentHP: hp,
-          _uid: `arena_${heroId}_${i}`, _modelId: String(modelId), ModelID: String(modelId),
+          ...base, HP: hp, ATK: atk, DEF: def, Speed: spd,
+          CritRate: critRate, CritDmg: critDmg,
+          slot: i, currentHP: hp,
+          _uid: `arena_${heroId}_${i}`, _modelId: resolvedModelId, ModelID: resolvedModelId,
         } as SlotHero
       })
       if (!enemySlotsArr.some(Boolean) && defender.isNPC) {
         const npcPower = defender.power
         const npcBase = heroesList[Math.floor(Math.random() * heroesList.length)]
         if (npcBase) {
-          const mid = Number(npcBase.ModelID ?? npcBase.HeroID ?? 1)
+          const rawMid = String(npcBase.ModelID ?? npcBase.HeroID ?? 1)
+          const zm = rawMid.match(/zombie[_-]?(\d+)/i)
+          const nm = rawMid.match(/\d+/)
+          const resolvedMid = zm ? `zombie_${zm[1]}` : nm ? `zombie_${nm[0]}` : 'zombie_1'
           const scale = Math.max(1, npcPower / 500)
           const hp = Math.floor(Number(npcBase.HP ?? 100) * scale)
           const atk = Math.floor(Number(npcBase.ATK ?? 10) * scale)
           enemySlotsArr[0] = {
             ...npcBase, HP: hp, ATK: atk, Speed: Number(npcBase.Speed ?? 100),
             slot: 0, currentHP: hp,
-            _uid: `arena_npc_0`, _modelId: String(mid), ModelID: String(mid),
+            _uid: `arena_npc_0`, _modelId: resolvedMid, ModelID: resolvedMid,
           } as SlotHero
         }
       }
@@ -171,6 +187,8 @@ export function useStageHandlers(deps: StageHandlerDeps) {
       setStageId(`arena-${targetRank}`)
       updateEnemySlots(() => enemySlotsArr)
       restoreFormationFromSave()
+      // 記住進入戰鬥前的 menuScreen，戰後可返回
+      preBattleMenuScreenRef.current = 'arena'
       setMenuScreen('none')
       setGameState('IDLE')
     } catch (e) {

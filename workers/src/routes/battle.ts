@@ -156,8 +156,10 @@ battle.post('/complete-battle', async (c) => {
   if (!saveData) return c.json({ success: false, error: 'save_not_found' });
 
   // 0b. 每日次數檢查（daily / pvp / boss）
+  // 競技場挑戰（stageId = 'arena-N'）不消耗 pvp 每日次數，由 arena-challenge-complete 管理
+  const isArena = stageMode === 'pvp' && stageId.startsWith('arena-');
   const dailyCounts = parseDailyCounts(saveData.dailyCounts);
-  if (DAILY_LIMITS[stageMode]) {
+  if (DAILY_LIMITS[stageMode] && !isArena) {
     const chk = checkDailyLimit(dailyCounts, stageMode);
     if (!chk.ok) {
       return c.json({
@@ -174,15 +176,8 @@ battle.post('/complete-battle', async (c) => {
   const battleResult = runBattle(players, enemies, maxTurns, seed);
   const winner = battleResult.winner;
 
-  // 若玩家敗北 → 不發獎勵（但仍消耗次數）
-  // Boss 模式例外：無論勝敗都依傷害量發放獎勵
+  // 若玩家敗北 → 不發獎勵（Boss 例外：無論勝敗都依傷害量發放）
   if (winner !== 'player' && stageMode !== 'boss') {
-    // 消耗每日次數（敗北也算）
-    if (DAILY_LIMITS[stageMode]) {
-      (dailyCounts as unknown as Record<string, number>)[stageMode] += 1;
-      await db.prepare('UPDATE save_data SET dailyCounts = ?, lastSaved = ? WHERE playerId = ?')
-        .bind(JSON.stringify(dailyCounts), isoNow(), playerId).run();
-    }
     return c.json({
       success: true, winner,
       rewards: { gold: 0, exp: 0, diamond: 0, items: [] },
@@ -281,33 +276,41 @@ battle.post('/complete-battle', async (c) => {
     await db.batch(stmts);
 
   } else if (stageMode === 'pvp') {
-    const sp = safeJsonParse<{ chapter: number; stage: number }>(saveData.storyProgress, { chapter: 1, stage: 1 });
-    const progress = (sp.chapter - 1) * 8 + sp.stage;
-    // 難度倍率：stageId 格式 "pvp_0" / "pvp_1" / "pvp_2"
-    const diffIdx = parseInt(stageId.split('_').pop() ?? '0') || 0;
-    const diffMult = [1.0, 1.5, 2.0][diffIdx] ?? 1.0;
-    rewards.gold = Math.floor((200 + progress * 40) * diffMult);
-    rewards.exp = Math.floor((80 + progress * 10) * diffMult);
-    rewards.diamond = Math.floor(10 * diffMult);
-    // pvp_coin — 與前端 getPvPReward 同步
-    const pvpCoinQty = Math.floor((3 + Math.floor(progress / 4)) * diffMult);
-    rewards.items.push({ itemId: 'pvp_coin', quantity: pvpCoinQty });
+    // 競技場挑戰（stageId 為 'arena-N'）由 arena-challenge-complete 處理獎勵
+    // battle-complete 不應重複發放，只需記錄次數
+    const isArena = stageId.startsWith('arena-');
 
-    // 消耗次數
-    dailyCounts.pvp += 1;
+    if (!isArena) {
+      const sp = safeJsonParse<{ chapter: number; stage: number }>(saveData.storyProgress, { chapter: 1, stage: 1 });
+      const progress = (sp.chapter - 1) * 8 + sp.stage;
+      // 難度倍率：stageId 格式 "pvp_0" / "pvp_1" / "pvp_2"
+      const diffIdx = parseInt(stageId.split('_').pop() ?? '0') || 0;
+      const diffMult = [1.0, 1.5, 2.0][diffIdx] ?? 1.0;
+      rewards.gold = Math.floor((200 + progress * 40) * diffMult);
+      rewards.exp = Math.floor((80 + progress * 10) * diffMult);
+      rewards.diamond = Math.floor(10 * diffMult);
+      // pvp_coin — 與前端 getPvPReward 同步
+      const pvpCoinQty = Math.floor((3 + Math.floor(progress / 4)) * diffMult);
+      rewards.items.push({ itemId: 'pvp_coin', quantity: pvpCoinQty });
 
-    const grantList: { itemId: string; quantity: number }[] = [
-      { itemId: 'gold', quantity: rewards.gold },
-      { itemId: 'diamond', quantity: rewards.diamond },
-      { itemId: 'exp', quantity: rewards.exp },
-      { itemId: 'pvp_coin', quantity: pvpCoinQty },
-    ];
-    const stmts = grantRewardsStmts(db, playerId, grantList);
-    stmts.push(
-      db.prepare('UPDATE save_data SET dailyCounts = ?, lastSaved = ? WHERE playerId = ?')
-        .bind(JSON.stringify(dailyCounts), isoNow(), playerId)
-    );
-    await db.batch(stmts);
+      const grantList: { itemId: string; quantity: number }[] = [
+        { itemId: 'gold', quantity: rewards.gold },
+        { itemId: 'diamond', quantity: rewards.diamond },
+        { itemId: 'exp', quantity: rewards.exp },
+        { itemId: 'pvp_coin', quantity: pvpCoinQty },
+      ];
+      const stmts = grantRewardsStmts(db, playerId, grantList);
+      // 消耗次數
+      dailyCounts.pvp += 1;
+      stmts.push(
+        db.prepare('UPDATE save_data SET dailyCounts = ?, lastSaved = ? WHERE playerId = ?')
+          .bind(JSON.stringify(dailyCounts), isoNow(), playerId)
+      );
+      await db.batch(stmts);
+    } else {
+      // 競技場：不發獎勵（由 arena-challenge-complete 處理），也不消耗 pvp 次數
+      // rewards 保持全零，前端不顯示 battle-complete 的獎勵
+    }
 
   } else if (stageMode === 'boss') {
     // 計算 totalDamage（從 finalPlayers.totalDamageDealt 加總）

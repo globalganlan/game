@@ -1,6 +1,6 @@
 # 開發狀態快照 — Dev Status
 
-> 最後更新：2026-03-06（第五十六次更新 — 競技場 4 項修復 + 紅點系統 + ClickableItemIcon 統一 + Boss 條修正 + 每日副本 exp 移除）
+> 最後更新：2026-03-06（第五十七次更新 — 全專案獎勵一致性審計 + ItemInfoPopup 金邊 + ClickableItemIcon 整組可點）
 
 ## 截至 2026-03-06 的開發狀態
 
@@ -13,6 +13,13 @@
 - [x] 提示詞模板集（`.ai/agents/prompt-playbook.md`，P-01~P-07）
 - [x] 模組化規格系統（.ai/specs/）
 - [x] 記憶持久化系統（.ai/memory/）
+- [x] **pvp_coin ID 統一** — `currency_pvp_coin` → `pvp_coin`（arena.ts + index.ts + D1 遷移），解決商店無法花費競技場獲得的幣
+- [x] **競技場獎勵前後端完全對齊** — 挑戰/里程碑/每日排名全部補 exp，每日排名擴為 8 階，runBattleLoop exp toast
+- [x] **競技場敵方屬性修復** — NPC 補 CritRate/CritDmg，真人玩家改用 RARITY_GROWTH × ascMult × starMult
+- [x] **stardust 儲存統一** — grantRewardsStmts stardust → inventory.currency_stardust（與 gacha 一致）
+- [x] **ItemInfoPopup 金邊+防溢出** — border: 2px solid #ffd43b + box-shadow + overflow-wrap + 描述區 max-height
+- [x] **ClickableItemIcon 整組可點** — 新增 children prop，7 處 icon+名稱+數量包為整體可點
+- [x] **ITEM_NAMES/ICONS 補齊** — currency_pvp_coin + currency_exp
 - [x] **競技場敵方模型修復** — `arena-challenge-start` 重寫：NPC 確定性種子生成 2~5 隻英雄、真實玩家查詢 hero_instances + heroes
 - [x] **競技場防守陣容載入** — ArenaPanel `useEffect` 掛載時呼叫 `getDefenseFormation()` 回顯
 - [x] **競技場戰力對齊** — `arena-set-defense` 以 CP_WEIGHTS 公式計算並寫入 power

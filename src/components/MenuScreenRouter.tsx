@@ -203,6 +203,7 @@ export function MenuScreenRouter(props: MenuScreenRouterProps) {
           heroesList={heroesList}
           heroInstances={heroInstances}
           formation={formation}
+          showAcquire={showAcquire}
         />
       )
 

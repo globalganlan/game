@@ -22,7 +22,7 @@ import type { BattleHero, BattleAction, SkillTemplate, DamageResult } from '../d
 import type { Element as DomainElement, HeroSkillConfig } from '../domain/types'
 import type { RawHeroInput, HeroInstanceData } from '../domain'
 import { BattleFlowValidator } from '../domain/battleFlowValidator'
-import { runBattleCollect, createBattleHero, generateBattleSeed } from '../domain'
+import { createBattleHero } from '../domain'
 import { getHeroSkillSet, toElement } from '../services'
 import { completeBattle, type CompleteBattleResult } from '../services/progressionService'
 import {
@@ -69,7 +69,6 @@ export interface BattleLoopContext {
   battleHeroesRef: MutableRefObject<Map<string, BattleHero>>
   actorStatesRef: MutableRefObject<Record<string, ActorState>>
   moveTargetsRef: MutableRefObject<Record<string, Vector3Tuple>>
-  completeBattleRef: MutableRefObject<Promise<CompleteBattleResult> | null>
   arenaTargetRankRef: MutableRefObject<number>
 
   /* ── BattleHUD id refs ── */
@@ -135,7 +134,7 @@ export async function executeBattleLoop(ctx: BattleLoopContext, replayActions?: 
     pSlotsRef, eSlotsRef, turnRef, skipBattleRef, speedRef,
     flowValidatorRef, skillsRef, heroSkillsRef, heroInputsRef,
     battleHeroesRef, actorStatesRef, moveTargetsRef,
-    completeBattleRef, arenaTargetRankRef,
+    arenaTargetRankRef,
     skillToastIdRef, elementHintIdRef, passiveHintIdRef, buffApplyHintIdRef,
     setGameState, setTurn, setShowBattleStats, setBattleCalculating,
     setBattleResult, setVictoryRewards, setBattleStats,
@@ -769,13 +768,12 @@ export async function executeBattleLoop(ctx: BattleLoopContext, replayActions?: 
     }
   }
 
-  // ── Phase A：計算戰鬥結果（本地優先，毫秒級完成） ──
+  // ── Phase A：後端權威戰鬥（伺服器計算，前端只播放） ──
   setBattleCalculating(true)
   let allActions: BattleAction[]
   let winner: 'player' | 'enemy' | 'draw'
   let needsHpSync = false
-
-  completeBattleRef.current = null
+  let serverResult: CompleteBattleResult | null = null
 
   if (replayActions) {
     allActions = replayActions
@@ -783,15 +781,38 @@ export async function executeBattleLoop(ctx: BattleLoopContext, replayActions?: 
     winner = endAct?.winner ?? 'draw'
     needsHpSync = true
   } else {
-    // ── 產生確定性種子 & 快照 ──
-    const battleSeed = generateBattleSeed()
+    // ── 快照當前英雄資料送後端 ──
     const snapshotPlayers = JSON.parse(JSON.stringify(playerBH)) as BattleHero[]
     const snapshotEnemies = JSON.parse(JSON.stringify(enemyBH)) as BattleHero[]
-
     const bossMaxTurns = stageMode === 'boss' ? 30 : 50
-    const result = await runBattleCollect(playerBH, enemyBH, { maxTurns: bossMaxTurns, seed: battleSeed })
-    allActions = result.actions
-    winner = result.winner
+    const dungeonTier = stageMode === 'daily' ? (stageId.split('_').pop() || 'normal') : undefined
+
+    // ── 等待後端戰鬥模擬 + 獎勵計算 ──
+    try {
+      serverResult = await completeBattle({
+        stageMode, stageId,
+        players: snapshotPlayers,
+        enemies: snapshotEnemies,
+        maxTurns: bossMaxTurns,
+        dungeonTier,
+      })
+    } catch (err) {
+      console.error('[Battle] 伺服器戰鬥請求失敗:', err)
+      showToast('⚠️ 伺服器連線失敗，無法進行戰鬥')
+      setBattleCalculating(false)
+      return
+    }
+
+    if (!serverResult?.success) {
+      console.error('[Battle] 伺服器戰鬥失敗:', serverResult?.error)
+      showToast(`⚠️ 戰鬥結算失敗：${serverResult?.error ?? '未知錯誤'}`)
+      setBattleCalculating(false)
+      return
+    }
+
+    // ── 使用伺服器回傳的 actions 與 winner ──
+    allActions = (serverResult.actions ?? []) as BattleAction[]
+    winner = (serverResult.winner as 'player' | 'enemy' | 'draw') || 'draw'
 
     // ★ 重置 heroMap HP 為初始值（Phase B 播放期間漸進更新）
     for (const bh of [...playerBH, ...enemyBH]) {
@@ -799,19 +820,6 @@ export async function executeBattleLoop(ctx: BattleLoopContext, replayActions?: 
       bh.energy = 0
     }
     needsHpSync = true
-
-    // ── 提取 daily 副本難度 ──
-    const dungeonTier = stageMode === 'daily' ? (stageId.split('_').pop() || 'normal') : undefined
-
-    // ── 背景呼叫 complete-battle（後端跑戰鬥 + 計算獎勵） ──
-    completeBattleRef.current = completeBattle({
-      stageMode, stageId,
-      seed: battleSeed,
-      players: snapshotPlayers,
-      enemies: snapshotEnemies,
-      maxTurns: bossMaxTurns,
-      dungeonTier,
-    })
   }
 
   // ── Phase B：播放動畫（可中途跳過） ──
@@ -1000,27 +1008,7 @@ export async function executeBattleLoop(ctx: BattleLoopContext, replayActions?: 
   }
   setBattleStats(stats)
 
-  // ── 伺服器端結算 — 等待後端回應，作為獎勵唯一來源 ──
-  let serverResult: CompleteBattleResult | null = null
-  if (!isReplay && completeBattleRef.current) {
-    const bgPromise = completeBattleRef.current
-    completeBattleRef.current = null
-    try {
-      const cbResult = await bgPromise
-      if (cbResult?.success) {
-        if (cbResult.winner !== winner) {
-          console.warn(
-            `[Battle] 伺服器判定不一致：本地=${winner} → 伺服器=${cbResult.winner}`
-          )
-        }
-        serverResult = cbResult
-      }
-    } catch (err) {
-      console.warn('[Battle] complete-battle 請求失敗:', err)
-    }
-  }
-
-  // ── 結算 ──
+  // ── 結算（serverResult 已在 Phase A 取得） ──
   // Boss 模式：無論勝敗都依傷害量發放獎勵
   const isBossMode = stageMode === 'boss'
   if (winner === 'player' || isBossMode) {
@@ -1071,12 +1059,21 @@ export async function executeBattleLoop(ctx: BattleLoopContext, replayActions?: 
               }
               const r = arenaRes.rewards
               if (r) {
-                showToast(`🏆 排名提升至 #${arenaRes.newRank ?? '?'}！獲得 ${r.diamond} 鑽石 + ${r.gold} 金幣`)
+                showToast(`🏆 排名提升至 #${arenaRes.newRank ?? '?'}！`)
                 const arenaItems: AcquireItem[] = []
                 if (r.diamond > 0) arenaItems.push({ type: 'currency', id: 'diamond', name: '鑽石', quantity: r.diamond, rarity: 'SR' })
                 if (r.gold > 0) arenaItems.push({ type: 'currency', id: 'gold', name: '金幣', quantity: r.gold })
                 if (r.pvpCoin > 0) arenaItems.push({ type: 'item', id: 'pvp_coin', name: '競技幣', quantity: r.pvpCoin })
+                if (r.exp > 0) arenaItems.push({ type: 'currency', id: 'exp', name: '經驗', quantity: r.exp })
                 if (arenaItems.length > 0) acquireShow(arenaItems)
+                // 更新勝利面板顯示正確的競技場獎勵
+                setVictoryRewards({
+                  gold: r.gold,
+                  diamond: r.diamond,
+                  exp: r.exp,
+                  drops: r.pvpCoin > 0 ? [{ itemId: 'pvp_coin', quantity: r.pvpCoin }] : [],
+                  resourceSpeed: null,
+                })
               }
               // 排名里程碑獎勵動畫
               const mr = arenaRes.milestoneReward
@@ -1085,6 +1082,7 @@ export async function executeBattleLoop(ctx: BattleLoopContext, replayActions?: 
                 if (mr.diamond > 0) milestoneItems.push({ type: 'currency', id: 'diamond', name: '鑽石（里程碑）', quantity: mr.diamond, rarity: 'SR' })
                 if (mr.gold > 0) milestoneItems.push({ type: 'currency', id: 'gold', name: '金幣（里程碑）', quantity: mr.gold })
                 if (mr.pvpCoin > 0) milestoneItems.push({ type: 'item', id: 'pvp_coin', name: '競技幣（里程碑）', quantity: mr.pvpCoin })
+                if (mr.exp > 0) milestoneItems.push({ type: 'currency', id: 'exp', name: '經驗（里程碑）', quantity: mr.exp })
                 if (milestoneItems.length > 0) {
                   showToast(`🎯 排名里程碑獎勵！`)
                   setTimeout(() => acquireShow(milestoneItems), 1500)
@@ -1133,22 +1131,41 @@ export async function executeBattleLoop(ctx: BattleLoopContext, replayActions?: 
         resourceSpeed,
       })
 
-      // 觸發獲得物品動畫
-      const acquireItems: AcquireItem[] = []
-      if (rewardGold > 0) acquireItems.push({ type: 'currency', id: 'gold', name: '金幣', quantity: rewardGold })
-      if (rewardDiamond > 0) acquireItems.push({ type: 'currency', id: 'diamond', name: '鑽石', quantity: rewardDiamond, rarity: 'SR' })
-      if (rewardExp > 0) acquireItems.push({ type: 'currency', id: 'exp', name: '經驗', quantity: rewardExp })
-      for (const d of drops) {
-        acquireItems.push({ type: 'item', id: d.itemId, name: getItemName(d.itemId), quantity: d.quantity })
+      // 觸發獲得物品動畫（競技場挑戰由 arena handler 單獨處理，此處跳過避免重複）
+      const isArenaChallenge = stageMode === 'pvp' && arenaTargetRankRef.current > 0
+      if (!isArenaChallenge) {
+        const acquireItems: AcquireItem[] = []
+        if (rewardGold > 0) acquireItems.push({ type: 'currency', id: 'gold', name: '金幣', quantity: rewardGold })
+        if (rewardDiamond > 0) acquireItems.push({ type: 'currency', id: 'diamond', name: '鑽石', quantity: rewardDiamond, rarity: 'SR' })
+        if (rewardExp > 0) acquireItems.push({ type: 'currency', id: 'exp', name: '經驗', quantity: rewardExp })
+        for (const d of drops) {
+          acquireItems.push({ type: 'item', id: d.itemId, name: getItemName(d.itemId), quantity: d.quantity })
+        }
+        if (acquireItems.length > 0) acquireShow(acquireItems)
       }
-      if (acquireItems.length > 0) acquireShow(acquireItems)
     }
   } else if (winner === 'enemy') {
     setBattleResult('defeat')
     if (!isReplay) setVictoryRewards(null)
     // 競技場敗北上報
     if (!isReplay && stageMode === 'pvp' && arenaTargetRankRef.current > 0) {
-      completeArenaChallenge(arenaTargetRankRef.current, false).catch(console.warn)
+      completeArenaChallenge(arenaTargetRankRef.current, false).then(async arenaRes => {
+        if (arenaRes.success) {
+          if (arenaRes.currencies) {
+            const { applyCurrenciesFromServer } = await import('../services/saveService')
+            applyCurrenciesFromServer(arenaRes.currencies)
+          }
+          const r = arenaRes.rewards
+          if (r) {
+            showToast('💀 挑戰失敗，獲得安慰獎')
+            const arenaItems: AcquireItem[] = []
+            if (r.gold > 0) arenaItems.push({ type: 'currency', id: 'gold', name: '金幣', quantity: r.gold })
+            if (r.pvpCoin > 0) arenaItems.push({ type: 'item', id: 'pvp_coin', name: '競技幣', quantity: r.pvpCoin })
+            if (r.exp > 0) arenaItems.push({ type: 'currency', id: 'exp', name: '經驗', quantity: r.exp })
+            if (arenaItems.length > 0) acquireShow(arenaItems)
+          }
+        }
+      }).catch(console.warn)
     }
   } else {
     setBattleResult('defeat')

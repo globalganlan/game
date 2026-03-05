@@ -42,8 +42,10 @@ export const ITEM_ICONS: Record<string, string> = {
   currency_diamond: '💎',
   currency_gold: '💰',
   currency_stardust: '✨',
+  currency_pvp_coin: '🏅',
   // 經驗資源
   exp: '💚',
+  currency_exp: '💚',
   // 突破職業石
   asc_class_power: '🗡️',
   asc_class_agility: '🏃',
@@ -89,8 +91,10 @@ export const ITEM_NAMES: Record<string, string> = {
   currency_diamond: '鑽石',
   currency_gold: '金幣',
   currency_stardust: '星塵',
+  currency_pvp_coin: '競技幣',
   // 經驗資源
   exp: '經驗',
+  currency_exp: '經驗',
   // 突破職業石
   asc_class_power: '力量職業石',
   asc_class_agility: '敏捷職業石',

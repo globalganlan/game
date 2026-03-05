@@ -25,7 +25,7 @@ export function GameOverButtons({ battleResult, stageMode, onNextStage, onRetry,
       )}
       <button onClick={onReplay} className="btn-replay">回放 ⏪</button>
       <button onClick={onShowStats} className="btn-stats">戰鬥資訊 📊</button>
-      <button onClick={onBackToLobby} className="btn-back-lobby">回大廳</button>
+      <button onClick={onBackToLobby} className="btn-back-lobby">返回</button>
     </div>
   )
 }

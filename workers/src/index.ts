@@ -77,33 +77,32 @@ app.onError((err, c) => {
 export default app;
 
 // ── Scheduled (Cron) Handler ─────────────
-const ARENA_DAILY_REWARDS: Record<string, { diamond: number; gold: number; pvpCoin: number }> = {
-  '10': { diamond: 50, gold: 15000, pvpCoin: 30 },
-  '50': { diamond: 30, gold: 8000, pvpCoin: 15 },
-  '100': { diamond: 20, gold: 5000, pvpCoin: 10 },
-  '200': { diamond: 10, gold: 3000, pvpCoin: 5 },
-  '500': { diamond: 5, gold: 1000, pvpCoin: 2 },
-};
+const ARENA_DAILY_REWARDS: { minRank: number; maxRank: number; diamond: number; gold: number; pvpCoin: number; exp: number }[] = [
+  { minRank: 1,   maxRank: 1,   diamond: 100, gold: 30000, pvpCoin: 50, exp: 500 },
+  { minRank: 2,   maxRank: 5,   diamond: 80,  gold: 25000, pvpCoin: 40, exp: 400 },
+  { minRank: 6,   maxRank: 10,  diamond: 60,  gold: 20000, pvpCoin: 35, exp: 350 },
+  { minRank: 11,  maxRank: 30,  diamond: 40,  gold: 15000, pvpCoin: 25, exp: 250 },
+  { minRank: 31,  maxRank: 50,  diamond: 30,  gold: 10000, pvpCoin: 20, exp: 200 },
+  { minRank: 51,  maxRank: 100, diamond: 20,  gold: 8000,  pvpCoin: 15, exp: 150 },
+  { minRank: 101, maxRank: 200, diamond: 15,  gold: 5000,  pvpCoin: 10, exp: 100 },
+  { minRank: 201, maxRank: 500, diamond: 10,  gold: 3000,  pvpCoin: 5,  exp: 50 },
+];
 
 /** 競技場每日排名獎勵 — UTC 16:05 (= UTC+8 00:05) */
 async function arenaDailyReward(db: D1Database) {
-  const thresholds = [10, 50, 100, 200, 500];
   let mailsSent = 0;
 
-  for (const th of thresholds) {
-    const lower = th === 10 ? 1 : thresholds[thresholds.indexOf(th) - 1] + 1;
+  for (const tier of ARENA_DAILY_REWARDS) {
     const rows = await db.prepare(
       'SELECT rank, playerId, isNPC FROM arena_rankings WHERE rank >= ? AND rank <= ? AND isNPC = 0'
-    ).bind(lower, th).all<{ rank: number; playerId: string; isNPC: number }>();
-
-    const rw = ARENA_DAILY_REWARDS[String(th)];
-    if (!rw) continue;
+    ).bind(tier.minRank, tier.maxRank).all<{ rank: number; playerId: string; isNPC: number }>();
 
     for (const row of (rows.results || [])) {
       const rewards = [
-        { itemId: 'diamond', quantity: rw.diamond },
-        { itemId: 'gold', quantity: rw.gold },
-        { itemId: 'currency_pvp_coin', quantity: rw.pvpCoin },
+        { itemId: 'diamond', quantity: tier.diamond },
+        { itemId: 'gold', quantity: tier.gold },
+        { itemId: 'pvp_coin', quantity: tier.pvpCoin },
+        { itemId: 'exp', quantity: tier.exp },
       ];
       await insertMail(
         db, row.playerId,

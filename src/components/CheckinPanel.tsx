@@ -116,7 +116,7 @@ export function CheckinPanel({ onBack, saveData, onCheckin }: CheckinPanelProps)
                   )}
                   {reward.items?.map((it, j) => (
                     <span key={j} className="checkin-reward-line">
-                      <ClickableItemIcon itemId={it.itemId} /> {getItemName(it.itemId)} ×{it.quantity}
+                      <ClickableItemIcon itemId={it.itemId}> {getItemName(it.itemId)} ×{it.quantity}</ClickableItemIcon>
                     </span>
                   ))}
                 </div>

@@ -340,7 +340,7 @@ function TowerPanel({
           <span className="sc-reward-tag"><CurrencyIcon type="exp" /> {reward.exp}</span>
           {reward.diamond ? <span className="sc-reward-tag"><CurrencyIcon type="diamond" /> {reward.diamond}</span> : null}
           {reward.items?.map((it, i) => (
-            <span key={i} className="sc-reward-tag"><ClickableItemIcon itemId={it.itemId} /> {getItemName(it.itemId)} ×{it.quantity}</span>
+            <span key={i} className="sc-reward-tag"><ClickableItemIcon itemId={it.itemId}> {getItemName(it.itemId)} ×{it.quantity}</ClickableItemIcon></span>
           ))}
         </div>
       </div>
@@ -414,7 +414,7 @@ function DailyPanel({
                       <CurrencyIcon type="gold" /> {diff.rewards.gold}
                       {' '}<CurrencyIcon type="exp" /> {diff.rewards.exp}
                       {diff.rewards.items?.filter(it => it.dropRate >= 1).slice(0, 2).map((it, i) => (
-                        <span key={i}> <ClickableItemIcon itemId={it.itemId} />×{it.quantity}</span>
+                        <span key={i}> <ClickableItemIcon itemId={it.itemId}>×{it.quantity}</ClickableItemIcon></span>
                       ))}
                     </span>
                   )}
@@ -583,7 +583,7 @@ function BossPanel2({
                       {' '}<CurrencyIcon type="diamond" /> {rw.diamond}
                       {' '}<CurrencyIcon type="exp" /> {rw.exp}
                       {rw.items?.map((it, i) => (
-                        <span key={i}> <ClickableItemIcon itemId={it.itemId} />×{it.quantity}</span>
+                        <span key={i}> <ClickableItemIcon itemId={it.itemId}>×{it.quantity}</ClickableItemIcon></span>
                       ))}
                     </div>
                   )

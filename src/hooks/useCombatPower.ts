@@ -41,7 +41,7 @@ export interface CombatPowerState {
    Helper: 從 save 資料建構 CP 輸入
    ════════════════════════════════════ */
 
-function buildHeroCPInputs(
+export function buildHeroCPInputs(
   formation: (string | null)[],
   heroInstances: HeroInstance[],
   heroesList: RawHeroData[],

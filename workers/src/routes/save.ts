@@ -38,8 +38,11 @@ export function grantRewardsStmts(
 
   for (const r of rewards) {
     if (!r.itemId || (r.quantity || 0) <= 0) continue;
-    if (r.itemId === 'gold' || r.itemId === 'diamond' || r.itemId === 'stardust' || r.itemId === 'exp') {
+    if (r.itemId === 'gold' || r.itemId === 'diamond' || r.itemId === 'exp') {
       resourceDeltas[r.itemId] = (resourceDeltas[r.itemId] || 0) + r.quantity;
+    } else if (r.itemId === 'stardust' || r.itemId === 'currency_stardust') {
+      // stardust 統一寫入 inventory.currency_stardust（與 gacha 一致，前端從 inventory 讀取）
+      itemDeltas.push({ itemId: 'currency_stardust', quantity: r.quantity });
     } else {
       itemDeltas.push(r);
     }

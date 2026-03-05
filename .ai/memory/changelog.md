@@ -3,6 +3,95 @@
 > 按時間倒序排列，最新的在最上面。
 
 ---
+### [2026-03-05] 競技場排行榜戰力全員即時重算 + 掃蕩結算面板
+
+- **觸發者**：使用者
+- **執行角色**：🔧 CODING + 🧪 QA
+- **變更摘要**：
+
+  1. **排行榜戰力全員即時重算**：後端 `arena-get-rankings` 原本只重算當前玩家的防守戰力，現改為重算排行榜上**所有非 NPC 玩家**的防守戰力。透過批次查詢 `defenseFormation` → `hero_instances` → `heroes`，使用 CP_WEIGHTS 公式計算後 `db.batch()` 一次性更新。排行榜返回值使用重算後的戰力。
+  2. **掃蕩結算面板**：掃蕩完成後彈出勝利結算面板，顯示「⚡ 掃蕩勝利」標題 + 排名上升 + 獎勵明細（金幣/鑽石/經驗/競技幣）+ 里程碑額外獎勵。物品以動畫逐一滑入。僅一個「確認」按鈕關閉面板。
+
+- **影響範圍**：
+  - `workers/src/routes/arena.ts` — `arena-get-rankings` 全員戰力即時重算
+  - `src/components/ArenaPanel.tsx` — 掃蕩結算 modal（sweepResult state + closeSweepResult）
+  - `src/App.css` — 掃蕩結算面板樣式（overlay + result card + reward animations）
+- **Spec 更新**：`arena-pvp.md` v1.0 → v1.1
+- **Workers 已部署**
+
+---
+### [2026-03-05] 競技場四項改進 — 掃蕩 + 模型修復 + 防守卡片風格 + 戰力修正
+
+- **觸發者**：使用者（4 項需求）
+- **執行角色**：🔧 CODING + 🧪 QA
+- **變更摘要**：
+
+  1. **排行榜戰力顯示修正**：後端 `arena-challenge-complete` 新玩家佔據 NPC 位時，計算其實際陣型戰力（CP_WEIGHTS 公式）而非繼承 NPC 的虛擬戰力。
+  2. **修復挑戰時敵方英雄模型不顯示**：`useStageHandlers.ts` 的 `handleArenaStartBattle` 中 `_modelId` 使用 `Number(base.ModelID)` 導致 NaN。改為 `resolveModelId` 式正規化（zombie_N 格式），同時帶入 DEF/CritRate/CritDmg 屬性。
+  3. **新增掃蕩功能**：排行榜頂部顯示「⚡ 掃蕩 #N（自動勝利）」按鈕，條件：`challengesLeft > 0` 且 `myRank < 500`。點擊呼叫 `completeArenaChallenge(myRank+1, true)` 直接領取勝利獎勵。
+  4. **防守陣型改用卡片風格**：槽位改為 ThumbnailList 同風格卡片（稀有度邊框顏色 + 縮圖 + 名稱 + Lv + ★6 星級），取代舊版純縮圖+名稱。新增 `resolveModelId`/`numToRarity` helper。
+
+- **影響範圍**：
+  - `workers/src/routes/arena.ts` — 新玩家加入時計算防守戰力
+  - `src/hooks/useStageHandlers.ts` — _modelId 正規化 + DEF/CritRate/CritDmg 傳遞
+  - `src/components/ArenaPanel.tsx` — 掃蕩按鈕 + 防守卡片風格 + getHeroInfo helper
+  - `src/App.css` — 掃蕩按鈕樣式 + 防守卡片樣式（稀有度badge/stats/stars）
+- **Spec 更新**：`arena-pvp.md` v0.9 → v1.0
+- **Workers 已部署**
+
+---
+### [2026-03-06] 競技場防守陣型縮圖 UI
+
+- **觸發者**：使用者
+- **執行角色**：🔧 CODING
+- **變更摘要**：
+  1. **防守陣型槽位改用英雄縮圖**：`ArenaPanel.tsx` 防守陣型分頁中，已放置英雄的槽位改為顯示 `Thumbnail3D` 縮圖 + 英雄名稱，取代舊版「位置 N」+ 純文字名稱。
+  2. **新增 `getHeroModelId` helper**：從 instanceId → heroInstances → heroesList → ModelID 取得模型 ID 供縮圖渲染。
+  3. **CSS 更新**：`.arena-defense-slot` 改為 flex-column 佈局（80×96px），新增 `.arena-slot-thumb`（56×56 圓角縮圖）、`.arena-slot-name`（文字截斷）、`.arena-slot-empty` 樣式。
+- **影響範圍**：`src/components/ArenaPanel.tsx`、`src/App.css`
+- **Spec 更新**：`arena-pvp.md` v0.8 → v0.9
+
+---
+### [2026-03-06] 全專案獎勵一致性審計 + UI 修復
+
+- **觸發者**：使用者（6 項批次需求）
+- **執行角色**：🔧 CODING + 🧪 QA
+- **變更摘要**：
+
+  **獎勵一致性修復（CRITICAL）**：
+  1. **pvp_coin ID 統一**：`arena.ts` 和 `index.ts` 的 `currency_pvp_coin` → `pvp_coin`，解決競技場獲得的幣無法在商店使用的問題。D1 遷移合併既有資料。
+  2. **競技場挑戰獎勵補 exp**：後端 `arena-challenge-complete` 新增 exp（勝:150, 敗:50），與前端 `arenaSystem.ts` 對齊。
+  3. **競技場里程碑補 exp**：後端 MILESTONES 8 階全部加上 exp（200~5000），與前端一致。
+  4. **每日排名獎勵對齊**：後端 `ARENA_DAILY_REWARDS` 從 5 階擴展為 8 階，加入 exp，與前端 `DAILY_REWARD_TIERS` 完全一致。
+  5. **勝利動畫顯示 exp**：`runBattleLoop.ts` 競技場結算 toast 新增 exp 獎勵顯示。
+
+  **競技場敵方屬性修復（HIGH）**：
+  6. **NPC 補 CritRate/CritDmg**：`arena-challenge-start` NPC 路徑回傳 CritRate、CritDmg。
+  7. **真人玩家計算升級**：從 flat `1 + (level-1)*0.03` 改為 `RARITY_LEVEL_GROWTH × ascMult × starMult`，與前端 `getFinalStats` 一致。CritRate/CritDmg 一併回傳。
+
+  **stardust 雙重儲存修復（MEDIUM）**：
+  8. **grantRewardsStmts 修正**：`stardust` / `currency_stardust` 統一寫入 `inventory.currency_stardust`，不再寫 `save_data.stardust`。與 gacha 系統一致，前端 `getItemQuantity('currency_stardust')` 可正確讀取。
+
+  **UI 修復（3 項）**：
+  9. **ItemInfoPopup 金邊+防溢出**：`border: 2px solid #ffd43b` + `box-shadow` 金色光暈 + `overflow-wrap: break-word` + 描述區 max-height 滾動。
+  10. **ClickableItemIcon 整組可點**：新增 `children` prop，icon+名稱+數量整體點擊觸發 ItemInfoPopup。5 檔案 7 處套用。
+  11. **ITEM_NAMES/ITEM_ICONS 補齊**：新增 `currency_pvp_coin`（競技幣 🏅）、`currency_exp`（經驗 💚）。
+
+- **影響檔案**：
+  - `workers/src/routes/arena.ts`（pvp_coin 修正 + exp + 敵方屬性強化）
+  - `workers/src/index.ts`（8 階每日獎勵 + pvp_coin + exp）
+  - `workers/src/routes/save.ts`（stardust → inventory.currency_stardust）
+  - `src/App.css`（ItemInfoPopup 金邊 + 防溢出）
+  - `src/components/ClickableItemIcon.tsx`（children prop）
+  - `src/components/CheckinPanel.tsx`（ClickableItemIcon children 包裹）
+  - `src/components/StageSelect.tsx`（ClickableItemIcon children 包裹）
+  - `src/App.tsx`（ClickableItemIcon children 包裹）
+  - `src/constants/rarity.ts`（currency_pvp_coin + currency_exp）
+  - `src/game/runBattleLoop.ts`（競技場 exp 獎勵顯示）
+- **D1 遷移**：`currency_pvp_coin` 資料合併至 `pvp_coin` + 刪除舊行
+- **驗證**：`tsc --noEmit` 零錯誤 × 2 + `vite build` 成功 + Workers deployed
+
+---
 ### [2026-03-06] 大規模修正 — 競技場修復 + 紅點系統 + ClickableItemIcon 統一 + Boss 條修正
 
 - **觸發者**：使用者（批次需求一步到位）

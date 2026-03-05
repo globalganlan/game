@@ -1,7 +1,7 @@
 # 競技場排名系統 Spec
 
-> 版本：v0.7 ｜ 狀態：🟢 已實作（戰鬥引擎已連接 + 敵方模型修復）
-> 最後更新：2026-03-06
+> 版本：v1.1 ｜ 狀態：🟢 已實作（全員戰力即時重算 + 掃蕩結算面板）
+> 最後更新：2026-03-05
 > 負責角色：🎯 GAME_DESIGN → 🔧 CODING
 
 ## 概述
@@ -28,7 +28,7 @@
 |--------|------|
 | `src/domain/arenaSystem.ts` | Domain 層 — 排名計算、NPC 生成、獎勵公式 |
 | `src/services/arenaService.ts` | Service 層 — GAS API 呼叫、樂觀更新 |
-| `src/components/ArenaPanel.tsx` | UI — 排行榜 + 防守陣型配置 + 挑戰 + 獎勵（v0.6 修復 10+ CSS class 名稱不匹配） |
+| `src/components/ArenaPanel.tsx` | UI — 排行榜 + 防守陣型（v1.1 掃蕩結算面板）+ 挑戰 + 獎勵 |
 | `gas/程式碼.js` | GAS Handler — 排行榜 CRUD、挑戰結算、每日/每週獎勵 |
 
 ---
@@ -318,9 +318,19 @@ function processArenaResult(
 
 ### 8.2 防守陣型配置
 
-- 與出征陣型相同的 6 格拖曳 UI
-- 「一鍵複製出征陣型」按鈕
+- 3×2 網格顯示 6 格防守槽位
+- 已放置英雄的槽位顯示 **卡片風格**（稀有度邊框 + Thumbnail3D 縮圖 + 名稱 + Lv + 星級）
+  - 與戰鬥準備下方英雄列表的卡片風格一致
+- 空槽位顯示虛線邊框 + 「空位」文字
+- 「🎮 前往配置防守陣型」按鈕跳轉配置介面
 - 儲存走 `arena-set-defense` API
+
+### 8.2.1 掃蕩功能（v1.0 新增）
+
+- 條件：`challengesLeft > 0` 且 `myRank < 500`
+- 按鈕顯示在排行榜頂部：「⚡ 掃蕩 #N（自動勝利）」
+- 點擊後對後一名玩家自動獲勝，直接發放勝利獎勵並消耗挑戰次數
+- 不會改變排名（目標排名 > 自己排名，不觸發交換）
 
 ### 8.3 挑戰按鈕規則
 
@@ -407,7 +417,10 @@ export type MenuScreen = 'none' | 'heroes' | 'inventory' | 'gacha' | 'stages' | 
 ## 變更歷史
 
 | 版本 | 日期 | 變更內容 |
-|------|------|---------|| v0.5 | 2026-03-01 | ArenaReward 新增 exp 欄位（勝:150/敗:50）、所有獎勵表補上 exp 數值、Spec 差異修復驗證替換原過時差異測試 |
+|------|------|---------|| v1.0 | 2026-03-05 | **掃蕩+模型修復+防守卡片風格**：①新增掃蕩按鈕（自動勝利後一名玩家，獲取勝利獎勵）②修復挑戰時敵方英雄模型不顯示（_modelId 正規化為 zombie_N 格式 + DEF/CritRate/CritDmg 傳遞）③防守陣型改用卡片風格（稀有度邊框 + 縮圖 + Lv + 星級）④新玩家加入競技場時計算實際防守戰力 |
+| v0.9 | 2026-03-06 | **防守陣型縮圖 UI**：槽位以 Thumbnail3D 縮圖+英雄名稱取代舊版「位置 N」文字，新增 getHeroModelId helper，更新 CSS 樣式 |
+| v0.8 | 2026-03-06 | **獎勵一致性審計修復**：①pvp_coin ID 統一（`currency_pvp_coin`→`pvp_coin`），D1 遷移合併數據②後端挑戰獎勵/里程碑/每日排名全部補上 exp③每日排名從 5 階擴展為 8 階，與前端 DAILY_REWARD_TIERS 完全對齊④敵方 NPC 補 CritRate/CritDmg⑤真人玩家改用 RARITY_LEVEL_GROWTH × ascMult × starMult⑥stardust 統一寫入 inventory.currency_stardust |
+| v0.5 | 2026-03-01 | ArenaReward 新增 exp 欄位（勝:150/敗:50）、所有獎勵表補上 exp 數值、Spec 差異修復驗證替換原過時差異測試 |
 | v0.7 | 2026-03-06 | **敵方模型修復 + 防守載入 + 戰力對齊 + 紅點**：①`arena-challenge-start` 重寫：NPC 以確定性種子生成 2~5 隻英雄（依排名分層），真實玩家從 hero_instances+heroes 查詢 defenseFormation 角色資料②ArenaPanel `useEffect` 掛載時呼叫 `getDefenseFormation()` 回顯已存陣容③`arena-set-defense` 儲存後以 CP_WEIGHTS 計算並更新 power 欄位④戰力圖示 ⚡→⚔️⑤MainMenu 新增 `arenaChallengesLeft` 紅點⑥PanelInfoTip 移入 `.arena-title` span 修復間距 |
 | v0.6 | 2026-03-05 | **PVP 兑換商店 + CSS 修復**：①新增 §十 PVP 兑換商店（6 項商品，以 pvp_coin 兑換 EXP/金幣/鑽石/職業石/裝備寶箱/英雄券）②`pvp_coin` 統一使用 `CurrencyIcon` 元件（type="pvp_coin"，🏅）③`ArenaPanel.tsx` 修復 10+ CSS class 名稱不匹配④`ShopPanel.tsx` 新增 `arena` 分類 Tab⑤後端 `inventory.ts` SHOP_CATALOG 新增 arena 商店 |
 | v0.4 | 2026-03-01 | QA 審計修正：NPC rank 1 數值更正為 10,480、挑戰獎勵移除 exp 欄位（待擴展）、113 單元測試全通過 |

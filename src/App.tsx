@@ -54,7 +54,8 @@ import { ClickableItemIcon } from './components/ClickableItemIcon'
 import { getTowerReward, getDailyDungeonConfig, getPvPReward, getBossConfig, getBossRewardByBossAndRank } from './domain/stageSystem'
 import { getChallengeReward } from './domain/arenaSystem'
 import type { StageReward } from './domain/stageSystem'
-import { useCombatPower } from './hooks/useCombatPower'
+import { useCombatPower, buildHeroCPInputs } from './hooks/useCombatPower'
+import { getTeamCombatPower } from './domain/combatPower'
 import { useAcquireToast } from './hooks/useAcquireToast'
 import type { AcquireItem } from './hooks/useAcquireToast'
 import { registerAcquireHandler, registerTextHandler } from './services/acquireToastBus'
@@ -107,6 +108,8 @@ export default function App() {
   const [sceneTheme, setSceneTheme] = useState<import('./components/Arena').SceneMode>('story')
   /** 競技場挑戰目標排名（用於結算上報） */
   const arenaTargetRankRef = useRef<number>(0)
+  /** 進入戰鬥前的 menuScreen（用於戰後返回） */
+  const preBattleMenuScreenRef = useRef<MenuScreen>('none')
   /** 防守陣型配置模式 */
   const [isDefenseSetup, setIsDefenseSetup] = useState(false)
   const isDefenseSetupRef = useRef(false)
@@ -147,7 +150,6 @@ export default function App() {
     showBattleStats, setShowBattleStats, isReplayingRef,
     actorStates, setActorStates, actorStatesRef,
     moveTargetsRef, flowValidatorRef,
-    completeBattleRef,
     setActorState, resetBattleRefs,
   } = bs
 
@@ -212,7 +214,7 @@ export default function App() {
       })
       .catch(() => {})
     return () => { cancelled = true }
-  }, [gameState, authHook.auth.playerId])
+  }, [gameState, menuScreen, authHook.auth.playerId])
 
   /* ── 召喚免費抽紅點 ── */
   const gachaHasFreePull = useMemo(() => {
@@ -231,7 +233,7 @@ export default function App() {
   const [arenaChallengesLeft, setArenaChallengesLeft] = useState(0)
   useEffect(() => {
     if (gameState !== 'MAIN_MENU' || !authHook.auth.playerId) return
-    // 若已有快取直接使用
+    // 快取可能已被 completeArenaChallenge 更新，優先使用
     const cached = getCachedChallengesLeft()
     if (cached !== null) { setArenaChallengesLeft(cached); return }
     // 否則背景取一次
@@ -240,7 +242,7 @@ export default function App() {
       .then(r => { if (!cancelled) setArenaChallengesLeft(r.challengesLeft) })
       .catch(() => {})
     return () => { cancelled = true }
-  }, [gameState, authHook.auth.playerId])
+  }, [gameState, menuScreen, authHook.auth.playerId])
 
   /** 登出後 React state / hook 全重設（服務快取清除由 useLogout 負責） */
   const handleLogoutResetState = useCallback(() => {
@@ -281,6 +283,16 @@ export default function App() {
     heroesList,
     enemySlots,
   )
+
+  /* ── 防守陣型即時戰力（根據 playerSlots 中的英雄計算） ── */
+  const defensePower = useMemo(() => {
+    if (!isDefenseSetup) return 0
+    const heroInstances = saveHook.playerData?.heroes ?? []
+    if (heroInstances.length === 0 || heroesList.length === 0) return 0
+    const formation = playerSlots.map(s => s ? String(s.HeroID ?? s.id ?? '') : null)
+    const inputs = buildHeroCPInputs(formation, heroInstances, heroesList)
+    return getTeamCombatPower(inputs)
+  }, [isDefenseSetup, playerSlots, saveHook.playerData?.heroes, heroesList])
 
   // ── 戰力變動 → 統一 toast 提示 ──
   useEffect(() => {
@@ -334,7 +346,7 @@ export default function App() {
     pSlotsRef, eSlotsRef, turnRef, skipBattleRef, speedRef,
     flowValidatorRef, skillsRef, heroSkillsRef, heroInputsRef,
     battleHeroesRef, actorStatesRef, moveTargetsRef,
-    completeBattleRef, arenaTargetRankRef,
+    arenaTargetRankRef, preBattleMenuScreenRef,
     skillToastIdRef, elementHintIdRef, passiveHintIdRef, buffApplyHintIdRef,
     actionResolveRefs, moveResolveRefs,
     setGameState, setStageId, setTurn, setShowBattleStats, setBattleCalculating,
@@ -383,6 +395,7 @@ export default function App() {
     heroesList, stageMode, arenaTargetRankRef,
     setIsDefenseSetup, isDefenseSetupRef,
     heroesListRef,
+    preBattleMenuScreenRef,
   })
   const {
     handleMenuNavigate, handleBackToMenu, handleStageSelect,
@@ -651,8 +664,11 @@ export default function App() {
           {gameState === 'IDLE' && turn === 0 && isDefenseSetup && (
             <div className="battle-prep-top-banner">
               <div className="bp-stage-section">
-                <div className="bp-stage-header">
+                <div className="bp-stage-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                   <span className="bp-stage-id">🛡️ 防守陣型配置</span>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: '0.95em', color: '#ffd700', fontWeight: 700, textShadow: '0 0 6px rgba(255,215,0,0.5)' }}>
+                    <CurrencyIcon type="cp" /> 戰力 {defensePower.toLocaleString()}
+                  </span>
                 </div>
                 <div className="bp-mode-desc" style={{ fontSize: '0.75em', opacity: 0.8, marginBottom: 4 }}>
                   拖曳或點選英雄配置你的防守陣型，其他玩家挑戰你時將使用此陣型
@@ -747,7 +763,7 @@ export default function App() {
                         {(cfg.rewards.gold ?? 0) > 0 && <span className="bp-reward-item"><CurrencyIcon type="gold" /> {cfg.rewards.gold}</span>}
                         {(cfg.rewards.diamond ?? 0) > 0 && <span className="bp-reward-item"><CurrencyIcon type="diamond" /> {cfg.rewards.diamond}</span>}
                         {cfg.rewards.items?.map((it, i) => (
-                          <span key={i} className="bp-reward-item"><ClickableItemIcon itemId={it.itemId} /> {getItemName(it.itemId)} ×{it.quantity}</span>
+                          <span key={i} className="bp-reward-item"><ClickableItemIcon itemId={it.itemId}> {getItemName(it.itemId)} ×{it.quantity}</ClickableItemIcon></span>
                         ))}
                       </div>
                     )}
@@ -788,7 +804,7 @@ export default function App() {
                         {(modeRewards.gold ?? 0) > 0 && <span className="bp-reward-item"><CurrencyIcon type="gold" /> {modeRewards.gold}</span>}
                         {(modeRewards.diamond ?? 0) > 0 && <span className="bp-reward-item"><CurrencyIcon type="diamond" /> {modeRewards.diamond}</span>}
                         {modeRewards.items?.map((it, i) => (
-                          <span key={i} className="bp-reward-item"><ClickableItemIcon itemId={it.itemId} /> {getItemName(it.itemId)} ×{it.quantity}</span>
+                          <span key={i} className="bp-reward-item"><ClickableItemIcon itemId={it.itemId}> {getItemName(it.itemId)} ×{it.quantity}</ClickableItemIcon></span>
                         ))}
                       </div>
                     )}
@@ -868,7 +884,7 @@ export default function App() {
             <div className="bottom-panel">
               {gameState === 'IDLE' && turn === 0 && !isDefenseSetup && (
                 <div className="bottom-panel-btn">
-                  <button onClick={() => { restoreFormationFromSave(true); setGameState('MAIN_MENU') }} className="btn-back-menu">← 返回</button>
+                  <button onClick={() => { restoreFormationFromSave(true); setMenuScreen(preBattleMenuScreenRef.current); preBattleMenuScreenRef.current = 'none'; setGameState('MAIN_MENU') }} className="btn-back-menu">← 返回</button>
                   <button onClick={startAutoBattle} className="btn-start">開始戰鬥</button>
                 </div>
               )}

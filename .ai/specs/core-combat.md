@@ -1,6 +1,6 @@
 # 戰鬥系統 Spec
 
-> 版本：v3.7 ｜ 狀態：🟢 已實作
+> 版本：v3.8 ｜ 狀態：🟢 已實作
 > 最後更新：2026-03-05
 > 負責角色：🎯 GAME_DESIGN → 🔧 CODING
 > 原始碼：`src/domain/battleEngine.ts`（前端邏輯）、`gas/battleEngine.js`（後端引擎）、`src/App.tsx`（3D 演出整合）、`gas/程式碼.js`（`handleCompleteBattle_` 伺服器端結算）
@@ -29,8 +29,8 @@
 |------|----------|--------|------|
 | 遊戲狀態機 | 1 | `src/App.tsx` useState | ✅ |
 | 陣型系統 | 2 | `src/App.tsx` SLOT_POSITIONS | ✅ |
-| 戰鬥迴圈 | 3 | `src/domain/battleEngine.ts` `runBattleCollect()`（前端）+ Workers `complete-battle`（後端驗證） | ✅ |
-| 確定性戰鬥 seed | 3.3 | `src/domain/seededRng.ts`（Mulberry32 PRNG）+ Workers `complete-battle` 以相同 seed 重播驗證 | ✅ |
+| 戰鬥迴圈 | 3 | Workers `complete-battle`（後端權威計算）→ 前端 Phase B 回放 `actions[]` | ✅ |
+| 確定性戰鬥 seed | 3.3 | 已移除前端 seed — 後端獨立使用 `Math.random` 或自行產生 seed | ✅ |
 | 伺服器端結算 | 3.4 | `workers/src/routes/battle.ts` `complete-battle` + `src/services/progressionService.ts` `completeBattle()` | ✅ |
 | 能量系統 | 4 | `src/domain/energySystem.ts` | ✅ |
 | Buff/Debuff | 5 | `src/domain/buffSystem.ts` | ✅ |
@@ -718,11 +718,12 @@ IDLE → ADVANCING → ATTACKING → RETREATING → IDLE
 - 有效值限 1 / 2 / 4，不合規則重置為 1
 - 不再同步到 Google Sheet，純前端本地儲存
 
-### 跳過戰鬥（v2.6 後端計算 + 前端回放）
+### 跳過戰鬥（v3.8 後端權威 + 前端回放）
 
 - 戰鬥中右下角顯示「跳過 ⏭」按鈕
-- **Phase A — 後端計算**：`runBattleRemote()` POST 到 GAS `run-battle` handler，後端 `runBattleEngine_()` 跑完整場戰鬥，回傳 `{ winner, actions[] }`
-  - 失敗時自動降級為本地 `runBattleCollect()` 計算（零網路依賴）
+- **Phase A — 後端權威計算**：前端 `await completeBattle()` 阻塞等待 Workers `complete-battle` 回傳 `{ winner, actions[], rewards }`
+  - 後端為戰鬥唯一計算源，前端不再執行任何本地戰鬥模擬
+  - 失敗時顯示錯誤 toast 並中斷（不再有本地 fallback）
 - **Phase B — 逐筆回放**：playback loop 依序迭代 `allActions`：
   - 每筆 action 前檢查 `skipBattleRef.current`
   - 若已跳過 → `continue`（不呼叫 `onAction`、不播 SFX、不等待動畫）
@@ -732,10 +733,8 @@ IDLE → ADVANCING → ATTACKING → RETREATING → IDLE
 - **stopAllSfx()**：點擊跳過同時呼叫 `audioManager.stopAllSfx()` 立即靜音
 - 結束後自然進入 GAMEOVER，顯示勝負結果與獎勵
 - 實作：
-  - `gas/battleEngine.js` — `runBattleEngine_()` 後端戰鬥引擎（~650 行 JS，完整移植 domain 層）
-  - `src/services/battleService.ts` — `runBattleRemote()` POST API 呼叫 + BattleHero 序列化
-  - `src/domain/battleEngine.ts` — `runBattleCollect()` 本地 fallback
-  - `src/App.tsx` — `skipBattleRef`、Phase A/B/C 回放迴圈、btn-skip-battle UI
+  - `workers/src/routes/battle.ts` — `complete-battle` 後端戰鬥引擎 + 獎勵計算
+  - `workers/src/domain/battleEngine.ts` — `runBattle()` 後端戰鬥模擬
   - `src/services/audioService.ts` — `stopAllSfx()` + `activeSfxGains[]` 追蹤
 
 ---
@@ -851,4 +850,4 @@ App.tsx
 | v3.3 | 2026-03-02 | **Phase B 死亡角色守衛 + 致死跳過 HURT**：(1) NORMAL_ATTACK / SKILL_CAST / DEATH handler 開頭新增 dead-actor guard，檢查 `actorStatesRef` + `currentHP`，已死角色直接 `break` 不播動畫（修復 DOT/反彈致死後，後續英雄仍衝向空位置攻擊的問題）；(2) 致死傷害不再播放 HURT 動畫，直接進入 DEAD 分支（普攻/技能/反彈三處統一行為） |
 | v3.4 | 2026-03-02 | **屬性提示修復 + DOT/被動致死動畫修復**：(1) NORMAL_ATTACK 的 elementHint 加入 `setTimeout(2000)` 自動清理（先前無 cleanup 導致累積）；(2) SKILL_CAST handler 新增屬性相剋指示（取第一個非閃避目標的 `elementMult`）；(3) DOT_TICK / PASSIVE_DAMAGE handler 新增致死判定 — 若 `hero.currentHP <= 0` 直接播放死亡動畫（含音效 + `waitForAction('DEAD')` + `removeSlot`），後續 DEATH action 因 `actorState===DEAD` 自動跳過 |
 | v3.5 | 2026-03-02 | **Dead-Actor Guard 修正 — 移除 `currentHP <= 0` 判斷**：`applyHpFromAction()` 在 `onAction()` 前執行，會將**當前 action** 的傷害預扣為 0，導致擊殺 action 誤觸 early-exit → 跳過死亡動畫（角色站著不動、HP 條不更新）。修正：三處 guard（NORMAL_ATTACK×2 + SKILL_CAST×1）只保留 `actorStatesRef === 'DEAD'`，移除 `|| currentHP <= 0` 判斷 || v3.6 | 2026-03-02 | **pendingRetreats 等待擴展 + Validator DEATH 降級**：(1) `pendingRetreats` 的 await 從只限 NORMAL_ATTACK/SKILL_CAST 擴展到所有非 TURN_START/TURN_END/BATTLE_END 的 action——修復被動文字/DOT 傷害在前一位英雄還在退回動畫時就提前顯示的問題，同時修復 DOT 傷害數字被前一位英雄動畫過渡後看不到的問題；(2) Validator `beforeAction` 對 DEATH action 的重複檢查從 error 降級為 warn（DOT/被動致死後引擎仍會發 DEATH action，表現層因 actorState===DEAD 正確跳過，非真正錯誤） |
-| v3.7 | 2026-03-05 | **Server-First 結算**：移除所有 `if (!serverResult)` 本地 fallback 分支（story/tower/pvp/boss/daily 五模式），API 失敗時不發放獎勵、不推進劇情/爬塔，顯示錯誤 toast；移除本地 `doUpdateProgress` 貨幣 fallback；清理未使用 imports（`getTowerFloorConfig`/`getNextStageId`/`isFirstClear` 等） |
+| v3.8 | 2026-03-05 | **後端權威戰鬥模式**：完全移除前端本地戰鬥模擬（`runBattleCollect()`、`generateBattleSeed()`），Phase A 改為阻塞式 `await completeBattle()` 等待後端回傳 `actions[]` + `winner`；移除 `completeBattleRef`（不再需要背景 Promise）；前端僅負責 Phase B 3D 動畫回放 + Phase C 狀態同步；後端 `complete-battle` 為戰鬥唯一計算源，消除前後端資料不一致風險 |

@@ -2648,7 +2648,18 @@
 .inv-detail-desc { color: #ccc; font-size: 0.8rem; line-height: 1.4; }
 
 /* ── ItemInfoPopup（唯讀道具詳情） ── */
-.item-info-popup { max-width: 280px; padding: 16px; }
+.item-info-popup {
+  max-width: 280px;
+  padding: 16px;
+  border: 2px solid #ffd43b;
+  box-shadow: 0 0 16px rgba(255, 212, 59, 0.35);
+  overflow-wrap: break-word;
+  word-break: break-word;
+}
+.item-info-popup .inv-detail-desc {
+  max-height: 120px;
+  overflow-y: auto;
+}
 
 /* ── 簽到道具可點擊 ── */
 .checkin-item-clickable {
@@ -5986,26 +5997,222 @@
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 8px;
-  max-width: 280px;
+  max-width: 300px;
 }
 .arena-defense-slot {
-  width: 80px;
-  height: 80px;
+  width: 90px;
+  height: 120px;
   border-radius: 10px;
-  border: 1px dashed rgba(255,255,255,0.2);
+  border: 2px dashed rgba(255,255,255,0.15);
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
   font-size: 0.75rem;
   color: #666;
   background: rgba(255,255,255,0.03);
+  overflow: hidden;
+  position: relative;
 }
 .arena-defense-slot.filled {
   border-style: solid;
-  border-color: rgba(100,180,255,0.3);
-  color: #aaf;
-  font-size: 0.8rem;
+  border-width: 2px;
+  background: rgba(0,0,0,0.25);
+}
+.arena-slot-rarity {
+  position: absolute;
+  top: 2px;
+  left: 4px;
+  font-size: 0.55rem;
+  font-weight: 700;
+  z-index: 1;
+  text-shadow: 0 0 4px rgba(0,0,0,0.6);
+}
+.arena-slot-thumb {
+  width: 52px;
+  height: 52px;
+  border-radius: 6px;
+  overflow: hidden;
+  flex-shrink: 0;
+  margin-top: 6px;
+}
+.arena-slot-thumb .thumb-canvas {
+  width: 52px;
+  height: 52px;
+}
+.arena-slot-name {
+  font-size: 0.6rem;
+  color: #def;
   font-weight: 600;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 82px;
+  margin-top: 2px;
+  line-height: 1.2;
+}
+.arena-slot-stats {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0;
+  line-height: 1.1;
+}
+.arena-slot-level {
+  font-size: 0.55rem;
+  color: #adf;
+  font-weight: 600;
+}
+.arena-slot-stars {
+  font-size: 0.45rem;
+  letter-spacing: -1px;
+}
+.arena-slot-stars .star-filled {
+  color: #ffd43b;
+}
+.arena-slot-stars .star-empty {
+  color: rgba(255,255,255,0.15);
+}
+.arena-slot-empty {
+  color: #555;
+  font-size: 0.75rem;
+}
+/* ── 掃蕩按鈕（行內，與挑戰按鈕並排） ── */
+.arena-sweep-btn {
+  padding: 4px 10px;
+  border-radius: 6px;
+  border: 1px solid rgba(100,200,255,0.4);
+  background: rgba(100,200,255,0.15);
+  color: #7df;
+  font-size: 0.72rem;
+  font-weight: 600;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all 0.2s;
+  margin-left: 4px;
+}
+.arena-sweep-btn:hover:not(:disabled) {
+  background: rgba(100,200,255,0.3);
+}
+.arena-sweep-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ── 掃蕩結算面板 ── */
+.arena-sweep-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: fadeIn 0.3s ease-out;
+}
+.arena-sweep-result {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 20px 28px;
+  background: linear-gradient(180deg, rgba(30, 25, 10, 0.95), rgba(15, 12, 5, 0.95));
+  border: 1px solid rgba(255, 215, 0, 0.35);
+  border-radius: 12px;
+  min-width: 260px;
+  max-width: 340px;
+  box-shadow: 0 0 30px rgba(255, 215, 0, 0.15), 0 8px 32px rgba(0,0,0,0.6);
+  animation: sweepResultAppear 0.5s ease-out;
+}
+@keyframes sweepResultAppear {
+  from { opacity: 0; transform: scale(0.85) translateY(20px); }
+  to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+.arena-sweep-result-banner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+.sweep-result-title {
+  font-size: clamp(1.4rem, 5vw, 2rem);
+  font-weight: 900;
+  color: #ffd700;
+  text-shadow: 0 0 12px rgba(255, 215, 0, 0.7), 0 2px 4px rgba(0,0,0,0.5);
+  letter-spacing: 4px;
+}
+.sweep-result-sub {
+  font-size: clamp(0.65rem, 1.6vw, 0.8rem);
+  color: #aaa;
+  letter-spacing: 1px;
+}
+.arena-sweep-rewards {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.sweep-reward-header {
+  font-size: clamp(0.7rem, 1.7vw, 0.85rem);
+  color: #7df9ff;
+  font-weight: bold;
+  text-align: center;
+  padding: 4px 0;
+  border-bottom: 1px solid rgba(125, 249, 255, 0.15);
+  letter-spacing: 1px;
+}
+.sweep-reward-header.milestone {
+  color: #ffd700;
+  border-bottom-color: rgba(255, 215, 0, 0.15);
+  margin-top: 6px;
+}
+.sweep-reward-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 4px 0;
+}
+.sweep-reward-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: clamp(0.65rem, 1.5vw, 0.8rem);
+  color: #e0d0b0;
+  animation: sweepItemSlideIn 0.4s ease-out both;
+}
+.sweep-reward-item:nth-child(1) { animation-delay: 0.15s; }
+.sweep-reward-item:nth-child(2) { animation-delay: 0.3s; }
+.sweep-reward-item:nth-child(3) { animation-delay: 0.45s; }
+.sweep-reward-item:nth-child(4) { animation-delay: 0.6s; }
+@keyframes sweepItemSlideIn {
+  from { opacity: 0; transform: translateX(-12px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+.sweep-reward-item .reward-label {
+  flex: 1;
+  opacity: 0.85;
+}
+.sweep-reward-item .reward-value {
+  font-weight: bold;
+  color: #ffd700;
+}
+.arena-sweep-confirm-btn {
+  margin-top: 6px;
+  padding: 8px 36px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 215, 0, 0.4);
+  background: linear-gradient(180deg, rgba(255, 215, 0, 0.2), rgba(200, 160, 0, 0.15));
+  color: #ffd700;
+  font-size: 0.9rem;
+  font-weight: bold;
+  cursor: pointer;
+  letter-spacing: 2px;
+  transition: all 0.2s;
+}
+.arena-sweep-confirm-btn:hover {
+  background: linear-gradient(180deg, rgba(255, 215, 0, 0.35), rgba(200, 160, 0, 0.25));
+  box-shadow: 0 0 12px rgba(255, 215, 0, 0.3);
 }
 .arena-defense-actions {
   display: flex;

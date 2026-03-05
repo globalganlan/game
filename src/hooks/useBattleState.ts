@@ -10,7 +10,6 @@ import type { BattleHero, BattleAction, SkillTemplate } from '../domain'
 import type { HeroSkillConfig } from '../domain/types'
 import type { RawHeroInput } from '../domain'
 import type { Vector3Tuple } from 'three'
-import type { CompleteBattleResult } from '../services/progressionService'
 import type { BattleStatEntry } from '../components/BattleStatsPanel'
 import type { VictoryRewards } from '../components/VictoryPanel'
 import { BattleFlowValidator } from '../domain/battleFlowValidator'
@@ -51,8 +50,6 @@ export function useBattleState() {
   const moveTargetsRef = useRef<Record<string, Vector3Tuple>>({})
   /** 戰鬥流程驗證器（僅 dev 模式啟用） */
   const flowValidatorRef = useRef<BattleFlowValidator | null>(null)
-  /** 戰鬥結算 Promise（complete-battle：伺服器端戰鬥模擬 + 獎勵計算） */
-  const completeBattleRef = useRef<Promise<CompleteBattleResult> | null>(null)
 
   const setActorState = useCallback((id: string, s: ActorState) => {
     // dev 模式：驗證狀態轉換合法性
@@ -101,7 +98,6 @@ export function useBattleState() {
     // Actor state
     actorStates, setActorStates, actorStatesRef,
     moveTargetsRef, flowValidatorRef,
-    completeBattleRef,
     setActorState,
     // Reset
     resetBattleRefs,

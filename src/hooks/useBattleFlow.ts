@@ -10,7 +10,6 @@ import type { BattleAction, BattleHero, SkillTemplate } from '../domain'
 import type { HeroSkillConfig } from '../domain/types'
 import type { RawHeroInput } from '../domain'
 import type { Vector3Tuple } from 'three'
-import type { CompleteBattleResult } from '../services/progressionService'
 import type { SaveData, HeroInstance } from '../services/saveService'
 import type { BattleLoopContext } from '../game/runBattleLoop'
 import type { BattleStatEntry } from '../components/BattleStatsPanel'
@@ -45,8 +44,8 @@ export interface BattleFlowDeps {
   battleHeroesRef: React.MutableRefObject<Map<string, BattleHero>>
   actorStatesRef: React.MutableRefObject<Record<string, ActorState>>
   moveTargetsRef: React.MutableRefObject<Record<string, Vector3Tuple>>
-  completeBattleRef: React.MutableRefObject<Promise<CompleteBattleResult> | null>
   arenaTargetRankRef: React.MutableRefObject<number>
+  preBattleMenuScreenRef: React.MutableRefObject<MenuScreen>
   skillToastIdRef: React.MutableRefObject<number>
   elementHintIdRef: React.MutableRefObject<number>
   passiveHintIdRef: React.MutableRefObject<number>
@@ -117,7 +116,7 @@ export interface BattleFlowDeps {
 export function useBattleFlow(deps: BattleFlowDeps) {
   const {
     preBattlePlayerSlotsRef, battleActionsRef, turnRef, skipBattleRef,
-    actorStatesRef, moveTargetsRef, arenaTargetRankRef,
+    actorStatesRef, moveTargetsRef, arenaTargetRankRef, preBattleMenuScreenRef,
     actionResolveRefs, moveResolveRefs,
     setGameState, setStageId, setTurn, setShowBattleStats, setBattleResult,
     setVictoryRewards, setMenuScreen,
@@ -158,7 +157,6 @@ export function useBattleFlow(deps: BattleFlowDeps) {
     battleHeroesRef: deps.battleHeroesRef,
     actorStatesRef: deps.actorStatesRef,
     moveTargetsRef: deps.moveTargetsRef,
-    completeBattleRef: deps.completeBattleRef,
     arenaTargetRankRef: deps.arenaTargetRankRef,
     skillToastIdRef: deps.skillToastIdRef,
     elementHintIdRef: deps.elementHintIdRef,
@@ -251,17 +249,19 @@ export function useBattleFlow(deps: BattleFlowDeps) {
     executeBattleLoop(buildBattleCtx(), savedActions)
   }, [stageMode, stageId, heroesList, resetBattleState, buildBattleCtx, updatePlayerSlots, updateEnemySlots, setShowBattleStats, showToast]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  /* ── 回大廳（戰敗後返回主選單） ── */
+  /* ── 回大廳（返回進入戰鬥前的場景） ── */
   const backToLobby = useCallback(() => {
     updatePlayerSlots(() => Array(6).fill(null))
     updateEnemySlots(() => Array(6).fill(null))
     resetBattleState()
     setVictoryRewards(null)
-    setMenuScreen('none')
+    // 返回戰前的 menuScreen
+    const returnScreen = preBattleMenuScreenRef.current
     if (stageMode === 'pvp' && arenaTargetRankRef.current > 0) {
       arenaTargetRankRef.current = 0
-      setMenuScreen('arena')
     }
+    setMenuScreen(returnScreen)
+    preBattleMenuScreenRef.current = 'none'
     setGameState('MAIN_MENU')
   }, [stageMode, resetBattleState, updatePlayerSlots, updateEnemySlots, setVictoryRewards, setMenuScreen, setGameState]) // eslint-disable-line react-hooks/exhaustive-deps
 
