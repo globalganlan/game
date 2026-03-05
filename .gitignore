@@ -26,3 +26,6 @@ dist-ssr
 
 # Playwright MCP screenshots/logs
 .playwright-mcp/
+
+# QA screenshots
+qa_screenshots/
