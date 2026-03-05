@@ -169,7 +169,15 @@ export async function useItem(
 export async function equipItem(equipId: string, heroInstanceId: string): Promise<boolean> {
   if (inventoryState) {
     const eq = inventoryState.equipment.find(e => e.equipId === equipId)
-    if (eq) eq.equippedBy = heroInstanceId
+    if (eq) {
+      // 先卸下同英雄同格位的舊裝備（前端樂觀更新，與後端原子操作對齊）
+      for (const old of inventoryState.equipment) {
+        if (old.equippedBy === heroInstanceId && old.slot === eq.slot && old.equipId !== equipId) {
+          old.equippedBy = ''
+        }
+      }
+      eq.equippedBy = heroInstanceId
+    }
     notify()
   }
   const res = await callApi<{ success: boolean; heroInstanceId?: string }>('equip-item', { equipId, heroInstanceId })

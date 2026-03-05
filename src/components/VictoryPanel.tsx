@@ -3,6 +3,7 @@
  */
 
 import { CurrencyIcon, ItemIcon } from './CurrencyIcon'
+import { ClickableItemIcon } from './ClickableItemIcon'
 import { getItemName } from '../constants/rarity'
 
 export interface VictoryRewards {
@@ -39,30 +40,30 @@ export function VictoryPanel({ battleResult, victoryRewards, stageMode, stageId 
             <div className="reward-floor-clear">👹 Boss 討伐完成！</div>
           )}
 
-          {/* 獎勵明細 */}
+          {/* 獎勵明細（可點擊查看道具詳情） */}
           <div className="reward-items-list">
             <div className="reward-item">
-              <span className="reward-icon gold"><CurrencyIcon type="gold" /></span>
+              <span className="reward-icon gold"><ClickableItemIcon itemId="gold" /></span>
               <span className="reward-label">金幣</span>
               <span className="reward-value">+{victoryRewards.gold.toLocaleString()}</span>
             </div>
             {victoryRewards.diamond > 0 && (
               <div className="reward-item">
-                <span className="reward-icon diamond"><CurrencyIcon type="diamond" /></span>
+                <span className="reward-icon diamond"><ClickableItemIcon itemId="diamond" /></span>
                 <span className="reward-label">鑽石</span>
                 <span className="reward-value">+{victoryRewards.diamond}</span>
               </div>
             )}
             {victoryRewards.exp > 0 && (
               <div className="reward-item">
-                <span className="reward-icon exp"><CurrencyIcon type="exp" /></span>
+                <span className="reward-icon exp"><ClickableItemIcon itemId="exp" /></span>
                 <span className="reward-label">經驗</span>
                 <span className="reward-value">+{victoryRewards.exp.toLocaleString()}</span>
               </div>
             )}
             {victoryRewards.drops.map((d, i) => (
               <div className="reward-item" key={i}>
-                <span className="reward-icon drop"><ItemIcon itemId={d.itemId} /></span>
+                <span className="reward-icon drop"><ClickableItemIcon itemId={d.itemId} /></span>
                 <span className="reward-label">{getItemName(d.itemId)}</span>
                 <span className="reward-value">×{d.quantity}</span>
               </div>

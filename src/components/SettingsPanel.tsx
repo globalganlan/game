@@ -10,6 +10,7 @@ import { audioManager } from '../services/audioService'
 import { useLogout } from '../hooks/useLogout'
 import { translateError } from '../utils/errorMessages'
 import { CurrencyIcon } from './CurrencyIcon'
+import { PanelInfoTip, PANEL_DESCRIPTIONS } from './PanelInfoTip'
 import {
   detectPlatform,
   isStandalone,
@@ -205,6 +206,7 @@ export function SettingsPanel({ onBack, onLogout, displayName, isBound: initialB
         <div className="panel-header">
           <button className="panel-back-btn" onClick={onBack}>← 返回</button>
           <h2 className="panel-title">⚙️ 設定</h2>
+          <PanelInfoTip description={PANEL_DESCRIPTIONS.settings} />
         </div>
 
         <div className="settings-scroll">

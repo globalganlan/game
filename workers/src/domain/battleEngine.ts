@@ -837,7 +837,8 @@ export function runBattle(
   const rng = seed != null ? createSeededRng(seed) : Math.random;
   const clonedP = JSON.parse(JSON.stringify(players)) as BattleHero[];
   const clonedE = JSON.parse(JSON.stringify(enemies)) as BattleHero[];
-  return runBattleEngine(rng, clonedP, clonedE, maxTurns);
+  const result = runBattleEngine(rng, clonedP, clonedE, maxTurns);
+  return { ...result, finalPlayers: clonedP, finalEnemies: clonedE };
 }
 
 

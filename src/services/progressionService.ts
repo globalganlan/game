@@ -143,7 +143,9 @@ export interface CompleteBattleResult {
   leveledUp?: boolean
   newStoryProgress?: { chapter: number; stage: number }
   newFloor?: number
+  bossRank?: string
   currencies?: ServerCurrencies
+  dailyCounts?: { daily: number; pvp: number; boss: number; date: string }
 }
 
 /**
@@ -178,7 +180,9 @@ export async function completeBattle(params: CompleteBattleParams): Promise<Comp
     leveledUp: res.leveledUp,
     newStoryProgress: res.newStoryProgress,
     newFloor: res.newFloor,
+    bossRank: res.bossRank,
     currencies: res.currencies,
+    dailyCounts: res.dailyCounts,
   }
 }
 

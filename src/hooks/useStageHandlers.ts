@@ -9,11 +9,30 @@ import type { GameState, MenuScreen, SlotHero, RawHeroData } from '../types'
 import type { AcquireItem } from '../hooks/useAcquireToast'
 import type { SceneMode } from '../components/Arena'
 import { getDailyDungeonDisplayName } from '../domain/stageSystem'
-import { startArenaChallenge } from '../services/arenaService'
+import { startArenaChallenge, getDefenseFormation, setDefenseFormation } from '../services/arenaService'
 import { getItemName } from '../constants/rarity'
 import { buildEnemySlotsFromStage, normalizeModelId } from '../game/helpers'
 import { getStageConfig } from '../services/stageService'
 import { waitFrames } from '../game/constants'
+import { EMPTY_SLOTS } from '../game/constants'
+
+/* ── 場景輪替配色池（基於 stageId 做確定性選取） ── */
+const SCENE_POOL_BY_MODE: Record<string, SceneMode[]> = {
+  tower: ['tower', 'underground', 'factory', 'hospital', 'city', 'core', 'forest'],
+  daily: ['daily', 'wasteland', 'factory', 'underground', 'core'],
+  pvp:   ['pvp', 'city', 'residential', 'forest', 'wasteland', 'underground'],
+  boss:  ['boss', 'core', 'underground', 'factory'],
+}
+
+/** 根據 stageId 產生確定性雜湊，從場景池中選取場景 */
+function pickSceneForStage(mode: string, stageId: string): SceneMode {
+  const pool = SCENE_POOL_BY_MODE[mode]
+  if (!pool || pool.length <= 1) return (mode as SceneMode)
+  // 簡易確定性雜湊：將 stageId 各字元 charCode 加總
+  let hash = 0
+  for (let i = 0; i < stageId.length; i++) hash = (hash * 31 + stageId.charCodeAt(i)) | 0
+  return pool[Math.abs(hash) % pool.length]
+}
 
 export interface StageHandlerDeps {
   setStageMode: (m: 'story' | 'tower' | 'daily' | 'pvp' | 'boss') => void
@@ -27,20 +46,25 @@ export interface StageHandlerDeps {
   curtainClosePromiseRef: React.MutableRefObject<Promise<boolean> | null>
   closeCurtain: () => Promise<boolean>
   updateEnemySlots: (updater: (prev: (SlotHero | null)[]) => (SlotHero | null)[]) => void
-  restoreFormationFromSave: () => void
+  updatePlayerSlots: (updater: (prev: (SlotHero | null)[]) => (SlotHero | null)[]) => void
+  restoreFormationFromSave: (force?: boolean) => void
   showToast: (msg: string) => void
   acquireShow: (items: AcquireItem[]) => void
   heroesList: RawHeroData[]
   stageMode: 'story' | 'tower' | 'daily' | 'pvp' | 'boss'
   arenaTargetRankRef: React.MutableRefObject<number>
+  setIsDefenseSetup: (b: boolean) => void
+  isDefenseSetupRef: React.MutableRefObject<boolean>
+  heroesListRef: React.MutableRefObject<RawHeroData[]>
 }
 
 export function useStageHandlers(deps: StageHandlerDeps) {
   const {
     setStageMode, setSceneTheme, setStageId, setMenuScreen, setGameState,
     setCurtainVisible, setCurtainFading, setCurtainText, curtainClosePromiseRef, closeCurtain,
-    updateEnemySlots, restoreFormationFromSave,
+    updateEnemySlots, updatePlayerSlots, restoreFormationFromSave,
     showToast, acquireShow, heroesList, stageMode, arenaTargetRankRef,
+    setIsDefenseSetup, isDefenseSetupRef, heroesListRef,
   } = deps
 
   /* ── 主選單導航 ── */
@@ -54,7 +78,7 @@ export function useStageHandlers(deps: StageHandlerDeps) {
   ) => {
     const displayName = mode === 'tower' ? `第 ${sid} 層`
       : mode === 'daily' ? getDailyDungeonDisplayName(sid)
-        : mode === 'pvp' ? '競技場對戰'
+        : mode === 'pvp' ? '試煉場對戰'
           : mode === 'boss' ? `Boss 挑戰`
             : `關卡 ${sid}`
 
@@ -84,8 +108,8 @@ export function useStageHandlers(deps: StageHandlerDeps) {
         }
       } catch { /* fallback: injectedEnemies stays undefined */ }
     } else {
-      // 非 story 模式：直接用模式名當場景主題
-      setSceneTheme(mode as SceneMode)
+      // 非 story 模式：基於 stageId 從場景池輪替選取
+      setSceneTheme(pickSceneForStage(mode, sid))
     }
 
     updateEnemySlots(() => buildEnemySlotsFromStage(mode, sid, heroesList, injectedEnemies))
@@ -143,7 +167,7 @@ export function useStageHandlers(deps: StageHandlerDeps) {
       }
       arenaTargetRankRef.current = targetRank
       setStageMode('pvp')
-      setSceneTheme('pvp')
+      setSceneTheme(pickSceneForStage('pvp', `arena-${targetRank}`))
       setStageId(`arena-${targetRank}`)
       updateEnemySlots(() => enemySlotsArr)
       restoreFormationFromSave()
@@ -153,6 +177,77 @@ export function useStageHandlers(deps: StageHandlerDeps) {
       showToast('挑戰載入失敗：' + String(e))
     }
   }, [heroesList, showToast, updateEnemySlots, restoreFormationFromSave, setStageMode, setSceneTheme, setStageId, setMenuScreen, setGameState]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  /* ── 競技場防守陣型配置 ── */
+  const handleArenaDefenseSetup = useCallback(async () => {
+    showToast('載入防守陣型配置…')
+    setIsDefenseSetup(true)
+    isDefenseSetupRef.current = true
+    setStageMode('pvp')
+    setSceneTheme('pvp')
+    setStageId('defense-setup')
+    // 清空敵方
+    updateEnemySlots(() => [...EMPTY_SLOTS])
+    // 嘗試載入已儲存的防守陣型到玩家槽位
+    try {
+      const defFormation = await getDefenseFormation()
+      const data = heroesListRef.current
+      if (defFormation.some(Boolean) && data.length > 0) {
+        const heroMap = new Map<string, { hero: RawHeroData; idx: number }>()
+        data.forEach((h, idx) => {
+          const hid = String(h.HeroID ?? h.id ?? idx + 1)
+          heroMap.set(hid, { hero: h, idx })
+        })
+        const restored: (SlotHero | null)[] = defFormation.map((heroId, slot) => {
+          if (!heroId) return null
+          const hid = String(heroId)
+          const found = heroMap.get(hid)
+          if (!found) return null
+          const { hero, idx } = found
+          const mid = normalizeModelId(hero, idx)
+          return {
+            ...hero,
+            currentHP: (hero.HP ?? 1) as number,
+            _uid: `${mid}_player_${slot}`,
+            _modelId: mid,
+            ModelID: mid,
+          }
+        })
+        if (restored.some(Boolean)) {
+          updatePlayerSlots(() => restored)
+        } else {
+          updatePlayerSlots(() => [...EMPTY_SLOTS])
+        }
+      } else {
+        // 沒有已儲存的防守陣型，清空
+        updatePlayerSlots(() => [...EMPTY_SLOTS])
+      }
+    } catch {
+      // API 失敗，清空
+      updatePlayerSlots(() => [...EMPTY_SLOTS])
+    }
+    setMenuScreen('none')
+    setGameState('IDLE')
+  }, [heroesList, showToast, setIsDefenseSetup, isDefenseSetupRef, heroesListRef, updateEnemySlots, updatePlayerSlots, setStageMode, setSceneTheme, setStageId, setMenuScreen, setGameState]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  /* ── 儲存防守陣型並返回 ── */
+  const handleSaveDefenseFormation = useCallback(async (currentPlayerSlots: (SlotHero | null)[]) => {
+    const formation = currentPlayerSlots.map(s => s ? String(s.HeroID ?? '') : null)
+    const ok = await setDefenseFormation(formation)
+    setIsDefenseSetup(false)
+    isDefenseSetupRef.current = false
+    setMenuScreen('arena')
+    setGameState('MAIN_MENU')
+    showToast(ok ? '防守陣型已儲存！' : '儲存失敗，請稍後再試')
+  }, [setIsDefenseSetup, isDefenseSetupRef, setMenuScreen, setGameState, showToast])
+
+  /* ── 離開防守配置（不儲存） ── */
+  const handleCancelDefenseSetup = useCallback(() => {
+    setIsDefenseSetup(false)
+    isDefenseSetupRef.current = false
+    setMenuScreen('arena')
+    setGameState('MAIN_MENU')
+  }, [setIsDefenseSetup, isDefenseSetupRef, setMenuScreen, setGameState])
 
   /* ── 每日簽到 ── */
   const handleCheckin = useCallback(async () => {
@@ -177,6 +272,9 @@ export function useStageHandlers(deps: StageHandlerDeps) {
     handleBackToMenu,
     handleStageSelect,
     handleArenaStartBattle,
+    handleArenaDefenseSetup,
+    handleSaveDefenseFormation,
+    handleCancelDefenseSetup,
     handleCheckin,
   }
 }

@@ -28,14 +28,15 @@ interface ShopItem {
   category: ShopCategory
 }
 
-type ShopCategory = 'daily' | 'material' | 'special' | 'stardust' | 'scrap'
+type ShopCategory = 'daily' | 'material' | 'special' | 'stardust' | 'scrap' | 'arena'
 
 const SHOP_CATEGORIES: { key: ShopCategory; label: string; icon: string }[] = [
   { key: 'daily', label: '每日商店', icon: '🔄' },
   { key: 'material', label: '素材商店', icon: '🧪' },
   { key: 'stardust', label: '星塵兌換', icon: '✨' },
+  { key: 'arena', label: '競技兌換', icon: '🏅' },
   { key: 'special', label: '特殊商店', icon: '⭐' },
-  { key: 'scrap', label: '碎片兌換', icon: '🔧' },
+  { key: 'scrap', label: '碎片兌換', icon: '🔩' },
 ]
 
 const SHOP_ITEMS: ShopItem[] = [
@@ -136,14 +137,14 @@ const SHOP_ITEMS: ShopItem[] = [
     dailyLimit: 5, category: 'special',
   },
   {
-    id: 'special_ticket_hero', name: '英雄召喚券 ×1', icon: '�️',
+    id: 'special_ticket_hero', name: '英雄召喚券 ×1', icon: '🎟️',
     description: '可用於英雄召喚，免費抽取一次',
     price: 50, currency: 'diamond',
     rewards: [{ itemId: 'gacha_ticket_hero', quantity: 1 }],
     dailyLimit: 3, category: 'special',
   },
   {
-    id: 'special_ticket_equip', name: '裝備鍛造券 ×1', icon: '�',
+    id: 'special_ticket_equip', name: '裝備鍛造券 ×1', icon: '🔧',
     description: '可用於裝備鍛造，免費鍛造一次',
     price: 50, currency: 'diamond',
     rewards: [{ itemId: 'gacha_ticket_equip', quantity: 1 }],
@@ -151,14 +152,14 @@ const SHOP_ITEMS: ShopItem[] = [
   },
   // ── 星塵兌換店（召喚券） ──
   {
-    id: 'sd_ticket_hero', name: '英雄召喚券 ×1', icon: '�️',
+    id: 'sd_ticket_hero', name: '英雄召喚券 ×1', icon: '🎟️',
     description: '用星塵兌換英雄召喚券',
     price: 30, currency: 'stardust',
     rewards: [{ itemId: 'gacha_ticket_hero', quantity: 1 }],
     dailyLimit: 0, category: 'stardust',
   },
   {
-    id: 'sd_ticket_equip', name: '裝備鍛造券 ×1', icon: '�',
+    id: 'sd_ticket_equip', name: '裝備鍛造券 ×1', icon: '🔧',
     description: '用星塵兌換裝備鍛造券',
     price: 30, currency: 'stardust',
     rewards: [{ itemId: 'gacha_ticket_equip', quantity: 1 }],
@@ -172,12 +173,56 @@ const SHOP_ITEMS: ShopItem[] = [
     rewards: [{ itemId: 'chest_equipment', quantity: 1 }],
     dailyLimit: 0, category: 'scrap',
   },
+  // ── 競技兌換店 ──
+  {
+    id: 'arena_exp_3000', name: '經驗 ×3,000', icon: '💚',
+    description: '用競技幣兌換大量經驗',
+    price: 5, currency: 'arena',
+    rewards: [{ itemId: 'exp', quantity: 3000 }],
+    dailyLimit: 0, category: 'arena',
+  },
+  {
+    id: 'arena_gold_20k', name: '金幣 ×20,000', icon: '💰',
+    description: '用競技幣兌換金幣',
+    price: 5, currency: 'arena',
+    rewards: [{ itemId: 'gold', quantity: 20000 }],
+    dailyLimit: 0, category: 'arena',
+  },
+  {
+    id: 'arena_diamond_30', name: '鑽石 ×30', icon: '💎',
+    description: '用競技幣兌換鑽石',
+    price: 10, currency: 'arena',
+    rewards: [{ itemId: 'diamond', quantity: 30 }],
+    dailyLimit: 0, category: 'arena',
+  },
+  {
+    id: 'arena_class_universal', name: '通用職業石 ×1', icon: '🌐',
+    description: '可替代任何職業突破石',
+    price: 15, currency: 'arena',
+    rewards: [{ itemId: 'asc_class_universal', quantity: 1 }],
+    dailyLimit: 0, category: 'arena',
+  },
+  {
+    id: 'arena_chest_equip', name: '裝備寶箱 ×1', icon: '📦',
+    description: '用競技幣兌換隨機裝備寶箱',
+    price: 8, currency: 'arena',
+    rewards: [{ itemId: 'chest_equipment', quantity: 1 }],
+    dailyLimit: 0, category: 'arena',
+  },
+  {
+    id: 'arena_ticket_hero', name: '英雄召喚券 ×1', icon: '🎟️',
+    description: '用競技幣兌換英雄召喚券',
+    price: 20, currency: 'arena',
+    rewards: [{ itemId: 'gacha_ticket_hero', quantity: 1 }],
+    dailyLimit: 0, category: 'arena',
+  },
 ]
 
 import { getItemIcon, getItemName } from '../constants/rarity'
 import { CurrencyIcon } from './CurrencyIcon'
+import { ClickableItemIcon } from './ClickableItemIcon'
 import { InfoTip } from './InfoTip'
-import { ItemInfoPopup } from './ItemInfoPopup'
+import { PanelInfoTip, PANEL_DESCRIPTIONS } from './PanelInfoTip'
 
 /* (CURRENCY_ICON removed — now using CurrencyIcon component) */
 
@@ -197,7 +242,6 @@ export function ShopPanel({ onBack }: ShopPanelProps) {
   const [activeCategory, setActiveCategory] = useState<ShopCategory>('daily')
   const [purchaseMsg, setPurchaseMsg] = useState('')
   const [purchasedToday, setPurchasedToday] = useState<Record<string, number>>({})
-  const [previewItemId, setPreviewItemId] = useState<string | null>(null)
 
   // 載入今日已購買次數
   useEffect(() => {
@@ -215,6 +259,7 @@ export function ShopPanel({ onBack }: ShopPanelProps) {
   const diamond = saveState?.save.diamond ?? 0
   const stardust = getItemQuantity('currency_stardust')
   const equipScrap = getItemQuantity('equip_scrap')
+  const pvpCoin = getItemQuantity('pvp_coin')
 
   const filteredItems = useMemo(
     () => SHOP_ITEMS.filter(item => item.category === activeCategory),
@@ -226,8 +271,9 @@ export function ShopPanel({ onBack }: ShopPanelProps) {
     if (item.currency === 'diamond') return diamond >= item.price
     if (item.currency === 'stardust') return stardust >= item.price
     if (item.currency === 'equip_scrap') return equipScrap >= item.price
+    if (item.currency === 'arena') return pvpCoin >= item.price
     return false
-  }, [gold, diamond, stardust, equipScrap])
+  }, [gold, diamond, stardust, equipScrap, pvpCoin])
 
   const getRemainingPurchases = useCallback((item: ShopItem): number | null => {
     if (item.dailyLimit <= 0) return null
@@ -242,16 +288,18 @@ export function ShopPanel({ onBack }: ShopPanelProps) {
       return
     }
     if (!canAfford(item)) {
-      const names: Record<string, string> = { gold: '金幣', diamond: '鑽石', stardust: '星塵', equip_scrap: '裝備碎片' }
+      const names: Record<string, string> = { gold: '金幣', diamond: '鑽石', stardust: '星塵', equip_scrap: '裝備碎片', arena: '競技幣' }
       setPurchaseMsg(`${names[item.currency] ?? '貨幣'}不足`)
       return
     }
 
-    // 星塵/碎片扣款（非 save 貨幣，需本地扣）
+    // 星塵/碎片/競技幣扣款（非 save 貨幣，需本地扣）
     if (item.currency === 'stardust') {
       removeItemsLocally([{ itemId: 'currency_stardust', quantity: item.price }])
     } else if (item.currency === 'equip_scrap') {
       removeItemsLocally([{ itemId: 'equip_scrap', quantity: item.price }])
+    } else if (item.currency === 'arena') {
+      removeItemsLocally([{ itemId: 'pvp_coin', quantity: item.price }])
     }
 
     // 非資源類獎勵本地加背包（伺服器也會同步）
@@ -287,7 +335,7 @@ export function ShopPanel({ onBack }: ShopPanelProps) {
     const rewardNames = item.rewards.map(r => `${getItemIcon(r.itemId)} ${getItemName(r.itemId)} ×${r.quantity}`).join('、')
     setPurchaseMsg(`購買成功！獲得 ${rewardNames}`)
     setTimeout(() => setPurchaseMsg(''), 2500)
-  }, [canAfford, getRemainingPurchases, gold, diamond, stardust, equipScrap])
+  }, [canAfford, getRemainingPurchases, gold, diamond, stardust, equipScrap, pvpCoin])
 
   return (
     <div className="panel-overlay">
@@ -296,11 +344,13 @@ export function ShopPanel({ onBack }: ShopPanelProps) {
         <div className="panel-header">
           <button className="panel-back-btn" onClick={onBack}>← 返回</button>
           <h2 className="panel-title">🏪 商店</h2>
+          <PanelInfoTip description={PANEL_DESCRIPTIONS.shop} />
           <div className="shop-currency-bar">
             <InfoTip icon={<CurrencyIcon type="gold" />} value={gold.toLocaleString()} label="金幣" description="購買道具、強化裝備所需" className="menu-gold" />
             <InfoTip icon={<CurrencyIcon type="diamond" />} value={diamond.toLocaleString()} label="鑽石" description="購買稀有商品、禮包" className="menu-diamond" />
             <InfoTip icon={<CurrencyIcon type="stardust" />} value={stardust.toLocaleString()} label="星塵" description="重複英雄轉化而來，可在商店兑換稀有道具" className="menu-stardust" />
-            <InfoTip icon={<span style={{fontSize:'0.85em'}}>🔧</span>} value={equipScrap.toLocaleString()} label="碎片" description="分解裝備獲得，可兌換強化素材或裝備寶箱" className="menu-stardust" />
+            <InfoTip icon={<span style={{fontSize:'0.85em'}}>🔩</span>} value={equipScrap.toLocaleString()} label="裝備碎片" description="分解裝備獲得，可兌換強化素材或裝備寶箱" className="menu-stardust" />
+            <InfoTip icon={<CurrencyIcon type="pvp_coin" />} value={pvpCoin.toLocaleString()} label="競技幣" description="試煉場勝利獲得，可在競技兌換店換取道具" className="menu-stardust" />
           </div>
         </div>
 
@@ -329,13 +379,13 @@ export function ShopPanel({ onBack }: ShopPanelProps) {
             const soldOut = remaining !== null && remaining <= 0
             return (
               <div key={item.id} className={`shop-item ${!affordable || soldOut ? 'shop-item-disabled' : ''}`}>
-                <div className="shop-item-icon shop-item-icon-clickable" onClick={() => setPreviewItemId(item.rewards[0]?.itemId)}>{item.icon || getItemIcon(item.rewards[0]?.itemId ?? '')}</div>
+                <div className="shop-item-icon"><ClickableItemIcon itemId={item.rewards[0]?.itemId ?? ''} /></div>
                 <div className="shop-item-body">
                   <div className="shop-item-name">{item.name}</div>
                   <div className="shop-item-desc">{item.description}</div>
                   <div className="shop-item-footer">
                     <span className={`shop-price ${!affordable ? 'shop-price-insufficient' : ''}`}>
-                      {item.currency === 'gold' ? <CurrencyIcon type="gold" /> : item.currency === 'diamond' ? <CurrencyIcon type="diamond" /> : item.currency === 'stardust' ? <CurrencyIcon type="stardust" /> : item.currency === 'equip_scrap' ? <span style={{fontSize:'0.85em'}}>🔧</span> : '🏟️'} {item.price.toLocaleString()}
+                      {item.currency === 'gold' ? <CurrencyIcon type="gold" /> : item.currency === 'diamond' ? <CurrencyIcon type="diamond" /> : item.currency === 'stardust' ? <CurrencyIcon type="stardust" /> : item.currency === 'equip_scrap' ? <span style={{fontSize:'0.85em'}}>🔩</span> : item.currency === 'arena' ? <CurrencyIcon type="pvp_coin" /> : '🏟️'} {item.price.toLocaleString()}
                     </span>
                     {remaining !== null && (
                       <span className={`shop-remaining ${soldOut ? 'sold-out' : ''}`}>
@@ -355,7 +405,6 @@ export function ShopPanel({ onBack }: ShopPanelProps) {
             )
           })}
         </div>
-        {previewItemId && <ItemInfoPopup itemId={previewItemId} onClose={() => setPreviewItemId(null)} />}
       </div>
     </div>
   )

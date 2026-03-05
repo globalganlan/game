@@ -52,6 +52,7 @@ export interface SaveDataRow {
   lastHeroFreePull: string;
   lastEquipFreePull: string;
   pwaRewardClaimed: number;
+  dailyCounts: string;       // JSON
 }
 
 export interface HeroInstanceRow {

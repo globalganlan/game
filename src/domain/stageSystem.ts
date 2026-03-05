@@ -112,6 +112,22 @@ export const MODE_UNLOCK: UnlockConditions = {
   boss:  { chapter: 2, stage: 8 },
 }
 
+/* ════════════════════════════════════
+   每日次數限制
+   ════════════════════════════════════ */
+
+/** 每日限制（主線/爬塔無限） */
+export const DAILY_LIMITS: Record<string, number> = {
+  daily: 3,   // 每日副本
+  pvp: 5,     // 試煉場
+  boss: 3,    // 首領戰
+}
+
+/** 取得某模式的每日上限（回傳 0 = 無限） */
+export function getDailyLimit(mode: string): number {
+  return DAILY_LIMITS[mode] ?? 0
+}
+
 export function isModeUnlocked(
   mode: keyof UnlockConditions,
   storyProgress: { chapter: number; stage: number },
@@ -214,10 +230,9 @@ export const DAILY_DUNGEONS: DailyDungeon[] = [
           { heroId: 13, slot: 2, levelMultiplier: 1, hpMultiplier: 1.0, atkMultiplier: 1.0, speedMultiplier: 1.0 },
         ],
         rewards: {
-          exp: 100, gold: 500,
+          exp: 0, gold: 500,
           items: [
-            { itemId: 'asc_class_power', quantity: 2, dropRate: 1.0 },
-            { itemId: 'eqm_enhance_s', quantity: 3, dropRate: 1.0 },
+            { itemId: 'asc_class_power', quantity: 3, dropRate: 1.0 },
           ],
         },
       },
@@ -231,11 +246,9 @@ export const DAILY_DUNGEONS: DailyDungeon[] = [
           { heroId: 2, slot: 3, levelMultiplier: 1, hpMultiplier: 1.5, atkMultiplier: 1.3, speedMultiplier: 1.1 },
         ],
         rewards: {
-          exp: 200, gold: 1000,
+          exp: 0, gold: 1000,
           items: [
-            { itemId: 'asc_class_power', quantity: 4, dropRate: 1.0 },
-            { itemId: 'eqm_enhance_m', quantity: 2, dropRate: 1.0 },
-            { itemId: 'exp', quantity: 500, dropRate: 0.5 },
+            { itemId: 'asc_class_power', quantity: 6, dropRate: 1.0 },
           ],
         },
       },
@@ -250,11 +263,9 @@ export const DAILY_DUNGEONS: DailyDungeon[] = [
           { heroId: 8, slot: 4, levelMultiplier: 1, hpMultiplier: 2.5, atkMultiplier: 2.0, speedMultiplier: 1.2 },
         ],
         rewards: {
-          exp: 400, gold: 2000,
+          exp: 0, gold: 2000,
           items: [
-            { itemId: 'asc_class_power', quantity: 8, dropRate: 1.0 },
-            { itemId: 'eqm_enhance_l', quantity: 1, dropRate: 1.0 },
-            { itemId: 'exp', quantity: 2000, dropRate: 0.3 },
+            { itemId: 'asc_class_power', quantity: 12, dropRate: 1.0 },
           ],
         },
       },
@@ -274,10 +285,9 @@ export const DAILY_DUNGEONS: DailyDungeon[] = [
           { heroId: 14, slot: 2, levelMultiplier: 1, hpMultiplier: 1.0, atkMultiplier: 1.0, speedMultiplier: 1.0 },
         ],
         rewards: {
-          exp: 100, gold: 500,
+          exp: 0, gold: 500,
           items: [
-            { itemId: 'asc_class_agility', quantity: 2, dropRate: 1.0 },
-            { itemId: 'eqm_enhance_s', quantity: 3, dropRate: 1.0 },
+            { itemId: 'asc_class_agility', quantity: 3, dropRate: 1.0 },
           ],
         },
       },
@@ -291,10 +301,9 @@ export const DAILY_DUNGEONS: DailyDungeon[] = [
           { heroId: 4, slot: 3, levelMultiplier: 1, hpMultiplier: 1.5, atkMultiplier: 1.3, speedMultiplier: 1.1 },
         ],
         rewards: {
-          exp: 200, gold: 1000,
+          exp: 0, gold: 1000,
           items: [
-            { itemId: 'asc_class_agility', quantity: 4, dropRate: 1.0 },
-            { itemId: 'eqm_enhance_m', quantity: 2, dropRate: 1.0 },
+            { itemId: 'asc_class_agility', quantity: 6, dropRate: 1.0 },
           ],
         },
       },
@@ -309,10 +318,9 @@ export const DAILY_DUNGEONS: DailyDungeon[] = [
           { heroId: 1, slot: 4, levelMultiplier: 1, hpMultiplier: 2.5, atkMultiplier: 2.0, speedMultiplier: 1.2 },
         ],
         rewards: {
-          exp: 400, gold: 2000,
+          exp: 0, gold: 2000,
           items: [
-            { itemId: 'asc_class_agility', quantity: 8, dropRate: 1.0 },
-            { itemId: 'eqm_enhance_l', quantity: 1, dropRate: 1.0 },
+            { itemId: 'asc_class_agility', quantity: 12, dropRate: 1.0 },
           ],
         },
       },
@@ -332,10 +340,9 @@ export const DAILY_DUNGEONS: DailyDungeon[] = [
           { heroId: 6, slot: 2, levelMultiplier: 1, hpMultiplier: 1.0, atkMultiplier: 1.0, speedMultiplier: 1.0 },
         ],
         rewards: {
-          exp: 100, gold: 500,
+          exp: 0, gold: 500,
           items: [
-            { itemId: 'asc_class_defense', quantity: 2, dropRate: 1.0 },
-            { itemId: 'eqm_enhance_s', quantity: 3, dropRate: 1.0 },
+            { itemId: 'asc_class_defense', quantity: 3, dropRate: 1.0 },
           ],
         },
       },
@@ -349,10 +356,9 @@ export const DAILY_DUNGEONS: DailyDungeon[] = [
           { heroId: 3, slot: 3, levelMultiplier: 1, hpMultiplier: 1.5, atkMultiplier: 1.3, speedMultiplier: 1.1 },
         ],
         rewards: {
-          exp: 200, gold: 1000,
+          exp: 0, gold: 1000,
           items: [
-            { itemId: 'asc_class_defense', quantity: 4, dropRate: 1.0 },
-            { itemId: 'eqm_enhance_m', quantity: 2, dropRate: 1.0 },
+            { itemId: 'asc_class_defense', quantity: 6, dropRate: 1.0 },
           ],
         },
       },
@@ -367,10 +373,9 @@ export const DAILY_DUNGEONS: DailyDungeon[] = [
           { heroId: 12, slot: 4, levelMultiplier: 1, hpMultiplier: 2.5, atkMultiplier: 2.0, speedMultiplier: 1.2 },
         ],
         rewards: {
-          exp: 400, gold: 2000,
+          exp: 0, gold: 2000,
           items: [
-            { itemId: 'asc_class_defense', quantity: 8, dropRate: 1.0 },
-            { itemId: 'eqm_enhance_l', quantity: 1, dropRate: 1.0 },
+            { itemId: 'asc_class_defense', quantity: 12, dropRate: 1.0 },
           ],
         },
       },
@@ -520,12 +525,14 @@ export function getPvPOpponents(
   return opponents
 }
 
-export function getPvPReward(progress: number): StageReward {
+export function getPvPReward(progress: number, difficultyIndex = 0): StageReward {
+  // difficultyIndex: 0=一般, 1=菁英, 2=強敵
+  const diffMult = [1.0, 1.5, 2.0][difficultyIndex] ?? 1.0
   return {
-    exp: 80 + progress * 10,
-    gold: 200 + progress * 40,
-    diamond: 10,
-    items: [{ itemId: 'pvp_coin', quantity: 3 + Math.floor(progress / 4), dropRate: 1.0 }],
+    exp: Math.floor((80 + progress * 10) * diffMult),
+    gold: Math.floor((200 + progress * 40) * diffMult),
+    diamond: Math.floor(10 * diffMult),
+    items: [{ itemId: 'pvp_coin', quantity: Math.floor((3 + Math.floor(progress / 4)) * diffMult), dropRate: 1.0 }],
   }
 }
 
@@ -538,7 +545,7 @@ export const BOSS_CONFIGS: BossConfig[] = [
     bossId: 'boss_1',
     name: '腐化巨獸',
     heroId: 5,
-    hp: 5000,
+    hp: 99999999,
     atk: 120,
     speed: 80,
     turnLimit: 30,
@@ -548,7 +555,7 @@ export const BOSS_CONFIGS: BossConfig[] = [
     bossId: 'boss_2',
     name: '暗夜領主',
     heroId: 9,
-    hp: 8000,
+    hp: 99999999,
     atk: 180,
     speed: 100,
     turnLimit: 30,
@@ -558,7 +565,7 @@ export const BOSS_CONFIGS: BossConfig[] = [
     bossId: 'boss_3',
     name: '末日審判者',
     heroId: 14,
-    hp: 12000,
+    hp: 99999999,
     atk: 250,
     speed: 120,
     turnLimit: 30,
@@ -591,13 +598,27 @@ export function getBossReward(bossId: string, totalDamage: number): StageReward 
   if (totalDamage >= boss.damageThresholds.S) rank = 'S'
   else if (totalDamage >= boss.damageThresholds.A) rank = 'A'
   else if (totalDamage >= boss.damageThresholds.B) rank = 'B'
-  const rewards: Record<string, StageReward> = {
+  return getBossRewardByBossAndRank(bossId, rank)
+}
+
+/** 給定 bossId + rank，回傳對應獎勵（越難的 Boss 獎勵越好） */
+export function getBossRewardByBossAndRank(bossId: string, rank: string): StageReward {
+  // Boss 倍率：boss_1=1.0, boss_2=1.5, boss_3=2.0
+  const bossIdx = BOSS_CONFIGS.findIndex(b => b.bossId === bossId)
+  const bossMult = [1.0, 1.5, 2.0][bossIdx] ?? 1.0
+  const baseRewards: Record<string, StageReward> = {
     S: { exp: 600, gold: 3000, diamond: 100, items: [{ itemId: 'chest_equipment', quantity: 2, dropRate: 1.0 }] },
     A: { exp: 400, gold: 2000, diamond: 50, items: [{ itemId: 'chest_equipment', quantity: 1, dropRate: 1.0 }] },
     B: { exp: 200, gold: 1000, diamond: 20, items: [{ itemId: 'exp', quantity: 2000, dropRate: 1.0 }] },
     C: { exp: 100, gold: 500, diamond: 0, items: [{ itemId: 'exp', quantity: 500, dropRate: 1.0 }] },
   }
-  return rewards[rank]
+  const base = baseRewards[rank] ?? baseRewards['C']
+  return {
+    exp: Math.floor(base.exp * bossMult),
+    gold: Math.floor(base.gold * bossMult),
+    diamond: Math.floor((base.diamond ?? 0) * bossMult),
+    items: base.items?.map(it => ({ ...it, quantity: Math.floor(it.quantity * bossMult) || 1 })),
+  }
 }
 
 /** 判斷 stageId 是否為首次通關（等於或超過目前進度的關卡都算首次） */

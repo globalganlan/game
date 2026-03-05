@@ -30,6 +30,12 @@ interface MainMenuProps {
   mailUnclaimedCount?: number
   /** 隊伍總戰力 */
   combatPower?: number
+  /** 是否有可用的每日探索次數（顯示關卡紅點） */
+  stagesHasDaily?: boolean
+  /** 召喚是否有免費抽可用（英雄或裝備任一） */
+  gachaHasFreePull?: boolean
+  /** 競技場剩餘挑戰次數（>0 顯示紅點） */
+  arenaChallengesLeft?: number
 }
 
 /* ────────────────────────────
@@ -69,6 +75,9 @@ export function MainMenu({
   getResourcePreview,
   mailUnclaimedCount = 0,
   combatPower = 0,
+  stagesHasDaily = false,
+  gachaHasFreePull = false,
+  arenaChallengesLeft = 0,
 }: MainMenuProps) {
   // 每 30 秒刷新離線獎勵預覽
   const [resourcePreview, setResourcePreview] = useState(
@@ -208,6 +217,15 @@ export function MainMenu({
                 <RedDot count={mailUnclaimedCount} />
               )}
               {item.key === 'checkin' && !locked && checkinNeeded && (
+                <RedDot size="sm" />
+              )}
+              {item.key === 'stages' && !locked && stagesHasDaily && (
+                <RedDot size="sm" />
+              )}
+              {item.key === 'gacha' && !locked && gachaHasFreePull && (
+                <RedDot size="sm" />
+              )}
+              {item.key === 'arena' && !locked && arenaChallengesLeft > 0 && (
                 <RedDot size="sm" />
               )}
             </button>

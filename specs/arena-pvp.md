@@ -1,7 +1,7 @@
 # 競技場排名系統 Spec
 
-> 版本：v0.4 ｜ 狀態：🟢 已實作（戰鬥引擎已連接）
-> 最後更新：2026-03-01
+> 版本：v0.7 ｜ 狀態：🟢 已實作（戰鬥引擎已連接 + 敵方模型修復）
+> 最後更新：2026-03-06
 > 負責角色：🎯 GAME_DESIGN → 🔧 CODING
 
 ## 概述
@@ -28,7 +28,7 @@
 |--------|------|
 | `src/domain/arenaSystem.ts` | Domain 層 — 排名計算、NPC 生成、獎勵公式 |
 | `src/services/arenaService.ts` | Service 層 — GAS API 呼叫、樂觀更新 |
-| `src/components/ArenaPanel.tsx` | UI — 排行榜 + 防守陣型配置 + 挑戰 + 獎勵 |
+| `src/components/ArenaPanel.tsx` | UI — 排行榜 + 防守陣型配置 + 挑戰 + 獎勵（v0.6 修復 10+ CSS class 名稱不匹配） |
 | `gas/程式碼.js` | GAS Handler — 排行榜 CRUD、挑戰結算、每日/每週獎勵 |
 
 ---
@@ -362,6 +362,37 @@ export type MenuScreen = 'none' | 'heroes' | 'inventory' | 'gacha' | 'stages' | 
 
 ---
 
+## 十、PVP 兑換商店（v0.6 新增）
+
+使用 PvP 競技（`stage-system.md` §四）戰鬥獲得的 `pvp_coin` 在商店中兑換道具。
+
+> `pvp_coin` 使用 `CurrencyIcon` 統一元件渲染（`type="pvp_coin"`，顯示為 🏅）。
+
+### 商店目錄（6 項商品）
+
+| 商品 ID | 名稱 | pvp_coin 價格 | 產出 |
+|----------|------|------------|------|
+| `arena_exp_3000` | EXP ×3,000 | 10 | 直接加 save_data.exp |
+| `arena_gold_20k` | 金幣 ×20,000 | 15 | 直接加 save_data.gold |
+| `arena_diamond_30` | 鑽石 ×30 | 25 | 直接加 save_data.diamond |
+| `arena_class_universal` | 通用職業石 ×2 | 20 | asc_class_universal 加入背包 |
+| `arena_chest_equip` | 裝備寶箱 ×1 | 30 | chest_equipment 加入背包 |
+| `arena_ticket_hero` | 英雄召喚券 ×1 | 40 | gacha_ticket_hero 加入背包 |
+
+### 後端實作
+
+`workers/src/routes/inventory.ts` 中 SHOP_CATALOG 新增 `arena` 分類，購買時扣除 inventory 表中 `pvp_coin` 行的 quantity。
+
+### 前端入口
+
+`ShopPanel.tsx` 新增「競技商店」分頁（`arena` category），價格使用 `<CurrencyIcon type="pvp_coin" />` 顯示。
+
+### ArenaPanel CSS 修復（v0.6）
+
+修復 `ArenaPanel.tsx` 中 10+ 個 CSS class 名稱與 `App.css` 定義不匹配的問題，確保所有樣式正確套用。
+
+---
+
 ## 擴展點
 
 - [ ] **即時對戰**：WebSocket 真人對戰（非異步 AI 防守）
@@ -377,6 +408,8 @@ export type MenuScreen = 'none' | 'heroes' | 'inventory' | 'gacha' | 'stages' | 
 
 | 版本 | 日期 | 變更內容 |
 |------|------|---------|| v0.5 | 2026-03-01 | ArenaReward 新增 exp 欄位（勝:150/敗:50）、所有獎勵表補上 exp 數值、Spec 差異修復驗證替換原過時差異測試 |
+| v0.7 | 2026-03-06 | **敵方模型修復 + 防守載入 + 戰力對齊 + 紅點**：①`arena-challenge-start` 重寫：NPC 以確定性種子生成 2~5 隻英雄（依排名分層），真實玩家從 hero_instances+heroes 查詢 defenseFormation 角色資料②ArenaPanel `useEffect` 掛載時呼叫 `getDefenseFormation()` 回顯已存陣容③`arena-set-defense` 儲存後以 CP_WEIGHTS 計算並更新 power 欄位④戰力圖示 ⚡→⚔️⑤MainMenu 新增 `arenaChallengesLeft` 紅點⑥PanelInfoTip 移入 `.arena-title` span 修復間距 |
+| v0.6 | 2026-03-05 | **PVP 兑換商店 + CSS 修復**：①新增 §十 PVP 兑換商店（6 項商品，以 pvp_coin 兑換 EXP/金幣/鑽石/職業石/裝備寶箱/英雄券）②`pvp_coin` 統一使用 `CurrencyIcon` 元件（type="pvp_coin"，🏅）③`ArenaPanel.tsx` 修復 10+ CSS class 名稱不匹配④`ShopPanel.tsx` 新增 `arena` 分類 Tab⑤後端 `inventory.ts` SHOP_CATALOG 新增 arena 商店 |
 | v0.4 | 2026-03-01 | QA 審計修正：NPC rank 1 數值更正為 10,480、挑戰獎勵移除 exp 欄位（待擴展）、113 單元測試全通過 |
 | v0.3 | 2026-03-01 | 戰鬥引擎連接：App.tsx onStartBattle 實作完整挑戰流程（startArenaChallenge → 建置敵方 SlotHero[] → stageMode='pvp' → IDLE → 戰鬥 → completeArenaChallenge）、勝利/敗北報告、獎勵 acquireToast、戰後自動返回競技場 || v0.2 | 2026-03-01 | 完成全部實作：domain/arenaSystem.ts + services/arenaService.ts + ArenaPanel + GAS 5 端點 + CSS + MainMenu 按鈕 + App.tsx 整合 |
 | v0.1 | 2026-03-01 | 初版草案：500 名排名制、防守陣型、NPC 佔位、排名交換、每日 5 次挑戰、挑戰/排名提升/每日/賽季四層獎勵、每週重置、GAS 7 個端點、ArenaPanel UI、與現有 PvP 共存方案、MenuScreen 擴展 |

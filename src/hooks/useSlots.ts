@@ -43,10 +43,10 @@ export function useSlots(heroesListRef: React.MutableRefObject<RawHeroData[]>) {
     [],
   )
 
-  /** 從存檔恢復上陣陣型到 playerSlots（若目前為空） */
-  const restoreFormationFromSave = useCallback(() => {
-    // 只在 playerSlots 全空時才恢復
-    if (pSlotsRef.current.some(Boolean)) return
+  /** 從存檔恢復上陣陣型到 playerSlots（預設只在全空時恢復；force=true 強制恢復） */
+  const restoreFormationFromSave = useCallback((force?: boolean) => {
+    // 預設只在 playerSlots 全空時才恢復；force 時無條件恢復
+    if (!force && pSlotsRef.current.some(Boolean)) return
     try {
       const saveState = getSaveState()
       const savedFormation = saveState?.save.formation

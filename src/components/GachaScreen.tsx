@@ -36,6 +36,7 @@ import { getItemName } from '../constants/rarity'
 import type { AcquireItem } from '../hooks/useAcquireToast'
 import { callApi } from '../services/apiClient'
 import { applyCurrenciesFromServer, getSaveState, updateFreePullLocally, updateGachaPityLocally } from '../services/saveService'
+import { RedDot } from './RedDot'
 
 /** 將原始英雄資料的 ID 正規化為 `zombie_N` 格式 */
 function resolveModelId(h: RawHeroData): string {
@@ -71,6 +72,7 @@ interface GachaScreenProps {
 import { RARITY_CONFIG } from '../constants/rarity'
 import { CurrencyIcon } from './CurrencyIcon'
 import { InfoTip } from './InfoTip'
+import { PanelInfoTip, PANEL_DESCRIPTIONS } from './PanelInfoTip'
 
 type GachaTab = 'hero' | 'equipment'
 
@@ -579,6 +581,7 @@ export function GachaScreen({
         <div className="panel-header">
           <button className="panel-back-btn" onClick={onBack}>← 返回</button>
           <h2 className="panel-title">🎰 召喚</h2>
+          <PanelInfoTip description={PANEL_DESCRIPTIONS.gacha} />
           <div className="gacha-currencies">
             <InfoTip icon={<CurrencyIcon type="diamond" />} value={diamond.toLocaleString()} label="鑽石" description="召喚英雄、抽取裝備所需" className="menu-diamond" />
             <InfoTip icon={<CurrencyIcon type="gold" />} value={gold.toLocaleString()} label="金幣" description="金幣池裝備鍛造所需" className="menu-gold" />
@@ -590,14 +593,18 @@ export function GachaScreen({
           <button
             className={`gacha-tab ${tab === 'hero' ? 'gacha-tab-active' : ''}`}
             onClick={() => { setTab('hero'); setError(null) }}
+            style={{ position: 'relative' }}
           >
             🧟 英雄召喚
+            {!freePullUsedToday && <RedDot size="sm" />}
           </button>
           <button
             className={`gacha-tab ${tab === 'equipment' ? 'gacha-tab-active' : ''}`}
             onClick={() => { setTab('equipment'); setError(null) }}
+            style={{ position: 'relative' }}
           >
             ⚔️ 裝備鍛造
+            {!freeEquipPullUsedToday && <RedDot size="sm" />}
           </button>
         </div>
 

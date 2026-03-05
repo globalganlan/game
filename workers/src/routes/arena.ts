@@ -120,13 +120,86 @@ arena.post('/arena-challenge-start', async (c) => {
 
   if (!defender) return c.json({ success: false, error: 'rank_not_found' });
 
+  // 解析防守陣型
+  let formation: (string | null)[] = [];
+  try { formation = JSON.parse(defender.defenseFormation || '[]'); } catch { formation = []; }
+
+  const heroes: Record<string, unknown>[] = [];
+
+  if (defender.isNPC) {
+    // NPC — 根據排名用 seed 產生確定性的隨機陣容
+    const allHeroes = await db.prepare('SELECT heroId, baseHP, baseATK, baseDEF, baseSPD, modelId, critRate, critDmg FROM heroes').all();
+    const heroPool = allHeroes.results || [];
+    if (heroPool.length > 0) {
+      const npcPower = defender.power || 500;
+      const scale = Math.max(1, npcPower / 500);
+      // NPC 陣容：排名越高英雄越多（rank 1-50: 5隻, 51-150: 4隻, 151-300: 3隻, 301+: 2隻）
+      const npcCount = targetRank <= 50 ? 5 : targetRank <= 150 ? 4 : targetRank <= 300 ? 3 : 2;
+      const seed = targetRank * 31337;
+      for (let i = 0; i < npcCount; i++) {
+        const idx = (seed + i * 7919) % heroPool.length;
+        const h = heroPool[idx] as any;
+        heroes.push({
+          heroId: h.heroId,
+          HP: Math.floor((h.baseHP || 100) * scale),
+          ATK: Math.floor((h.baseATK || 10) * scale),
+          DEF: Math.floor((h.baseDEF || 5) * scale),
+          Speed: h.baseSPD || 100,
+          ModelID: h.modelId || String(h.heroId),
+          slot: i,
+        });
+      }
+    }
+  } else {
+    // 真人玩家 — 從 defenseFormation 讀取英雄 instanceId，查詢英雄資料
+    const validIds = formation.filter((id): id is string => !!id);
+    if (validIds.length > 0) {
+      const instances = await db.prepare(
+        `SELECT instanceId, heroId, level, ascension, stars FROM hero_instances WHERE playerId = ? AND instanceId IN (${validIds.map(() => '?').join(',')})`
+      ).bind(defender.playerId, ...validIds).all();
+      const instMap = new Map<string, any>();
+      for (const inst of (instances.results || [])) instMap.set((inst as any).instanceId, inst);
+
+      // 批量查詢英雄基礎資料
+      const heroIds = [...new Set((instances.results || []).map((r: any) => r.heroId))];
+      const heroMap = new Map<number, any>();
+      if (heroIds.length > 0) {
+        const heroRows = await db.prepare(
+          `SELECT heroId, baseHP, baseATK, baseDEF, baseSPD, modelId, critRate, critDmg FROM heroes WHERE heroId IN (${heroIds.map(() => '?').join(',')})`
+        ).bind(...heroIds).all();
+        for (const h of (heroRows.results || [])) heroMap.set((h as any).heroId, h);
+      }
+
+      formation.forEach((instId, slot) => {
+        if (!instId) return;
+        const inst = instMap.get(instId);
+        if (!inst) return;
+        const base = heroMap.get(inst.heroId);
+        if (!base) return;
+        // 簡易等級加成：每級 +3% HP/ATK/DEF
+        const lvScale = 1 + (inst.level - 1) * 0.03;
+        heroes.push({
+          heroId: inst.heroId,
+          HP: Math.floor((base.baseHP || 100) * lvScale),
+          ATK: Math.floor((base.baseATK || 10) * lvScale),
+          DEF: Math.floor((base.baseDEF || 5) * lvScale),
+          Speed: base.baseSPD || 100,
+          ModelID: base.modelId || String(inst.heroId),
+          slot,
+          level: inst.level,
+          stars: inst.stars || 0,
+        });
+      });
+    }
+  }
+
   return c.json({
     success: true,
     defenderData: {
       displayName: defender.displayName,
       power: defender.power || 0,
       isNPC: !!defender.isNPC,
-      heroes: [],
+      heroes,
     },
   });
 });
@@ -262,13 +335,77 @@ arena.post('/arena-challenge-complete', async (c) => {
 arena.post('/arena-set-defense', async (c) => {
   const playerId = c.get('playerId');
   const body = getBody(c);
-  const defenseFormation = JSON.stringify(body.defenseFormation || []);
+  // body.defenseFormation 已經是 JSON 字串（前端已 stringify），直接使用
+  const defenseFormation = typeof body.defenseFormation === 'string'
+    ? body.defenseFormation
+    : JSON.stringify(body.defenseFormation || []);
 
+  const now = isoNow();
+
+  // 先嘗試 UPDATE
   const result = await c.env.DB.prepare(
     'UPDATE arena_rankings SET defenseFormation = ?, lastUpdated = ? WHERE playerId = ?'
-  ).bind(defenseFormation, isoNow(), playerId).run();
+  ).bind(defenseFormation, now, playerId).run();
 
-  if (result.meta.changes === 0) return c.json({ success: false, error: 'player_not_in_arena' });
+  // 如果玩家尚未在 arena_rankings，INSERT 一筆預設資料（排在最後）
+  if (result.meta.changes === 0) {
+    // 查詢玩家顯示名稱
+    const playerRow = await c.env.DB.prepare(
+      'SELECT displayName FROM players WHERE playerId = ?'
+    ).bind(playerId).first<{ displayName: string }>();
+    const dName = playerRow?.displayName || '';
+
+    // 找到最大 rank + 1 作為新排名
+    const maxRow = await c.env.DB.prepare(
+      'SELECT MAX(rank) as maxRank FROM arena_rankings'
+    ).first<{ maxRank: number }>();
+    const newRank = (maxRow?.maxRank ?? 500) + 1;
+
+    await c.env.DB.prepare(
+      `INSERT INTO arena_rankings (rank, playerId, displayName, isNPC, power, defenseFormation, lastUpdated)
+       VALUES (?, ?, ?, 0, 0, ?, ?)`
+    ).bind(newRank, playerId, dName, defenseFormation, now).run();
+  }
+
+  // 計算防守陣型戰力並更新 power 欄位
+  try {
+    let formArr: (string | null)[] = [];
+    try { formArr = JSON.parse(defenseFormation); } catch { formArr = []; }
+    const validIds = formArr.filter((id): id is string => !!id);
+    if (validIds.length > 0) {
+      const instances = await c.env.DB.prepare(
+        `SELECT instanceId, heroId, level, ascension, stars FROM hero_instances WHERE playerId = ? AND instanceId IN (${validIds.map(() => '?').join(',')})`
+      ).bind(playerId, ...validIds).all();
+      const heroIds = [...new Set((instances.results || []).map((r: any) => r.heroId))];
+      let totalPower = 0;
+      if (heroIds.length > 0) {
+        const heroRows = await c.env.DB.prepare(
+          `SELECT heroId, baseHP, baseATK, baseDEF, baseSPD, critRate, critDmg FROM heroes WHERE heroId IN (${heroIds.map(() => '?').join(',')})`
+        ).bind(...heroIds).all();
+        const heroMap = new Map<number, any>();
+        for (const h of (heroRows.results || [])) heroMap.set((h as any).heroId, h);
+        for (const inst of (instances.results || [])) {
+          const i = inst as any;
+          const base = heroMap.get(i.heroId);
+          if (!base) continue;
+          const lvScale = 1 + (i.level - 1) * 0.03;
+          const hp = (base.baseHP || 100) * lvScale;
+          const atk = (base.baseATK || 10) * lvScale;
+          const def = (base.baseDEF || 5) * lvScale;
+          const spd = base.baseSPD || 100;
+          const cr = base.critRate || 5;
+          const cd = base.critDmg || 50;
+          // CP_WEIGHTS: HP*0.5 + ATK*3 + DEF*2.5 + SPD*8 + CritRate*5 + CritDmg*2 + 技能100
+          totalPower += Math.floor(hp*0.5 + atk*3 + def*2.5 + spd*8 + cr*5 + cd*2 + 100);
+        }
+      }
+      if (totalPower > 0) {
+        await c.env.DB.prepare('UPDATE arena_rankings SET power = ? WHERE playerId = ?')
+          .bind(totalPower, playerId).run();
+      }
+    }
+  } catch { /* power 計算失敗不影響儲存 */ }
+
   return c.json({ success: true });
 });
 

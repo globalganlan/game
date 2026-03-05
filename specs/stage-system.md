@@ -1,7 +1,7 @@
 # 關卡系統 Spec
 
-> 版本：v2.8 ｜ 狀態：🟢 已實作
-> 最後更新：2026-06-19
+> 版本：v2.9 ｜ 狀態：🟢 已實作
+> 最後更新：2026-03-05
 > 負責角色：🎯 GAME_DESIGN → 🔧 CODING
 
 ## 概述
@@ -25,9 +25,10 @@
 | 原始碼 | 說明 |
 |--------|------|
 | `workers/src/routes/stage.ts` | Workers API — `/list-stages`、`/stage-config` 端點 |
+| `workers/src/routes/battle.ts` | Workers API — 統一戰鬥結算（v2.9 完全重寫：DAILY_LIMITS 限制、DailyCounts 管理、per-mode 獎勵計算、`/daily-counts` 端點） |
 | `src/services/stageService.ts` | 前端關卡服務 — fetchStageConfigs / getCachedStageConfig / getStageConfig |
-| `src/domain/stageSystem.ts` | 核心邏輯 — 爬塔/副本/PvP/Boss 配置生成 / 掉落擲骰（主線部分已移至 D1；星級計算已移除） |
-| `src/components/StageSelect.tsx` | 關卡選擇 UI — 5 個分頁，主線改用 API 驅動的章節主題卡片 |
+| `src/domain/stageSystem.ts` | 核心邏輯 — 爬塔/副本/PvP/Boss 配置生成 / 掉落擲骰（主線部分已移至 D1；星級計算已移除）；新增 `DAILY_LIMITS` 常數 + `getDailyLimit()` 函式 |
+| `src/components/StageSelect.tsx` | 關卡選擇 UI — 5 個分頁（主線/爬塔/每日/PvP/Boss），主線改用 API 驅動的章節主題卡片；每模式顯示獎勵預覽 + 剩餘次數 + 紅點 badge |
 | `src/components/SceneProps.tsx` | 章節專屬 3D 場景道具（8 主題 × 3-5 種道具，seeded 散佈，stageId 參與 seed 計算使每小關佈局不同）；4 種共用氛圍元件（RubblePile/BloodStain/ScatteredLitter/RustMark）；每個道具含精細末日風化細節（鏽斑、血漬、裂縫、碎玻璃、掉落物等） |
 | `src/components/Arena.tsx` | 場景環境（地面 + 碎片 + 粒子 + 燈光 + 天空 + SceneProps），接收 stageId 傳給 SceneProps |
 | `src/game/helpers.ts` | buildEnemySlotsFromStage — 接受 injectedEnemies 參數（story 模式從 API 取得）+ defMultiplier 縮放敵方 DEF |
@@ -170,6 +171,55 @@ CREATE TABLE stage_configs (
 
 ---
 
+## 每日挑戰次數限制（v2.9 新增）
+
+後端 `battle.ts` 強制執行每日挑戰次數限制，超過限制的挑戰會被拒絕。**即使戰鬥失敗也會消耗一次**。
+
+```typescript
+const DAILY_LIMITS = { daily: 3, pvp: 5, boss: 3 }
+```
+
+| 模式 | 每日上限 | 說明 |
+|------|---------|------|
+| 主線 (story) | **無限制** | — |
+| 爬塔 (tower) | **無限制** | — |
+| 每日副本 (daily) | **3 次/天** | 所有副本共用計數 |
+| PvP 競技場 (pvp) | **5 次/天** | UTC 00:00 重置 |
+| Boss 挑戰 (boss) | **3 次/天** | 所有 Boss 共用計數 |
+
+### dailyCounts 存檔欄位
+
+`save_data` 表新增 `dailyCounts TEXT NOT NULL DEFAULT '{}'` 欄位，儲存 JSON 格式的每日計數：
+
+```json
+{ "daily": 2, "pvp": 3, "boss": 1, "date": "2026-03-05" }
+```
+
+當 `date` 與當日不同時自動重置為 0。
+
+### /daily-counts API 端點
+
+`GET /daily-counts` 回傳目前的計數與上限：
+
+```json
+{
+  "counts": { "daily": 2, "pvp": 3, "boss": 1 },
+  "limits": { "daily": 3, "pvp": 5, "boss": 3 }
+}
+```
+
+前端：`StageSelect` 在 mount 時 fetch `/daily-counts`，各面板顯示「剩餘 X/Y 次」。次數耗盡時按鈕 disabled + 顯示「今日已挑戰完畢」。
+
+### 獎勵預覽 UI（v2.9 新增）
+
+- **TowerPanel**：顯示獎勵預覽（金幣/經驗/鑽石 via `sc-reward-tag`）
+- **DailyPanel**：各難度顯示獎勵預覽 + 剩餘每日次數 + 耗盡訊息 + 按鈕 disabled
+- **PvPPanel**：顯示獎勵預覽（含 pvp_coin）+ 剩餘次數 + 按鈕 disabled
+- **BossPanel2**：顯示剩餘次數 + 各段位獎勵提示 + 按鈕 disabled
+- 所有 Tab：剩餘次數 > 0 時顯示紅點 badge
+
+---
+
 ## 二、無盡爬塔
 
 ### 機制
@@ -183,6 +233,7 @@ CREATE TABLE stage_configs (
 
 | 項目 | 值 |
 |------|-----|
+| 每日限制 | **無限制** |
 | 體力消耗 | **0** |
 | stageId 格式 | `"{floor}"`（純數字，如 `"15"`） |
 | 重置週期 | 不重置，永久進度 |
@@ -235,8 +286,7 @@ enemies = randomFormation(enemyCount, hpMult, atkMult, speedMult)
 **週日(0)**：三個副本全部開放。
 
 | 項目 | 值 |
-|------|-----|
-| stageId 格式 | `"{dungeonId}_{tier}"`（如 `"power_trial_easy"`） |
+|------|-----|| **每日限制** | **3 次/天**（所有副本共用計數，後端強制） || stageId 格式 | `"{dungeonId}_{tier}"`（如 `"power_trial_easy"`） |
 | 難度分級 | `easy` / `normal` / `hard` |
 | 解鎖條件 | Easy: Ch.1、Normal: Ch.2、Hard: Ch.3 |
 
@@ -270,6 +320,7 @@ enemies = randomFormation(enemyCount, hpMult, atkMult, speedMult)
 
 | 項目 | 值 |
 |------|-----|
+| **每日限制** | **5 次/天**（後端強制，含勝敗） |
 | 體力消耗 | **0** |
 | 解鎖條件 | 通關 2-1 |
 | 刷新週期 | 每日自動刷新（基於日期 seed） |
@@ -303,6 +354,14 @@ Seed = `年×10000 + 月×100 + 日 + progress×7`
 
 ### PvP 獎勵（getPvPReward）
 
+**後端（battle.ts v2.9）實際發放：**
+
+| gold | exp | diamond | pvp_coin |
+|------|-----|---------|----------|
+| `200 + linear×30` | `100 + linear×15` | 10 | `3 + floor(linear/4)` |
+
+**前端預估值（stageSystem.ts，顯示用）：**
+
 | exp | gold | diamond | items |
 |-----|------|---------|-------|
 | `80 + progress×10` | `200 + progress×40` | 10 | `pvp_coin ×(3 + floor(progress/4))` |
@@ -321,6 +380,7 @@ PvP 使用專屬「冷藍電光」競技場主題（Arena `SceneMode = 'pvp'`、
 
 | 項目 | 值 |
 |------|-----|
+| **每日限制** | **3 次/天**（所有 Boss 共用計數，後端強制） |
 | 體力消耗 | **0** |
 | 解鎖條件 | 通關 2-8 |
 | Boss 數量 | 3 位 |
@@ -361,6 +421,17 @@ interface BossConfig {
 | `getBossReward(bossId, totalDamage)` | 依累計傷害判定段位（S/A/B/C），回傳分級獎勵 |
 
 ### Boss 獎勵分級（getBossReward）
+
+**後端（battle.ts v2.9）實際發放（依段位分級）：**
+
+| 段位 | 傷害門檻 | gold | diamond |
+|------|---------|------|--------|
+| S | `≥ damageThresholds.S` | 3000 | 100 |
+| A | `≥ damageThresholds.A` | 2000 | 50 |
+| B | `≥ damageThresholds.B` | 1000 | 20 |
+| C | 其他 | 500 | 0 |
+
+**前端預估值（stageSystem.ts，顯示用）：**
 
 | 段位 | 傷害門檻 | exp | gold | diamond | items |
 |------|---------|-----|------|---------|-------|
@@ -564,3 +635,4 @@ mergeDrops(items: InventoryItem[]): InventoryItem[]   // 合併同 itemId
 | v2.6 | 2026-03-04 | **每小關場景道具佈局差異化**：SceneProps seed 計算加入 stageId（`chapter*100+stage`），同章不同小關道具種類相同但位置分佈不同；Arena 新增 `stageId` prop 傳遞給 SceneProps；App.tsx 傳遞 stageId 給 Arena |
 | v2.7 | 2026-03-06 | **場景道具品質全面升級**：4 種共用氛圍元件（RubblePile/BloodStain/ScatteredLitter/RustMark）；全部 8 主題 20+ 道具逐一增加末日風化細節 — city(掛線/碎玻璃/鏽斑)、forest(樹皮剝落/菌絲/爪痕/蘑菇發光)、wasteland(缺輪/散落貨物/油漬)、factory(傳送帶殘片/管線洩漏)、hospital(血漬床墊/點滴管/藥瓶散落)、residential(桌面汙漬/碎盤/椅裂縫/灰塵/書籍掉落/電視碎屏)、underground(火損車身/碎玻璃/少輪/鋼筋外露/水漬)、core(碎片衛星增多/地裂光環/螢幕裂紋/管線洩漏)；`generateSceneElements` 為所有 8 主題加入獨立散佈的 RubblePile/BloodStain/ScatteredLitter 氛圍元素 |
 | v2.8 | 2026-06-19 | **星級簡化 + 爬塔獎勵顯示移除**：移除 `calculateStarRating` 函式，關卡評價從三星制（1/2/3）改為二元通關制（通關=1 / 未通關）；`stageStars` 值固定為 `1`（已通關）；勝利面板不再顯示星級評價或首通星級獎勵；爬塔 UI 關卡列表不再顯示金幣/經驗/鑽石獎勵行（後端仍正常發放獎勵） |
+| v2.9 | 2026-03-05 | **每日限制 + 獎勵預覽 + battle.ts 重寫**：①`battle.ts` 完全重寫 — 新增 `DAILY_LIMITS`（daily:3/pvp:5/boss:3）、`DailyCounts` 介面 + `parseDailyCounts()` + `checkDailyLimit()`、後端強制每日限制（超過拒絕，敗北也消耗）、per-mode 獎勵計算（daily=依 tier 發 gold/exp/items、pvp=gold/exp/diamond/pvp_coin、boss=S/A/B/C rank-based gold/diamond）②新 `/daily-counts` API 端點 ③D1 `save_data` 新增 `dailyCounts TEXT` 欄位 ④前端 `stageSystem.ts` 新增 `DAILY_LIMITS` + `getDailyLimit()` ⑤`StageSelect.tsx` 大幅改版 — TowerPanel 獎勵預覽、DailyPanel 獎勵+剩餘次數+耗盡訊息、PvPPanel 獎勵+pvp_coin+剩餘次數、BossPanel2 段位獎勵提示+剩餘次數、全 Tab 紅點 badge ⑥`CurrencyIcon` 新增 `pvp_coin` 類型（🏅）⑦`MainMenu` 新增 `stagesHasDaily` prop + 關卡按鈕紅點 ⑧`App.tsx` 在 MAIN_MENU 時 fetch daily-counts ⑨`App.css` 新增 tower-rewards/sc-reward-tag/daily-attempts/daily-exhausted/daily-tier-rewards/pvp-meta-row/pvp-reward-preview/boss-card-reward-hint 樣式 |

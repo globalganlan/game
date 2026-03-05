@@ -48,6 +48,7 @@ interface InventoryPanelProps {
 import { getItemIcon, getItemName } from '../constants/rarity'
 import { CurrencyIcon } from './CurrencyIcon'
 import { InfoTip } from './InfoTip'
+import { PanelInfoTip, PANEL_DESCRIPTIONS } from './PanelInfoTip'
 
 /** 根據 itemId pattern 推導中文名稱 */
 function resolveFallbackName(
@@ -389,7 +390,7 @@ function EquipmentDetail({ equip, onClose, heroInstances, heroNameMap }: Equipme
     const res = await decomposeEquipment([localEquip.equipId])
     setIsProcessing(false)
     if (res.success) {
-      emitToast(`♻️ 分解獲得 ${res.goldGained} 金幣 + ${res.scrapGained} 碎片`)
+      emitToast(`♻️ 分解獲得 ${res.goldGained} 金幣 + ${res.scrapGained} 裝備碎片`)
       emitAcquire([
         { type: 'currency', id: 'gold', name: '金幣', quantity: res.goldGained ?? 0 },
         { type: 'item', id: 'equip_scrap', name: '裝備碎片', quantity: res.scrapGained ?? 0 },
@@ -639,6 +640,7 @@ export function InventoryPanel({ onBack, heroesList, heroInstances }: InventoryP
         <div className="panel-header">
           <button className="panel-back-btn" onClick={onBack}>← 返回</button>
           <h2 className="panel-title">🎒 背包</h2>
+          <PanelInfoTip description={PANEL_DESCRIPTIONS.inventory} />
           <div className="inv-currency-bar">
             <InfoTip icon={<CurrencyIcon type="gold" />} value={gold.toLocaleString()} label="金幣" description="升級、購買、強化所需的通用貨幣" className="menu-gold" />
             <InfoTip icon={<CurrencyIcon type="diamond" />} value={diamond.toLocaleString()} label="鑽石" description="召喚、加速、購買稀有道具" className="menu-diamond" />

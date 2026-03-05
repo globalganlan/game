@@ -3,6 +3,104 @@
 > 按時間倒序排列，最新的在最上面。
 
 ---
+### [2026-03-06] 大規模修正 — 競技場修復 + 紅點系統 + ClickableItemIcon 統一 + Boss 條修正
+
+- **觸發者**：使用者（批次需求一步到位）
+- **執行角色**：🔧 CODING + 🎨 UI_DESIGN + 🧪 QA
+- **變更摘要**：
+
+  **競技場（4 項修復）**：
+  1. **敵方模型/動畫卡住修復（根本原因）**：`arena-challenge-start` 端點原本回傳 `heroes: []`，導致前端無敵方資料。重寫為：NPC 透過確定性種子生成 2~5 隻英雄（依排名分層），真實玩家從 `hero_instances + heroes` 表查詢 `defenseFormation` 角色
+  2. **防守陣容載入修復**：ArenaPanel 掛載時 `useEffect` 呼叫 `getDefenseFormation()`，已存陣容即時回顯
+  3. **排行榜戰力對齊**：`arena-set-defense` 儲存後以 CP_WEIGHTS 公式計算並寫入 `power`
+  4. **戰力圖示修正**：ArenaPanel 排行榜 ⚡ → ⚔️
+  5. **InfoTip 間距修正**：PanelInfoTip 移入 `.arena-title` span 內
+
+  **紅點系統（3 項新增）**：
+  6. **抽卡免費抽紅點**：App.tsx `gachaHasFreePull` useMemo（UTC+8 日期比較）→ MainMenu + GachaScreen 雙分頁紅點
+  7. **競技場挑戰紅點**：App.tsx `arenaChallengesLeft` 狀態（cachePriority + API fetch）→ MainMenu 紅點
+  8. **解鎖條件審核**：所有紅點已加 `!locked &&` / `unlocked &&` 守衛，鎖定按鈕不會出現紅點
+
+  **ClickableItemIcon 統一（5 檔案 10 處）**：
+  9. **App.tsx**：戰鬥準備獎勵（L749, L790）`getItemIcon` → `<ClickableItemIcon>`
+  10. **StageSelect.tsx**：爬塔/每日/Boss 獎勵（L342, L416, L585）→ `<ClickableItemIcon>`
+  11. **CheckinPanel.tsx**：簽到獎勵 → `<ClickableItemIcon>`，移除手動 `previewItemId` 狀態 + `ItemInfoPopup`
+  12. **ShopPanel.tsx**：商品 icon → `<ClickableItemIcon>`，移除手動 `previewItemId` + `ItemInfoPopup`
+  13. **HeroListPanel.tsx**：突破/升星素材（L799, L806, L843）→ `<ClickableItemIcon>`
+
+  **其他修復**：
+  14. **Boss 傷害條 emoji 修復**：BattleHUD 獎勵階段 💰💎✨ → `<CurrencyIcon>` 元件（ADR-007）
+  15. **PanelInfoTip children 支援**：新增 `children?: ReactNode` prop，允許內嵌 ClickableItemIcon
+  16. **每日副本經驗移除**：前端 stageSystem.ts 9 處 + 後端 battle.ts 3 處，exp 全歸零；移除 exp 掉落物
+  17. **arenaService 匯出**：新增 `getCachedChallengesLeft()` 函式
+
+- **影響檔案**：
+  - `workers/src/routes/arena.ts`（arena-challenge-start 重寫 + arena-set-defense 戰力計算）
+  - `workers/src/routes/battle.ts`（每日副本 exp 歸零）
+  - `src/App.tsx`（gachaHasFreePull + arenaChallengesLeft + ClickableItemIcon 替換）
+  - `src/components/ArenaPanel.tsx`（useEffect 載入防守陣容 + InfoTip 間距 + ⚔️ 圖示）
+  - `src/components/MainMenu.tsx`（gachaHasFreePull / arenaChallengesLeft props + 紅點）
+  - `src/components/GachaScreen.tsx`（雙分頁紅點）
+  - `src/components/BattleHUD.tsx`（CurrencyIcon 替換 emoji）
+  - `src/components/PanelInfoTip.tsx`（children ReactNode prop）
+  - `src/components/StageSelect.tsx`（ClickableItemIcon 替換）
+  - `src/components/CheckinPanel.tsx`（ClickableItemIcon 替換，移除 ItemInfoPopup）
+  - `src/components/ShopPanel.tsx`（ClickableItemIcon 替換，移除 ItemInfoPopup）
+  - `src/components/HeroListPanel.tsx`（ClickableItemIcon 替換）
+  - `src/domain/stageSystem.ts`（每日副本 exp 歸零）
+  - `src/services/arenaService.ts`（getCachedChallengesLeft 匯出）
+- **Workers 部署**：已部署
+- **Spec 更新**：
+  - `ui-flow.md` v2.4 → v2.5
+  - `tech-architecture.md` v1.5 → v1.6
+  - `arena-pvp.md` v1.0 → v1.1
+
+---
+### [2026-03-05] 面板說明 InfoTip + 紅點閃現修正 + 爬塔樓層同步 + BOSS 次數重置
+
+- **觸發者**：使用者（4 項需求）
+- **執行角色**：🔧 CODING + 🎨 UI_DESIGN
+- **變更摘要**：
+  1. **面板說明 InfoTip（全 9 面板）**：新增 `PanelInfoTip.tsx` 元件（ℹ️ 按鈕 + Portal popup），所有大廳子面板的標題欄旁新增說明按鈕。`PANEL_DESCRIPTIONS` 常數集中管理 9 面板的多行說明文字。CSS 使用暗色毛玻璃風格 + `panelInfoFadeIn` 動畫。
+  2. **紅點閃現修正**：StageSelect `hasRemaining()` 在 `dailyCounts` 尚未載入時改為 `return false`（原為 `return true`），消除進入關卡選擇時紅點一閃而逝的問題
+  3. **爬塔樓層即時同步**：`runBattleLoop.ts` 爬塔勝利後新增 `doUpdateProgress({ towerFloor: nextFloor })`，修復 `serverResult.newFloor` 已返回但未寫入本地狀態的問題
+  4. **BOSS 挑戰次數重置**：D1 SQL 手動重置玩家 #RFNAHZ（playerId=PRFNAHZ）的 dailyCounts
+- **影響檔案**：
+  - `src/components/PanelInfoTip.tsx`（新增）
+  - `src/components/StageSelect.tsx`（import PanelInfoTip + 標題 JSX + hasRemaining 修正）
+  - `src/components/ArenaPanel.tsx`（import + 標題 JSX）
+  - `src/components/CheckinPanel.tsx`（import + 標題 JSX）
+  - `src/components/GachaScreen.tsx`（import + 標題 JSX）
+  - `src/components/HeroListPanel.tsx`（import + 標題 JSX）
+  - `src/components/InventoryPanel.tsx`（import + 標題 JSX）
+  - `src/components/ShopPanel.tsx`（import + 標題 JSX）
+  - `src/components/SettingsPanel.tsx`（import + 標題 JSX）
+  - `src/components/MailboxPanel.tsx`（import + 標題 JSX）
+  - `src/game/runBattleLoop.ts`（爬塔樓層更新邏輯）
+  - `src/App.css`（panel-infotip-btn / panel-infotip-popup / panelInfoFadeIn）
+- **Spec 更新**：
+  - `ui-flow.md` v2.3 → v2.4
+
+---
+### [2026-03-04] 4 項 UI 優化 — 碎片外觀統一 + 裝備編輯介面 + 章節網格 + 戰鬥準備資訊
+
+- **觸發者**：使用者（4 項 UI 改善需求）
+- **執行角色**：🔧 CODING + 🎨 UI_DESIGN
+- **變更摘要**：
+  1. **統一裝備碎片外觀與名稱（Task 1）**：商店碎片兌換分頁 icon 從 🔧 改為 🔩（與分解流程一致），Header InfoTip 標籤從「碎片」改為「裝備碎片」，價格圖示統一使用 🔩，分解 toast 文字也統一為「裝備碎片」
+  2. **裝備穿脫改為部位編輯介面（Task 2）**：點擊任何裝備欄位（無論空/已裝備）→ 開啟編輯 Modal。已裝備槽位顯示「目前裝備」區塊（黃色邊框 + 卸下按鈕）+ 「可更換裝備」列表（排除已裝備品，移除 useMemo 快取失效 bug）。穿上裝備後 Modal 立即關閉（先關 Modal 再 await API，消除閃爍）
+  3. **主線章節兩行排版優化（Task 3）**：章節標籤從 `flex + flex-wrap: wrap` 改為 `grid-template-columns: repeat(4, 1fr)` 兩行四列網格排列
+  4. **戰鬥準備顯示關卡與獎勵（Task 4）**：戰鬥準備頂部新增 `battle-prep-top-banner`，整合 CombatPowerComparison + 關卡資訊區塊（關卡 ID badge + 名稱 + 通關獎勵列：經驗/金幣/鑽石/掉落物）
+- **影響檔案**：
+  - `src/components/ShopPanel.tsx`（碎片 icon 🔧→🔩 × 3 處）
+  - `src/components/InventoryPanel.tsx`（分解 toast「碎片」→「裝備碎片」）
+  - `src/components/HeroListPanel.tsx`（裝備編輯 Modal 重寫 + availableForSlot 移除 useMemo + handleEquipSelect 先關 Modal + 新增 handleUnequipFromModal）
+  - `src/App.tsx`（battle-prep-top-banner + 關卡資訊區塊 + getCachedStageConfig / getItemIcon / getItemName import）
+  - `src/App.css`（章節 grid 排版 + battle-prep-top-banner CSS）
+- **Spec 更新**：
+  - `ui-flow.md` v2.1 → v2.2
+
+---
 ### [2026-03-05] 裝備暴擊屬性修正 + 裝備欄完整資訊 + 關卡選擇佈局修正
 
 - **觸發者**：使用者回報 3 項問題（裝備暴擊無反映、裝備欄缺稀有度/副屬、關卡選擇橫向捲軸）

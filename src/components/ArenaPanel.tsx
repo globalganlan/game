@@ -8,10 +8,12 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { CurrencyIcon } from './CurrencyIcon'
+import { PanelInfoTip, PANEL_DESCRIPTIONS } from './PanelInfoTip'
 import {
   getArenaRankings,
   completeArenaChallenge,
   setDefenseFormation,
+  getDefenseFormation,
   clearArenaCache,
   type ArenaRankingsResult,
 } from '../services/arenaService'
@@ -33,6 +35,7 @@ import type { HeroInstance, SaveData } from '../services/saveService'
 interface ArenaPanelProps {
   onBack: () => void
   onStartBattle: (targetRank: number, defender: ArenaEntry) => void
+  onSetupDefense: () => void
   saveData: SaveData | null
   heroesList: RawHeroData[]
   heroInstances: HeroInstance[]
@@ -48,6 +51,7 @@ type Tab = 'rankings' | 'defense' | 'rewards'
 export function ArenaPanel({
   onBack,
   onStartBattle,
+  onSetupDefense,
   saveData,
   heroesList,
   heroInstances,
@@ -75,6 +79,13 @@ export function ArenaPanel({
   }, [])
 
   useEffect(() => { loadData() }, [loadData])
+
+  // 載入已儲存的防守陣型
+  useEffect(() => {
+    getDefenseFormation().then(f => {
+      if (f && f.some(Boolean)) setDefFormation(f)
+    })
+  }, [])
 
   // 挑戰
   const handleChallenge = (entry: ArenaEntry) => {
@@ -110,15 +121,15 @@ export function ArenaPanel({
       {/* 頂部 */}
       <div className="arena-header">
         <button className="arena-back-btn" onClick={onBack}>← 返回</button>
-        <span className="arena-title">⚔️ 競技場排名</span>
+        <span className="arena-title">⚔️ 競技場排名 <PanelInfoTip description={PANEL_DESCRIPTIONS.arena} /></span>
       </div>
 
       {/* 我的資訊 */}
       {data && (
         <div className="arena-my-info">
           <div className="arena-info-row">
-            <span>我的排名: <strong>#{data.myRank}</strong></span>
-            <span>今日剩餘: <strong>{data.challengesLeft}/5</strong> 次</span>
+            <span className="arena-my-rank">我的排名: <strong>#{data.myRank}</strong></span>
+            <span className="arena-challenges">今日剩餘: <strong>{data.challengesLeft}/5</strong> 次</span>
           </div>
           <div className="arena-info-row">
             <span>本週最高: <strong>#{data.highestRank}</strong></span>
@@ -134,13 +145,13 @@ export function ArenaPanel({
       </div>
 
       {/* Tab 內容 */}
-      <div className="arena-content">
+      <div className="arena-body">
         {loading && <div className="arena-loading">載入中…</div>}
         {error && <div className="arena-error">{error}</div>}
 
         {/* ── 排行榜 ── */}
         {tab === 'rankings' && data && !loading && (
-          <div className="arena-rankings-list">
+          <div className="arena-rank-list">
             {data.rankings
               .sort((a, b) => a.rank - b.rank)
               .map(entry => {
@@ -149,7 +160,7 @@ export function ArenaPanel({
                 const medal = entry.rank === 1 ? '🥇' : entry.rank === 2 ? '🥈' : entry.rank === 3 ? '🥉' : ''
 
                 return (
-                  <div key={entry.rank} className={`arena-rank-row ${isMe ? 'arena-rank-me' : ''}`}>
+                  <div key={entry.rank} className={`arena-rank-row ${isMe ? 'arena-me' : ''}`}>
                     <span className="arena-rank-num">
                       {medal} #{entry.rank}
                     </span>
@@ -157,7 +168,7 @@ export function ArenaPanel({
                       {entry.displayName}
                       {entry.isNPC && <span className="arena-npc-tag">(NPC)</span>}
                     </span>
-                    <span className="arena-rank-power">⚡ {entry.power.toLocaleString()}</span>
+                    <span className="arena-rank-power">⚔️ {entry.power.toLocaleString()}</span>
                     {!isMe && canChallenge && (
                       <button className="arena-challenge-btn" onClick={() => handleChallenge(entry)}>
                         挑戰
@@ -172,8 +183,8 @@ export function ArenaPanel({
 
         {/* ── 防守陣型 ── */}
         {tab === 'defense' && (
-          <div className="arena-defense">
-            <div className="arena-defense-hint">配置你的防守陣型，其他玩家挑戰你時將使用此陣型</div>
+          <div className="arena-defense-section">
+            <div className="arena-defense-title">配置你的防守陣型，其他玩家挑戰你時將使用此陣型</div>
             <div className="arena-defense-grid">
               {defFormation.map((id, i) => (
                 <div key={i} className="arena-defense-slot">
@@ -183,11 +194,8 @@ export function ArenaPanel({
               ))}
             </div>
             <div className="arena-defense-actions">
-              <button className="arena-copy-btn" onClick={handleCopyFormation}>
-                📋 複製出征陣型
-              </button>
-              <button className="arena-save-btn" onClick={handleSaveDefense} disabled={savingDef}>
-                {savingDef ? '儲存中...' : '💾 儲存防守陣型'}
+              <button className="arena-def-btn primary" onClick={onSetupDefense}>
+                🎮 前往配置防守陣型
               </button>
             </div>
           </div>
@@ -195,22 +203,22 @@ export function ArenaPanel({
 
         {/* ── 獎勵 ── */}
         {tab === 'rewards' && (
-          <div className="arena-rewards">
+          <div className="arena-rewards-section">
             {/* 排名里程碑 */}
-            <div className="arena-reward-section">
-              <div className="arena-reward-section-title">🎯 排名里程碑獎勵（每週重置）</div>
+            <div className="arena-reward-group">
+              <div className="arena-reward-group-title">🎯 排名里程碑獎勵（每週重置）</div>
               {RANK_MILESTONES.map((m, i) => {
                 const reached = data ? data.highestRank <= m.rankThreshold : false
                 return (
                   <div key={i} className={`arena-reward-row ${reached ? 'reached' : ''}`}>
-                    <span className="arena-reward-cond">前 {m.rankThreshold} 名</span>
-                    <span className="arena-reward-detail">
-                      <CurrencyIcon type="diamond" />{m.reward.diamond}
-                      <CurrencyIcon type="gold" />{m.reward.gold.toLocaleString()}
-                      <span className="arena-pvp-coin">🏅{m.reward.pvpCoin}</span>
+                    <span className="arena-reward-rank">前 {m.rankThreshold} 名</span>
+                    <span className="arena-reward-items">
+                      <span className="arena-reward-item"><CurrencyIcon type="diamond" />{m.reward.diamond}</span>
+                      <span className="arena-reward-item"><CurrencyIcon type="gold" />{m.reward.gold.toLocaleString()}</span>
+                      <span className="arena-reward-item"><CurrencyIcon type="pvp_coin" />{m.reward.pvpCoin}</span>
                     </span>
-                    <span className={`arena-reward-status ${reached ? 'claimed' : ''}`}>
-                      {reached ? '✅' : '⬜'}
+                    <span className={`arena-reward-reached ${reached ? '' : 'arena-reward-pending'}`}>
+                      {reached ? '✅ 已達成' : '⬜'}
                     </span>
                   </div>
                 )
@@ -218,35 +226,37 @@ export function ArenaPanel({
             </div>
 
             {/* 每日排名獎勵 */}
-            <div className="arena-reward-section">
-              <div className="arena-reward-section-title">📅 每日排名獎勵（21:00 UTC 發放至信箱）</div>
+            <div className="arena-reward-group">
+              <div className="arena-reward-group-title">📅 每日排名獎勵（21:00 UTC 發放至信箱）</div>
               {DAILY_REWARD_TIERS.map((tier, i) => (
                 <div key={i} className="arena-reward-row">
-                  <span className="arena-reward-cond">
+                  <span className="arena-reward-rank">
                     {tier.minRank === tier.maxRank ? `第 ${tier.minRank} 名` : `${tier.minRank}~${tier.maxRank} 名`}
                   </span>
-                  <span className="arena-reward-detail">
-                    <CurrencyIcon type="diamond" />{tier.reward.diamond}
-                    <CurrencyIcon type="gold" />{tier.reward.gold.toLocaleString()}
-                    <span className="arena-pvp-coin">🏅{tier.reward.pvpCoin}</span>
+                  <span className="arena-reward-items">
+                    <span className="arena-reward-item"><CurrencyIcon type="diamond" />{tier.reward.diamond}</span>
+                    <span className="arena-reward-item"><CurrencyIcon type="gold" />{tier.reward.gold.toLocaleString()}</span>
+                    <span className="arena-reward-item"><CurrencyIcon type="pvp_coin" />{tier.reward.pvpCoin}</span>
                   </span>
                 </div>
               ))}
             </div>
 
             {/* 挑戰獎勵 */}
-            <div className="arena-reward-section">
-              <div className="arena-reward-section-title">⚔️ 每場挑戰獎勵</div>
+            <div className="arena-reward-group">
+              <div className="arena-reward-group-title">⚔️ 每場挑戰獎勵</div>
               <div className="arena-reward-row">
-                <span className="arena-reward-cond">勝利</span>
-                <span className="arena-reward-detail">
-                  <CurrencyIcon type="gold" />2,000 <span className="arena-pvp-coin">🏅5</span>
+                <span className="arena-reward-rank">勝利</span>
+                <span className="arena-reward-items">
+                  <span className="arena-reward-item"><CurrencyIcon type="gold" />2,000</span>
+                  <span className="arena-reward-item"><CurrencyIcon type="pvp_coin" />5</span>
                 </span>
               </div>
               <div className="arena-reward-row">
-                <span className="arena-reward-cond">敗北</span>
-                <span className="arena-reward-detail">
-                  <CurrencyIcon type="gold" />500 <span className="arena-pvp-coin">🏅1</span>
+                <span className="arena-reward-rank">敗北</span>
+                <span className="arena-reward-items">
+                  <span className="arena-reward-item"><CurrencyIcon type="gold" />500</span>
+                  <span className="arena-reward-item"><CurrencyIcon type="pvp_coin" />1</span>
                 </span>
               </div>
             </div>

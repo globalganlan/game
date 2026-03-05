@@ -13,6 +13,7 @@ import * as SkeletonUtils from 'three/examples/jsm/utils/SkeletonUtils'
 import * as THREE from 'three'
 import type { RawHeroData } from '../types'
 import type { HeroInstance } from '../services/saveService'
+import { PanelInfoTip, PANEL_DESCRIPTIONS } from './PanelInfoTip'
 import { updateHeroLocally, getSaveState, updateProgress, applyCurrenciesFromServer } from '../services/saveService'
 import type { SkillTemplate, HeroSkillConfig } from '../domain/types'
 import { getHeroSkillSet } from '../services/dataService'
@@ -71,8 +72,9 @@ function initialStars(rarity: number | string | unknown): number {
    Exp Materials
    ──────────────────────────── */
 
-import { getItemIcon, getItemName } from '../constants/rarity'
+import { getItemName } from '../constants/rarity'
 import { CurrencyIcon, ItemIcon } from './CurrencyIcon'
+import { ClickableItemIcon } from './ClickableItemIcon'
 
 /** 將原始英雄資料的 ID 正規化為 `zombie_N` 格式 */
 function resolveModelId(h: RawHeroData, idx = 0): string {
@@ -422,32 +424,31 @@ function HeroDetail({ hero, instance, onClose, skills, heroSkills }: HeroDetailP
     return map
   }, [heroEquipment])
 
-  const availableForSlot = useMemo(() => {
-    if (!equipSelectSlot) return []
-    return getUnequippedEquipment().filter(eq => eq.slot === equipSelectSlot)
-  }, [equipSelectSlot])
+  // 不使用 useMemo — 裝備/卸下會改變 inventoryState，需要每次 render 重新取得
+  const availableForSlot = equipSelectSlot
+    ? getUnequippedEquipment().filter(eq => eq.slot === equipSelectSlot)
+    : []
 
   const handleSlotClick = useCallback((slotKey: string) => {
     if (!isOwned) return
-    const equipped = equippedBySlot[slotKey]
-    if (equipped) {
-      // 已裝備 → 卸下
-      unequipItem(equipped.equipId).catch(console.warn)
-      setResultMsg(`已卸下 ${getEquipDisplayName(equipped)}`)
-    } else {
-      // 空欄位 → 打開裝備選擇
-      setEquipSelectSlot(slotKey)
-      setResultMsg('')
-      setModalMode('equip')
-    }
-  }, [isOwned, equippedBySlot])
+    // 無論有無裝備，都打開部位編輯介面
+    setEquipSelectSlot(slotKey)
+    setResultMsg('')
+    setModalMode('equip')
+  }, [isOwned])
 
   const handleEquipSelect = useCallback(async (eq: EquipmentInstance) => {
     if (!instance) return
+    setModalMode('none')
     await equipItem(eq.equipId, instance.instanceId)
     setResultMsg(`已裝備 ${getEquipDisplayName(eq)}`)
-    setModalMode('none')
   }, [instance])
+
+  const handleUnequipFromModal = useCallback(async (eq: EquipmentInstance) => {
+    await unequipItem(eq.equipId).catch(console.warn)
+    setResultMsg(`已卸下 ${getEquipDisplayName(eq)}`)
+    setModalMode('none')
+  }, [])
 
   // ── 強化裝備 ──
   const [enhanceTarget, setEnhanceTarget] = useState<EquipmentInstance | null>(null)
@@ -619,7 +620,7 @@ function HeroDetail({ hero, instance, onClose, skills, heroSkills }: HeroDetailP
                 key={key}
                 className={`hd2-equip-slot ${eq ? 'equipped' : ''} ${isOwned ? 'clickable' : ''}`}
                 onClick={() => handleSlotClick(key)}
-                title={eq ? `${getEquipDisplayName(eq)} +${eq.enhanceLevel}\n點擊卸下` : `${label}：空\n點擊裝備`}
+                title={eq ? `${getEquipDisplayName(eq)} +${eq.enhanceLevel}\n點擊編輯` : `${label}：空\n點擊裝備`}
               >
                 <span className="hd2-equip-icon">{icon}</span>
                 {eq ? (
@@ -796,14 +797,14 @@ function HeroDetail({ hero, instance, onClose, skills, heroSkills }: HeroDetailP
               </div>
               <div className="hd2-material-list">
                 <div className="hd2-material-row">
-                  <span className="hd2-mat-icon">{getItemIcon('asc_fragment_0')}</span>
+                  <span className="hd2-mat-icon"><ClickableItemIcon itemId="asc_fragment_0" /></span>
                   <span className="hd2-mat-name">英雄碎片</span>
                   <span className={`hd2-mat-qty ${ownedFragments >= ascCost.fragments ? 'sufficient' : 'insufficient'}`}>
                     {ownedFragments}/{ascCost.fragments}
                   </span>
                 </div>
                 <div className="hd2-material-row">
-                  <span className="hd2-mat-icon">{getItemIcon('asc_class_power')}</span>
+                  <span className="hd2-mat-icon"><ClickableItemIcon itemId="asc_class_power" /></span>
                   <span className="hd2-mat-name">職業石</span>
                   <span className={`hd2-mat-qty ${ownedClassStones >= ascCost.classStones ? 'sufficient' : 'insufficient'}`}>
                     {ownedClassStones}/{ascCost.classStones}
@@ -840,7 +841,7 @@ function HeroDetail({ hero, instance, onClose, skills, heroSkills }: HeroDetailP
               </div>
               <div className="hd2-material-list">
                 <div className="hd2-material-row">
-                  <span className="hd2-mat-icon">{getItemIcon('asc_fragment_0')}</span>
+                  <span className="hd2-mat-icon"><ClickableItemIcon itemId="asc_fragment_0" /></span>
                   <span className="hd2-mat-name">英雄碎片</span>
                   <span className={`hd2-mat-qty ${ownedFragments >= starCost ? 'sufficient' : 'insufficient'}`}>
                     {ownedFragments}/{starCost}
@@ -869,9 +870,45 @@ function HeroDetail({ hero, instance, onClose, skills, heroSkills }: HeroDetailP
             <div className="hd2-modal" onClick={e => e.stopPropagation()}>
               <h4 className="hd2-modal-title">
                 {EQUIP_SLOTS.find(s => s.key === equipSelectSlot)?.icon}{' '}
-                選擇{EQUIP_SLOTS.find(s => s.key === equipSelectSlot)?.label ?? '裝備'}
+                {EQUIP_SLOTS.find(s => s.key === equipSelectSlot)?.label ?? '裝備'}
               </h4>
-              {availableForSlot.length === 0 ? (
+
+              {/* ── 目前已裝備 ── */}
+              {equippedBySlot[equipSelectSlot!] && (() => {
+                const cur = equippedBySlot[equipSelectSlot!]!
+                return (
+                  <div style={{ marginBottom: 10 }}>
+                    <div style={{ fontSize: '0.75rem', color: '#aaa', marginBottom: 4 }}>目前裝備</div>
+                    <div className="hd2-equip-option" style={{ borderColor: 'rgba(250,204,21,0.5)', background: 'rgba(250,204,21,0.08)' }}>
+                      <div className="hd2-equip-option-header">
+                        <span className={`hd2-equip-rarity rarity-${(cur.rarity || 'N').toLowerCase()}`}>{cur.rarity || 'N'}</span>
+                        <span className="hd2-equip-option-name">{getEquipDisplayName(cur)}</span>
+                        {(cur.enhanceLevel ?? 0) > 0 && <span className="hd2-equip-lv">+{cur.enhanceLevel}</span>}
+                      </div>
+                      <div className="hd2-equip-option-stats">
+                        <span>{statZh(cur.mainStat ?? '?')} +{enhancedMainStat(cur.mainStatValue ?? 0, cur.enhanceLevel ?? 0, cur.rarity ?? 'N')}</span>
+                        {(Array.isArray(cur.subStats) ? cur.subStats : []).map((sub, i) => (
+                          <span key={i} className="hd2-sub-stat">
+                            {statZh(sub.stat)} +{sub.value}{sub.isPercent ? '%' : ''}
+                          </span>
+                        ))}
+                      </div>
+                      {cur.setId && <span className="hd2-equip-set">{SET_NAMES[cur.setId] || cur.setId}</span>}
+                      <button
+                        className="hd2-modal-cancel"
+                        style={{ marginTop: 6, fontSize: '0.72rem', padding: '4px 12px' }}
+                        onClick={() => handleUnequipFromModal(cur)}
+                      >卸下裝備</button>
+                    </div>
+                  </div>
+                )
+              })()}
+
+              {/* ── 可選裝備列表 ── */}
+              {availableForSlot.length > 0 && equippedBySlot[equipSelectSlot!] && (
+                <div style={{ fontSize: '0.75rem', color: '#aaa', marginBottom: 4 }}>可更換裝備</div>
+              )}
+              {availableForSlot.length === 0 && !equippedBySlot[equipSelectSlot!] ? (
                 <div className="hd2-modal-info">沒有可用的裝備</div>
               ) : (
                 <div className="hd2-equip-list">
@@ -1051,6 +1088,7 @@ export function HeroListPanel({ heroesList, heroInstances, onBack, skills, heroS
         <div className="panel-header">
           <button className="panel-back-btn" onClick={onBack}>← 返回</button>
           <h2 className="panel-title">🧟 英雄列表</h2>
+          <PanelInfoTip description={PANEL_DESCRIPTIONS.heroList} />
           <div className="panel-filter">
             <button
               className={`filter-btn ${filter === 'all' ? 'filter-active' : ''}`}

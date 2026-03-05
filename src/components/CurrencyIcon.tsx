@@ -7,7 +7,7 @@
 
 import { getItemIcon } from '../constants/rarity'
 
-export type CurrencyType = 'gold' | 'diamond' | 'exp' | 'stardust' | 'cp'
+export type CurrencyType = 'gold' | 'diamond' | 'exp' | 'stardust' | 'cp' | 'pvp_coin'
 
 const CURRENCY_EMOJI: Record<CurrencyType, string> = {
   gold: '💰',
@@ -15,6 +15,7 @@ const CURRENCY_EMOJI: Record<CurrencyType, string> = {
   exp: '💚',
   stardust: '✨',
   cp: '⚔️',
+  pvp_coin: '🏅',
 }
 
 /** Emoji icon for main currencies */
@@ -32,6 +33,8 @@ const CURRENCY_TYPE_MAP: Record<string, CurrencyType> = {
   currency_exp: 'exp',
   stardust: 'stardust',
   currency_stardust: 'stardust',
+  pvp_coin: 'pvp_coin',
+  currency_pvp_coin: 'pvp_coin',
 }
 
 /**

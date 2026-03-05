@@ -100,6 +100,7 @@ export interface BattleLoopContext {
   setElementHints: Dispatch<SetStateAction<ElementHint[]>>
   setPassiveHints: Dispatch<SetStateAction<PassiveHint[]>>
   setBuffApplyHints: Dispatch<SetStateAction<BuffApplyHint[]>>
+  setBossDamageProgress: Dispatch<SetStateAction<number>>
 
   /* ── Animation promise callbacks ── */
   addDamage: (targetUids: string | string[], value: number, damageType?: import('../types').DamageDisplayType) => void
@@ -144,6 +145,7 @@ export async function executeBattleLoop(ctx: BattleLoopContext, replayActions?: 
     updatePlayerSlots, updateEnemySlots, setActorState,
     setBattleBuffs, setBattleEnergy, setSkillToasts,
     setElementHints, setPassiveHints, setBuffApplyHints,
+    setBossDamageProgress,
     addDamage, waitForAction, waitForMove, clearAllPromises,
     actionResolveRefs, moveResolveRefs,
     doSaveFormation, doUpdateProgress, doUpdateStory,
@@ -789,7 +791,8 @@ export async function executeBattleLoop(ctx: BattleLoopContext, replayActions?: 
     const snapshotPlayers = JSON.parse(JSON.stringify(playerBH)) as BattleHero[]
     const snapshotEnemies = JSON.parse(JSON.stringify(enemyBH)) as BattleHero[]
 
-    const result = await runBattleCollect(playerBH, enemyBH, { maxTurns: 50, seed: battleSeed })
+    const bossMaxTurns = stageMode === 'boss' ? 30 : 50
+    const result = await runBattleCollect(playerBH, enemyBH, { maxTurns: bossMaxTurns, seed: battleSeed })
     allActions = result.actions
     winner = result.winner
 
@@ -809,13 +812,39 @@ export async function executeBattleLoop(ctx: BattleLoopContext, replayActions?: 
       seed: battleSeed,
       players: snapshotPlayers,
       enemies: snapshotEnemies,
-      maxTurns: 50,
+      maxTurns: bossMaxTurns,
       dungeonTier,
     })
   }
 
   // ── Phase B：播放動畫（可中途跳過） ──
   setBattleCalculating(false)
+
+  // ── Boss 模式即時傷害追蹤 ──
+  let bossDmgAccum = 0
+  const playerUids = new Set(playerBH.map(bh => bh.uid))
+  const extractPlayerDamage = (act: BattleAction): number => {
+    let dmg = 0
+    if (act.type === 'NORMAL_ATTACK') {
+      if (playerUids.has(act.attackerUid) && !act.result.isDodge) dmg += act.result.damage
+    } else if (act.type === 'SKILL_CAST') {
+      if (playerUids.has(act.attackerUid)) {
+        for (const t of act.targets) {
+          if ('damage' in t.result) {
+            const dr = t.result as DamageResult
+            if (!dr.isDodge) dmg += dr.damage
+          }
+        }
+      }
+    } else if (act.type === 'DOT_TICK' && act.sourceUid && playerUids.has(act.sourceUid)) {
+      dmg += act.damage
+    } else if (act.type === 'PASSIVE_DAMAGE' && playerUids.has(act.attackerUid)) {
+      dmg += act.damage
+    }
+    return dmg
+  }
+  if (stageMode === 'boss') setBossDamageProgress(0)
+
   const applyHpFromAction = (act: BattleAction) => {
     if (act.type === 'NORMAL_ATTACK') {
       const tgt = heroMap.get(act.targetUid)
@@ -849,13 +878,20 @@ export async function executeBattleLoop(ctx: BattleLoopContext, replayActions?: 
   for (const act of allActions) {
     if (skipBattleRef.current) {
       if (needsHpSync) applyHpFromAction(act)
+      if (stageMode === 'boss') { bossDmgAccum += extractPlayerDamage(act) }
       continue
     }
     if (needsHpSync) applyHpFromAction(act)
+    if (stageMode === 'boss') {
+      bossDmgAccum += extractPlayerDamage(act)
+      setBossDamageProgress(bossDmgAccum)
+    }
     if (import.meta.env.DEV && flowValidatorRef.current) flowValidatorRef.current.beforeAction(act)
     await onAction(act)
     if (import.meta.env.DEV && flowValidatorRef.current) flowValidatorRef.current.afterAction(act)
   }
+  // 跳過模式結束後同步最終傷害
+  if (stageMode === 'boss') setBossDamageProgress(bossDmgAccum)
 
   // 等待背景動畫
   const allPending: Promise<void>[] = [...backgroundAnims]
@@ -988,8 +1024,10 @@ export async function executeBattleLoop(ctx: BattleLoopContext, replayActions?: 
   }
 
   // ── 結算 ──
-  if (winner === 'player') {
-    setBattleResult('victory')
+  // Boss 模式：無論勝敗都依傷害量發放獎勵
+  const isBossMode = stageMode === 'boss'
+  if (winner === 'player' || isBossMode) {
+    setBattleResult(isBossMode ? 'victory' : 'victory')
 
     if (!isReplay) {
       // 僅使用伺服器回傳的獎勵資料
@@ -1004,6 +1042,11 @@ export async function executeBattleLoop(ctx: BattleLoopContext, replayActions?: 
           exp: serverResult.rewards.exp,
           gold: serverResult.rewards.gold,
           diamond: serverResult.rewards.diamond,
+          items: (serverResult.rewards.items ?? []).map((it: { itemId: string; quantity: number; dropRate?: number }) => ({
+            itemId: it.itemId,
+            quantity: it.quantity,
+            dropRate: 1.0,  // 後端已完成掉落判定，前端直接顯示
+          })),
         }
         first = serverResult.isFirstClear
       }
@@ -1038,7 +1081,8 @@ export async function executeBattleLoop(ctx: BattleLoopContext, replayActions?: 
         if (!serverResult) {
           const progress = saveData?.storyProgress ?? { chapter: 1, stage: 1 }
           const linearProgress = (progress.chapter - 1) * 8 + progress.stage
-          rewards = getPvPReward(linearProgress)
+          const diffIdx = parseInt(stageId.split('_').pop() ?? '0') || 0
+          rewards = getPvPReward(linearProgress, diffIdx)
         }
         // 競技場結算上報
         if (arenaTargetRankRef.current > 0) {
@@ -1125,6 +1169,12 @@ export async function executeBattleLoop(ctx: BattleLoopContext, replayActions?: 
           }
         }
         doUpdateProgress({ resourceTimerStage: stageId })
+      }
+
+      // 推進爬塔樓層
+      if (stageMode === 'tower') {
+        const nextFloor = serverResult?.newFloor ?? (Number(stageId) || 1) + 1
+        doUpdateProgress({ towerFloor: nextFloor })
       }
 
       // 掉落物即時寫入本地背包

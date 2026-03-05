@@ -1,8 +1,8 @@
 # 開發狀態快照 — Dev Status
 
-> 最後更新：2026-03-05（第五十四次更新 — 裝備暴擊修正+裝備欄完整資訊+關卡選擇佈局修正）
+> 最後更新：2026-03-06（第五十六次更新 — 競技場 4 項修復 + 紅點系統 + ClickableItemIcon 統一 + Boss 條修正 + 每日副本 exp 移除）
 
-## 截至 2026-03-05 的開發狀態
+## 截至 2026-03-06 的開發狀態
 
 ### 已完成
 - [x] 3D 喪屍對戰場景（React 19 + Vite 5 + R3F 9 + Three.js 0.183 + TypeScript 5.9）
@@ -13,6 +13,17 @@
 - [x] 提示詞模板集（`agents/prompt-playbook.md`，P-01~P-07）
 - [x] 模組化規格系統（specs/）
 - [x] 記憶持久化系統（memory/）
+- [x] **競技場敵方模型修復** — `arena-challenge-start` 重寫：NPC 確定性種子生成 2~5 隻英雄、真實玩家查詢 hero_instances + heroes
+- [x] **競技場防守陣容載入** — ArenaPanel `useEffect` 掛載時呼叫 `getDefenseFormation()` 回顯
+- [x] **競技場戰力對齊** — `arena-set-defense` 以 CP_WEIGHTS 公式計算並寫入 power
+- [x] **紅點系統擴展** — 抽卡免費抽（gachaHasFreePull）+ 競技場挑戰（arenaChallengesLeft）+ 解鎖條件審核
+- [x] **ClickableItemIcon 統一** — 5 檔案 10 處 getItemIcon → ClickableItemIcon（App.tsx/StageSelect/CheckinPanel/ShopPanel/HeroListPanel）
+- [x] **Boss 傷害條 emoji 修復** — BattleHUD 💰💎✨ → CurrencyIcon 元件
+- [x] **每日副本經驗移除** — 前端 stageSystem.ts + 後端 battle.ts 全面歸零
+- [x] **PanelInfoTip children 支援** — 新增 `children?: ReactNode` prop
+- [x] **面板說明 InfoTip** — 新增 `PanelInfoTip.tsx`，9 個面板標題旁皆有 ℹ️ 按鈕 + Portal popup 說明文字
+- [x] **紅點閃現修正** — StageSelect `hasRemaining()` 在 dailyCounts 未載入時返回 false，消除紅點一閃而逝
+- [x] **爬塔樓層即時同步** — `runBattleLoop.ts` 爬塔勝利後呼叫 `doUpdateProgress({ towerFloor })`
 - [x] **裝備暴擊屬性加算修正** — CritRate/CritDmg percent subs 改為加算百分點（+5% = +5），修復乘算 floor 歸零問題
 - [x] **裝備欄完整資訊顯示** — 英雄資訊裝備欄顯示稀有度標籤（SSR/SR/R/N）、主屬性、所有副屬性、強化等級
 - [x] **關卡選擇佈局修正** — 移除橫向捲軸，章節 tab 自動換行，4×2 網格完整顯示 8 關
@@ -119,7 +130,7 @@
 | damage-formula.md | v1.0 | 🟢 10 步完整傷害公式 |
 | skill-system.md | v1.3 | 🟢 SkillTemplate + 15 PassiveTrigger + extra_turn 機制 + on_ally_death/on_ally_skill |
 | progression.md | v2.3 | 🟢 EXP 資源重構（頂層資源 + 滑桿升級 UI） |
-| tech-architecture.md | v1.5 | 🟢 CurrencyIcon 統一 icon + constants 層 |
+| tech-architecture.md | v2.1 | 🟢 ClickableItemIcon 統一 + PanelInfoTip + CurrencyIcon |
 | auth-system.md | v0.1 | 🟡 草案 |
 | save-system.md | v2.2 | 🟢 saveService 狀態刷新修復 + updateFreePullLocally/updateGachaPityLocally |
 | stage-system.md | v2.2 | 🟢 EXP 資源獎勵（取代 exp_core 掉落） |
@@ -129,7 +140,9 @@
 | optimistic-queue.md | v1.0 | 🟢 3 種套用模式 |
 | local-storage-migration.md | v2.0 | 🟢 舊版 key 清除器（後端權威模式） |
 | buff-debuff-icons.md | v1.0 | 🟢 3D 狀態圖示（綠底/紅底 + 疊層數） |
-| buff-apply-toast.md | v1.0 | 🟢 施加漂浮文字（DOT 中文名稱） |
+| buff-apply-toast.md | v1.0 | 🟢 施加浮動文字（DOT 中文名稱） |
+| arena-pvp.md | v0.7 | 🟢 敵方模型修復 + 防守載入 + 戰力對齊 + 紅點 |
+| ui-flow.md | v2.5 | 🟢 紅點系統擴展 + ClickableItemIcon 統一 |
 
 ### 現有戰鬥系統已實作功能
 - [x] GameState 5 態狀態機（PRE_BATTLE→FETCHING→IDLE→BATTLE→GAMEOVER）

@@ -48,10 +48,18 @@ import { CurrencyIcon } from './components/CurrencyIcon'
 import { CombatPowerComparison } from './components/CombatPowerHUD'
 import { AcquireToast } from './components/AcquireToast'
 import { TutorialOverlay, useTutorial } from './components/TutorialOverlay'
+import { getCachedStageConfig } from './services/stageService'
+import { getItemName } from './constants/rarity'
+import { ClickableItemIcon } from './components/ClickableItemIcon'
+import { getTowerReward, getDailyDungeonConfig, getPvPReward, getBossConfig, getBossRewardByBossAndRank } from './domain/stageSystem'
+import { getChallengeReward } from './domain/arenaSystem'
+import type { StageReward } from './domain/stageSystem'
 import { useCombatPower } from './hooks/useCombatPower'
 import { useAcquireToast } from './hooks/useAcquireToast'
 import type { AcquireItem } from './hooks/useAcquireToast'
 import { registerAcquireHandler, registerTextHandler } from './services/acquireToastBus'
+import { callApi } from './services/apiClient'
+import { getArenaRankings, getCachedChallengesLeft } from './services/arenaService'
 
 /* ── Extracted modules ── */
 import { PLAYER_SLOT_POSITIONS, ENEMY_SLOT_POSITIONS } from './game/constants'
@@ -99,6 +107,9 @@ export default function App() {
   const [sceneTheme, setSceneTheme] = useState<import('./components/Arena').SceneMode>('story')
   /** 競技場挑戰目標排名（用於結算上報） */
   const arenaTargetRankRef = useRef<number>(0)
+  /** 防守陣型配置模式 */
+  const [isDefenseSetup, setIsDefenseSetup] = useState(false)
+  const isDefenseSetupRef = useRef(false)
   const ownedHeroesList = useMemo(() => {
     const ownedIds = new Set(
       (saveHook.playerData?.heroes ?? []).map(h => Number(h.heroId)),
@@ -146,6 +157,7 @@ export default function App() {
     battleBuffs, setBattleBuffs, battleEnergy, setBattleEnergy,
     skillToasts, setSkillToasts, elementHints, setElementHints,
     passiveHints, setPassiveHints, buffApplyHints, setBuffApplyHints,
+    bossDamageProgress, setBossDamageProgress,
     skillToastIdRef, elementHintIdRef, passiveHintIdRef, buffApplyHintIdRef,
   } = battleHUD
 
@@ -182,6 +194,53 @@ export default function App() {
   /* ── 信箱（hook） ── */
   const mail = useMail(authHook.auth.playerId)
   const { mailItems, setMailItems, mailLoaded, setMailLoaded, mailUnclaimedCount, refreshMailData } = mail
+
+  /* ── 每日探索次數紅點（存完整次數物件，供 StageSelect 初始化用） ── */
+  const [cachedDailyCounts, setCachedDailyCounts] = useState<{ daily: number; pvp: number; boss: number; date: string } | null>(null)
+  const stagesHasDaily = useMemo(() => {
+    if (!cachedDailyCounts) return false
+    const c = cachedDailyCounts
+    return (c.daily < 3) || (c.pvp < 5) || (c.boss < 3)
+  }, [cachedDailyCounts])
+  useEffect(() => {
+    if (gameState !== 'MAIN_MENU' || !authHook.auth.playerId) return
+    let cancelled = false
+    callApi<{ success: boolean; dailyCounts: { daily: number; pvp: number; boss: number; date: string } }>('daily-counts', {})
+      .then(res => {
+        if (cancelled || !res.success || !res.dailyCounts) return
+        setCachedDailyCounts(res.dailyCounts)
+      })
+      .catch(() => {})
+    return () => { cancelled = true }
+  }, [gameState, authHook.auth.playerId])
+
+  /* ── 召喚免費抽紅點 ── */
+  const gachaHasFreePull = useMemo(() => {
+    const sd = saveHook.playerData?.save as any
+    if (!sd) return false
+    const now = new Date()
+    const utc = now.getTime() + now.getTimezoneOffset() * 60000
+    const taipei = new Date(utc + 8 * 3600000)
+    const today = `${taipei.getFullYear()}-${String(taipei.getMonth() + 1).padStart(2, '0')}-${String(taipei.getDate()).padStart(2, '0')}`
+    const heroFree = (sd.lastHeroFreePull ?? '') !== today
+    const equipFree = (sd.lastEquipFreePull ?? '') !== today
+    return heroFree || equipFree
+  }, [saveHook.playerData])
+
+  /* ── 競技場剩餘次數紅點 ── */
+  const [arenaChallengesLeft, setArenaChallengesLeft] = useState(0)
+  useEffect(() => {
+    if (gameState !== 'MAIN_MENU' || !authHook.auth.playerId) return
+    // 若已有快取直接使用
+    const cached = getCachedChallengesLeft()
+    if (cached !== null) { setArenaChallengesLeft(cached); return }
+    // 否則背景取一次
+    let cancelled = false
+    getArenaRankings()
+      .then(r => { if (!cancelled) setArenaChallengesLeft(r.challengesLeft) })
+      .catch(() => {})
+    return () => { cancelled = true }
+  }, [gameState, authHook.auth.playerId])
 
   /** 登出後 React state / hook 全重設（服務快取清除由 useLogout 負責） */
   const handleLogoutResetState = useCallback(() => {
@@ -284,6 +343,7 @@ export default function App() {
     setDamagePopups, setHitFlashSignals,
     setBattleBuffs, setBattleEnergy, setSkillToasts,
     setElementHints, setPassiveHints, setBuffApplyHints,
+    setBossDamageProgress,
     setCurtainVisible, setCurtainFading, setCurtainText, curtainClosePromiseRef, closeCurtain,
     addDamage, waitForAction, waitForMove, clearAllPromises,
     resetBattleHUD: battleHUD.resetBattleHUD,
@@ -318,13 +378,17 @@ export default function App() {
   const stageHandlers = useStageHandlers({
     setStageMode, setSceneTheme, setStageId, setMenuScreen, setGameState,
     setCurtainVisible, setCurtainFading, setCurtainText, curtainClosePromiseRef, closeCurtain,
-    updateEnemySlots, restoreFormationFromSave,
+    updateEnemySlots, updatePlayerSlots, restoreFormationFromSave,
     showToast, acquireShow: acquireToast.show,
     heroesList, stageMode, arenaTargetRankRef,
+    setIsDefenseSetup, isDefenseSetupRef,
+    heroesListRef,
   })
   const {
     handleMenuNavigate, handleBackToMenu, handleStageSelect,
-    handleArenaStartBattle, handleCheckin,
+    handleArenaStartBattle, handleArenaDefenseSetup,
+    handleSaveDefenseFormation, handleCancelDefenseSetup,
+    handleCheckin,
   } = stageHandlers
 
   /* ══════════════════════════════
@@ -394,7 +458,7 @@ export default function App() {
               {PLAYER_SLOT_POSITIONS.map((pos, i) => (
                 <SlotMarker key={`ps${i}`} position={pos} color="#00aaff" />
               ))}
-              {ENEMY_SLOT_POSITIONS.map((pos, i) => (
+              {!isDefenseSetup && ENEMY_SLOT_POSITIONS.map((pos, i) => (
                 <SlotMarker key={`es${i}`} position={pos} color="#ff2222" />
               ))}
 
@@ -445,8 +509,8 @@ export default function App() {
                 onDragEnd={endDragAt}
               />
 
-              {/* 敵方英雄 */}
-              {enemySlots.map((e, i) =>
+              {/* 敵方英雄（防守配置模式時隱藏） */}
+              {!isDefenseSetup && enemySlots.map((e, i) =>
                 e ? (
                   <Hero
                     key={`e${i}`}
@@ -491,6 +555,9 @@ export default function App() {
               getResourcePreview={saveHook.getResourcePreview}
               mailUnclaimedCount={mailUnclaimedCount}
               combatPower={cpState.currentPower}
+              stagesHasDaily={stagesHasDaily}
+              gachaHasFreePull={gachaHasFreePull}
+              arenaChallengesLeft={arenaChallengesLeft}
               onCollectResources={async () => {
                 const result = await saveHook.doCollectResources()
                 if (result && (result.gold > 0 || result.exp > 0)) {
@@ -538,6 +605,8 @@ export default function App() {
               onCheckin={handleCheckin}
               formation={saveHook.playerData?.save?.formation ?? [null, null, null, null, null, null]}
               onArenaStartBattle={handleArenaStartBattle}
+              onArenaDefenseSetup={handleArenaDefenseSetup}
+              initialDailyCounts={cachedDailyCounts}
             />
           )}
 
@@ -545,6 +614,9 @@ export default function App() {
           {gameState === 'BATTLE' && (
             <BattleHUD
               visible
+              stageMode={stageMode}
+              stageId={stageId}
+              bossDamageProgress={bossDamageProgress}
               playerHeroes={playerSlots
                 .filter((s): s is SlotHero => s !== null)
                 .map(s => ({
@@ -575,14 +647,169 @@ export default function App() {
             {turn > 0 && gameState !== 'GAMEOVER' && <div className="hud-round">第 {turn} 回合</div>}
           </div>
 
-          {/* ── 戰力對比（IDLE 且有敵人時顯示） ── */}
-          {gameState === 'IDLE' && turn === 0 && cpState.enemyPower > 0 && (
-            <CombatPowerComparison
-              myPower={cpState.currentPower}
-              enemyPower={cpState.enemyPower}
-              comparison={cpState.comparison}
-            />
+          {/* ── 防守陣型配置 頂部提示 + 操作按鈕 ── */}
+          {gameState === 'IDLE' && turn === 0 && isDefenseSetup && (
+            <div className="battle-prep-top-banner">
+              <div className="bp-stage-section">
+                <div className="bp-stage-header">
+                  <span className="bp-stage-id">🛡️ 防守陣型配置</span>
+                </div>
+                <div className="bp-mode-desc" style={{ fontSize: '0.75em', opacity: 0.8, marginBottom: 4 }}>
+                  拖曳或點選英雄配置你的防守陣型，其他玩家挑戰你時將使用此陣型
+                </div>
+                <div className="defense-setup-actions">
+                  <button className="defense-btn defense-btn-back" onClick={handleCancelDefenseSetup}>← 返回</button>
+                  <button
+                    className="defense-btn defense-btn-copy"
+                    onClick={() => {
+                      updatePlayerSlots(() => [null, null, null, null, null, null])
+                      setTimeout(() => {
+                        restoreFormationFromSave()
+                        showToast('已複製出征陣型')
+                      }, 50)
+                    }}
+                  >📋 複製出征</button>
+                  <button
+                    className="defense-btn defense-btn-save"
+                    onClick={() => handleSaveDefenseFormation(playerSlots)}
+                  >💾 儲存陣型</button>
+                </div>
+              </div>
+            </div>
           )}
+
+          {/* ── 戰力對比 + 關卡資訊（IDLE 且有敵人時顯示） ── */}
+          {gameState === 'IDLE' && turn === 0 && !isDefenseSetup && cpState.enemyPower > 0 && (() => {
+            const cfg = getCachedStageConfig(stageId)
+
+            // 非主線模式：根據 stageMode 計算獎勵與顯示名
+            let modeLabel = ''
+            let modeRewards: StageReward | null = null
+            let modeDescription = ''
+            let arenaWinLoss: { win: ReturnType<typeof getChallengeReward>; loss: ReturnType<typeof getChallengeReward> } | null = null
+            if (!cfg && stageMode === 'tower') {
+              const floor = Number(stageId) || 1
+              modeLabel = `🗼 爬塔 第 ${floor} 層`
+              modeRewards = getTowerReward(floor)
+              modeDescription = floor % 10 === 0 ? '首領層 — 額外掉落裝備寶箱！' : '逐層挑戰，獎勵遞增'
+            } else if (!cfg && stageMode === 'daily') {
+              const dc = getDailyDungeonConfig(stageId)
+              if (dc) {
+                const tierName = { easy: '簡單', normal: '普通', hard: '困難' }[dc.difficulty.tier] ?? dc.difficulty.tier
+                modeLabel = `📅 ${dc.dungeon.name} — ${tierName}`
+                modeRewards = dc.difficulty.rewards
+                modeDescription = '每日副本，限時產出職業石'
+              }
+            } else if (!cfg && stageMode === 'pvp') {
+              const sp = saveHook.playerData?.save.storyProgress ?? { chapter: 1, stage: 1 }
+              const progress = (sp.chapter - 1) * 8 + sp.stage
+              // 競技場挑戰（stageId 為 'arena-N'）vs 試煉場（stageId 為 'pvp_N'）
+              if (stageId.startsWith('arena-')) {
+                modeLabel = `🏆 競技場挑戰`
+                modeDescription = '勝利可提升排名並獲得獎勵，敗北也有安慰獎'
+                arenaWinLoss = { win: getChallengeReward(true), loss: getChallengeReward(false) }
+                modeRewards = null
+              } else {
+                const diffIdx = parseInt(stageId.split('_').pop() ?? '0') || 0
+                const diffNames = ['一般', '菁英', '強敵']
+                modeLabel = `⚔️ 試煉場 — ${diffNames[diffIdx] ?? '一般'}`
+                modeRewards = getPvPReward(progress, diffIdx)
+                modeDescription = '挑戰 AI 對手，獲得競技幣'
+              }
+            } else if (!cfg && stageMode === 'boss') {
+              const boss = getBossConfig(stageId)
+              if (boss) {
+                modeLabel = `👹 ${boss.name}`
+                modeDescription = `限 ${boss.turnLimit} 回合（Boss 不可擊殺），以傷害量評分 S/A/B/C`
+                // 顯示 S 級獎勵作為預覽
+                modeRewards = getBossRewardByBossAndRank(stageId, 'S')
+              }
+            }
+
+            return (
+              <div className="battle-prep-top-banner">
+                <CombatPowerComparison
+                  myPower={cpState.currentPower}
+                  enemyPower={cpState.enemyPower}
+                  comparison={cpState.comparison}
+                />
+                {/* 主線關卡 */}
+                {cfg && (
+                  <div className="bp-stage-section">
+                    <div className="bp-stage-header">
+                      <span className="bp-stage-id">{cfg.stageId}</span>
+                      <span className="bp-stage-name">{cfg.extra?.stageName || ''}</span>
+                    </div>
+                    {cfg.rewards && (
+                      <div className="bp-reward-row">
+                        <span className="bp-reward-label">通關獎勵：</span>
+                        {(cfg.rewards.exp ?? 0) > 0 && <span className="bp-reward-item"><CurrencyIcon type="exp" /> {cfg.rewards.exp}</span>}
+                        {(cfg.rewards.gold ?? 0) > 0 && <span className="bp-reward-item"><CurrencyIcon type="gold" /> {cfg.rewards.gold}</span>}
+                        {(cfg.rewards.diamond ?? 0) > 0 && <span className="bp-reward-item"><CurrencyIcon type="diamond" /> {cfg.rewards.diamond}</span>}
+                        {cfg.rewards.items?.map((it, i) => (
+                          <span key={i} className="bp-reward-item"><ClickableItemIcon itemId={it.itemId} /> {getItemName(it.itemId)} ×{it.quantity}</span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+                {/* 非主線模式（爬塔/每日/試煉場/Boss） */}
+                {!cfg && modeLabel && (
+                  <div className="bp-stage-section">
+                    <div className="bp-stage-header">
+                      <span className="bp-stage-id">{modeLabel}</span>
+                    </div>
+                    {modeDescription && (
+                      <div className="bp-mode-desc" style={{ fontSize: '0.75em', opacity: 0.8, marginBottom: 4 }}>{modeDescription}</div>
+                    )}
+                    {/* 競技場：顯示勝/敗兩組獎勵 */}
+                    {arenaWinLoss && (
+                      <>
+                        <div className="bp-reward-row">
+                          <span className="bp-reward-label" style={{ color: '#68d391' }}>🏆 勝利：</span>
+                          <span className="bp-reward-item"><CurrencyIcon type="gold" /> {arenaWinLoss.win.gold}</span>
+                          {arenaWinLoss.win.diamond > 0 && <span className="bp-reward-item"><CurrencyIcon type="diamond" /> {arenaWinLoss.win.diamond}</span>}
+                          <span className="bp-reward-item"><CurrencyIcon type="pvp_coin" /> {arenaWinLoss.win.pvpCoin}</span>
+                          <span className="bp-reward-item"><CurrencyIcon type="exp" /> {arenaWinLoss.win.exp}</span>
+                        </div>
+                        <div className="bp-reward-row">
+                          <span className="bp-reward-label" style={{ color: '#e63946' }}>💀 敗北：</span>
+                          <span className="bp-reward-item"><CurrencyIcon type="gold" /> {arenaWinLoss.loss.gold}</span>
+                          {arenaWinLoss.loss.diamond > 0 && <span className="bp-reward-item"><CurrencyIcon type="diamond" /> {arenaWinLoss.loss.diamond}</span>}
+                          <span className="bp-reward-item"><CurrencyIcon type="pvp_coin" /> {arenaWinLoss.loss.pvpCoin}</span>
+                          <span className="bp-reward-item"><CurrencyIcon type="exp" /> {arenaWinLoss.loss.exp}</span>
+                        </div>
+                      </>
+                    )}
+                    {modeRewards && (
+                      <div className="bp-reward-row">
+                        <span className="bp-reward-label">通關獎勵：</span>
+                        {(modeRewards.exp ?? 0) > 0 && <span className="bp-reward-item"><CurrencyIcon type="exp" /> {modeRewards.exp}</span>}
+                        {(modeRewards.gold ?? 0) > 0 && <span className="bp-reward-item"><CurrencyIcon type="gold" /> {modeRewards.gold}</span>}
+                        {(modeRewards.diamond ?? 0) > 0 && <span className="bp-reward-item"><CurrencyIcon type="diamond" /> {modeRewards.diamond}</span>}
+                        {modeRewards.items?.map((it, i) => (
+                          <span key={i} className="bp-reward-item"><ClickableItemIcon itemId={it.itemId} /> {getItemName(it.itemId)} ×{it.quantity}</span>
+                        ))}
+                      </div>
+                    )}
+                    {/* Boss 特有：評分閾值 */}
+                    {stageMode === 'boss' && (() => {
+                      const boss = getBossConfig(stageId)
+                      if (!boss) return null
+                      return (
+                        <div className="bp-reward-row" style={{ marginTop: 4 }}>
+                          <span className="bp-reward-label">評分閾值：</span>
+                          <span className="bp-reward-item" style={{ color: '#ffd700' }}>S ≥{boss.damageThresholds.S.toLocaleString()}</span>
+                          <span className="bp-reward-item" style={{ color: '#c0c0c0' }}>A ≥{boss.damageThresholds.A.toLocaleString()}</span>
+                          <span className="bp-reward-item" style={{ color: '#cd7f32' }}>B ≥{boss.damageThresholds.B.toLocaleString()}</span>
+                        </div>
+                      )
+                    })()}
+                  </div>
+                )}
+              </div>
+            )
+          })()}
 
           {/* ── 統一浮動 Toast（文字 + 物品） ── */}
           <AcquireToast entries={acquireToast.entries} onRemove={acquireToast.remove} />
@@ -639,12 +866,13 @@ export default function App() {
           {/* ── 底部面板：按鈕 + 英雄選擇欄 ── */}
           {(gameState === 'IDLE' || gameState === 'FETCHING' || gameState === 'PRE_BATTLE') && (
             <div className="bottom-panel">
-              {gameState === 'IDLE' && turn === 0 && (
+              {gameState === 'IDLE' && turn === 0 && !isDefenseSetup && (
                 <div className="bottom-panel-btn">
-                  <button onClick={() => setGameState('MAIN_MENU')} className="btn-back-menu">← 返回</button>
+                  <button onClick={() => { restoreFormationFromSave(true); setGameState('MAIN_MENU') }} className="btn-back-menu">← 返回</button>
                   <button onClick={startAutoBattle} className="btn-start">開始戰鬥</button>
                 </div>
               )}
+              {/* 防守配置按鈕已移至頂部 banner */}
               <ThumbnailList
                 heroes={ownedHeroesList}
                 heroInstances={saveHook.playerData?.heroes}

@@ -1516,6 +1516,50 @@
   white-space: nowrap;
 }
 
+/* ── PanelInfoTip — 面板說明按鈕 ── */
+.panel-infotip-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 0.85em;
+  padding: 2px 4px;
+  opacity: 0.6;
+  transition: opacity 0.2s;
+  vertical-align: middle;
+  line-height: 1;
+  flex-shrink: 0;
+}
+.panel-infotip-btn:hover,
+.panel-infotip-btn:active {
+  opacity: 1;
+}
+.panel-infotip-popup {
+  position: fixed;
+  z-index: 100000;
+  background: rgba(20, 20, 40, 0.97);
+  border: 1px solid rgba(255,255,255,0.2);
+  border-radius: 10px;
+  padding: 12px 16px;
+  max-width: min(340px, 90vw);
+  min-width: 200px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.6);
+  backdrop-filter: blur(8px);
+  animation: panelInfoFadeIn 0.15s ease-out;
+}
+@keyframes panelInfoFadeIn {
+  from { opacity: 0; transform: translateX(-50%) translateY(-4px); }
+  to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+.panel-infotip-line {
+  color: #d0d0e0;
+  font-size: 0.82rem;
+  line-height: 1.55;
+  margin: 0 0 6px 0;
+}
+.panel-infotip-line:last-child {
+  margin-bottom: 0;
+}
+
 .panel-filter {
   display: flex;
   gap: 4px;
@@ -4073,6 +4117,7 @@
   cursor: pointer;
   font-size: 0.75rem;
   transition: all 0.15s;
+  position: relative;
 }
 
 .stage-mode-active {
@@ -4231,6 +4276,38 @@
 }
 
 .tower-challenge-btn:hover { transform: translateY(-2px); filter: brightness(1.15); }
+.tower-challenge-btn:disabled { background: #444; cursor: not-allowed; opacity: 0.7; }
+
+.tower-rewards {
+  width: 100%;
+  max-width: 320px;
+  text-align: center;
+}
+
+.tower-rewards-title {
+  font-size: 0.85rem;
+  color: #e9c46a;
+  margin-bottom: 6px;
+}
+
+.tower-rewards-list {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+}
+
+/* sc-reward-tag：各種獎勵小標籤 */
+.sc-reward-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  background: rgba(255,255,255,0.08);
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-size: 0.72rem;
+  color: #ddd;
+}
 
 /* Daily */
 .stage-daily {
@@ -4307,6 +4384,34 @@
   color: #aaa;
 }
 
+.daily-attempts {
+  font-size: 0.78rem;
+  color: #88bbff;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+.daily-exhausted {
+  text-align: center;
+  color: #ff8866;
+  font-size: 0.82rem;
+  padding: 10px 0;
+  animation: pulse-glow 2s infinite;
+}
+
+@keyframes pulse-glow {
+  0%, 100% { opacity: 0.8; }
+  50% { opacity: 1; text-shadow: 0 0 6px rgba(255,136,102,0.5); }
+}
+
+.daily-tier-rewards {
+  display: block;
+  font-size: 0.58rem;
+  color: #bbb;
+  margin-top: 4px;
+  line-height: 1.3;
+}
+
 /* ══════════════════════════════════════════════════
    PvP 競技場
    ══════════════════════════════════════════════════ */
@@ -4361,6 +4466,22 @@
 }
 
 .pvp-challenge-btn:hover { transform: translateY(-2px); filter: brightness(1.15); }
+.pvp-challenge-btn:disabled { background: #444; cursor: not-allowed; opacity: 0.7; }
+
+.pvp-meta-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.pvp-reward-preview {
+  font-size: 0.75rem;
+  color: #aab;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
 
 /* ══════════════════════════════════════════════════
    Boss 挑戰
@@ -4441,6 +4562,12 @@
   opacity: 0.7;
 }
 
+.boss-card-reward-hint {
+  font-size: 0.68rem;
+  color: #cba;
+  line-height: 1.4;
+}
+
 /* ══════════════════════════════════════════════════
    Story Stage Cards (API-driven themed UI)
    ══════════════════════════════════════════════════ */
@@ -4460,17 +4587,17 @@
 
 /* Chapter tabs */
 .sc-chapter-tabs {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
   gap: 6px;
   margin-bottom: 4px;
-  flex-wrap: wrap;
 }
 
 .sc-chapter-tab {
-  flex: 0 1 auto;
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: center;
   gap: 2px;
   padding: 8px 6px;
   min-width: 0;
@@ -5425,6 +5552,103 @@
    Combat Power HUD — 戰力顯示（戰力飛行動畫已合併至通用 toast）
    ═══════════════════════════════════════════════════════ */
 
+/* ── 戰鬥準備頂部橫幅 ── */
+.battle-prep-top-banner {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 12px 6px;
+  background: linear-gradient(180deg, rgba(0,0,0,0.65) 0%, rgba(0,0,0,0.25) 80%, transparent 100%);
+  z-index: 12;
+  pointer-events: auto;
+}
+.bp-stage-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+.bp-stage-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.8rem;
+}
+.bp-stage-id {
+  background: rgba(250,204,21,0.85);
+  color: #1a1a2e;
+  font-weight: 800;
+  font-size: 0.65rem;
+  padding: 1px 6px;
+  border-radius: 4px;
+}
+.bp-stage-name {
+  color: #eee;
+  font-weight: 600;
+}
+.bp-reward-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.7rem;
+  color: #ccc;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+.bp-reward-label {
+  color: #aaa;
+}
+.bp-reward-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+/* ── 防守陣型配置 按鈕列 ── */
+.defense-setup-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 6px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+.defense-btn {
+  padding: clamp(5px, 1vh, 10px) clamp(10px, 2.5vw, 20px);
+  font-size: clamp(0.7rem, 1.8vw, 0.85rem);
+  cursor: pointer;
+  border-radius: 6px;
+  font-weight: 700;
+  touch-action: manipulation;
+  transition: transform 0.1s, box-shadow 0.15s;
+  white-space: nowrap;
+}
+.defense-btn:active { transform: scale(0.95); }
+.defense-btn-back {
+  background: rgba(50,50,50,0.9);
+  color: #ccc;
+  border: 1px solid #666;
+}
+.defense-btn-back:hover { background: rgba(70,70,70,0.95); }
+.defense-btn-copy {
+  background: linear-gradient(135deg, #3a6db5, #2a5298);
+  color: #fff;
+  border: 1px solid #5b8dd6;
+  box-shadow: 0 0 8px rgba(58,109,181,0.3);
+}
+.defense-btn-copy:hover { box-shadow: 0 0 14px rgba(58,109,181,0.5); }
+.defense-btn-save {
+  background: #990000;
+  color: #fff;
+  border: 2px solid #ff0000;
+  box-shadow: 0 0 12px rgba(153,0,0,0.4);
+}
+.defense-btn-save:hover { box-shadow: 0 0 20px rgba(153,0,0,0.6); }
+
 /* ── CP 比較條（IDLE 畫面底部） ── */
 .cp-comparison {
   display: flex;
@@ -5583,7 +5807,11 @@
 
 .arena-panel {
   position: fixed;
-  inset: 0;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(100vw, calc(100dvh * 9 / 16));
   z-index: 5000;
   background: linear-gradient(135deg, #0d0d1a 0%, #1a0e2e 100%);
   display: flex;
@@ -5867,6 +6095,36 @@
   color: #888;
   font-size: 0.9rem;
 }
+.arena-error {
+  text-align: center;
+  padding: 20px;
+  color: #f87171;
+  font-size: 0.85rem;
+}
+
+/* ── 我的排名資訊（新增） ── */
+.arena-my-info {
+  padding: 8px 16px;
+  background: rgba(100,180,255,0.06);
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  flex-shrink: 0;
+}
+.arena-info-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.85rem;
+  color: #ccc;
+  padding: 2px 0;
+}
+.arena-info-row strong {
+  color: #ffc83c;
+}
+
+/* ── 獎勵狀態 ── */
+.arena-reward-pending {
+  opacity: 0.4;
+}
 
 /* ═══════════════════════════════════════════════════════
    CheckinPanel — 每日簽到
@@ -6103,4 +6361,143 @@
 
 .tutorial-skip:hover {
   color: #bbb;
+}
+
+/* ════════════════════════════════════
+   Boss Damage Progress Bar
+   ════════════════════════════════════ */
+
+.boss-dmg-bar-wrap {
+  position: fixed;
+  top: clamp(6px, 1.5vw, 14px);
+  left: 50%;
+  transform: translateX(-50%);
+  width: clamp(260px, 55vw, 480px);
+  background: rgba(0, 0, 0, 0.82);
+  border: 1px solid rgba(255, 80, 80, 0.5);
+  border-radius: 10px;
+  padding: clamp(6px, 1vw, 12px) clamp(8px, 1.5vw, 16px);
+  z-index: 200;
+  backdrop-filter: blur(6px);
+  box-shadow: 0 0 18px rgba(255, 50, 50, 0.25);
+  pointer-events: auto;
+}
+
+.boss-dmg-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.boss-dmg-title {
+  font-size: clamp(0.65rem, 1.6vw, 0.85rem);
+  color: #ffcccc;
+  font-weight: 700;
+  text-shadow: 0 0 6px rgba(255, 50, 50, 0.5);
+}
+
+.boss-dmg-value {
+  font-size: clamp(0.7rem, 1.8vw, 0.95rem);
+  color: #fff;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  text-shadow: 0 0 8px rgba(255, 200, 50, 0.6);
+}
+
+.boss-dmg-track {
+  position: relative;
+  width: 100%;
+  height: clamp(14px, 2.5vw, 22px);
+  background: rgba(40, 40, 40, 0.9);
+  border-radius: 6px;
+  overflow: visible;
+  border: 1px solid rgba(100, 100, 100, 0.4);
+}
+
+.boss-dmg-fill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  border-radius: 5px;
+  transition: width 0.3s ease-out;
+  box-shadow: 0 0 10px rgba(255, 150, 50, 0.4);
+}
+
+.boss-dmg-marker {
+  position: absolute;
+  top: -2px;
+  bottom: -2px;
+  width: 0;
+  border-left: 2px dashed;
+  transform: translateX(-1px);
+  pointer-events: none;
+}
+
+.boss-dmg-marker-label {
+  position: absolute;
+  top: -16px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: clamp(0.55rem, 1.2vw, 0.72rem);
+  font-weight: 800;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+}
+
+.boss-dmg-marker-val {
+  position: absolute;
+  bottom: -15px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: clamp(0.45rem, 1vw, 0.58rem);
+  color: #aaa;
+  white-space: nowrap;
+}
+
+.boss-dmg-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 10px;
+}
+
+.boss-dmg-rank {
+  font-size: clamp(0.65rem, 1.6vw, 0.85rem);
+  font-weight: 800;
+  text-shadow: 0 0 6px currentColor;
+}
+
+.boss-dmg-reward {
+  font-size: clamp(0.55rem, 1.3vw, 0.72rem);
+  color: #ddd;
+  letter-spacing: 0.5px;
+}
+
+/* ════════════════════════════════════
+   ClickableItemIcon — 可點擊道具 icon
+   ════════════════════════════════════ */
+
+.clickable-item-icon {
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  transition: transform 0.15s, filter 0.15s;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.clickable-item-icon:hover {
+  transform: scale(1.15);
+  filter: brightness(1.2);
+}
+
+.clickable-item-icon:active {
+  transform: scale(0.95);
+}
+
+.clickable-item-label {
+  font-size: 0.72em;
+  color: #ccc;
 }

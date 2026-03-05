@@ -1,16 +1,17 @@
 {
   "servers": {
     "chrome-devtools": {
-      "command": "C:\\Users\\ColinChen\\AppData\\Local\\nvs\\default\\npx.cmd",
+      "command": "C:\\nvm4w\\nodejs\\npx.cmd",
       "args": [
         "-y",
         "chrome-devtools-mcp@latest"
       ]
     },
     "playwright": {
-      "command": "C:\\Users\\ColinChen\\AppData\\Local\\nvs\\default\\node.exe",
+      "command": "C:\\nvm4w\\nodejs\\npx.cmd",
       "args": [
-        "C:\\Users\\ColinChen\\AppData\\Local\\nvs\\default\\node_modules\\@playwright\\mcp\\cli.js"
+        "-y",
+        "@playwright/mcp@latest"
       ]
     }
   }

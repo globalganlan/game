@@ -30,6 +30,11 @@ export function clearArenaCache(): void {
   cachedHighestRank = ARENA_MAX_RANK
 }
 
+/** 取得快取中的剩餘挑戰次數（若尚未載入則回傳 null） */
+export function getCachedChallengesLeft(): number | null {
+  return cachedChallengesLeft
+}
+
 /* 
    排行榜讀取
     */

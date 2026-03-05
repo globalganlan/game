@@ -75,6 +75,10 @@ interface MenuScreenRouterProps {
   /* 競技場 */
   formation: (string | null)[]
   onArenaStartBattle: (targetRank: number, defender: { displayName: string; power: number; isNPC: boolean }) => Promise<void>
+  onArenaDefenseSetup: () => Promise<void>
+
+  /* 關卡每日次數（快取） */
+  initialDailyCounts?: { daily: number; pvp: number; boss: number; date: string } | null
 }
 
 /* ────────────────────────────
@@ -93,7 +97,8 @@ export function MenuScreenRouter(props: MenuScreenRouterProps) {
     mailItems, mailLoaded, onMailItemsChange, onRefreshMail,
     showAcquire,
     onCheckin,
-    formation, onArenaStartBattle,
+    formation, onArenaStartBattle, onArenaDefenseSetup,
+    initialDailyCounts,
   } = props
 
   switch (menuScreen) {
@@ -132,6 +137,7 @@ export function MenuScreenRouter(props: MenuScreenRouterProps) {
           towerFloor={towerFloor}
           onBack={onBack}
           onSelectStage={onSelectStage}
+          initialDailyCounts={initialDailyCounts ?? null}
         />
       )
 
@@ -192,6 +198,7 @@ export function MenuScreenRouter(props: MenuScreenRouterProps) {
         <ArenaPanel
           onBack={onBack}
           onStartBattle={onArenaStartBattle}
+          onSetupDefense={onArenaDefenseSetup}
           saveData={saveData}
           heroesList={heroesList}
           heroInstances={heroInstances}

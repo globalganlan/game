@@ -1,7 +1,7 @@
 # 技術架構 Spec
 
-> 版本：v2.0 ｜ 狀態：🟢 定稿（含 Domain Engine + Services 層 + Optimistic Queue + Audio Engine + CurrencyIcon 統一 icon + PWA + App 模組化拆分 + D1 原子批次寫入 + InfoTip/RedDot 新元件）
-> 最後更新：2026-03-03
+> 版本：v2.1 ｜ 狀態：🟢 定稿（含 Domain Engine + Services 層 + Optimistic Queue + Audio Engine + CurrencyIcon 統一 icon + PWA + App 模組化拆分 + D1 原子批次寫入 + InfoTip/RedDot/ClickableItemIcon 新元件）
+> 最後更新：2026-03-06
 > 負責角色：🔧 CODING → 🏗️ ARCHITECT
 
 ## 概述
@@ -95,6 +95,8 @@ src/
     BattleSpeedControls.tsx 戰鬥倍速 + 跳過按鈕
     InfoTip.tsx             資源說明 Tooltip（min 300px / max 380px）
     RedDot.tsx              通知紅點 badge 元件
+    ClickableItemIcon.tsx   道具可點擊 icon（自帶 ItemInfoPopup 彈窗）
+    PanelInfoTip.tsx        面板標題 ℹ️ 說明浮窗（Portal popup）
 
  hooks/
     useResponsive.ts        RWD 偵測 hook
@@ -610,3 +612,4 @@ POST { "action": "invalidate-cache" }
 | v1.8 | 2026-06-15 | **配合裝備模板制 v2**：inventoryService Optimistic Queue 操作數 5→1（移除 equip/unequip/lock/expand）；progressionService 操作數 8+→7+（移除 forge/dismantle，新增 enhanceEquipment/equipGachaPull）；不快取資料表移除 equipment |
 | v1.9 | 2026-03-02 | **useLogout hook**：hooks/ 目錄新增 `useLogout.ts`（auth logout + 9 快取清除）；新增 App.tsx Phase 4 抽出的 12 個 hooks 完整列表（useCurtain/useBattleHUD/useAnimationPromises/useDragFormation/useSlots/useGameInit/useBattleFlow/useStageHandlers/useMail/useBattleState/useBgm） |
 | v2.0 | 2026-03-03 | **新元件 + Arena 擴展**：新增 `InfoTip.tsx`（資源說明 Tooltip，min 300px / max 380px）、`RedDot.tsx`（通知紅點 badge）；Arena.tsx SceneMode 從 5 擴展至 13 種（新增 8 個章節專屬場景主題：ruins/forest/desert/glacier/volcano/abyss/sky_temple/doomsday）；sceneTheme 與 stageMode 分離 |
+| v2.1 | 2026-03-06 | **ClickableItemIcon 統一**：5 檔案 10 處 `getItemIcon` → `<ClickableItemIcon>`（App.tsx/StageSelect/CheckinPanel/ShopPanel/HeroListPanel）；CheckinPanel/ShopPanel 移除手動 `previewItemId` 狀態 + `ItemInfoPopup` 渲染（改由 ClickableItemIcon 自帶 popup）；PanelInfoTip 新增 `children?: ReactNode` prop；BattleHUD Boss 條 emoji → CurrencyIcon |

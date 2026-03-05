@@ -11,7 +11,7 @@ const inventory = new Hono<{ Bindings: Env; Variables: HonoVars }>();
 
 // ── 商店目錄 ──
 const SHOP_CATALOG: Record<string, {
-  price: number; currency: 'gold' | 'diamond' | 'stardust' | 'equip_scrap'; rewards: Array<{ itemId: string; quantity: number }>; dailyLimit: number;
+  price: number; currency: 'gold' | 'diamond' | 'stardust' | 'equip_scrap' | 'arena'; rewards: Array<{ itemId: string; quantity: number }>; dailyLimit: number;
 }> = {
   daily_exp_s:      { price: 1000,  currency: 'gold',    rewards: [{ itemId: 'exp', quantity: 500 }], dailyLimit: 10 },
   daily_exp_m:      { price: 5000,  currency: 'gold',    rewards: [{ itemId: 'exp', quantity: 1500 }], dailyLimit: 5 },
@@ -39,6 +39,13 @@ const SHOP_CATALOG: Record<string, {
   scrap_enhance_s:      { price: 3,   currency: 'equip_scrap', rewards: [{ itemId: 'eqm_enhance_s', quantity: 5 }], dailyLimit: 0 },
   scrap_enhance_m:      { price: 8,   currency: 'equip_scrap', rewards: [{ itemId: 'eqm_enhance_m', quantity: 3 }], dailyLimit: 0 },
   scrap_enhance_l:      { price: 15,  currency: 'equip_scrap', rewards: [{ itemId: 'eqm_enhance_l', quantity: 2 }], dailyLimit: 0 },
+  // ── 競技兌換店 ──
+  arena_exp_3000:       { price: 5,   currency: 'arena', rewards: [{ itemId: 'exp', quantity: 3000 }], dailyLimit: 0 },
+  arena_gold_20k:       { price: 5,   currency: 'arena', rewards: [{ itemId: 'gold', quantity: 20000 }], dailyLimit: 0 },
+  arena_diamond_30:     { price: 10,  currency: 'arena', rewards: [{ itemId: 'diamond', quantity: 30 }], dailyLimit: 0 },
+  arena_class_universal: { price: 15, currency: 'arena', rewards: [{ itemId: 'asc_class_universal', quantity: 1 }], dailyLimit: 0 },
+  arena_chest_equip:    { price: 8,   currency: 'arena', rewards: [{ itemId: 'chest_equipment', quantity: 1 }], dailyLimit: 0 },
+  arena_ticket_hero:    { price: 20,  currency: 'arena', rewards: [{ itemId: 'gacha_ticket_hero', quantity: 1 }], dailyLimit: 0 },
 };
 
 // ── 載入道具定義 ──────────────────────────────
@@ -226,10 +233,10 @@ inventory.post('/shop-buy', async (c) => {
   const catalog = SHOP_CATALOG[shopItemId];
   if (!catalog) return c.json({ success: false, error: 'invalid_shop_item' });
 
-  // 餘額檢查 — 星塵/碎片從 inventory，其他從 save_data
+  // 餘額檢查 — 星塵/碎片/競技幣從 inventory，其他從 save_data
   let currentBalance = 0;
-  if (catalog.currency === 'stardust' || catalog.currency === 'equip_scrap') {
-    const invItemId = catalog.currency === 'stardust' ? 'currency_stardust' : 'equip_scrap';
+  if (catalog.currency === 'stardust' || catalog.currency === 'equip_scrap' || catalog.currency === 'arena') {
+    const invItemId = catalog.currency === 'stardust' ? 'currency_stardust' : catalog.currency === 'arena' ? 'pvp_coin' : 'equip_scrap';
     const row = await db.prepare(
       'SELECT quantity FROM inventory WHERE playerId = ? AND itemId = ?'
     ).bind(playerId, invItemId).first<{ quantity: number }>();
@@ -269,8 +276,8 @@ inventory.post('/shop-buy', async (c) => {
   }
 
   // 扣款
-  if (catalog.currency === 'stardust' || catalog.currency === 'equip_scrap') {
-    const invItemId = catalog.currency === 'stardust' ? 'currency_stardust' : 'equip_scrap';
+  if (catalog.currency === 'stardust' || catalog.currency === 'equip_scrap' || catalog.currency === 'arena') {
+    const invItemId = catalog.currency === 'stardust' ? 'currency_stardust' : catalog.currency === 'arena' ? 'pvp_coin' : 'equip_scrap';
     stmts.push(upsertItemStmt(db, playerId, invItemId, -catalog.price));
   } else {
     stmts.push(db.prepare(

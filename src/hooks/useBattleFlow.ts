@@ -76,6 +76,7 @@ export interface BattleFlowDeps {
   setElementHints: React.Dispatch<React.SetStateAction<ElementHint[]>>
   setPassiveHints: React.Dispatch<React.SetStateAction<PassiveHint[]>>
   setBuffApplyHints: React.Dispatch<React.SetStateAction<BuffApplyHint[]>>
+  setBossDamageProgress: React.Dispatch<React.SetStateAction<number>>
 
   /* ── Curtain ── */
   setCurtainVisible: (b: boolean) => void
@@ -179,6 +180,7 @@ export function useBattleFlow(deps: BattleFlowDeps) {
     setElementHints: deps.setElementHints,
     setPassiveHints: deps.setPassiveHints,
     setBuffApplyHints: deps.setBuffApplyHints,
+    setBossDamageProgress: deps.setBossDamageProgress,
     addDamage: deps.addDamage,
     waitForAction: deps.waitForAction,
     waitForMove: deps.waitForMove,

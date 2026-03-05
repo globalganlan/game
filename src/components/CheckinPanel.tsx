@@ -8,8 +8,9 @@
 import { useState, useCallback } from 'react'
 import type { SaveData } from '../services/saveService'
 import { CurrencyIcon } from './CurrencyIcon'
-import { getItemName, getItemIcon } from '../constants/rarity'
-import { ItemInfoPopup } from './ItemInfoPopup'
+import { getItemName } from '../constants/rarity'
+import { ClickableItemIcon } from './ClickableItemIcon'
+import { PanelInfoTip, PANEL_DESCRIPTIONS } from './PanelInfoTip'
 
 /* ────────────────────────────
    常數 — 7 日獎勵預覽（與 GAS CHECKIN_REWARDS_ 對應）
@@ -57,7 +58,6 @@ export function CheckinPanel({ onBack, saveData, onCheckin }: CheckinPanelProps)
   const [msg, setMsg] = useState('')
   const [localDay, setLocalDay] = useState(checkinDay)
   const [localChecked, setLocalChecked] = useState(alreadyCheckedIn)
-  const [previewItemId, setPreviewItemId] = useState<string | null>(null)
 
   const handleCheckin = useCallback(async () => {
     if (localChecked || loading) return
@@ -86,6 +86,7 @@ export function CheckinPanel({ onBack, saveData, onCheckin }: CheckinPanelProps)
         <div className="panel-header">
           <button className="panel-back-btn" onClick={onBack}>← 返回</button>
           <h2 className="panel-title">📅 每日簽到</h2>
+          <PanelInfoTip description={PANEL_DESCRIPTIONS.checkin} />
         </div>
 
         <div className="checkin-subtitle">
@@ -114,8 +115,8 @@ export function CheckinPanel({ onBack, saveData, onCheckin }: CheckinPanelProps)
                     <span className="checkin-reward-line"><CurrencyIcon type="diamond" /> {reward.diamond}</span>
                   )}
                   {reward.items?.map((it, j) => (
-                    <span key={j} className="checkin-reward-line checkin-item-clickable" onClick={(e) => { e.stopPropagation(); setPreviewItemId(it.itemId) }}>
-                      {getItemIcon(it.itemId)} {getItemName(it.itemId)} ×{it.quantity}
+                    <span key={j} className="checkin-reward-line">
+                      <ClickableItemIcon itemId={it.itemId} /> {getItemName(it.itemId)} ×{it.quantity}
                     </span>
                   ))}
                 </div>
@@ -135,7 +136,6 @@ export function CheckinPanel({ onBack, saveData, onCheckin }: CheckinPanelProps)
         </button>
 
         {msg && <div className="checkin-msg">{msg}</div>}
-        {previewItemId && <ItemInfoPopup itemId={previewItemId} onClose={() => setPreviewItemId(null)} />}
       </div>
     </div>
   )

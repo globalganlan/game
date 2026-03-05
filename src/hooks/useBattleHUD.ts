@@ -20,6 +20,7 @@ export function useBattleHUD() {
   const [elementHints, setElementHints] = useState<ElementHint[]>([])
   const [passiveHints, setPassiveHints] = useState<PassiveHint[]>([])
   const [buffApplyHints, setBuffApplyHints] = useState<BuffApplyHint[]>([])
+  const [bossDamageProgress, setBossDamageProgress] = useState<number>(0)
 
   const skillToastIdRef = useRef(0)
   const elementHintIdRef = useRef(0)
@@ -34,6 +35,7 @@ export function useBattleHUD() {
     setElementHints([])
     setPassiveHints([])
     setBuffApplyHints([])
+    setBossDamageProgress(0)
   }, [])
 
   /** 完全重置（含 ref id 計數器歸零，登出時用） */
@@ -52,6 +54,7 @@ export function useBattleHUD() {
     elementHints, setElementHints,
     passiveHints, setPassiveHints,
     buffApplyHints, setBuffApplyHints,
+    bossDamageProgress, setBossDamageProgress,
     skillToastIdRef, elementHintIdRef,
     passiveHintIdRef, buffApplyHintIdRef,
     resetBattleHUD, fullResetBattleHUD,

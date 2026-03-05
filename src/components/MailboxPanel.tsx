@@ -7,6 +7,7 @@
  */
 
 import { useState, useCallback } from 'react'
+import { PanelInfoTip, PANEL_DESCRIPTIONS } from './PanelInfoTip'
 import {
   readMail,
   claimMailReward,
@@ -52,6 +53,7 @@ function formatDate(iso: string): string {
 
 import { getItemName } from '../constants/rarity'
 import { ItemIcon } from './CurrencyIcon'
+import { ClickableItemIcon } from './ClickableItemIcon'
 
 function rewardLabel(r: MailReward): string {
   return `${getItemName(r.itemId)} ×${r.quantity}`
@@ -216,6 +218,7 @@ export function MailboxPanel({
         <div className="panel-header">
           <button className="panel-back-btn" onClick={onBack}>← 返回</button>
           <h2 className="panel-title">📬 信箱</h2>
+          <PanelInfoTip description={PANEL_DESCRIPTIONS.mailbox} />
           <div className="mail-header-actions">
             <button
               className="settings-btn settings-btn-primary mail-claim-all-btn"
@@ -271,7 +274,7 @@ export function MailboxPanel({
                   <div className="mail-rewards-list">
                     {selected.rewards.map((r, i) => (
                       <span key={i} className="mail-reward-tag">
-                        <span className="mail-reward-tag-icon"><ItemIcon itemId={r.itemId} /></span>
+                        <span className="mail-reward-tag-icon"><ClickableItemIcon itemId={r.itemId} /></span>
                         {rewardLabel(r)}
                       </span>
                     ))}

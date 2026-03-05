@@ -62,6 +62,7 @@ export const ITEM_ICONS: Record<string, string> = {
   // 其他
   stamina_potion: '⚡',
   gold_pack_10k: '💰',
+  pvp_coin: '🏅',
   // 召喚券
   gacha_ticket_hero: '🎟️',
   gacha_ticket_equip: '🔧',
@@ -108,6 +109,7 @@ export const ITEM_NAMES: Record<string, string> = {
   // 其他
   stamina_potion: '體力藥水',
   gold_pack_10k: '金幣禮包',
+  pvp_coin: '競技幣',
   // 召喚券
   gacha_ticket_hero: '英雄召喚券',
   gacha_ticket_equip: '裝備鍛造券',

@@ -8,9 +8,11 @@
  *  - 屬性相剋指示
  */
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import type { StatusEffect, StatusType, Element } from '../domain/types'
 import { statusZh } from '../constants/statNames'
+import { getBossConfig, getBossRewardByBossAndRank } from '../domain/stageSystem'
+import { CurrencyIcon } from './CurrencyIcon'
 
 /* ════════════════════════════════════
    型別
@@ -107,6 +109,12 @@ const ELEMENT_COLORS: Record<Element, string> = {
 interface BattleHUDProps {
   /** 是否顯示（僅在 BATTLE 狀態） */
   visible: boolean
+  /** 當前模式 */
+  stageMode?: 'story' | 'tower' | 'daily' | 'pvp' | 'boss'
+  /** 當前關卡 ID（boss 模式用） */
+  stageId?: string
+  /** Boss 模式即時累計傷害 */
+  bossDamageProgress?: number
   /** 玩家英雄資訊 */
   playerHeroes: Array<{
     uid: string
@@ -321,11 +329,102 @@ function CompactEnergyItem({
 }
 
 /* ════════════════════════════════════
+   BossDamageBar — Boss 戰即時傷害進度條
+   ════════════════════════════════════ */
+
+const RANK_COLORS: Record<string, string> = { S: '#ff4444', A: '#ff9900', B: '#44aaff', C: '#88cc44' }
+
+function BossDamageBar({ stageId, totalDamage }: { stageId: string; totalDamage: number }) {
+  const boss = useMemo(() => getBossConfig(stageId), [stageId])
+  if (!boss) return null
+
+  const th = boss.damageThresholds
+  const maxBar = th.S * 1.25 // 進度條最大值 = S 閾值的 125%
+
+  // 計算目前評級
+  let currentRank: 'S' | 'A' | 'B' | 'C' | '-' = '-'
+  if (totalDamage >= th.S) currentRank = 'S'
+  else if (totalDamage >= th.A) currentRank = 'A'
+  else if (totalDamage >= th.B) currentRank = 'B'
+  else if (totalDamage >= th.C) currentRank = 'C'
+
+  // 當前評級對應獎勵
+  const reward = currentRank !== '-'
+    ? getBossRewardByBossAndRank(stageId, currentRank)
+    : null
+
+  const pct = Math.min(100, (totalDamage / maxBar) * 100)
+
+  // 各閾值在進度條上的位置 %
+  const markers = (['C', 'B', 'A', 'S'] as const).map(rank => ({
+    rank,
+    value: th[rank],
+    pos: Math.min(100, (th[rank] / maxBar) * 100),
+  }))
+
+  return (
+    <div className="boss-dmg-bar-wrap">
+      <div className="boss-dmg-header">
+        <span className="boss-dmg-title">⚔️ {boss.name} — 累計傷害</span>
+        <span className="boss-dmg-value">{totalDamage.toLocaleString()}</span>
+      </div>
+
+      <div className="boss-dmg-track">
+        {/* 填充條 */}
+        <div
+          className="boss-dmg-fill"
+          style={{
+            width: `${pct}%`,
+            background: currentRank === 'S' ? 'linear-gradient(90deg, #ff4444, #ffaa00)'
+              : currentRank === 'A' ? 'linear-gradient(90deg, #ff9900, #ffcc44)'
+              : currentRank === 'B' ? 'linear-gradient(90deg, #44aaff, #88ccff)'
+              : currentRank === 'C' ? 'linear-gradient(90deg, #88cc44, #bbee77)'
+              : 'linear-gradient(90deg, #555, #777)',
+          }}
+        />
+
+        {/* 閾值標記 */}
+        {markers.map(m => (
+          <div
+            key={m.rank}
+            className="boss-dmg-marker"
+            style={{ left: `${m.pos}%`, borderColor: RANK_COLORS[m.rank] }}
+          >
+            <span
+              className="boss-dmg-marker-label"
+              style={{ color: RANK_COLORS[m.rank] }}
+            >
+              {m.rank}
+            </span>
+            <span className="boss-dmg-marker-val">{m.value >= 1000 ? `${(m.value / 1000).toFixed(0)}k` : m.value}</span>
+          </div>
+        ))}
+      </div>
+
+      {/* 當前評級與獎勵 */}
+      <div className="boss-dmg-footer">
+        <span className="boss-dmg-rank" style={{ color: currentRank !== '-' ? RANK_COLORS[currentRank] : '#666' }}>
+          評級：{currentRank}
+        </span>
+        {reward && (
+          <span className="boss-dmg-reward">
+            <CurrencyIcon type="gold" />{reward.gold} <CurrencyIcon type="diamond" />{reward.diamond ?? 0} <CurrencyIcon type="exp" />{reward.exp}
+          </span>
+        )}
+      </div>
+    </div>
+  )
+}
+
+/* ════════════════════════════════════
    Main BattleHUD
    ════════════════════════════════════ */
 
 export function BattleHUD({
   visible,
+  stageMode,
+  stageId,
+  bossDamageProgress,
   playerHeroes: _playerHeroes,
   enemyHeroes: _enemyHeroes,
   buffMap: _buffMap,
@@ -337,7 +436,10 @@ export function BattleHUD({
 
   return (
     <div className="bhud-container">
-      {/* Skill/Element popups now rendered in 3D space via Hero component */}
+      {/* Boss 傷害進度條 */}
+      {stageMode === 'boss' && stageId && (
+        <BossDamageBar stageId={stageId} totalDamage={bossDamageProgress ?? 0} />
+      )}
     </div>
   )
 }
