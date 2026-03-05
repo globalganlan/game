@@ -88,7 +88,7 @@ export async function claimMailReward(mailId: string): Promise<{ success: boolea
     return { success: res.success, rewards: res.rewards ?? [], currencies: res.currencies }
   } catch (e) {
     console.warn('[mail] claim-mail-reward error:', e)
-    return { success: true, rewards: [] }
+    return { success: false, rewards: [] }
   }
 }
 
@@ -104,7 +104,7 @@ export async function claimAllMail(): Promise<{
     return { success: res.success, claimedCount: res.claimedCount ?? 0, totalRewards: res.totalRewards ?? [], currencies: res.currencies }
   } catch (e) {
     console.warn('[mail] claim-all-mail error:', e)
-    return { success: true, claimedCount: 0, totalRewards: [] }
+    return { success: false, claimedCount: 0, totalRewards: [] }
   }
 }
 

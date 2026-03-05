@@ -509,10 +509,7 @@ export async function collectResources(): Promise<AccumulatedResources | null> {
     }
   } catch (e) {
     console.warn('[save] collect-resources error:', e)
-    // 離線時使用本地預估值
-    currentData.save.gold += resources.gold
-    currentData.save.exp = (currentData.save.exp ?? 0) + resources.exp
-    notify()
+    // 伺服器失敗時不更新本地資料，僅回傳預估值供顯示
   }
 
   return resources
@@ -618,18 +615,6 @@ export async function doDailyCheckin(): Promise<DailyCheckinResult> {
     return { success: false, error: serverRes.error || 'server_error' }
   } catch (e) {
     console.warn('[save] daily-checkin error:', e)
-    // 離線備援：本地更新內存
-    currentData.save.checkinDay = newDay
-    currentData.save.checkinLastDate = todayStr
-    if (reward.gold) currentData.save.gold += reward.gold
-    if (reward.diamond) currentData.save.diamond += reward.diamond
-    if (reward.items) {
-      const expItems = reward.items.filter(i => i.itemId === 'exp')
-      if (expItems.length > 0) {
-        currentData.save.exp += expItems.reduce((acc, i) => acc + i.quantity, 0)
-      }
-    }
-    notify()
-    return { success: true, checkinDay: newDay, checkinLastDate: todayStr, reward }
+    return { success: false, error: 'network_error' }
   }
 }

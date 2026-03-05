@@ -1,6 +1,6 @@
 # 背包與道具系統 Spec
 
-> 版本：v2.8 ｜ 狀態：🟢 已實作
+> 版本：v2.9 ｜ 狀態：🟢 已實作
 > 最後更新：2026-03-05
 > 負賬角色：🎯 GAME_DESIGN → 🔧 CODING
 
@@ -233,8 +233,8 @@ InventoryPanel mount
 | 3 | `loadInventory(): Promise<InventoryState>` | 載入背包（僅可堆疊道具），合併 localStorage | API `load-inventory` |
 | 4 | `addItems(items): Promise<boolean>` | 批量增加道具 | API `add-items` |
 | 5 | `removeItems(items): Promise<boolean>` | 批量消耗道具（不足則整筆失敗） | API `remove-items` |
-| 6 | `sellItems(items): Promise<number>` | 出售道具換金幣 | API `sell-items` |
-| 7 | `useItem(itemId, quantity, targetId?): Promise<{success, result?}>` | 使用道具（寶箱/經驗核心） | Optimistic Queue |
+| 6 | `sellItems(items): Promise<number>` | 出售道具換金幣（API 先調，成功後扣本地） | API `sell-items` |
+| 7 | `useItem(itemId, quantity, targetId?): Promise<{success, result?}>` | 使用道具（API 先調，成功後扣本地） | API `use-item` |
 | 8 | `getItemQuantity(itemId): number` | 查詢某道具數量 | 純前端 |
 | 9 | `filterItemsByCategory(category \| 'all'): InventoryItem[]` | 依分類篩選（'all' 回傳 qty>0） | 純前端 |
 | 10 | `onInventoryChange(fn): () => void` | 訂閱背包變化，回傳 unsubscribe | 純前端 |
@@ -487,3 +487,4 @@ type SortMode = 'default' | 'rarity-desc' | 'quantity-desc' | 'name-asc'
 | v2.5 | 2026-03-03 | **背包 UI 改善**：①「全部」分頁同時顯示道具+裝備（原只顯示道具） ②英雄碎片名稱修復：`asc_fragment_X` 一律用 `resolveFallbackName()`（英雄名+碎片），不被 DB 定義的原始 key 覆蓋 ③裝備「使用中」稀有度視覺：外框光暈+徽章顏色跟隨稀有度色 ④分頁更新為 6 個（全部/裝備/突破/素材/寶箱/貨幣），「通用」改名「素材」 |
 | v2.6 | 2026-03-03 | **裝備圖鑑系統**：①背包新增「📖 圖鑑」tab（第 7 個分頁）②新建 `CodexPanel.tsx`，可擴展 `CodexCategory` 聯合型別（目前 'equipment'，預留 hero/monster/achievement）③EquipmentCodex 子元件：128 種裝備百科（8 套裝 × 4 部位 × 4 稀有度）、收集進度條、套裝效果卡（2pc/4pc）、稀有度篩選、擁有/鎖定卡片視覺 ④匯出 equipmentGacha 常數（SET_IDS/SLOTS/SLOT_MAIN_STAT/MAIN_STAT_BASE）⑤App.css 新增 `.codex-*` 全套樣式 ~200 行含 RWD |
 | v2.7 | 2026-06-19 | **背包功能強化**：①圖鑑面板移除收集進度追蹤（無進度條/X÷Y 計數），所有裝備項目一律顯示不再灰顯 ②背包容量上限完全移除，Header 不再顯示 X/Y 容量（`equipmentCapacity` 欄位 + `expand-inventory` API 棄用）③新增裝備分解功能：`/decompose-equipment` API 端點，回收金幣＋裝備碎片（`equip_scrap`）；商店面板新增「碎片兌換」分頁 ④裝備鎖定功能移除：`/lock-equipment` API 棄用、`locked` 欄位不再使用、UI 移除鎖定按鈕 ⑤裝備可直接從背包裝備詳情彈窗中強化（不必進入英雄詳情頁） || v2.8 | 2026-03-05 | **競技商店 + pvp_coin 貨幣**：①新增 `pvp_coin` 貨幣定義（§2.4），使用 `CurrencyIcon type="pvp_coin"` 顯示（🏅）②商店系統新增「競技商店」分類（6 項商品：arena_exp_3000/arena_gold_20k/arena_diamond_30/arena_class_universal/arena_chest_equip/arena_ticket_hero，以 pvp_coin 定價）③後端 `inventory.ts` SHOP_CATALOG 新增 `arena` 分類④`ShopPanel.tsx` 新增「競技商店」分頁 |
+| v2.9 | 2026-03-05 | **Server-First 庫存操作**：`sellItems` / `useItem` 改為 API 先調、成功後才扣本地庫存；`sellItems` 失敗回傳 0（移除 estimatedGold fallback）；`ShopPanel.handlePurchase` 改為 API 先調、成功後才扣本地貨幣/加道具，失敗顯示「購買失敗」toast |

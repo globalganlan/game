@@ -118,28 +118,27 @@ export async function removeItems(items: { itemId: string; quantity: number }[])
 }
 
 export async function sellItems(items: { itemId: string; quantity: number }[]): Promise<number> {
-  let estimatedGold = 0
-  if (inventoryState) {
-    for (const sold of items) {
-      const def = inventoryState.definitions.get(sold.itemId)
-      estimatedGold += (def?.sellPrice || 0) * sold.quantity
-    }
-    for (const sold of items) {
-      const existing = inventoryState.items.find(i => i.itemId === sold.itemId)
-      if (existing) existing.quantity = Math.max(0, existing.quantity - sold.quantity)
-    }
-    notify()
-  }
   try {
     const res = await callApi<{ goldGained: number; currencies?: { gold?: number; diamond?: number; exp?: number } }>('sell-items', { items })
-    if (res.success && res.currencies) {
-      const { applyCurrenciesFromServer } = await import('./saveService')
-      applyCurrenciesFromServer(res.currencies)
+    if (res.success) {
+      // 伺服器確認成功後才更新本地庫存
+      if (inventoryState) {
+        for (const sold of items) {
+          const existing = inventoryState.items.find(i => i.itemId === sold.itemId)
+          if (existing) existing.quantity = Math.max(0, existing.quantity - sold.quantity)
+        }
+        notify()
+      }
+      if (res.currencies) {
+        const { applyCurrenciesFromServer } = await import('./saveService')
+        applyCurrenciesFromServer(res.currencies)
+      }
+      return res.goldGained ?? 0
     }
-    return res.goldGained ?? estimatedGold
+    return 0
   } catch (e) {
     console.warn('[inventory] sell-items error:', e)
-    return estimatedGold
+    return 0
   }
 }
 
@@ -149,16 +148,17 @@ export async function useItem(
   targetId?: string,
   extra?: Record<string, unknown>,
 ): Promise<{ success: boolean; result?: unknown; currencies?: { gold?: number; diamond?: number; exp?: number } }> {
-  if (inventoryState) {
+  const res = await callApi<{ result: unknown; currencies?: { gold?: number; diamond?: number; exp?: number } }>(
+    'use-item', { itemId, quantity, ...(targetId ? { targetId } : {}), ...(extra || {}) },
+  )
+  // 伺服器確認成功後才扣除本地庫存
+  if (res.success && inventoryState) {
     const existing = inventoryState.items.find(i => i.itemId === itemId)
     if (existing) {
       existing.quantity = Math.max(0, existing.quantity - quantity)
       notify()
     }
   }
-  const res = await callApi<{ result: unknown; currencies?: { gold?: number; diamond?: number; exp?: number } }>(
-    'use-item', { itemId, quantity, ...(targetId ? { targetId } : {}), ...(extra || {}) },
-  )
   return { success: res.success, result: res.result, currencies: res.currencies }
 }
 

@@ -1,7 +1,7 @@
 # 存檔系統 Spec
 
-> 版本：v2.2 ｜ 狀態：🟢 已實作
-> 最後更新：2026-06-19
+> 版本：v2.3 ｜ 狀態：🟢 已實作
+> 最後更新：2026-03-05
 > 負責角色：🎯 GAME_DESIGN → 🔧 CODING
 
 ## 概述
@@ -164,15 +164,14 @@ updateLocal(changes):
 ```
 
 > **v2.0 架構簡化**：移除 debounce 2s + retry 機制，不再使用 `save-progress` 統一寫入。
-> 所有存檔欄位皆由專用 API 路由在對應操作時直接寫入伺服器，前端僅做本地樂觀更新。
-> 所有寫入操作均採用 Optimistic Queue（`fireOptimistic` / `fireOptimisticAsync`）。
+> 所有存檔欄位皆由專用 API 路由在對應操作時直接寫入伺服器。
+> 貨幣更新採用 Server-First：伺服器回傳 currencies 絕對值覆蓋本地，API 失敗時不做本地更新。
 
 ### 本地快取
 
 - localStorage key: `globalganlan_save_cache`
 - 存檔副本同步複寫到 localStorage
-- 離線時可讀取快取繼續遊玩
-- 重新上線後 `reconcilePendingOps()` 補償
+- 離線時可讀取快取繼續瀏覽（但不能進行貨幣/物品異動操作）
 
 ---
 
@@ -346,10 +345,11 @@ function getAccumulatedResources(stageId, lastCollect, maxHours = 24) {
   1. storyProgress.chapter===1 && stage===1 → 未解鎖，return null
   2. 本地計算 getAccumulatedResources()
   3. gold<=0 && expItems<=0 → return null
-  4. 樂觀更新 currentData.save.gold + resourceTimerLastCollect=now
-  5. fireOptimistic('collect-resources', {})  ← 幂等保護 opId
-  6. 伺服器 callback 校正 newGoldTotal（若不一致）
-  7. 回傳本地計算結果
+  4. 呼叫 API collect-resources
+  5. 伺服器成功 → applyCurrenciesFromServer(currencies) 覆蓋本地
+  6. 伺服器失敗 → 不更新本地資料（僅 console.warn）
+  7. 回傳本地計算結果（供 UI 顯示）
+```
 
 GAS handleCollectResources_:（包在 executeWithIdempotency_ 中）
   1. 驗證 token → playerId
@@ -397,3 +397,4 @@ GAS handleCollectResources_:（包在 executeWithIdempotency_ 中）
 | v2.0 | 2026-03-02 | **移除 `save-progress` 路由**：原本的 debounce 2s + retry 寫入佇列已經完全無用—— 4 個 allowedFields 均已有專用路由（change-name / save-formation / complete-battle / collect-resources）。前端 `enqueueSave` 簡化為 `updateLocal()`（僅更新本地 state + localStorage），不再發送 API 請求 |
 | v2.1 | 2026-06-19 | **欄位調整**：`stageStars` 值改為 `1`（已通關）取代舊版 `1~3` 星級；`equipmentCapacity` 欄位廢棄（不再限制裝備容量）；裝備實例 `locked` 欄位廢棄；新增 `equip_scrap` 可堆疊背包道具（裝備分解產出） |
 | v2.2 | 2026-03-04 | **saveService 狀態刷新修復**：`notify()` 深複製 heroes + save 物件修復 useMemo 偵測；`updateLocal()` 移除 `if (key in currentData.save)` guard 允許寫入 optional fields（lastHeroFreePull/lastEquipFreePull/gachaPity）；`sanitizeSaveData()` 初始化 optional 日期欄位；新增 `updateFreePullLocally()` / `updateGachaPityLocally()` 匯出函式 |
+| v2.3 | 2026-03-05 | **Server-First 資料一致性**：`collectResources` catch 不再加本地金幣/經驗；`doDailyCheckin` catch 不再發本地獎勵，回傳 `success:false`；移除離線樂觀更新策略 |

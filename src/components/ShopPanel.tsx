@@ -293,48 +293,57 @@ export function ShopPanel({ onBack }: ShopPanelProps) {
       return
     }
 
-    // 星塵/碎片/競技幣扣款（非 save 貨幣，需本地扣）
-    if (item.currency === 'stardust') {
-      removeItemsLocally([{ itemId: 'currency_stardust', quantity: item.price }])
-    } else if (item.currency === 'equip_scrap') {
-      removeItemsLocally([{ itemId: 'equip_scrap', quantity: item.price }])
-    } else if (item.currency === 'arena') {
-      removeItemsLocally([{ itemId: 'pvp_coin', quantity: item.price }])
-    }
-
-    // 非資源類獎勵本地加背包（伺服器也會同步）
-    const RESOURCE_REWARDS = ['exp', 'gold', 'diamond', 'stardust'] as const
-    const inventoryItems = item.rewards.filter(r => !(RESOURCE_REWARDS as readonly string[]).includes(r.itemId))
-    if (inventoryItems.length > 0) addItemsLocally(inventoryItems)
-
-    // 獲得物品動畫
-    const CURRENCY_IDS = ['gold', 'diamond', 'stardust', 'exp'] as const
-    emitAcquire(item.rewards.map(r => ({
-      type: r.itemId.startsWith('currency_') || (CURRENCY_IDS as readonly string[]).includes(r.itemId) ? 'currency' as const : 'item' as const,
-      id: r.itemId,
-      name: getItemName(r.itemId),
-      quantity: r.quantity,
-    })))
-
-    // 呼叫後端 → 以伺服器權威值覆蓋貨幣
+    // 先呼叫後端確認購買 → 成功後才更新本地狀態
     try {
-      const res = await callApi<{ currencies?: { gold?: number; diamond?: number; exp?: number } }>('shop-buy', { shopItemId: item.id })
-      if (res.success && res.currencies) {
+      const res = await callApi<{ currencies?: { gold?: number; diamond?: number; exp?: number }; inventory?: { itemId: string; quantity: number }[] }>('shop-buy', { shopItemId: item.id })
+      if (!res.success) {
+        setPurchaseMsg('購買失敗，請稍後再試')
+        setTimeout(() => setPurchaseMsg(''), 2500)
+        return
+      }
+
+      // 伺服器確認成功 → 以伺服器權威值覆蓋貨幣
+      if (res.currencies) {
         applyCurrenciesFromServer(res.currencies)
       }
+
+      // 星塵/碎片/競技幣扣款（非 save 貨幣，需本地扣）
+      if (item.currency === 'stardust') {
+        removeItemsLocally([{ itemId: 'currency_stardust', quantity: item.price }])
+      } else if (item.currency === 'equip_scrap') {
+        removeItemsLocally([{ itemId: 'equip_scrap', quantity: item.price }])
+      } else if (item.currency === 'arena') {
+        removeItemsLocally([{ itemId: 'pvp_coin', quantity: item.price }])
+      }
+
+      // 非資源類獎勵本地加背包
+      const RESOURCE_REWARDS = ['exp', 'gold', 'diamond', 'stardust'] as const
+      const inventoryItems = item.rewards.filter(r => !(RESOURCE_REWARDS as readonly string[]).includes(r.itemId))
+      if (inventoryItems.length > 0) addItemsLocally(inventoryItems)
+
+      // 獲得物品動畫
+      const CURRENCY_IDS = ['gold', 'diamond', 'stardust', 'exp'] as const
+      emitAcquire(item.rewards.map(r => ({
+        type: r.itemId.startsWith('currency_') || (CURRENCY_IDS as readonly string[]).includes(r.itemId) ? 'currency' as const : 'item' as const,
+        id: r.itemId,
+        name: getItemName(r.itemId),
+        quantity: r.quantity,
+      })))
+
+      // 更新購買計數
+      setPurchasedToday(prev => ({
+        ...prev,
+        [item.id]: (prev[item.id] ?? 0) + 1,
+      }))
+
+      const rewardNames = item.rewards.map(r => `${getItemIcon(r.itemId)} ${getItemName(r.itemId)} ×${r.quantity}`).join('、')
+      setPurchaseMsg(`購買成功！獲得 ${rewardNames}`)
+      setTimeout(() => setPurchaseMsg(''), 2500)
     } catch (e) {
       console.warn('[shop] shop-buy error:', e)
+      setPurchaseMsg('購買失敗，請檢查網路連線')
+      setTimeout(() => setPurchaseMsg(''), 2500)
     }
-
-    // 更新購買計數
-    setPurchasedToday(prev => ({
-      ...prev,
-      [item.id]: (prev[item.id] ?? 0) + 1,
-    }))
-
-    const rewardNames = item.rewards.map(r => `${getItemIcon(r.itemId)} ${getItemName(r.itemId)} ×${r.quantity}`).join('、')
-    setPurchaseMsg(`購買成功！獲得 ${rewardNames}`)
-    setTimeout(() => setPurchaseMsg(''), 2500)
   }, [canAfford, getRemainingPurchases, gold, diamond, stardust, equipScrap, pvpCoin])
 
   return (
