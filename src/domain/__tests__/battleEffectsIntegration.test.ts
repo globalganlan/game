@@ -13,7 +13,7 @@ import {
   hasStatus,
   getBuffedStats,
 } from '../buffSystem'
-import skillDataJson from '../../../scripts/skill_data_zh.json'
+import skillDataJson from '../../../.ai/scripts/skill_data_zh.json'
 
 /* ═══════════════════════════════════
    工廠 Helper

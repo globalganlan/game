@@ -2,7 +2,7 @@
  * elementSystem — 屬性剋制倍率查詢
  *
  * 純函式模組，無副作用。
- * 對應 specs/element-system.md v0.1
+ * 對應 .ai/specs/element-system.md v0.1
  * 資料來源：Google Sheet `element_matrix`（可動態載入覆蓋）
  */
 

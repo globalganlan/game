@@ -2,7 +2,7 @@
  * damageFormula — 完整傷害/治療/DOT/閃避計算
  *
  * 純函式模組，無副作用。
- * 對應 specs/damage-formula.md v0.1
+ * 對應 .ai/specs/damage-formula.md v0.1
  */
 
 import type { BattleHero, DamageResult, HealResult, SkillEffect, FinalStats } from './types'

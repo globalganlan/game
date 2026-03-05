@@ -4,7 +4,7 @@
  * 純函式，零 React 依賴。
  * 金幣池（SSR 2%）/ 鑽石池（SSR 8%），十連保底 SR+，無保底計數。
  *
- * 對應 Spec: specs/gacha.md §6
+ * 對應 Spec: .ai/specs/gacha.md §6
  */
 
 import type { EquipmentInstance, Rarity, EquipmentSlot, SubStat } from './progressionSystem'

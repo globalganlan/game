@@ -1,7 +1,7 @@
 /**
  * useAcquireToast.test.ts — 獲得物品動畫 Hook 單元測試
  *
- * 對照 specs/item-acquire-toast.md v0.3
+ * 對照 .ai/specs/item-acquire-toast.md v0.3
  * 使用 vitest + 手動 state 追蹤（不需 @testing-library/react）
  */
 

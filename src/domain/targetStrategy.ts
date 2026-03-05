@@ -2,7 +2,7 @@
  * targetStrategy — 目標選擇策略
  *
  * 純函式模組。
- * 對應 specs/core-combat.md v2.0 第七節
+ * 對應 .ai/specs/core-combat.md v2.0 第七節
  */
 
 import type { BattleHero, TargetType } from './types'

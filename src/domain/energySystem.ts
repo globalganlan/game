@@ -2,7 +2,7 @@
  * energySystem — 能量管理
  *
  * 純函式模組。
- * 對應 specs/core-combat.md v2.0 第四節、specs/skill-system.md v0.2
+ * 對應 .ai/specs/core-combat.md v2.0 第四節、.ai/specs/skill-system.md v0.2
  */
 
 import type { BattleHero, EnergyConfig, DEFAULT_ENERGY_CONFIG } from './types'

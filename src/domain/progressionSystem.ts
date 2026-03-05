@@ -3,7 +3,7 @@
  *
  * 包含：等級成長、突破、星級、裝備數值、套裝效果、最終數值結算
  *
- * 對應 Spec: specs/progression.md v0.2
+ * 對應 Spec: .ai/specs/progression.md v0.2
  */
 
 import type { FinalStats } from './types'

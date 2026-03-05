@@ -2,7 +2,7 @@
  * useAcquireToast — 統一浮動 Toast 系統
  *
  * 同時處理「純文字提示」與「獲得物品動畫」，每條 toast 獨立動畫、自動移除。
- * 對應 Spec: specs/item-acquire-toast.md v0.2
+ * 對應 Spec: .ai/specs/item-acquire-toast.md v0.2
  */
 
 import { useState, useCallback, useRef, ReactNode } from 'react'

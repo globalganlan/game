@@ -3,7 +3,7 @@
  *
  * NPC 生成、排名機制、獎勵計算
  *
- * 對應 Spec: specs/arena-pvp.md v0.1
+ * 對應 Spec: .ai/specs/arena-pvp.md v0.1
  */
 
 import { createSeededRng } from './seededRng'

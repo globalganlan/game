@@ -5,7 +5,7 @@
  * 每條獨立動畫，animationEnd 自動移除。
  * SSR/SR 物品帶光暈。不阻擋操作（pointer-events: none）。
  *
- * 對應 Spec: specs/item-acquire-toast.md
+ * 對應 Spec: .ai/specs/item-acquire-toast.md
  */
 
 import { CurrencyIcon } from './CurrencyIcon'

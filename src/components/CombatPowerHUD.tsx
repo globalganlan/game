@@ -1,7 +1,7 @@
 /**
  * CombatPowerHUD — 戰力顯示 + 變動飛行動畫 + 敵我對比條
  *
- * 對應 Spec: specs/combat-power.md v0.1
+ * 對應 Spec: .ai/specs/combat-power.md v0.1
  */
 
 import { COMPARISON_TEXT, COMPARISON_COLOR, type ComparisonLevel } from '../domain/combatPower'

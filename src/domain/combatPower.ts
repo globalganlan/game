@@ -3,7 +3,7 @@
  *
  * 六維加權計算英雄 CP、隊伍 CP、敵方 CP
  *
- * 對應 Spec: specs/combat-power.md v0.1
+ * 對應 Spec: .ai/specs/combat-power.md v0.1
  */
 
 import type { FinalStats } from './types'

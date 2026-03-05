@@ -4,7 +4,7 @@
  * 包裝 saveService，提供 React 響應式狀態 + 操作方法。
  * 自動在頁面關閉前同步未寫入變更。
  *
- * 對應 Spec: specs/save-system.md v0.2
+ * 對應 Spec: .ai/specs/save-system.md v0.2
  */
 
 import { useState, useEffect, useRef, useCallback } from 'react'

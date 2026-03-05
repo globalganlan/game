@@ -1,7 +1,7 @@
 /**
  * arenaSystem.test.ts — 競技場排名系統單元測試
  *
- * 對照 specs/arena-pvp.md v0.3 驗證所有公式、常數、資料表、邊界值
+ * 對照 .ai/specs/arena-pvp.md v0.3 驗證所有公式、常數、資料表、邊界值
  */
 
 import { describe, it, expect } from 'vitest'

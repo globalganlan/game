@@ -1,9 +1,9 @@
-﻿/**
+/**
  * inventoryService  背包與道具系統前端服務
  *
  * 負責：背包載入、道具增減、裝備管理、擴容、出售
  *
- * 對應 Spec: specs/inventory.md v0.1
+ * 對應 Spec: .ai/specs/inventory.md v0.1
  */
 
 import { callApi } from './apiClient'

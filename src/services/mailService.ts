@@ -1,9 +1,9 @@
-﻿/**
+/**
  * mailService  信箱系統前端服務
  *
  * 負責：信件載入、已讀標記、獎勵領取、信件刪除
  *
- * 對應 Spec: specs/mailbox.md v0.1
+ * 對應 Spec: .ai/specs/mailbox.md v0.1
  */
 
 import { callApi } from './apiClient'

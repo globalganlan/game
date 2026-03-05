@@ -2,7 +2,7 @@
  * buffSystem — Buff / Debuff 管理
  *
  * 純函式模組，管理角色身上的狀態效果。
- * 對應 specs/core-combat.md v2.0 第五節
+ * 對應 .ai/specs/core-combat.md v2.0 第五節
  */
 
 import type { BattleHero, StatusEffect, StatusType, Shield, FinalStats } from './types'

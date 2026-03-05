@@ -1,7 +1,7 @@
 /**
  * combatPower.test.ts — 戰力系統單元測試
  *
- * 對照 specs/combat-power.md v0.3 驗證所有公式、常數、邊界值
+ * 對照 .ai/specs/combat-power.md v0.3 驗證所有公式、常數、邊界值
  */
 
 import { describe, it, expect } from 'vitest'

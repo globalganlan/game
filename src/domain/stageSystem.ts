@@ -3,7 +3,7 @@
  *
  * 包含：主線關卡、無盡爬塔、每日副本、Boss 戰的敵方生成與獎勵計算
  *
- * 對應 Spec: specs/stage-system.md v0.2
+ * 對應 Spec: .ai/specs/stage-system.md v0.2
  */
 
 /* ════════════════════════════════════

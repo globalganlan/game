@@ -28,4 +28,4 @@ dist-ssr
 .playwright-mcp/
 
 # QA screenshots
-qa_screenshots/
+.ai/qa_screenshots/

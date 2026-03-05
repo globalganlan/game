@@ -1,7 +1,7 @@
 # Copilot 專案指引 — GlobalGanLan
 
 > 本檔案在每次新對話時自動載入，確保 AI 助手保有專案知識。
-> 詳細知識點請參閱 `docs/Three.js場景與模型整合筆記.md`。
+> 詳細知識點請參閱 `.ai/docs/Three.js場景與模型整合筆記.md`。
 
 ## ❗ 強制規則（每次任務必讀）
 
@@ -17,7 +17,7 @@
    - **測試通過後、回報完成前，必須播放提示音**：`[console]::beep(800,300); Start-Sleep -ms 100; [console]::beep(1000,300); Start-Sleep -ms 100; [console]::beep(1200,400)`
    - **需要使用者參與才能繼續時，也必須播放提示音**（例如：詢問需求細節、等待確認選項、需要使用者手動測試回報結果等）
 3. **Workers 修改後自行部署**：改 `workers/src/` → `cd workers && npx wrangler deploy`
-4. **程式碼改動必須同步更新 Spec**：每次完成使用者任務後，若有改動程式碼，必須將功能變更同步到對應的 `specs/` 文件上（含版本號遞增、變更歷史更新），以確保 spec 始終與實際程式碼一致。不可遺漏任何功能變更未被記錄。
+4. **程式碼改動必須同步更新 Spec**：每次完成使用者任務後，若有改動程式碼，必須將功能變更同步到對應的 `.ai/specs/` 文件上（含版本號遞增、變更歷史更新），以確保 spec 始終與實際程式碼一致。不可遺漏任何功能變更未被記錄。
 5. **貨幣 & 物品 Icon 必須使用統一元件**（ADR-007）：
    - **四種貨幣**必須用 `<CurrencyIcon type="..." />`（來自 `src/components/CurrencyIcon.tsx`）：
      - 金幣 → `type="gold"`（金色圓形 G）
@@ -81,7 +81,7 @@
   - 禁止監聽 `controllerchange` 自動 reload
   - `public/sw.js` install 可呼叫 `skipWaiting()`，但禁止 `clients.claim()` / 預快取 HTML
   - iOS Chrome「加入主畫面」不會觸發 `display-mode: standalone`，故必須靠 UA 偵測
-  - 詳見 `memory/decisions.md` ADR-009
+  - 詳見 `.ai/memory/decisions.md` ADR-009
 
 ## 後端架構（Cloudflare Workers + D1）
 
@@ -165,31 +165,31 @@ Pop-Location
 
 ## AI 團隊調度
 
-- **調度中心**：`agents/README.md` — 自動分析需求、分配角色、各司其職
-- **規格系統**：`specs/README.md` — 模組化遊戲規格，可擴展、有版本、有衝突偵測
-- **記憶系統**：`memory/` — 跨對話持久化（changelog / decisions / dev-status / backlog）
-- **提示詞模板**：`agents/prompt-playbook.md` — 7 套常用提示詞（P-01~P-07），已標注對應角色
-- 收到需求時先讀取 `agents/README.md` 的調度規則，自動判斷要啟動哪些角色
-- 新對話啟動時先讀取 `memory/dev-status.md` + `specs/README.md` 恢復記憶
-- 各角色的專業提示詞：`agents/01~11-*.md`（11 位角色）
+- **調度中心**：`.ai/agents/README.md` — 自動分析需求、分配角色、各司其職
+- **規格系統**：`.ai/specs/README.md` — 模組化遊戲規格，可擴展、有版本、有衝突偵測
+- **記憶系統**：`.ai/memory/` — 跨對話持久化（changelog / decisions / dev-status / backlog）
+- **提示詞模板**：`.ai/agents/prompt-playbook.md` — 7 套常用提示詞（P-01~P-07），已標注對應角色
+- 收到需求時先讀取 `.ai/agents/README.md` 的調度規則，自動判斷要啟動哪些角色
+- 新對話啟動時先讀取 `.ai/memory/dev-status.md` + `.ai/specs/README.md` 恢復記憶
+- 各角色的專業提示詞：`.ai/agents/01~11-*.md`（11 位角色）
 
 ## 文件索引
 
 | 文件 | 內容 |
 |------|------|
-| `agents/README.md` | AI 團隊自動調度系統（11 位角色的路由與協作規則） |
-| `specs/README.md` | 遊戲規格總索引（模組化 spec 清單、格式規範、衝突處理流程） |
-| `memory/README.md` | 記憶持久化機制說明 |
-| `docs/FBX轉GLB壓縮指南.md` | FBX→GLB 批次轉換流程、Draco/Decimate/JPEG 壓縮、前端載入架構 |
-| `docs/大頭照生成指南.md` | Puppeteer + Three.js 離線渲染角色大頭照 |
-| `docs/2D-to-3D-Model-Generation-Guide.md` | TripoSR 模型生成流程 |
-| `docs/Mixamo使用指南.md` | Mixamo 動畫下載與整合 |
+| `.ai/agents/README.md` | AI 團隊自動調度系統（11 位角色的路由與協作規則） |
+| `.ai/specs/README.md` | 遊戲規格總索引（模組化 spec 清單、格式規範、衝突處理流程） |
+| `.ai/memory/README.md` | 記憶持久化機制說明 |
+| `.ai/docs/FBX轉GLB壓縮指南.md` | FBX→GLB 批次轉換流程、Draco/Decimate/JPEG 壓縮、前端載入架構 |
+| `.ai/docs/大頭照生成指南.md` | Puppeteer + Three.js 離線渲染角色大頭照 |
+| `.ai/docs/2D-to-3D-Model-Generation-Guide.md` | TripoSR 模型生成流程 |
+| `.ai/docs/Mixamo使用指南.md` | Mixamo 動畫下載與整合 |
 
 ## 工具腳本索引
 
 | 腳本 | 用途 | 使用方式 |
 |------|------|----------|
-| `scripts/fbx_to_glb.py` | FBX→GLB 批次轉換（Blender Python） | `blender --background --python scripts/fbx_to_glb.py` |
-| `scripts/convert_models.ps1` | 上述腳本的 PowerShell 包裝器 | `.\scripts\convert_models.ps1` |
-| `scripts/generate_thumbnails.js` | 角色大頭照生成（Puppeteer） | `node scripts/generate_thumbnails.js` |
+| `.ai/scripts/fbx_to_glb.py` | FBX→GLB 批次轉換（Blender Python） | `blender --background --python .ai/scripts/fbx_to_glb.py` |
+| `.ai/scripts/convert_models.ps1` | 上述腳本的 PowerShell 包裝器 | `.\.ai\scripts\convert_models.ps1` |
+| `.ai/scripts/generate_thumbnails.js` | 角色大頭照生成（Puppeteer） | `node .ai/scripts/generate_thumbnails.js` |
 

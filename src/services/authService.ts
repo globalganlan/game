@@ -1,10 +1,10 @@
-﻿/**
+/**
  * authService  帳號系統前端服務
  *
  * 訪客自動登入 + 帳密綁定 + 跨裝置登入。
  * Token 存 localStorage，狀態存 memory（不依賴 React）。
  *
- * 對應 Spec: specs/auth-system.md v0.1
+ * 對應 Spec: .ai/specs/auth-system.md v0.1
  */
 
 import { callAuthApi, getStoredToken, setStoredToken } from './apiClient'

@@ -3,7 +3,7 @@
  *
  * 三分頁：排行榜、防守陣型、獎勵
  *
- * 對應 Spec: specs/arena-pvp.md v0.1
+ * 對應 Spec: .ai/specs/arena-pvp.md v0.1
  */
 
 import { useState, useEffect, useCallback } from 'react'

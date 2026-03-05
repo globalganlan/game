@@ -5,9 +5,9 @@
  * 產出 BattleAction 指令序列，由表現層（App.tsx）消費並播放 3D 演出。
  *
  * 對應：
- * - specs/core-combat.md v2.0
- * - specs/damage-formula.md v0.1
- * - specs/skill-system.md v0.2
+ * - .ai/specs/core-combat.md v2.0
+ * - .ai/specs/damage-formula.md v0.1
+ * - .ai/specs/skill-system.md v0.2
  */
 
 import type {

@@ -1,10 +1,10 @@
-﻿/**
+/**
  * progressionService  養成系統前端服務
  *
  * 負責：英雄升級、突破、升星、裝備強化、戰鬥結算等操作
  * 所有操作直接 await Workers API 回應（不再使用 optimisticQueue）。
  *
- * 對應 Spec: specs/progression.md v2.0
+ * 對應 Spec: .ai/specs/progression.md v2.0
  */
 
 import { callApi } from './apiClient'

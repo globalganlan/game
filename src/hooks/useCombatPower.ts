@@ -3,7 +3,7 @@
  *
  * 監聽 formation/heroInstances/equipment 變化，自動重算並觸發飛行動畫。
  *
- * 對應 Spec: specs/combat-power.md v0.1
+ * 對應 Spec: .ai/specs/combat-power.md v0.1
  */
 
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'

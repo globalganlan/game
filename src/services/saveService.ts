@@ -1,4 +1,4 @@
-﻿/**
+/**
  * saveService  存檔系統前端服務
  *
  * 負責：
@@ -6,7 +6,7 @@
  *  - 資源產出計時器計算
  *  - 內存快取（不使用 localStorage，後端為唯一資料來源）
  *
- * 對應 Spec: specs/save-system.md v0.3
+ * 對應 Spec: .ai/specs/save-system.md v0.3
  */
 
 import { callApi } from './apiClient'

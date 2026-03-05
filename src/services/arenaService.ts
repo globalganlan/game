@@ -1,9 +1,9 @@
-﻿/**
+/**
  * arenaService  競技場 API 前端服務
  *
  * 封裝與 Workers 的通信：排行榜讀取、挑戰、防守陣型設定、獎勵領取
  *
- * 對應 Spec: specs/arena-pvp.md v0.1
+ * 對應 Spec: .ai/specs/arena-pvp.md v0.1
  */
 
 import { callApi } from './apiClient'
