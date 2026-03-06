@@ -7,11 +7,11 @@
 
 import { useRef, useState, useEffect, Suspense } from 'react'
 import { useFrame } from '@react-three/fiber'
-import { Billboard, Text } from '@react-three/drei'
+import { Html } from '@react-three/drei'
 import * as THREE from 'three'
 
 import { ZombieModel } from './ZombieModel'
-import { DamagePopup, HealthBar3D, EnergyBar3D, SkillToast3D, ElementHint3D, PassiveHint3D, BuffIcons3D, BuffApplyToast3D, LOCAL_FONT } from './SceneWidgets'
+import { DamagePopup, HealthBar3D, EnergyBar3D, SkillToast3D, ElementHint3D, PassiveHint3D, BuffIcons3D, BuffApplyToast3D } from './SceneWidgets'
 import type { SlotHero, ActorState, AnimationState, DamagePopupData } from '../types'
 import type { SkillToast, ElementHint, PassiveHint, BuffApplyHint } from './BattleHUD'
 import type { StatusEffect } from '../domain/types'
@@ -266,11 +266,9 @@ export function Hero({
         {/* Buff/Debuff 3D 圖示列 */}
         <BuffIcons3D effects={battleBuffs} textScale={textScale} />
 
-        <Billboard position={[0, 3.5, 0]} renderOrder={15}>
-          <Text font={LOCAL_FONT} fontSize={0.4 * textScale} color="white" outlineColor="black" outlineWidth={0.06}>
-            {heroData.Name}
-          </Text>
-        </Billboard>
+        <Html position={[0, 3.5, 0]} center wrapperClass="hero-name-html" style={{ pointerEvents: 'none' }}>
+          <div className="hero-name-label">{heroData.Name}</div>
+        </Html>
 
         <HealthBar3D
           position={[0, 3.0, 0]}

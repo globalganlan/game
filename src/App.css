@@ -45,6 +45,30 @@
   background: transparent;
 }
 
+/* ── 英雄名稱 HTML Overlay（固定像素大小，不受 3D 透視縮放）── */
+
+.hero-name-html,
+.hero-name-html > div {
+  pointer-events: none !important;
+}
+
+.hero-name-label {
+  font-size: 13px;
+  font-weight: 700;
+  color: #fff;
+  text-shadow:
+    -1px -1px 0 #000,
+     1px -1px 0 #000,
+    -1px  1px 0 #000,
+     1px  1px 0 #000,
+     0 0 6px rgba(0, 0, 0, 0.9);
+  white-space: nowrap;
+  user-select: none;
+  pointer-events: none;
+  letter-spacing: 0.5px;
+  font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+}
+
 /* ── Game HUD ── */
 
 .game-hud {
