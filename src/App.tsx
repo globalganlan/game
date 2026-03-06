@@ -440,7 +440,9 @@ export default function App() {
           <Canvas
             style={{
               position: 'absolute', top: 0, left: 0, width: '100%', height: '100%',
-              visibility: (gameState === 'MAIN_MENU' && menuScreen !== 'none') ? 'hidden' : 'visible',
+              // ★ 不使用 visibility:hidden — iOS WKWebView 會在 hidden 期間回收 GPU 紋理，
+              //   導致恢復可見時已載入模型變黑。改用 pointer-events 控制觸摸穿透。
+              pointerEvents: (gameState === 'MAIN_MENU' && menuScreen !== 'none') ? 'none' : 'auto',
             }}
             camera={{ position: responsive.camPos, fov: responsive.fov }}
             shadows

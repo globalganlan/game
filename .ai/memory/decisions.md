@@ -331,3 +331,12 @@
   - `src/components/ArenaPanel.tsx` — Top 10 + 10 Opponents + Refresh UI
   - `src/hooks/useStageHandlers.ts` — `targetUserId` + `rankChanged` 處理
   - `workers/schema.sql` — `arenaOpponents TEXT`、`arenaRefreshCount INTEGER`
+
+### ADR-016: Canvas 不使用 visibility:hidden（iOS GPU 紋理保活）
+
+- **日期**：2026-03-06
+- **決策**：Canvas style 從 `visibility: hidden` 改為 `pointerEvents: none`
+- **根因**：iOS WKWebView 在 Canvas `visibility:hidden` 期間會主動回收 GPU 紋理資源。當選單關閉、Canvas 恢復 visible 時，已載入模型的紋理被清空 → 渲染為黑色剪影。第二次開啟 PWA 不受影響是因為 HTTP cache 使載入速度極快，Canvas hidden 時間極短、紋理尚未被回收。
+- **症狀**：iOS PWA 首次開啟 → 進入競技場挑戰 → 預先載入的英雄模型全黑；後載入的模型正常；第二次開 PWA 一切正常。
+- **修復**：`App.tsx` Canvas style 改用 `pointerEvents: (menuScreen !== 'none') ? 'none' : 'auto'`，Canvas 始終保持 visible（被選單面板 DOM 自然遮蓋），避免 iOS GPU 回收紋理。
+- **影響範圍**：`src/App.tsx` Canvas style 屬性

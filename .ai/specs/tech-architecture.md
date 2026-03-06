@@ -1,6 +1,6 @@
 # 技術架構 Spec
 
-> 版本：v2.2 ｜ 狀態：🟢 定稿（含 Domain Engine + Services 層 + Optimistic Queue + Audio Engine + CurrencyIcon 統一 icon + PWA + App 模組化拆分 + D1 原子批次寫入 + InfoTip/RedDot/ClickableItemIcon 新元件 + 獎勵一致性修復）
+> 版本：v2.3 ｜ 狀態：🟢 定稿（含 Domain Engine + Services 層 + Optimistic Queue + Audio Engine + CurrencyIcon 統一 icon + PWA + App 模組化拆分 + D1 原子批次寫入 + InfoTip/RedDot/ClickableItemIcon 新元件 + 獎勵一致性修復 + Canvas iOS GPU 紋理保活修復）
 > 最後更新：2026-03-06
 > 負責角色：🔧 CODING → 🏗️ ARCHITECT
 
@@ -613,3 +613,4 @@ POST { "action": "invalidate-cache" }
 | v1.9 | 2026-03-02 | **useLogout hook**：hooks/ 目錄新增 `useLogout.ts`（auth logout + 9 快取清除）；新增 App.tsx Phase 4 抽出的 12 個 hooks 完整列表（useCurtain/useBattleHUD/useAnimationPromises/useDragFormation/useSlots/useGameInit/useBattleFlow/useStageHandlers/useMail/useBattleState/useBgm） |
 | v2.0 | 2026-03-03 | **新元件 + Arena 擴展**：新增 `InfoTip.tsx`（資源說明 Tooltip，min 300px / max 380px）、`RedDot.tsx`（通知紅點 badge）；Arena.tsx SceneMode 從 5 擴展至 13 種（新增 8 個章節專屬場景主題：ruins/forest/desert/glacier/volcano/abyss/sky_temple/doomsday）；sceneTheme 與 stageMode 分離 |
 | v2.1 | 2026-03-06 | **ClickableItemIcon 統一**：5 檔案 10 處 `getItemIcon` → `<ClickableItemIcon>`（App.tsx/StageSelect/CheckinPanel/ShopPanel/HeroListPanel）；CheckinPanel/ShopPanel 移除手動 `previewItemId` 狀態 + `ItemInfoPopup` 渲染（改由 ClickableItemIcon 自帶 popup）；PanelInfoTip 新增 `children?: ReactNode` prop；BattleHUD Boss 條 emoji → CurrencyIcon |
+| v2.3 | 2026-03-06 | **iOS PWA Canvas GPU 紋理保活**：Canvas `visibility:hidden` → `pointerEvents:none`，避免 iOS WKWebView 在 Canvas 隱藏期間回收 GPU 紋理資源導致已載入模型變黑；還原 ZombieModel/HeroListPanel cloneMat metalness 覆寫（非根因） |
