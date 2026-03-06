@@ -302,10 +302,33 @@ arena.post('/arena-get-rankings', async (c) => {
   const db = c.env.DB;
   await ensureArenaInit(db);
 
-  // 找到玩家排名
-  const myRow = await db.prepare('SELECT rank FROM arena_rankings WHERE playerId = ?')
-    .bind(playerId).first<{ rank: number }>();
+  // 找到玩家排名 + 戰力
+  const myRow = await db.prepare('SELECT rank, power, defenseFormation FROM arena_rankings WHERE playerId = ?')
+    .bind(playerId).first<{ rank: number; power: number; defenseFormation?: string }>();
   const myRank = myRow?.rank ?? ARENA_MAX_RANK;
+  let myPower = myRow?.power ?? 0;
+
+  // 自動同步戰力：每次進入排行榜時，用當前陣型重新計算戰力，避免養成後戰力不同步
+  if (myRow && myRow.rank <= ARENA_MAX_RANK) {
+    try {
+      let formArr: (string | null)[] = [];
+      try { formArr = JSON.parse(myRow.defenseFormation || '[]'); } catch { formArr = []; }
+      // 若無防守陣型，用出征陣型
+      if (!formArr.some(Boolean)) {
+        const saveRow = await db.prepare('SELECT formation FROM save_data WHERE playerId = ?')
+          .bind(playerId).first<{ formation?: string }>();
+        try { formArr = JSON.parse(saveRow?.formation || '[]'); } catch { formArr = []; }
+      }
+      if (formArr.some(Boolean)) {
+        const recalced = await calcDefensePower(db, playerId, formArr);
+        if (recalced > 0 && recalced !== myPower) {
+          myPower = recalced;
+          await db.prepare('UPDATE arena_rankings SET power = ? WHERE playerId = ?')
+            .bind(myPower, playerId).run();
+        }
+      }
+    } catch { /* 戰力同步失敗不影響主流程 */ }
+  }
 
   // Top 10 排行榜
   const topRows = await db.prepare(
@@ -359,7 +382,7 @@ arena.post('/arena-get-rankings', async (c) => {
       isNPC: !!r.isNPC, power: r.power ?? 0,
     })),
     opponents,
-    myRank, challengesLeft, highestRank, refreshesLeft,
+    myRank, myPower, challengesLeft, highestRank, refreshesLeft,
   });
 });
 

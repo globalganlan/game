@@ -53,14 +53,19 @@ interface MenuItem {
 }
 
 const MENU_ITEMS: MenuItem[] = [
+  /* ── 永遠開放 ── */
   { key: 'stages', icon: '🗺️', label: '關卡', sub: '主線·爬塔·副本', color: '#457b9d' },
-  { key: 'heroes', icon: '🧟', label: '英雄', sub: '養成·突破·升星', color: '#2a9d8f', unlock: { chapter: 1, stage: 2, hint: '通關 1-1 後解鎖' } },
-  { key: 'gacha', icon: '🎰', label: '召喚', sub: '英雄招募·裝備鍛造', color: '#e9c46a', unlock: { chapter: 1, stage: 3, hint: '通關 1-2 後解鎖' } },
-  { key: 'inventory', icon: '🎒', label: '背包', sub: '道具·裝備', color: '#f4a261', unlock: { chapter: 1, stage: 2, hint: '通關 1-1 後解鎖' } },
-  { key: 'arena', icon: '⚔️', label: '競技場', sub: '排名·對戰·獎勵', color: '#e74c3c', unlock: { chapter: 2, stage: 1, hint: '通關 1-8 後解鎖' } },
-  { key: 'shop', icon: '🏪', label: '商店', sub: '購買素材·禮包', color: '#72b01d', unlock: { chapter: 1, stage: 3, hint: '通關 1-2 後解鎖' } },
   { key: 'checkin', icon: '📅', label: '簽到', sub: '每日登入獎勵', color: '#e9a820' },
   { key: 'mailbox', icon: '📬', label: '信箱', sub: '信件·獎勵', color: '#7ec8e3' },
+  /* ── 通關 1-1 解鎖 ── */
+  { key: 'heroes', icon: '🧟', label: '英雄', sub: '養成·突破·升星', color: '#2a9d8f', unlock: { chapter: 1, stage: 2, hint: '通關 1-1 後解鎖' } },
+  { key: 'inventory', icon: '🎒', label: '背包', sub: '道具·裝備', color: '#f4a261', unlock: { chapter: 1, stage: 2, hint: '通關 1-1 後解鎖' } },
+  /* ── 通關 1-2 解鎖 ── */
+  { key: 'gacha', icon: '🎰', label: '召喚', sub: '英雄招募·裝備鍛造', color: '#e9c46a', unlock: { chapter: 1, stage: 3, hint: '通關 1-2 後解鎖' } },
+  { key: 'shop', icon: '🏪', label: '商店', sub: '購買素材·禮包', color: '#72b01d', unlock: { chapter: 1, stage: 3, hint: '通關 1-2 後解鎖' } },
+  /* ── 通關 1-8 解鎖 ── */
+  { key: 'arena', icon: '⚔️', label: '競技場', sub: '排名·對戰·獎勵', color: '#e74c3c', unlock: { chapter: 2, stage: 1, hint: '通關 1-8 後解鎖' } },
+  /* ── 設定 ── */
   { key: 'settings', icon: '⚙️', label: '設定', sub: '帳號·綁定', color: '#888' },
 ]
 

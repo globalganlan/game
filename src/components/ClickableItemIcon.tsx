@@ -41,7 +41,8 @@ export function ClickableItemIcon({ itemId, label, showLabel, className, childre
     <>
       <span
         className={`clickable-item-icon ${className ?? ''}`}
-        onClick={(e) => { e.stopPropagation(); setShowInfo(true) }}
+        onClick={(e) => { e.stopPropagation(); e.preventDefault(); setShowInfo(true) }}
+        onPointerDown={(e) => e.stopPropagation()}
         role="button"
         tabIndex={0}
         title="點擊查看詳情"

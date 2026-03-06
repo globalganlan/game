@@ -7,6 +7,7 @@
  */
 
 import { useState, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { getItemIcon, getItemName, RARITY_COLORS } from '../constants/rarity'
 import type { Rarity } from '../constants/rarity'
 import { getItemDefinition, loadItemDefinitions } from '../services/inventoryService'
@@ -64,7 +65,7 @@ export function ItemInfoPopup({ itemId, onClose }: ItemInfoPopupProps) {
   const rarity: Rarity = (def?.rarity as Rarity) || inferRarity(itemId)
   const desc = def?.description || ITEM_DESCRIPTIONS[itemId] || '無描述'
 
-  return (
+  return createPortal(
     <div className="inv-detail-backdrop" onClick={onClose}>
       <div className="inv-detail-card item-info-popup" onClick={(e) => e.stopPropagation()}>
         <button className="inv-detail-close" onClick={onClose}>✕</button>
@@ -77,6 +78,7 @@ export function ItemInfoPopup({ itemId, onClose }: ItemInfoPopupProps) {
         </div>
         <p className="inv-detail-desc">{desc}</p>
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }

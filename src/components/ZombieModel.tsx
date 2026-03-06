@@ -68,20 +68,37 @@ export function ZombieModel({
   const { scene, modelScale } = useMemo(() => {
     const cloned = SkeletonUtils.clone(meshAsset.scene)
 
+    // iOS 偵測 — iOS Safari/WebView 有較嚴格的 GPU 記憶體限制
+    const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent)
+
+    // ★ 強制紋理重新上傳（iOS WKWebView 紋理 eviction 防護）
+    const markTextureForUpload = (tex: THREE.Texture | null, isSRGB = false) => {
+      if (!tex) return
+      tex.needsUpdate = true
+      if (isSRGB) tex.colorSpace = THREE.SRGBColorSpace
+    }
+
     // 材質獨立化 — GLB 已是 MeshStandardMaterial，只需 clone 確保實例獨立
     // 並確保 emissive 乾淨以支援受擊紅色閃光
     cloned.traverse((child) => {
       if ((child as THREE.Mesh).isMesh) {
         const mesh = child as THREE.Mesh
-        // 啟用投射陰影
-        mesh.castShadow = true
-        mesh.receiveShadow = true
+        // 啟用投射陰影（iOS 降級：不投射以節省 GPU 記憶體）
+        mesh.castShadow = !isIOS
+        mesh.receiveShadow = !isIOS
         const cloneMat = (m: THREE.Material): THREE.MeshStandardMaterial => {
           const cloned = m.clone() as THREE.MeshStandardMaterial
           // 確保 emissive 乾淨
           if (cloned.emissive) cloned.emissive.set(0, 0, 0)
           cloned.emissiveIntensity = 1
           cloned.emissiveMap = null
+          // ★ 強制所有紋理 re-upload（iOS WebGL 必須）
+          markTextureForUpload(cloned.map, true)  // diffuse → sRGB
+          markTextureForUpload(cloned.normalMap)
+          markTextureForUpload(cloned.roughnessMap)
+          markTextureForUpload(cloned.metalnessMap)
+          markTextureForUpload(cloned.aoMap)
+          cloned.needsUpdate = true
           return cloned
         }
         if (Array.isArray(mesh.material)) {
@@ -382,6 +399,20 @@ export function ZombieModel({
       mixer.timeScale = state === 'IDLE' ? 1 : speed
     }
   }, [isDragging, mixer, speed, state])
+
+  // ★ GPU 資源清理 — unmount 時 dispose clone 的材質和幾何體，避免 iOS VRAM 洩漏
+  useEffect(() => {
+    return () => {
+      scene.traverse((child) => {
+        if ((child as THREE.Mesh).isMesh) {
+          const mesh = child as THREE.Mesh
+          const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material]
+          mats.forEach(m => m?.dispose())
+          // 不 dispose geometry — 它由共用快取的原始 asset 持有
+        }
+      })
+    }
+  }, [scene])
 
   return (
     <group

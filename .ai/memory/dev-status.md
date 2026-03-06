@@ -1,6 +1,6 @@
 # 開發狀態快照 — Dev Status
 
-> 最後更新：2026-03-06（第六十二次更新 — 12 項 UX 修正與獎勵清理）
+> 最後更新：2026-03-07（第六十三次更新 — 9 項穩定性與 UI 修復）
 
 ## 截至 2026-03-06 的開發狀態
 
@@ -19,6 +19,7 @@
 - [x] **競技場動態挑戰範圍** — 固定 -3 改為 4 階動態（rank>100→200, 21-100→50, 6-20→15, 1-5→5）
 - [x] **持久化對手清單** — 10 名隨機對手存入 save_data.arenaOpponents，每日/勝利後自動重生
 - [x] **12 項 UX 修正** — backToLobby 移除過場幕、戰鬥準備即時戰力、Boss B/C 段移除重複 EXP、鑽石=0 時隱藏圖示、ItemInfoPopup z-index 99999、簽到描述換行、紅點檢查模式解鎖、背包過濾廢棄強化石、商店/寶箱替換強化石為鍛造礦
+- [x] **9 項穩定性修復** — ItemInfoPopup Portal 防遮擋、每日副本道具事件冒泡、英雄裝備 useMemo invTick、競技場自動重算戰力+我的排名區塊、大廳按鈕排序、模型預載防黑屏（preloadHeroModel+獨立 Suspense）、iOS 紋理黑色（needsUpdate+outputColorSpace+shadow 降級）、簽到斷簽 streak 判斷
 - [x] **對手手動刷新** — 每日 5 次免費，arena-refresh-opponents 新端點
 - [x] **排名變動偵測** — 挑戰時檢查對手排名，變動則免費自動刷新（不扣次數）
 - [x] **全專案 safe-area-inset-top** — 10 個介面全覆蓋（arena-panel/battle-prep/battle-result/boss-dmg/bhud-toasts 5 處新增）

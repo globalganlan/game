@@ -52,11 +52,18 @@ export function CheckinPanel({ onBack, saveData, onCheckin }: CheckinPanelProps)
 
   // 判斷今天是否已簽到（UTC+8）
   const todayStr = getTaipeiDate()
+  const yesterdayStr = getYesterdayTaipeiDate()
   const alreadyCheckedIn = checkinLastDate === todayStr
+
+  // ★ 判斷連續簽到是否有效：最後簽到必須是今天或昨天，且未滿 7 天才算延續
+  // 今天已簽 → 完整顯示 checkinDay；昨天簽且 <7 → 連續中；否則 → 斷簽或週期結束
+  const isStreakAlive = checkinLastDate === todayStr
+    || (checkinLastDate === yesterdayStr && checkinDay < 7)
+  const effectiveDay = isStreakAlive ? checkinDay : 0
 
   const [loading, setLoading] = useState(false)
   const [msg, setMsg] = useState('')
-  const [localDay, setLocalDay] = useState(checkinDay)
+  const [localDay, setLocalDay] = useState(effectiveDay)
   const [localChecked, setLocalChecked] = useState(alreadyCheckedIn)
 
   const handleCheckin = useCallback(async () => {
@@ -97,7 +104,7 @@ export function CheckinPanel({ onBack, saveData, onCheckin }: CheckinPanelProps)
         <div className="checkin-grid">
           {REWARDS.map((reward, i) => {
             const dayNum = i + 1
-            const isClaimed = dayNum <= localDay && (localChecked || dayNum < localDay)
+            const isClaimed = dayNum <= localDay
             const isCurrent = dayNum === (localChecked ? localDay : localDay + 1)
             const isToday = isCurrent && !localChecked
 
@@ -150,6 +157,17 @@ function getTaipeiDate(): string {
   const now = new Date()
   const utc = now.getTime() + now.getTimezoneOffset() * 60000
   const taipei = new Date(utc + 8 * 3600000)
+  const y = taipei.getFullYear()
+  const m = String(taipei.getMonth() + 1).padStart(2, '0')
+  const d = String(taipei.getDate()).padStart(2, '0')
+  return `${y}-${m}-${d}`
+}
+
+/** 取得 UTC+8 (Taipei) 昨天的 YYYY-MM-DD 字串 */
+function getYesterdayTaipeiDate(): string {
+  const now = new Date()
+  const utc = now.getTime() + now.getTimezoneOffset() * 60000
+  const taipei = new Date(utc + 8 * 3600000 - 86400000)
   const y = taipei.getFullYear()
   const m = String(taipei.getMonth() + 1).padStart(2, '0')
   const d = String(taipei.getDate()).padStart(2, '0')

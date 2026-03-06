@@ -126,6 +126,13 @@ function IdlePreviewModel({ modelId }: { modelId: string }) {
           if (c.emissive) c.emissive.set(0, 0, 0)
           c.emissiveIntensity = 1
           c.emissiveMap = null
+          // ★ iOS 紋理修復：強制所有紋理 re-upload + 正確色彩空間
+          if (c.map) { c.map.needsUpdate = true; c.map.colorSpace = THREE.SRGBColorSpace }
+          if (c.normalMap) c.normalMap.needsUpdate = true
+          if (c.roughnessMap) c.roughnessMap.needsUpdate = true
+          if (c.metalnessMap) c.metalnessMap.needsUpdate = true
+          if (c.aoMap) c.aoMap.needsUpdate = true
+          c.needsUpdate = true
           return c
         }
         if (Array.isArray(mesh.material)) mesh.material = mesh.material.map(cloneMat)
@@ -291,8 +298,8 @@ function HeroDetail({ hero, instance, onClose, skills, heroSkills }: HeroDetailP
   const [isProcessing, setIsProcessing] = useState(false)
   const [resultMsg, setResultMsg] = useState('')
   const [equipSelectSlot, setEquipSelectSlot] = useState<string>('')
-  // 背包訂閱（用於讀取素材數量）
-  const [, setInvTick] = useState(0)
+  // 背包訂閱（用於讀取素材數量 + 裝備變更即時刷新）
+  const [invTick, setInvTick] = useState(0)
   useEffect(() => {
     const unsub = onInventoryChange(() => setInvTick(t => t + 1))
     return unsub
@@ -426,7 +433,7 @@ function HeroDetail({ hero, instance, onClose, skills, heroSkills }: HeroDetailP
   const heroEquipment = useMemo(
     () => isOwned ? getHeroEquipment(instance!.instanceId) : [],
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [isOwned, instance?.instanceId],
+    [isOwned, instance?.instanceId, invTick],
   )
   const equippedBySlot = useMemo(() => {
     const map: Record<string, EquipmentInstance | undefined> = {}

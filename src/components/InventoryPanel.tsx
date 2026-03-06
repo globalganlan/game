@@ -6,6 +6,7 @@
  */
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react'
+import { createPortal } from 'react-dom'
 import type { InventoryItem } from '../services/saveService'
 import { getSaveState } from '../services/saveService'
 import type { RawHeroData } from '../types'
@@ -297,7 +298,7 @@ function ItemDetail({ item, definition, onClose, heroMap }: ItemDetailProps & { 
     setActionMsg(`出售獲得 ${gold} 金幣`)
   }, [item.itemId, canSell])
 
-  return (
+  return createPortal(
     <div className="inv-detail-backdrop" onClick={onClose}>
       <div className="inv-detail-card" onClick={(e) => e.stopPropagation()}>
         <button className="inv-detail-close" onClick={onClose}>✕</button>
@@ -334,7 +335,8 @@ function ItemDetail({ item, definition, onClose, heroMap }: ItemDetailProps & { 
           )}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }
 
@@ -437,7 +439,7 @@ function EquipmentDetail({ equip, onClose, heroInstances, heroNameMap }: Equipme
     return heroNameMap?.get(inst.heroId) ?? `英雄#${inst.heroId}`
   }, [heroInstances, heroNameMap])
 
-  return (
+  return createPortal(
     <div className="inv-detail-backdrop" onClick={onClose}>
       <div className="inv-detail-card inv-equip-detail" onClick={e => e.stopPropagation()}>
         <button className="inv-detail-close" onClick={onClose}>✕</button>
@@ -540,7 +542,8 @@ function EquipmentDetail({ equip, onClose, heroInstances, heroNameMap }: Equipme
           </div>
         )}
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }
 

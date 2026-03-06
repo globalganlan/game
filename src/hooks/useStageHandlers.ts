@@ -15,6 +15,8 @@ import { buildEnemySlotsFromStage, normalizeModelId } from '../game/helpers'
 import { getStageConfig } from '../services/stageService'
 import { waitFrames } from '../game/constants'
 import { EMPTY_SLOTS } from '../game/constants'
+import { preloadHeroModel } from '../loaders/glbLoader'
+import { getSaveState } from '../services/saveService'
 
 /* ── 場景輪替配色池（基於 stageId 做確定性選取） ── */
 const SCENE_POOL_BY_MODE: Record<string, SceneMode[]> = {
@@ -93,10 +95,6 @@ export function useStageHandlers(deps: StageHandlerDeps) {
     curtainClosePromiseRef.current = null
     await waitFrames(2)
 
-    setShowBattleScene(true)
-    setStageMode(mode)
-    setStageId(sid)
-
     // story mode: 從 API 快取取得敵方陣容 + 場景主題
     let injectedEnemies: { heroId: number; slot: number; hpMultiplier: number; atkMultiplier: number; speedMultiplier: number }[] | undefined
     if (mode === 'story') {
@@ -115,7 +113,29 @@ export function useStageHandlers(deps: StageHandlerDeps) {
       setSceneTheme(pickSceneForStage(mode, sid))
     }
 
-    updateEnemySlots(() => buildEnemySlotsFromStage(mode, sid, heroesList, injectedEnemies))
+    // ── 預載入所有英雄 3D 模型，避免 Canvas 掛載後 Suspense 黑屏 ──
+    const builtEnemySlots = buildEnemySlotsFromStage(mode, sid, heroesList, injectedEnemies)
+    const modelIds = new Set<string>()
+    builtEnemySlots.forEach(s => { if (s?._modelId) modelIds.add(s._modelId) })
+    try {
+      const saveState = getSaveState()
+      const savedFormation = saveState?.save?.formation as (string | null)[] | undefined
+      if (savedFormation) {
+        const ownedIds = new Set((saveState?.heroes ?? []).map((h: { heroId: number }) => String(h.heroId)))
+        savedFormation.forEach((heroId) => {
+          if (!heroId || !ownedIds.has(String(heroId))) return
+          const hero = heroesList.find(h => String(h.HeroID ?? h.id) === String(heroId))
+          if (hero) modelIds.add(normalizeModelId(hero, heroesList.indexOf(hero)))
+        })
+      }
+    } catch { /* ignore save read errors */ }
+    await Promise.all([...modelIds].map(mid => preloadHeroModel(mid).catch(() => {})))
+
+    setShowBattleScene(true)
+    setStageMode(mode)
+    setStageId(sid)
+
+    updateEnemySlots(() => builtEnemySlots)
     restoreFormationFromSave()
     // 記住進入戰鬥前的 menuScreen，戰後可返回（一律回到關卡選擇頁）
     preBattleMenuScreenRef.current = 'stages'
@@ -131,13 +151,12 @@ export function useStageHandlers(deps: StageHandlerDeps) {
     targetUserId: string,
     defender: { displayName: string; power: number; isNPC: boolean },
   ) => {
-    // 過場幕 + 掛載戰鬥場景
+    // 過場幕（先不掛載 Canvas，等 API + 模型預載完成後再掛載）
     setCurtainVisible(true)
     setCurtainFading(false)
     setCurtainText(`正在載入 ${defender.displayName} 的陣型…`)
     curtainClosePromiseRef.current = null
     await waitFrames(2)
-    setShowBattleScene(true)
 
     try {
       const res = await startArenaChallenge(targetUserId)
@@ -147,7 +166,6 @@ export function useStageHandlers(deps: StageHandlerDeps) {
         } else {
           showToast(`挑戰失敗：${res.error === 'no_challenges_left' ? '今日挑戰次數已用完' : res.error}`)
         }
-        setShowBattleScene(false)
         closeCurtain()
         return
       }
@@ -196,6 +214,26 @@ export function useStageHandlers(deps: StageHandlerDeps) {
         }
       }
       arenaTargetRankRef.current = targetRank
+
+      // ── 預載入所有英雄 3D 模型，避免 Suspense 黑屏 ──
+      const arenaModelIds = new Set<string>()
+      enemySlotsArr.forEach(s => { if (s?._modelId) arenaModelIds.add(s._modelId) })
+      try {
+        const saveState = getSaveState()
+        const savedFormation = saveState?.save?.formation as (string | null)[] | undefined
+        if (savedFormation) {
+          const ownedIds = new Set((saveState?.heroes ?? []).map((h: { heroId: number }) => String(h.heroId)))
+          savedFormation.forEach((heroId) => {
+            if (!heroId || !ownedIds.has(String(heroId))) return
+            const hero = heroesList.find(h => String(h.HeroID ?? h.id) === String(heroId))
+            if (hero) arenaModelIds.add(normalizeModelId(hero, heroesList.indexOf(hero)))
+          })
+        }
+      } catch { /* ignore */ }
+      await Promise.all([...arenaModelIds].map(mid => preloadHeroModel(mid).catch(() => {})))
+
+      // ── 模型預載完成，現在才掛載 Canvas + 設定戰鬥狀態 ──
+      setShowBattleScene(true)
       setStageMode('pvp')
       setSceneTheme(pickSceneForStage('pvp', `arena-${targetRank}`))
       setStageId(`arena-${targetRank}`)
@@ -214,13 +252,12 @@ export function useStageHandlers(deps: StageHandlerDeps) {
 
   /* ── 競技場防守陣型配置 ── */
   const handleArenaDefenseSetup = useCallback(async () => {
-    // 過場幕 + 掛載戰鬥場景
+    // 過場幕（先不掛載 Canvas，等 API + 模型預載完成後再掛載）
     setCurtainVisible(true)
     setCurtainFading(false)
     setCurtainText('載入防守陣型配置…')
     curtainClosePromiseRef.current = null
     await waitFrames(2)
-    setShowBattleScene(true)
 
     setIsDefenseSetup(true)
     isDefenseSetupRef.current = true
@@ -254,6 +291,9 @@ export function useStageHandlers(deps: StageHandlerDeps) {
             ModelID: mid,
           }
         })
+        // ── 預載入防守陣型模型 ──
+        const defModelIds = restored.filter(Boolean).map(h => h!._modelId).filter(Boolean) as string[]
+        await Promise.all(defModelIds.map(mid => preloadHeroModel(mid).catch(() => {})))
         if (restored.some(Boolean)) {
           updatePlayerSlots(() => restored)
         } else {
@@ -267,6 +307,8 @@ export function useStageHandlers(deps: StageHandlerDeps) {
       // API 失敗，清空
       updatePlayerSlots(() => [...EMPTY_SLOTS])
     }
+    // ── API + 模型預載完成，現在才掛載 Canvas ──
+    setShowBattleScene(true)
     setMenuScreen('none')
     setGameState('IDLE')
     // closeCurtain 由 Canvas 內 SceneReady 在 Suspense 解析後觸發

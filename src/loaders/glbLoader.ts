@@ -67,3 +67,27 @@ export function getGlbForSuspense(url: string): GlbAsset {
   if (cached) return cached
   throw loadGlbShared(url)
 }
+
+/**
+ * 預載入一個英雄的所有 GLB（mesh + 5 animations）。
+ * 在 Canvas 掛載前呼叫，確保模型進入快取後 getGlbForSuspense 可同步讀取。
+ */
+export function preloadHeroModel(modelId: string): Promise<void> {
+  const folder = `${import.meta.env.BASE_URL}models/${modelId}`
+  return Promise.all([
+    loadGlbShared(`${folder}/${modelId}.glb`),
+    loadGlbShared(`${folder}/${modelId}_idle.glb`),
+    loadGlbShared(`${folder}/${modelId}_attack.glb`),
+    loadGlbShared(`${folder}/${modelId}_hurt.glb`),
+    loadGlbShared(`${folder}/${modelId}_dying.glb`),
+    loadGlbShared(`${folder}/${modelId}_run.glb`),
+  ]).then(() => {})
+}
+
+/**
+ * 釋放 Draco WASM 解碼器佔用的記憶體。
+ * 所有模型載入完成後呼叫，減少 iOS WKWebView 記憶體壓力。
+ */
+export function disposeDracoDecoder(): void {
+  try { dracoLoader.dispose() } catch { /* ignore */ }
+}

@@ -1,6 +1,6 @@
 # 技術架構 Spec
 
-> 版本：v2.5 ｜ 狀態：🟢 定稿（含 Domain Engine + Services 層 + Optimistic Queue + Audio Engine + CurrencyIcon 統一 icon + PWA + App 模組化拆分 + D1 原子批次寫入 + InfoTip/RedDot/ClickableItemIcon 新元件 + 獎勵一致性修復 + 大廳/戰鬥場景分離架構 + 英雄名稱 HTML Overlay）
+> 版本：v2.6 ｜ 狀態：🟢 定稿（含 Domain Engine + Services 層 + Optimistic Queue + Audio Engine + CurrencyIcon 統一 icon + PWA + App 模組化拆分 + D1 原子批次寫入 + InfoTip/RedDot/ClickableItemIcon 新元件 + 獎勵一致性修復 + 大廳/戰鬥場景分離架構 + 英雄名稱 HTML Overlay + iOS WebGL 深度紋理修復）
 > 最後更新：2026-03-06
 > 負責角色：🔧 CODING → 🏗️ ARCHITECT
 
@@ -620,3 +620,4 @@ POST { "action": "invalidate-cache" }
 | v2.3 | 2026-03-06 | **iOS PWA Canvas GPU 紋理保活**：Canvas `visibility:hidden` → `pointerEvents:none`，避免 iOS WKWebView 在 Canvas 隱藏期間回收 GPU 紋理資源導致已載入模型變黑；還原 ZombieModel/HeroListPanel cloneMat metalness 覆寫（非根因） |
 | v2.4 | 2026-03-06 | **英雄名稱 HTML Overlay**：Billboard Text → Html DOM，固定像素大小 |
 | v2.5 | 2026-03-06 | **大廳/戰鬥場景分離架構**：新增 `showBattleScene` 狀態，Canvas（3D 場景）不再常駐掛載 — 大廳模式完全不載入 Canvas，僅在進入戰鬥準備（handleStageSelect/handleArenaStartBattle/handleArenaDefenseSetup）時才動態掛載，並以過場幕遮蔽載入過程；返回大廳時 Canvas 卸載釋放 GPU 資源。還原 v2.3 的 `visibility:hidden → pointerEvents:none` 修改（不再需要），根本解決 iOS WKWebView 紋理回收問題 |
+| v2.6 | 2026-03-06 | **iOS WebGL 深度紋理修復**：(1) ZombieModel/HeroListPanel `cloneMat` 新增所有紋理貼圖 `needsUpdate=true`（map/normalMap/roughnessMap/metalnessMap/aoMap），diffuse map 強制 `SRGBColorSpace`；(2) Canvas iOS 強制 WebGL1 渲染器（WKWebView WebGL2 紋理分配 bug）、`shadows=false`、`flat` 模式、`NoToneMapping`（避免 ACES 壓暗）；(3) ZombieModel useEffect cleanup — unmount 時 dispose cloned materials 防止 VRAM 洩漏；(4) glbLoader 新增 `disposeDracoDecoder()` 釋放 WASM 記憶體；(5) Context restored handler 加入紋理 colorSpace 修正 |

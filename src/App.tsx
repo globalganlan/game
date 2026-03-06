@@ -13,6 +13,7 @@
 
 import { useState, useEffect, useRef, useCallback, useMemo, Suspense } from 'react'
 import { Canvas } from '@react-three/fiber'
+import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 
 import './App.css'
@@ -98,6 +99,22 @@ function SceneReady({ onReady }: { onReady: (delay?: number) => void }) {
     requestAnimationFrame(() => onReady(0))
   }, [onReady])
   return null
+}
+
+/** 英雄模型載入中佔位符 — 半透明旋轉方塊 */
+function HeroLoadingPlaceholder({ position }: { position: [number, number, number] }) {
+  const ref = useRef<THREE.Mesh>(null)
+  useFrame((_, delta) => {
+    if (ref.current) ref.current.rotation.y += delta * 2
+  })
+  return (
+    <group position={position}>
+      <mesh ref={ref} position={[0, 1, 0]}>
+        <boxGeometry args={[0.6, 0.6, 0.6]} />
+        <meshStandardMaterial color="#4488ff" transparent opacity={0.5} wireframe />
+      </mesh>
+    </group>
+  )
 }
 
 export default function App() {
@@ -478,13 +495,36 @@ export default function App() {
               position: 'absolute', top: 0, left: 0, width: '100%', height: '100%',
             }}
             camera={{ position: responsive.camPos, fov: responsive.fov }}
-            shadows
+            shadows={!/iPhone|iPad|iPod/.test(navigator.userAgent)}
+            flat={/iPhone|iPad|iPod/.test(navigator.userAgent)}
             frameloop="always"
             dpr={responsive.dpr}
-            gl={{ powerPreference: 'default', antialias: !/iPhone|iPad|iPod/.test(navigator.userAgent) }}
-            onCreated={({ gl }) => {
-              gl.shadowMap.enabled = true
-              gl.shadowMap.type = THREE.PCFShadowMap
+            gl={(/iPhone|iPad|iPod/.test(navigator.userAgent))
+              ? ((defaultProps) => {
+                  // ★ iOS 強制 WebGL1 — WKWebView 的 WebGL2 有紋理分配 bug
+                  const cvs = defaultProps.canvas as HTMLCanvasElement
+                  const context = cvs.getContext('webgl', {
+                    alpha: true,
+                    antialias: false,
+                    powerPreference: 'default',
+                    preserveDrawingBuffer: false,
+                  })!
+                  const renderer = new THREE.WebGLRenderer({ canvas: cvs, context })
+                  renderer.outputColorSpace = THREE.SRGBColorSpace
+                  renderer.toneMapping = THREE.NoToneMapping
+                  return renderer
+                }) as NonNullable<React.ComponentProps<typeof Canvas>['gl']>
+              : { antialias: true }
+            }
+            onCreated={({ gl, scene }) => {
+              const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent)
+              if (!isIOS) {
+                gl.shadowMap.enabled = true
+                gl.shadowMap.type = THREE.PCFShadowMap
+              }
+              // ★ 顯式設定 sRGB 色彩空間 + 關閉 tone mapping（避免 ACES 壓暗）
+              gl.outputColorSpace = THREE.SRGBColorSpace
+              if (isIOS) gl.toneMapping = THREE.NoToneMapping
 
               // ── WebGL Context Lost / Restored 處理 ──
               const canvas = gl.domElement
@@ -494,8 +534,27 @@ export default function App() {
               })
               canvas.addEventListener('webglcontextrestored', () => {
                 console.info('[WebGL] Context Restored — reinitializing renderer')
-                gl.shadowMap.enabled = true
-                gl.shadowMap.type = THREE.PCFShadowMap
+                if (!isIOS) {
+                  gl.shadowMap.enabled = true
+                  gl.shadowMap.type = THREE.PCFShadowMap
+                }
+                // ★ 重新上傳所有紋理 + 色彩空間修正（context lost 後 GPU 資料遺失）
+                scene.traverse((obj) => {
+                  if ((obj as THREE.Mesh).isMesh) {
+                    const mesh = obj as THREE.Mesh
+                    const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material]
+                    mats.forEach((mat) => {
+                      if (!mat) return
+                      mat.needsUpdate = true
+                      const stdMat = mat as THREE.MeshStandardMaterial
+                      if (stdMat.map) { stdMat.map.needsUpdate = true; stdMat.map.colorSpace = THREE.SRGBColorSpace }
+                      if (stdMat.normalMap) stdMat.normalMap.needsUpdate = true
+                      if (stdMat.roughnessMap) stdMat.roughnessMap.needsUpdate = true
+                      if (stdMat.metalnessMap) stdMat.metalnessMap.needsUpdate = true
+                      if (stdMat.aoMap) stdMat.aoMap.needsUpdate = true
+                    })
+                  }
+                })
               })
             }}
           >
@@ -510,11 +569,11 @@ export default function App() {
                 <SlotMarker key={`es${i}`} position={pos} color="#ff2222" />
               ))}
 
-              {/* 玩家英雄 */}
+              {/* 玩家英雄 — 各自獨立 Suspense，避免新英雄載入時整場黑屏 */}
               {playerSlots.map((p, i) =>
                 p ? (
+                  <Suspense key={`p${i}`} fallback={<HeroLoadingPlaceholder position={PLAYER_SLOT_POSITIONS[i]} />}>
                   <Hero
-                    key={`p${i}`}
                     position={PLAYER_SLOT_POSITIONS[i]}
                     heroData={p}
                     isPlayer
@@ -546,6 +605,7 @@ export default function App() {
                     battleBuffs={battleBuffs[p._uid] || []}
                     buffApplyHints={buffApplyHints.filter((bh) => bh.heroUid === p._uid)}
                   />
+                  </Suspense>
                 ) : null,
               )}
 
@@ -557,11 +617,11 @@ export default function App() {
                 onDragEnd={endDragAt}
               />
 
-              {/* 敵方英雄（防守配置模式時隱藏） */}
+              {/* 敵方英雄（防守配置模式時隱藏）— 各自獨立 Suspense */}
               {!isDefenseSetup && enemySlots.map((e, i) =>
                 e ? (
+                  <Suspense key={`e${i}`} fallback={<HeroLoadingPlaceholder position={ENEMY_SLOT_POSITIONS[i]} />}>
                   <Hero
-                    key={`e${i}`}
                     position={ENEMY_SLOT_POSITIONS[i]}
                     heroData={e}
                     isPlayer={false}
@@ -582,6 +642,7 @@ export default function App() {
                     battleBuffs={battleBuffs[e._uid] || []}
                     buffApplyHints={buffApplyHints.filter((bh) => bh.heroUid === e._uid)}
                   />
+                  </Suspense>
                 ) : null,
               )}
 

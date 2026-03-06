@@ -4,6 +4,47 @@
 
 ---
 
+### [2026-03-06] iOS WebGL 深度紋理修復（v2.6）
+- **觸發者**：使用者（iOS PWA 戰鬥場景英雄模型紋理顯示黑色 — 第二輪深度修復）
+- **執行角色**：🔧 CODING + 🧪 QA
+- **變更摘要**：
+  1. **ZombieModel.tsx cloneMat** — 所有紋理貼圖（map/normalMap/roughnessMap/metalnessMap/aoMap）加入 `texture.needsUpdate=true`，diffuse map 強制 `SRGBColorSpace`；iOS `receiveShadow` 也設為 false
+  2. **ZombieModel.tsx GPU cleanup** — 新增 useEffect cleanup，unmount 時 dispose cloned materials 防止 VRAM 洩漏
+  3. **HeroListPanel.tsx cloneMat** — 同步修復，加入所有紋理 `needsUpdate=true` + `material.needsUpdate=true`
+  4. **App.tsx Canvas iOS 渲染器** — iOS 強制 WebGL1（getContext('webgl')）避免 WKWebView WebGL2 紋理分配 bug；`shadows=false`、`flat` 模式、`NoToneMapping`（避免 ACES 壓暗 PBR 暗部）
+  5. **App.tsx Context Restored** — 紋理重新上傳時加入 colorSpace 修正（`map.colorSpace = SRGBColorSpace`）
+  6. **glbLoader.ts** — 新增 `disposeDracoDecoder()` 導出函數，載入完成後可釋放 Draco WASM 記憶體
+- **影響範圍**：ZombieModel.tsx / HeroListPanel.tsx / App.tsx / glbLoader.ts
+- **Spec 更新**：tech-architecture.md v2.5 → v2.6
+- **測試結果**：TSC 零錯誤、Vite build 成功、Playwright 完整流程測試通過（登入→大廳→關卡→英雄選擇→戰鬥→勝利→返回，0 errors）
+
+---
+
+### [2026-03-07] 9 項穩定性與 UI 修復
+- **觸發者**：使用者（多項 Bug 回報）
+- **執行角色**：🔧 CODING + 🧪 QA
+- **變更摘要**：
+  1. **物品資訊彈窗被遮擋** — `ItemInfoPopup.tsx` 使用 `createPortal` 將彈窗渲染到 `document.body`，避免被 CSS stacking context 遮擋；`InventoryPanel.tsx` 同步修復
+  2. **每日副本點道具進入戰鬥** — `StageSelect.tsx` 將 `ClickableItemIcon` 從 `<button>` 內移到外層 `.daily-tier-wrapper` 包裹；`ClickableItemIcon.tsx` 加入 `e.preventDefault()` + `onPointerDown` stopPropagation
+  3. **英雄穿戴裝備不更新** — `HeroListPanel.tsx` `heroEquipment` useMemo deps 加入 `invTick`
+  4. **競技場排名看不到自己戰力** — `workers/src/routes/arena.ts` 後端返回 `myPower`；`arenaService.ts` 前端傳遞；`ArenaPanel.tsx` 新增「我的排名」區塊
+  5. **競技場戰力不一致** — `workers/src/routes/arena.ts` 每次 `arena-get-rankings` 自動用 `calcDefensePower` 重新計算並更新戰力
+  6. **大廳按鈕順序** — `MainMenu.tsx` 按解鎖需求重排 MENU_ITEMS
+  7. **模型未載入黑屏** — `glbLoader.ts` 新增 `preloadHeroModel()`；`App.tsx` 每個 Hero 獨立 `<Suspense>` + `HeroLoadingPlaceholder`；`useStageHandlers.ts` + `useBattleFlow.ts` Canvas 掛載前預載模型
+  8. **iOS PWA 紋理黑色** — `ZombieModel.tsx` material.clone() 後 `needsUpdate=true`、iOS 不投射陰影；`App.tsx` 設定 `outputColorSpace` + context restored 重新上傳紋理；`Arena.tsx` iOS shadow map 降為 512×512 且關閉 castShadow
+  9. **簽到斷簽顯示錯誤** — `CheckinPanel.tsx` 加入 `getYesterdayTaipeiDate()` 判斷 streak 是否有效，斷簽時 `effectiveDay=0`
+- **影響範圍**：
+  - `src/components/ItemInfoPopup.tsx`、`src/components/InventoryPanel.tsx`（Portal 修復）
+  - `src/components/StageSelect.tsx`、`src/components/ClickableItemIcon.tsx`（事件冒泡修復）
+  - `src/components/HeroListPanel.tsx`（裝備 useMemo deps）
+  - `workers/src/routes/arena.ts`、`src/services/arenaService.ts`、`src/components/ArenaPanel.tsx`（競技場戰力）
+  - `src/components/MainMenu.tsx`（按鈕排序）
+  - `src/loaders/glbLoader.ts`、`src/App.tsx`、`src/hooks/useStageHandlers.ts`、`src/hooks/useBattleFlow.ts`（模型預載）
+  - `src/components/ZombieModel.tsx`、`src/components/Arena.tsx`（iOS 紋理修復）
+  - `src/components/CheckinPanel.tsx`（簽到 streak 修復）
+
+---
+
 ### [2026-03-07] 英雄模型載入指示器 + 全專案 lint 清理
 - **觸發者**：使用者（兩項需求）
 - **執行角色**：🔧 CODING + 🧪 QA

@@ -26,6 +26,7 @@ import { buildEnemySlotsFromStage } from '../game/helpers'
 import { getStageConfig } from '../services/stageService'
 import { waitFrames } from '../game/constants'
 import { executeBattleLoop } from '../game/runBattleLoop'
+import { preloadHeroModel } from '../loaders/glbLoader'
 
 export interface BattleFlowDeps {
   /* ── Refs ── */
@@ -283,7 +284,11 @@ export function useBattleFlow(deps: BattleFlowDeps) {
       )
       updatePlayerSlots(() => restored)
       setStageId(String(nextFloor))
-      updateEnemySlots(() => buildEnemySlotsFromStage('tower', String(nextFloor), heroesList))
+      const nextEnemySlots = buildEnemySlotsFromStage('tower', String(nextFloor), heroesList)
+      // ── 預載入下一層敵人模型 ──
+      const towerModelIds = nextEnemySlots.filter(Boolean).map(s => s!._modelId).filter(Boolean) as string[]
+      await Promise.all(towerModelIds.map(mid => preloadHeroModel(mid).catch(() => {})))
+      updateEnemySlots(() => nextEnemySlots)
       resetBattleState()
       setVictoryRewards(null)
       setGameState('IDLE')
@@ -310,7 +315,11 @@ export function useBattleFlow(deps: BattleFlowDeps) {
     if (stageMode === 'story') {
       try { const cfg = await getStageConfig(nextId); if (cfg) injectedEnemies = cfg.enemies } catch {}
     }
-    updateEnemySlots(() => buildEnemySlotsFromStage(stageMode, nextId, heroesList, injectedEnemies))
+    const nextEnemySlots = buildEnemySlotsFromStage(stageMode, nextId, heroesList, injectedEnemies)
+    // ── 預載入下一關敵人模型 ──
+    const nextModelIds = nextEnemySlots.filter(Boolean).map(s => s!._modelId).filter(Boolean) as string[]
+    await Promise.all(nextModelIds.map(mid => preloadHeroModel(mid).catch(() => {})))
+    updateEnemySlots(() => nextEnemySlots)
 
     resetBattleState()
     setVictoryRewards(null)

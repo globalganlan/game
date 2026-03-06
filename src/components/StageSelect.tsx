@@ -402,15 +402,16 @@ function DailyPanel({
               const tierLabel = { easy: '簡單', normal: '普通', hard: '困難' }[diff.tier]
               const noAttempts = remaining <= 0
               return (
-                <button
-                  key={diff.tier}
-                  className={`daily-tier-btn ${!unlocked ? 'daily-tier-locked' : ''} ${noAttempts ? 'daily-tier-locked' : ''}`}
-                  disabled={!unlocked || noAttempts}
-                  onClick={() => onSelect(`${dungeon.dungeonId}_${diff.tier}`)}
-                >
-                  <span>{tierLabel}</span>
-                  {!unlocked && <span className="daily-tier-req">需第{diff.requiredChapter}章</span>}
-                  {/* 獎勵預覽 */}
+                <div key={diff.tier} className="daily-tier-wrapper">
+                  <button
+                    className={`daily-tier-btn ${!unlocked ? 'daily-tier-locked' : ''} ${noAttempts ? 'daily-tier-locked' : ''}`}
+                    disabled={!unlocked || noAttempts}
+                    onClick={() => onSelect(`${dungeon.dungeonId}_${diff.tier}`)}
+                  >
+                    <span>{tierLabel}</span>
+                    {!unlocked && <span className="daily-tier-req">需第{diff.requiredChapter}章</span>}
+                  </button>
+                  {/* 獎勵預覽（移至按鈕外，避免點擊道具說明時觸發戰鬥） */}
                   {unlocked && (
                     <span className="daily-tier-rewards">
                       <CurrencyIcon type="gold" /> {diff.rewards.gold}
@@ -420,7 +421,7 @@ function DailyPanel({
                       ))}
                     </span>
                   )}
-                </button>
+                </div>
               )
             })}
           </div>

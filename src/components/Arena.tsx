@@ -730,6 +730,8 @@ interface ArenaProps {
 
 export function Arena({ sceneMode = 'story', stageId = '1-1' }: ArenaProps) {
   const theme = THEMES[sceneMode]
+  // iOS 偵測 — 降低 shadow map 尺寸以節省 GPU 記憶體
+  const isIOS = useMemo(() => /iPhone|iPad|iPod/.test(navigator.userAgent), [])
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const debris = useMemo(() => generateDebris(theme), [sceneMode])
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -789,9 +791,9 @@ export function Arena({ sceneMode = 'story', stageId = '1-1' }: ArenaProps) {
         position={theme.dirLights[0]?.pos ?? [5, 25, 15]}
         intensity={theme.dirLights[0]?.intensity ?? 5}
         color={theme.dirLights[0]?.color ?? '#ffffff'}
-        castShadow
-        shadow-mapSize-width={2048}
-        shadow-mapSize-height={2048}
+        castShadow={!isIOS}
+        shadow-mapSize-width={isIOS ? 512 : 2048}
+        shadow-mapSize-height={isIOS ? 512 : 2048}
         shadow-camera-left={-15}
         shadow-camera-right={15}
         shadow-camera-top={15}

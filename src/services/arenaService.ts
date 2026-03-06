@@ -53,6 +53,7 @@ export interface ArenaRankingsResult {
   rankings: ArenaEntry[]
   opponents: ArenaOpponent[]
   myRank: number
+  myPower: number
   challengesLeft: number
   highestRank: number
   refreshesLeft: number
@@ -66,6 +67,7 @@ export async function getArenaRankings(): Promise<ArenaRankingsResult> {
       rankings: ArenaEntry[]
       opponents: ArenaOpponent[]
       myRank: number
+      myPower: number
       challengesLeft: number
       highestRank: number
       refreshesLeft: number
@@ -74,6 +76,7 @@ export async function getArenaRankings(): Promise<ArenaRankingsResult> {
       const rankings = result.rankings ?? []
       const opponents = result.opponents ?? []
       const myRank = result.myRank ?? ARENA_MAX_RANK
+      const myPower = result.myPower ?? 0
       const challengesLeft = result.challengesLeft ?? ARENA_DAILY_CHALLENGES_CONST
       const highestRank = result.highestRank ?? ARENA_MAX_RANK
       const refreshesLeft = result.refreshesLeft ?? ARENA_DAILY_REFRESHES
@@ -83,7 +86,7 @@ export async function getArenaRankings(): Promise<ArenaRankingsResult> {
       cachedChallengesLeft = challengesLeft
       cachedHighestRank = highestRank
 
-      return { rankings, opponents, myRank, challengesLeft, highestRank, refreshesLeft }
+      return { rankings, opponents, myRank, myPower, challengesLeft, highestRank, refreshesLeft }
     }
   } catch {
     // 降級到離線 NPC 模式
@@ -108,6 +111,7 @@ function getOfflineRankings(): ArenaRankingsResult {
     rankings,
     opponents,
     myRank,
+    myPower: 0,
     challengesLeft: cachedChallengesLeft ?? ARENA_DAILY_CHALLENGES_CONST,
     highestRank: cachedHighestRank,
     refreshesLeft: ARENA_DAILY_REFRESHES,

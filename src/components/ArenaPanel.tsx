@@ -267,6 +267,16 @@ export function ArenaPanel({
                 )
               })}
 
+            {/* 我的排名（不在 Top 10 時顯示） */}
+            {data.myRank > 10 && (
+              <div className="arena-rank-row arena-me" style={{ marginTop: '4px', borderTop: '1px dashed rgba(255,255,255,0.15)', paddingTop: '6px' }}>
+                <span className="arena-rank-num">#{data.myRank}</span>
+                <span className="arena-rank-name">{saveData?.displayName || '我'}</span>
+                <span className="arena-rank-power">⚔️ {(data.myPower ?? 0).toLocaleString()}</span>
+                <span className="arena-me-tag">◄ 我</span>
+              </div>
+            )}
+
             {/* 挑戰對手清單 */}
             <div className="arena-section-header" style={{ marginTop: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span>⚔️ 挑戰對手</span>
