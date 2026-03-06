@@ -18,14 +18,17 @@ import {
   setDefenseFormation,
   getDefenseFormation,
   clearArenaCache,
+  refreshArenaOpponents,
   type ArenaRankingsResult,
+  type ArenaOpponent,
 } from '../services/arenaService'
 import {
-  getChallengeable,
   getChallengeReward,
   RANK_MILESTONES,
   DAILY_REWARD_TIERS,
   ARENA_MAX_RANK,
+  ARENA_DAILY_REFRESHES,
+  getChallengeRange,
   type ArenaEntry,
   type ArenaReward,
 } from '../domain/arenaSystem'
@@ -59,7 +62,7 @@ function resolveModelId(h: RawHeroData, idx = 0): string {
 
 interface ArenaPanelProps {
   onBack: () => void
-  onStartBattle: (targetRank: number, defender: ArenaEntry) => void
+  onStartBattle: (targetUserId: string, defender: ArenaEntry | ArenaOpponent) => void
   onSetupDefense: () => void
   saveData: SaveData | null
   heroesList: RawHeroData[]
@@ -91,6 +94,7 @@ export function ArenaPanel({
   const [defFormation, setDefFormation] = useState<(string | null)[]>([null, null, null, null, null, null])
   const [savingDef, setSavingDef] = useState(false)
   const [sweeping, setSweeping] = useState(false)
+  const [refreshing, setRefreshing] = useState(false)
   const [sweepResult, setSweepResult] = useState<{
     rewards: ArenaReward
     milestoneReward: ArenaReward | null
@@ -120,13 +124,28 @@ export function ArenaPanel({
     })
   }, [])
 
-  // 挑戰
-  const handleChallenge = (entry: ArenaEntry) => {
-    onStartBattle(entry.rank, entry)
+  // 挑戰（用 playerId 識別對手）
+  const handleChallenge = (entry: ArenaOpponent) => {
+    onStartBattle(entry.playerId, entry)
   }
 
-  // 取得可挑戰的排名
-  const challengeable = data ? new Set(getChallengeable(data.myRank)) : new Set<number>()
+  // 刷新對手清單
+  const handleRefreshOpponents = async () => {
+    setRefreshing(true)
+    try {
+      const res = await refreshArenaOpponents()
+      if (res.success && data) {
+        setData({ ...data, opponents: res.opponents ?? [], refreshesLeft: res.refreshesLeft ?? 0 })
+      } else if (res.error === 'no_refreshes_left') {
+        setError('今日免費刷新次數已用完')
+        setTimeout(() => setError(null), 2000)
+      }
+    } catch { /* ignore */ }
+    setRefreshing(false)
+  }
+
+  // 挑戰跨度提示
+  const challengeRange = data ? getChallengeRange(data.myRank) : 0
 
   // 防守陣型 — 一鍵複製
   const handleCopyFormation = () => {
@@ -208,6 +227,7 @@ export function ArenaPanel({
           </div>
           <div className="arena-info-row">
             <span>本週最高: <strong>#{data.highestRank}</strong></span>
+            <span>挑戰跨度: <strong>{challengeRange}</strong> 名</span>
           </div>
         </div>
       )}
@@ -227,38 +247,70 @@ export function ArenaPanel({
         {/* ── 排行榜 ── */}
         {tab === 'rankings' && data && !loading && (
           <div className="arena-rank-list">
+            {/* Top 10 排行榜 */}
+            <div className="arena-section-header">🏆 排行榜 Top 10</div>
             {data.rankings
+              .filter(e => e.rank <= 10)
               .sort((a, b) => a.rank - b.rank)
               .map(entry => {
                 const isMe = entry.rank === data.myRank && !entry.isNPC
-                const canChallenge = challengeable.has(entry.rank) && data.challengesLeft > 0
-                const canSweep = entry.rank === data.myRank + 1 && data.challengesLeft > 0 && data.myRank > 0 && data.myRank < ARENA_MAX_RANK
                 const medal = entry.rank === 1 ? '🥇' : entry.rank === 2 ? '🥈' : entry.rank === 3 ? '🥉' : ''
-
                 return (
-                  <div key={entry.rank} className={`arena-rank-row ${isMe ? 'arena-me' : ''}`}>
-                    <span className="arena-rank-num">
-                      {medal} #{entry.rank}
-                    </span>
+                  <div key={`top-${entry.rank}`} className={`arena-rank-row ${isMe ? 'arena-me' : ''}`}>
+                    <span className="arena-rank-num">{medal} #{entry.rank}</span>
                     <span className="arena-rank-name">
                       {entry.displayName}
                       {entry.isNPC && <span className="arena-npc-tag">(NPC)</span>}
                     </span>
                     <span className="arena-rank-power">⚔️ {entry.power.toLocaleString()}</span>
-                    {!isMe && canChallenge && (
-                      <button className="arena-challenge-btn" onClick={() => handleChallenge(entry)}>
-                        挑戰
-                      </button>
-                    )}
-                    {canSweep && (
-                      <button className="arena-sweep-btn" onClick={handleSweep} disabled={sweeping}>
-                        {sweeping ? '⚡…' : '⚡ 掃蕩'}
-                      </button>
-                    )}
                     {isMe && <span className="arena-me-tag">◄ 我</span>}
                   </div>
                 )
               })}
+
+            {/* 挑戰對手清單 */}
+            <div className="arena-section-header" style={{ marginTop: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span>⚔️ 挑戰對手</span>
+              <button
+                className="arena-refresh-btn"
+                onClick={handleRefreshOpponents}
+                disabled={refreshing || (data.refreshesLeft ?? 0) <= 0}
+              >
+                {refreshing ? '刷新中…' : `🔄 刷新 (${data.refreshesLeft}/${ARENA_DAILY_REFRESHES})`}
+              </button>
+            </div>
+            {data.opponents.length === 0 && (
+              <div className="arena-loading">已在最高排名，無可挑戰對手</div>
+            )}
+            {data.opponents
+              .sort((a, b) => a.rank - b.rank)
+              .map(entry => {
+                const canChallenge = data.challengesLeft > 0
+                return (
+                  <div key={`opp-${entry.playerId}`} className="arena-rank-row">
+                    <span className="arena-rank-num">#{entry.rank}</span>
+                    <span className="arena-rank-name">
+                      {entry.displayName}
+                      {entry.isNPC && <span className="arena-npc-tag">(NPC)</span>}
+                    </span>
+                    <span className="arena-rank-power">⚔️ {entry.power.toLocaleString()}</span>
+                    {canChallenge && (
+                      <button className="arena-challenge-btn" onClick={() => handleChallenge(entry)}>
+                        挑戰
+                      </button>
+                    )}
+                  </div>
+                )
+              })}
+
+            {/* 掃蕩（打後一名） */}
+            {data.myRank < ARENA_MAX_RANK && data.challengesLeft > 0 && (
+              <div style={{ textAlign: 'center', marginTop: '8px' }}>
+                <button className="arena-sweep-btn" onClick={handleSweep} disabled={sweeping}>
+                  {sweeping ? '⚡…' : '⚡ 掃蕩（打後一名拿獎勵）'}
+                </button>
+              </div>
+            )}
           </div>
         )}
 

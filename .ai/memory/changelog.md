@@ -3,6 +3,49 @@
 > 按時間倒序排列，最新的在最上面。
 
 ---
+### [2026-03-06] 全專案 safe-area-inset-top 補齊
+
+- **觸發者**：使用者（「所有介面上方都要留手機導航列的空間」）
+- **執行角色**：🔧 CODING + 🧪 QA
+- **變更摘要**：
+
+  掃描全部 34 個元件 + App.css（6742 行），找出所有缺少 `env(safe-area-inset-top)` 的頂部介面，統一修復：
+  1. **`.arena-panel`** — 新增 `padding-top: env(safe-area-inset-top, 0px)`
+  2. **`.battle-prep-top-banner`** — `padding-top` 改為 `max(8px, env(safe-area-inset-top, 0px))`
+  3. **`.battle-result-banner`** — `top` 改為 `max(5%, env(safe-area-inset-top, 0px))`
+  4. **`.boss-dmg-bar-wrap`** — `top` 改為 `max(clamp(...), env(safe-area-inset-top, 0px))`
+  5. **`.bhud-skill-toasts`** — `margin-top` 改為 `max(60px, calc(env(safe-area-inset-top) + 30px))`
+
+  原本已有 safe-area 的 5 個介面確認不需修改（`.game-hud` / `.login-screen` / `.main-menu-overlay` / `.panel-overlay` / `.hero-detail-backdrop`）。
+
+- **影響範圍**：`src/App.css`（5 處修改）
+- **驗證**：Puppeteer 模擬 iPhone 14 Pro 掃描確認全部 10 個介面 CSS 規則含 safe-area ✅
+- **Spec 更新**：`arena-pvp.md` v1.1 → v2.0、`decisions.md` ADR-014/015
+
+---
+### [2026-03-06] 競技場動態挑戰範圍 + 對手清單系統重構
+
+- **觸發者**：使用者（維持 5 場但擴大跨度 + 排名變動自動免費刷新）
+- **執行角色**：🔧 CODING + 🧪 QA
+- **變更摘要**：
+
+  1. **動態挑戰範圍**：固定 -3 → 4 階動態（rank>100→200, 21-100→50, 6-20→15, 1-5→5）
+  2. **持久化對手清單**：10 名隨機對手存入 `save_data.arenaOpponents`（JSON）
+  3. **手動刷新**：每日 5 次免費，`arena-refresh-opponents` 新端點
+  4. **排名變動偵測**：挑戰時檢查對手排名是否仍比自己前面，否則拒絕 + 免費自動刷新
+  5. **勝利後自動重生**：排名交換後自動重新生成對手清單
+  6. **UI 重構**：Top 10 排行榜（唯讀）+ 10 名挑戰對手 + 🔄刷新按鈕
+
+- **影響範圍**：
+  - `workers/src/routes/arena.ts` — 大幅重寫（getChallengeRange、refreshAndStoreOpponents、排名變動檢查）
+  - `src/domain/arenaSystem.ts` — getChallengeRange() + ARENA_DAILY_REFRESHES
+  - `src/services/arenaService.ts` — ArenaOpponent 型別 + refreshArenaOpponents()
+  - `src/components/ArenaPanel.tsx` — 全新 UI
+  - `src/hooks/useStageHandlers.ts` — targetUserId + rankChanged 處理
+  - `workers/schema.sql` — 新增 arenaOpponents / arenaRefreshCount 欄位
+- **Workers 已部署** + **D1 遷移完成**
+
+---
 ### [2026-03-05] 競技場排行榜戰力全員即時重算 + 掃蕩結算面板
 
 - **觸發者**：使用者

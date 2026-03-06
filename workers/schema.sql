@@ -52,6 +52,8 @@ CREATE TABLE IF NOT EXISTS save_data (
   arenaChallengesLeft     INTEGER NOT NULL DEFAULT 5,
   arenaHighestRank        INTEGER NOT NULL DEFAULT 500,
   arenaLastReset          TEXT NOT NULL DEFAULT '',
+  arenaOpponents          TEXT NOT NULL DEFAULT '[]',
+  arenaRefreshCount       INTEGER NOT NULL DEFAULT 0,
   -- PWA 獎勵
   pwaRewardClaimed        INTEGER NOT NULL DEFAULT 0,
   -- 每日次數計數 (JSON: {"daily":0,"pvp":0,"boss":0,"date":"2026-03-04"})

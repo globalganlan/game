@@ -8,7 +8,8 @@ import { describe, it, expect } from 'vitest'
 import {
   ARENA_MAX_RANK,
   ARENA_DAILY_CHALLENGES,
-  ARENA_CHALLENGE_RANGE,
+  ARENA_DAILY_REFRESHES,
+  getChallengeRange,
   RANK_MILESTONES,
   DAILY_REWARD_TIERS,
   SEASON_REWARD_TIERS,
@@ -28,7 +29,11 @@ import {
 describe('Spec AR-16: 競技場常數', () => {
   it('排名上限 = 500', () => expect(ARENA_MAX_RANK).toBe(500))
   it('每日挑戰次數 = 5', () => expect(ARENA_DAILY_CHALLENGES).toBe(5))
-  it('挑戰範圍 = 3', () => expect(ARENA_CHALLENGE_RANGE).toBe(3))
+  it('每日刷新次數 = 5', () => expect(ARENA_DAILY_REFRESHES).toBe(5))
+  it('挑戰跨度：rank 500 → 200', () => expect(getChallengeRange(500)).toBe(200))
+  it('挑戰跨度：rank 50 → 50', () => expect(getChallengeRange(50)).toBe(50))
+  it('挑戰跨度：rank 10 → 15', () => expect(getChallengeRange(10)).toBe(15))
+  it('挑戰跨度：rank 3 → 5', () => expect(getChallengeRange(3)).toBe(5))
 })
 
 /* ════════════════════════════════════
@@ -87,13 +92,19 @@ describe('Spec AR-2: NPC 確定性（seeded RNG）', () => {
    三、挑戰對象選取（AR-3 ~ AR-5）
    ════════════════════════════════════ */
 
-describe('Spec AR-3: getChallengeable 正常範圍', () => {
-  it('rank 50 → [49, 48, 47]', () => {
-    expect(getChallengeable(50)).toEqual([49, 48, 47])
+describe('Spec AR-3: getChallengeable 動態跨度', () => {
+  it('rank 50 → 跨度 50，回傳 50 個目標', () => {
+    const targets = getChallengeable(50)
+    expect(targets.length).toBe(49) // rank 1..49
+    expect(targets[0]).toBe(49)
+    expect(targets[targets.length - 1]).toBe(1)
   })
 
-  it('rank 100 → [99, 98, 97]', () => {
-    expect(getChallengeable(100)).toEqual([99, 98, 97])
+  it('rank 500 → 跨度 200', () => {
+    const targets = getChallengeable(500)
+    expect(targets.length).toBe(200)
+    expect(targets[0]).toBe(499)
+    expect(targets[targets.length - 1]).toBe(300)
   })
 })
 
@@ -112,10 +123,6 @@ describe('Spec AR-5: rank 2 邊界', () => {
 describe('getChallengeable 其他邊界', () => {
   it('rank 3 → [2, 1]', () => {
     expect(getChallengeable(3)).toEqual([2, 1])
-  })
-
-  it('rank 500（最低）→ [499, 498, 497]', () => {
-    expect(getChallengeable(500)).toEqual([499, 498, 497])
   })
 })
 

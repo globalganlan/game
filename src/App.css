@@ -76,7 +76,7 @@
 
 .battle-result-banner {
   position: absolute;
-  top: 5%;
+  top: max(5%, env(safe-area-inset-top, 0px));
   left: 50%;
   transform: translateX(-50%);
   z-index: 20;
@@ -4828,7 +4828,7 @@
 /* Skill Toasts */
 .bhud-skill-toasts {
   align-self: center;
-  margin-top: 60px;
+  margin-top: max(60px, calc(env(safe-area-inset-top, 0px) + 30px));
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -5573,7 +5573,7 @@
   flex-direction: column;
   align-items: center;
   gap: 4px;
-  padding: 8px 12px 6px;
+  padding: max(8px, env(safe-area-inset-top, 0px)) 12px 6px;
   background: linear-gradient(180deg, rgba(0,0,0,0.65) 0%, rgba(0,0,0,0.25) 80%, transparent 100%);
   z-index: 12;
   pointer-events: auto;
@@ -5829,6 +5829,7 @@
   flex-direction: column;
   color: #eee;
   overflow: hidden;
+  padding-top: env(safe-area-inset-top, 0px);
 }
 
 /* 競技場頂部 */
@@ -5839,6 +5840,7 @@
   background: rgba(0,0,0,0.3);
   gap: 12px;
   flex-shrink: 0;
+  /* safe-area 已由 .arena-panel padding-top 處理 */
 }
 .arena-back-btn {
   background: none;
@@ -5976,6 +5978,38 @@
   background: rgba(255,200,60,0.3);
 }
 .arena-challenge-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* 區段標題 */
+.arena-section-header {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #ffc83c;
+  padding: 6px 8px;
+  background: rgba(255,200,60,0.08);
+  border-left: 3px solid #ffc83c;
+  border-radius: 4px;
+  margin-bottom: 4px;
+}
+
+/* 刷新按鈕 */
+.arena-refresh-btn {
+  padding: 3px 10px;
+  border-radius: 4px;
+  border: 1px solid rgba(100,180,255,0.4);
+  background: rgba(100,180,255,0.12);
+  color: #8ac8ff;
+  font-size: 0.7rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.arena-refresh-btn:hover {
+  background: rgba(100,180,255,0.25);
+}
+.arena-refresh-btn:disabled {
   opacity: 0.4;
   cursor: not-allowed;
 }
@@ -6576,7 +6610,7 @@
 
 .boss-dmg-bar-wrap {
   position: fixed;
-  top: clamp(6px, 1.5vw, 14px);
+  top: max(clamp(6px, 1.5vw, 14px), env(safe-area-inset-top, 0px));
   left: 50%;
   transform: translateX(-50%);
   width: clamp(260px, 55vw, 480px);

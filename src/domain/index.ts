@@ -201,7 +201,8 @@ export type {
 export {
   ARENA_MAX_RANK,
   ARENA_DAILY_CHALLENGES,
-  ARENA_CHALLENGE_RANGE,
+  ARENA_DAILY_REFRESHES,
+  getChallengeRange,
   generateNPCForRank,
   getChallengeable,
   processArenaResult,

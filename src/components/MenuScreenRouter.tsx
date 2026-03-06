@@ -74,7 +74,7 @@ interface MenuScreenRouterProps {
 
   /* 競技場 */
   formation: (string | null)[]
-  onArenaStartBattle: (targetRank: number, defender: { displayName: string; power: number; isNPC: boolean }) => Promise<void>
+  onArenaStartBattle: (targetUserId: string, defender: { displayName: string; power: number; isNPC: boolean }) => Promise<void>
   onArenaDefenseSetup: () => Promise<void>
 
   /* 關卡每日次數（快取） */

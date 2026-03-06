@@ -283,3 +283,51 @@
   - 新增/修改技能被動效果對戰力的影響
   - 新增任何會改變 `getFinalStats` 輸出的機制
 - **絕對禁止**：只改一端的戰力計算而遺漏另一端
+
+---
+
+### ADR-014: 全介面 safe-area-inset-top 強制規則
+
+- **狀態**：✅ 永久生效
+- **日期**：2026-03-06
+- **背景**：iPhone 的瀏海/動態島會遮蔽畫面頂部內容。專案已在 `index.html` 設定 `viewport-fit=cover`，但多個介面缺少 `env(safe-area-inset-top)` 處理。
+- **決定**：
+  - **任何 `position: fixed/absolute` 且 `top: 0`（或接近頂部）的全屏/頂部元素，必須使用 `env(safe-area-inset-top)` 留出導航列空間**
+  - 推薦模式：`padding-top: max(原始值, env(safe-area-inset-top, 0px))` 或 `top: max(原始值, env(safe-area-inset-top, 0px))`
+  - 居中彈窗（`top: 50%` / `inset: 0` + `align-items: center`）不需要額外處理
+- **已覆蓋的 10 個介面**（截至 v2.0）：
+  1. `.game-hud` — `padding-top: max(4px, env(safe-area-inset-top))`
+  2. `.login-screen` — `padding-top: env(safe-area-inset-top, 0px)`
+  3. `.main-menu-overlay` — `padding-top: max(16px, env(safe-area-inset-top, 0px))`
+  4. `.panel-overlay`（含 8 個子面板）— `padding-top: max(12px, env(safe-area-inset-top, 0px))`
+  5. `.hero-detail-backdrop` — `padding-top: max(40px, env(safe-area-inset-top, 0px))`
+  6. `.arena-panel` — `padding-top: env(safe-area-inset-top, 0px)`
+  7. `.battle-prep-top-banner` — `padding: max(8px, env(...)) 12px 6px`
+  8. `.battle-result-banner` — `top: max(5%, env(...))`
+  9. `.boss-dmg-bar-wrap` — `top: max(clamp(...), env(...))`
+  10. `.bhud-skill-toasts` — `margin-top: max(60px, calc(env(...) + 30px))`
+- **未來規則**：新增任何頂部定位的 UI 元素時，必須檢查是否需要 safe-area-inset-top
+- **驗證方式**：Puppeteer 模擬 iPhone 14 Pro（393×852）掃描所有 CSS 規則確認含 safe-area
+
+---
+
+### ADR-015: 競技場對手清單系統設計
+
+- **狀態**：✅ 已定案
+- **日期**：2026-03-06
+- **背景**：原本競技場固定只能挑戰前方 3 名（`ARENA_CHALLENGE_RANGE = 3`），低排名玩家需打數百場才能攀到前列。使用者要求維持每日 5 場但大幅擴大挑戰跨度。
+- **決定**：
+  - **動態挑戰範圍**：依排名分 4 階（>100→200, 21-100→50, 6-20→15, 1-5→5）
+  - **持久化對手清單**：10 名隨機對手存入 `save_data.arenaOpponents`（JSON array of playerId）
+  - **手動刷新**：每日 5 次免費，`save_data.arenaRefreshCount` 計數
+  - **排名變動偵測**：`arena-challenge-start` 檢查目標排名是否仍比自己前面，否則拒絕 + 免費自動刷新（不扣刷新次數）
+  - **勝利後自動重生**：排名交換後對手池已變，自動重新生成清單
+  - **每日重置**：00:00 UTC 清空 arenaOpponents + arenaRefreshCount
+  - **挑戰改用 `targetUserId`**（非 `targetRank`），避免排名漂移問題
+- **影響範圍**：
+  - `workers/src/routes/arena.ts` — `getChallengeRange()`、`refreshAndStoreOpponents()`、排名變動檢查
+  - `src/domain/arenaSystem.ts` — `getChallengeRange()`、`ARENA_DAILY_REFRESHES`
+  - `src/services/arenaService.ts` — `ArenaOpponent` 型別、`refreshArenaOpponents()`
+  - `src/components/ArenaPanel.tsx` — Top 10 + 10 Opponents + Refresh UI
+  - `src/hooks/useStageHandlers.ts` — `targetUserId` + `rankChanged` 處理
+  - `workers/schema.sql` — `arenaOpponents TEXT`、`arenaRefreshCount INTEGER`

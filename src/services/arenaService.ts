@@ -12,7 +12,17 @@ import {
   type ArenaEntry,
   type ArenaReward,
   ARENA_MAX_RANK,
+  ARENA_DAILY_REFRESHES,
 } from '../domain/arenaSystem'
+
+/* ── 對手清單型別 ── */
+export interface ArenaOpponent {
+  playerId: string
+  rank: number
+  displayName: string
+  isNPC: boolean
+  power: number
+}
 
 /* 
    快取
@@ -41,9 +51,11 @@ export function getCachedChallengesLeft(): number | null {
 
 export interface ArenaRankingsResult {
   rankings: ArenaEntry[]
+  opponents: ArenaOpponent[]
   myRank: number
   challengesLeft: number
   highestRank: number
+  refreshesLeft: number
 }
 
 const ARENA_DAILY_CHALLENGES_CONST = 5
@@ -52,22 +64,26 @@ export async function getArenaRankings(): Promise<ArenaRankingsResult> {
   try {
     const result = await callApi<{
       rankings: ArenaEntry[]
+      opponents: ArenaOpponent[]
       myRank: number
       challengesLeft: number
       highestRank: number
+      refreshesLeft: number
     }>('arena-get-rankings')
     if (result.success) {
       const rankings = result.rankings ?? []
+      const opponents = result.opponents ?? []
       const myRank = result.myRank ?? ARENA_MAX_RANK
       const challengesLeft = result.challengesLeft ?? ARENA_DAILY_CHALLENGES_CONST
       const highestRank = result.highestRank ?? ARENA_MAX_RANK
+      const refreshesLeft = result.refreshesLeft ?? ARENA_DAILY_REFRESHES
 
       cachedRankings = rankings
       cachedMyRank = myRank
       cachedChallengesLeft = challengesLeft
       cachedHighestRank = highestRank
 
-      return { rankings, myRank, challengesLeft, highestRank }
+      return { rankings, opponents, myRank, challengesLeft, highestRank, refreshesLeft }
     }
   } catch {
     // 降級到離線 NPC 模式
@@ -78,19 +94,23 @@ export async function getArenaRankings(): Promise<ArenaRankingsResult> {
 
 function getOfflineRankings(): ArenaRankingsResult {
   const rankings: ArenaEntry[] = []
-  for (let r = 1; r <= 20; r++) {
+  for (let r = 1; r <= 10; r++) {
     rankings.push(generateNPCForRank(r))
   }
   const myRank = cachedMyRank ?? ARENA_MAX_RANK
-  for (let r = Math.max(21, myRank - 5); r <= Math.min(ARENA_MAX_RANK, myRank + 5); r++) {
-    if (r <= 20) continue
-    rankings.push(generateNPCForRank(r))
+  // 離線時用前幾名 NPC 作為對手
+  const opponents: ArenaOpponent[] = []
+  for (let r = Math.max(1, myRank - 3); r < myRank && r >= 1; r++) {
+    const npc = generateNPCForRank(r)
+    opponents.push({ playerId: npc.playerId, rank: npc.rank, displayName: npc.displayName, isNPC: true, power: npc.power })
   }
   return {
     rankings,
+    opponents,
     myRank,
     challengesLeft: cachedChallengesLeft ?? ARENA_DAILY_CHALLENGES_CONST,
     highestRank: cachedHighestRank,
+    refreshesLeft: ARENA_DAILY_REFRESHES,
   }
 }
 
@@ -100,6 +120,7 @@ function getOfflineRankings(): ArenaRankingsResult {
 
 export interface ArenaChallengeResponse {
   success: boolean
+  targetRank?: number
   defenderData?: {
     displayName: string
     heroes: unknown[]
@@ -107,15 +128,28 @@ export interface ArenaChallengeResponse {
     isNPC: boolean
   }
   error?: string
+  rankChanged?: boolean
+  opponents?: ArenaOpponent[]
 }
 
-export async function startArenaChallenge(targetRank: number): Promise<ArenaChallengeResponse> {
+export async function startArenaChallenge(targetUserId: string): Promise<ArenaChallengeResponse> {
   try {
     const result = await callApi<{
+      targetRank: number
       defenderData: ArenaChallengeResponse['defenderData']
-    }>('arena-challenge-start', { targetRank })
+      opponents?: ArenaOpponent[]
+    }>('arena-challenge-start', { targetUserId })
     if (result.success) {
-      return { success: true, defenderData: result.defenderData }
+      return { success: true, targetRank: result.targetRank, defenderData: result.defenderData }
+    }
+    // 排名變動 → 回傳新對手清單
+    if (result.error === 'rank_changed') {
+      return {
+        success: false,
+        error: 'rank_changed',
+        rankChanged: true,
+        opponents: result.opponents ?? [],
+      }
     }
     return { success: false, error: result.error }
   } catch {
@@ -132,6 +166,7 @@ export async function completeArenaChallenge(
   rewards?: ArenaReward
   milestoneReward?: ArenaReward | null
   currencies?: { gold?: number; diamond?: number; exp?: number }
+  opponents?: ArenaOpponent[]
   error?: string
 }> {
   try {
@@ -141,6 +176,7 @@ export async function completeArenaChallenge(
       milestoneReward: ArenaReward | null
       challengesLeft: number
       currencies?: { gold?: number; diamond?: number; exp?: number }
+      opponents?: ArenaOpponent[]
     }>('arena-challenge-complete', { targetRank, won })
     if (result.success) {
       if (won && typeof result.newRank === 'number') {
@@ -158,6 +194,7 @@ export async function completeArenaChallenge(
         rewards: result.rewards,
         milestoneReward: result.milestoneReward ?? null,
         currencies: result.currencies,
+        opponents: result.opponents,
       }
     }
     return { success: false, error: result.error }
@@ -189,4 +226,26 @@ export async function getDefenseFormation(): Promise<(string | null)[]> {
     }
   } catch { /* fallback */ }
   return [null, null, null, null, null, null]
+}
+
+/* ── 刷新對手清單 ── */
+
+export async function refreshArenaOpponents(): Promise<{
+  success: boolean
+  opponents?: ArenaOpponent[]
+  refreshesLeft?: number
+  error?: string
+}> {
+  try {
+    const result = await callApi<{
+      opponents: ArenaOpponent[]
+      refreshesLeft: number
+    }>('arena-refresh-opponents')
+    if (result.success) {
+      return { success: true, opponents: result.opponents ?? [], refreshesLeft: result.refreshesLeft ?? 0 }
+    }
+    return { success: false, error: result.error }
+  } catch {
+    return { success: false, error: 'network_error' }
+  }
 }

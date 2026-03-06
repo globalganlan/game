@@ -14,7 +14,15 @@ import { createSeededRng } from './seededRng'
 
 export const ARENA_MAX_RANK = 500
 export const ARENA_DAILY_CHALLENGES = 5
-export const ARENA_CHALLENGE_RANGE = 3
+export const ARENA_DAILY_REFRESHES = 5
+
+/** 動態挑戰跨度：排名越高，可挑戰的範圍越大 */
+export function getChallengeRange(myRank: number): number {
+  if (myRank <= 5) return 5
+  if (myRank <= 20) return 15
+  if (myRank <= 100) return 50
+  return 200
+}
 
 /* ════════════════════════════════════
    型別
@@ -80,9 +88,11 @@ export function generateNPCForRank(rank: number): ArenaEntry {
    挑戰對象選取
    ════════════════════════════════════ */
 
+/** @deprecated 改用後端持久對手清單 */
 export function getChallengeable(myRank: number): number[] {
+  const range = getChallengeRange(myRank)
   const targets: number[] = []
-  for (let i = 1; i <= ARENA_CHALLENGE_RANGE; i++) {
+  for (let i = 1; i <= range; i++) {
     const targetRank = myRank - i
     if (targetRank >= 1) targets.push(targetRank)
   }

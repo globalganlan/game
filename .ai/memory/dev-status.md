@@ -1,6 +1,6 @@
 # 開發狀態快照 — Dev Status
 
-> 最後更新：2026-03-06（第五十七次更新 — 全專案獎勵一致性審計 + ItemInfoPopup 金邊 + ClickableItemIcon 整組可點）
+> 最後更新：2026-03-06（第五十八次更新 — 競技場動態挑戰範圍 + 對手清單 + 全專案 safe-area 補齊）
 
 ## 截至 2026-03-06 的開發狀態
 
@@ -13,6 +13,11 @@
 - [x] 提示詞模板集（`.ai/agents/prompt-playbook.md`，P-01~P-07）
 - [x] 模組化規格系統（.ai/specs/）
 - [x] 記憶持久化系統（.ai/memory/）
+- [x] **競技場動態挑戰範圍** — 固定 -3 改為 4 階動態（rank>100→200, 21-100→50, 6-20→15, 1-5→5）
+- [x] **持久化對手清單** — 10 名隨機對手存入 save_data.arenaOpponents，每日/勝利後自動重生
+- [x] **對手手動刷新** — 每日 5 次免費，arena-refresh-opponents 新端點
+- [x] **排名變動偵測** — 挑戰時檢查對手排名，變動則免費自動刷新（不扣次數）
+- [x] **全專案 safe-area-inset-top** — 10 個介面全覆蓋（arena-panel/battle-prep/battle-result/boss-dmg/bhud-toasts 5 處新增）
 - [x] **pvp_coin ID 統一** — `currency_pvp_coin` → `pvp_coin`（arena.ts + index.ts + D1 遷移），解決商店無法花費競技場獲得的幣
 - [x] **競技場獎勵前後端完全對齊** — 挑戰/里程碑/每日排名全部補 exp，每日排名擴為 8 階，runBattleLoop exp toast
 - [x] **競技場敵方屬性修復** — NPC 補 CritRate/CritDmg，真人玩家改用 RARITY_GROWTH × ascMult × starMult

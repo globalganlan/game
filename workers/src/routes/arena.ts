@@ -10,6 +10,8 @@ import { upsertItemStmt, getCurrencies } from './save.js';
 const arena = new Hono<{ Bindings: Env; Variables: HonoVars }>();
 
 const ARENA_MAX_RANK = 500;
+const ARENA_DAILY_REFRESHES = 5;
+const ARENA_OPPONENT_COUNT = 10;
 
 const NPC_PREFIXES = ['暗影', '末日', '鐵血', '荒野', '幽靈', '狂暴', '冰霜', '烈焰', '鏽蝕', '黎明', '血月', '迷霧'];
 const NPC_SUFFIXES = ['獵人', '倖存者', '戰士', '指揮官', '護衛', '遊蕩者', '潛伏者', '收割者', '守望者', '流浪者'];
@@ -216,6 +218,56 @@ async function calcDefensePower(db: D1Database, playerId: string, formArr: (stri
   return totalPower;
 }
 
+/* ════════════════════════════════════════════
+   動態挑戰跨度 + 對手清單生成
+   ════════════════════════════════════════════ */
+
+function getChallengeRange(myRank: number): number {
+  if (myRank <= 5) return 5;
+  if (myRank <= 20) return 15;
+  if (myRank <= 100) return 50;
+  return 200;
+}
+
+interface OpponentInfo {
+  playerId: string; rank: number; displayName: string;
+  isNPC: boolean; power: number;
+}
+
+/** 從 DB 取得對手清單的即時資料 */
+async function getOpponentData(db: D1Database, opponentIds: string[]): Promise<OpponentInfo[]> {
+  if (opponentIds.length === 0) return [];
+  const rows = await db.prepare(
+    `SELECT playerId, rank, displayName, isNPC, power FROM arena_rankings
+     WHERE playerId IN (${opponentIds.map(() => '?').join(',')}) ORDER BY rank`
+  ).bind(...opponentIds).all();
+  return ((rows.results || []) as any[]).map(r => ({
+    playerId: r.playerId, rank: r.rank, displayName: r.displayName,
+    power: r.power ?? 0, isNPC: !!r.isNPC,
+  }));
+}
+
+/** 產生新的對手清單（10 位隨機對手 within range），儲存到 save_data */
+async function refreshAndStoreOpponents(
+  db: D1Database, playerId: string, myRank: number,
+): Promise<OpponentInfo[]> {
+  const range = getChallengeRange(myRank);
+  const minRank = Math.max(1, myRank - range);
+  const maxRank = myRank - 1;
+  if (maxRank < minRank) return []; // 已在 #1
+
+  const rows = await db.prepare(
+    `SELECT playerId FROM arena_rankings WHERE rank >= ? AND rank <= ? AND playerId != ?
+     ORDER BY RANDOM() LIMIT ?`
+  ).bind(minRank, maxRank, playerId, ARENA_OPPONENT_COUNT).all();
+  const ids = ((rows.results || []) as { playerId: string }[]).map(r => r.playerId);
+
+  await db.prepare('UPDATE save_data SET arenaOpponents = ? WHERE playerId = ?')
+    .bind(JSON.stringify(ids), playerId).run();
+
+  return getOpponentData(db, ids);
+}
+
 // ── 確保 arena 表有 500 NPC ────────────
 async function ensureArenaInit(db: D1Database) {
   const count = await db.prepare('SELECT COUNT(*) as c FROM arena_rankings').first<{ c: number }>();
@@ -243,7 +295,7 @@ async function ensureArenaInit(db: D1Database) {
 }
 
 // ════════════════════════════════════════════
-// Get Rankings
+// Get Rankings — 回傳 Top 10 + 持久對手清單
 // ════════════════════════════════════════════
 arena.post('/arena-get-rankings', async (c) => {
   const playerId = c.get('playerId');
@@ -255,61 +307,111 @@ arena.post('/arena-get-rankings', async (c) => {
     .bind(playerId).first<{ rank: number }>();
   const myRank = myRow?.rank ?? ARENA_MAX_RANK;
 
-  // top 20 + 自己前後 5
-  const lo = Math.max(1, myRank - 5);
-  const hi = myRank + 5;
-  const rows = await db.prepare(
+  // Top 10 排行榜
+  const topRows = await db.prepare(
     `SELECT rank, playerId, displayName, isNPC, power FROM arena_rankings
-     WHERE rank <= 20 OR (rank >= ? AND rank <= ?) ORDER BY rank`
-  ).bind(lo, hi).all<ArenaRankingRow>();
+     WHERE rank <= 10 ORDER BY rank`
+  ).all<ArenaRankingRow>();
 
-  // ── 排行榜資料（直接使用 DB 儲存的 power，不再重算） ──
-
-  // 挑戰次數 (daily reset)
+  // 挑戰次數 + 對手清單 (daily reset)
   let challengesLeft = 5;
   let highestRank = ARENA_MAX_RANK;
+  let refreshesLeft = ARENA_DAILY_REFRESHES;
+  let opponentIds: string[] = [];
 
   const saveData = await db.prepare(
-    'SELECT arenaChallengesLeft, arenaHighestRank, arenaLastReset FROM save_data WHERE playerId = ?'
-  ).bind(playerId).first<Pick<SaveDataRow, 'arenaChallengesLeft' | 'arenaHighestRank' | 'arenaLastReset'>>();
+    'SELECT arenaChallengesLeft, arenaHighestRank, arenaLastReset, arenaOpponents, arenaRefreshCount FROM save_data WHERE playerId = ?'
+  ).bind(playerId).first<Pick<SaveDataRow, 'arenaChallengesLeft' | 'arenaHighestRank' | 'arenaLastReset'> & { arenaOpponents?: string; arenaRefreshCount?: number }>();
 
   if (saveData) {
     const today = todayUTC8();
     const lastReset = (saveData.arenaLastReset || '').split('T')[0];
     if (lastReset !== today) {
+      // 每日重置：挑戰次數 + 刷新次數
       challengesLeft = 5;
-      await db.prepare('UPDATE save_data SET arenaChallengesLeft = 5, arenaLastReset = ? WHERE playerId = ?')
-        .bind(isoNow(), playerId).run();
+      refreshesLeft = ARENA_DAILY_REFRESHES;
+      await db.prepare(
+        'UPDATE save_data SET arenaChallengesLeft = 5, arenaRefreshCount = 0, arenaOpponents = ?, arenaLastReset = ? WHERE playerId = ?'
+      ).bind('[]', isoNow(), playerId).run();
+      opponentIds = [];
     } else {
       challengesLeft = saveData.arenaChallengesLeft ?? 5;
+      refreshesLeft = Math.max(0, ARENA_DAILY_REFRESHES - (saveData.arenaRefreshCount ?? 0));
+      try { opponentIds = JSON.parse(saveData.arenaOpponents || '[]'); } catch { opponentIds = []; }
     }
     highestRank = saveData.arenaHighestRank ?? ARENA_MAX_RANK;
   }
 
+  // 若對手清單為空 → 自動生成（首次 / 每日重置後）
+  let opponents: OpponentInfo[];
+  if (opponentIds.length === 0) {
+    opponents = await refreshAndStoreOpponents(db, playerId, myRank);
+  } else {
+    opponents = await getOpponentData(db, opponentIds);
+    // 過濾掉已經排在自己後面的對手
+    opponents = opponents.filter(o => o.rank < myRank);
+  }
+
   return c.json({
     success: true,
-    rankings: (rows.results || []).map(r => ({
+    rankings: (topRows.results || []).map(r => ({
       rank: r.rank, playerId: r.playerId, displayName: r.displayName,
       isNPC: !!r.isNPC, power: r.power ?? 0,
     })),
-    myRank, challengesLeft, highestRank,
+    opponents,
+    myRank, challengesLeft, highestRank, refreshesLeft,
   });
 });
 
 // ════════════════════════════════════════════
-// Challenge Start
+// Challenge Start — 用 targetUserId 查詢，自動偵測排名變動
 // ════════════════════════════════════════════
 arena.post('/arena-challenge-start', async (c) => {
   const playerId = c.get('playerId');
   const db = c.env.DB;
   const body = getBody(c);
-  const targetRank = Number(body.targetRank);
-  if (!targetRank || targetRank < 1) return c.json({ success: false, error: 'invalid_rank' });
+
+  // 支援新版 targetUserId 及舊版 targetRank（向後相容）
+  const targetUserId = body.targetUserId as string | undefined;
+  const legacyTargetRank = Number(body.targetRank);
 
   await ensureArenaInit(db);
-  const defender = await db.prepare(
-    'SELECT playerId, displayName, isNPC, power, defenseFormation FROM arena_rankings WHERE rank = ?'
-  ).bind(targetRank).first<ArenaRankingRow>();
+
+  // 查自己的排名
+  const myRow = await db.prepare('SELECT rank FROM arena_rankings WHERE playerId = ?')
+    .bind(playerId).first<{ rank: number }>();
+  const myRank = myRow?.rank ?? ARENA_MAX_RANK;
+
+  let defender: ArenaRankingRow | null = null;
+  let targetRank: number;
+
+  if (targetUserId) {
+    // 新版：用 playerId 查對手目前排名
+    defender = await db.prepare(
+      'SELECT rank, playerId, displayName, isNPC, power, defenseFormation FROM arena_rankings WHERE playerId = ?'
+    ).bind(targetUserId).first<ArenaRankingRow>();
+    if (!defender) return c.json({ success: false, error: 'target_not_found' });
+    targetRank = defender.rank;
+
+    // 排名變動偵測：對手排名必須小於（前於）自己
+    if (targetRank >= myRank) {
+      // 免費自動刷新對手清單（不扣次數）
+      const newOpponents = await refreshAndStoreOpponents(db, playerId, myRank);
+      return c.json({
+        success: false,
+        error: 'rank_changed',
+        message: '對手排名已變動，已自動刷新對手清單',
+        opponents: newOpponents,
+      });
+    }
+  } else {
+    // 舊版相容：用排名查（掃蕩用）
+    if (!legacyTargetRank || legacyTargetRank < 1) return c.json({ success: false, error: 'invalid_rank' });
+    defender = await db.prepare(
+      'SELECT rank, playerId, displayName, isNPC, power, defenseFormation FROM arena_rankings WHERE rank = ?'
+    ).bind(legacyTargetRank).first<ArenaRankingRow>();
+    targetRank = legacyTargetRank;
+  }
 
   if (!defender) return c.json({ success: false, error: 'rank_not_found' });
 
@@ -320,13 +422,11 @@ arena.post('/arena-challenge-start', async (c) => {
   const heroes: Record<string, unknown>[] = [];
 
   if (defender.isNPC) {
-    // NPC — 根據排名用 seed 產生確定性的隨機陣容
     const allHeroes = await db.prepare('SELECT heroId, baseHP, baseATK, baseDEF, baseSPD, modelId, critRate, critDmg, rarity FROM heroes').all();
     const heroPool = allHeroes.results || [];
     if (heroPool.length > 0) {
       const npcPower = defender.power || 500;
       const scale = Math.max(1, npcPower / 500);
-      // NPC 陣容：排名越高英雄越多（rank 1-50: 5隻, 51-150: 4隻, 151-300: 3隻, 301+: 2隻）
       const npcCount = targetRank <= 50 ? 5 : targetRank <= 150 ? 4 : targetRank <= 300 ? 3 : 2;
       const seed = targetRank * 31337;
       for (let i = 0; i < npcCount; i++) {
@@ -346,7 +446,6 @@ arena.post('/arena-challenge-start', async (c) => {
       }
     }
   } else {
-    // 真人玩家 — 從 defenseFormation 讀取英雄 instanceId，查詢英雄資料
     const validIds = formation.filter((id): id is string => !!id);
     if (validIds.length > 0) {
       const instances = await db.prepare(
@@ -355,7 +454,6 @@ arena.post('/arena-challenge-start', async (c) => {
       const instMap = new Map<string, any>();
       for (const inst of (instances.results || [])) instMap.set((inst as any).instanceId, inst);
 
-      // 批量查詢英雄基礎資料（含 rarity）
       const heroIds = [...new Set((instances.results || []).map((r: any) => r.heroId))];
       const heroMap = new Map<number, any>();
       if (heroIds.length > 0) {
@@ -365,25 +463,6 @@ arena.post('/arena-challenge-start', async (c) => {
         for (const h of (heroRows.results || [])) heroMap.set((h as any).heroId, h);
       }
 
-      // 稀有度成長率（與前端 progressionSystem.ts RARITY_LEVEL_GROWTH 一致）
-      const RARITY_GROWTH: Record<string, number> = { 'N': 0.030, 'R': 0.035, 'SR': 0.040, 'SSR': 0.050 };
-      // 稀有度→數字對映（查表用）
-      const RARITY_NUM: Record<string, number> = { 'N': 1, 'R': 2, 'SR': 3, 'SSR': 4 };
-      // 突破加成（與前端 RARITY_ASC_MULT 一致）
-      const ASC_MULT: Record<number, Record<number, number>> = {
-        1: { 0:1, 1:1.03, 2:1.06, 3:1.09, 4:1.12, 5:1.18 },
-        2: { 0:1, 1:1.04, 2:1.08, 3:1.12, 4:1.16, 5:1.24 },
-        3: { 0:1, 1:1.05, 2:1.10, 3:1.15, 4:1.20, 5:1.30 },
-        4: { 0:1, 1:1.07, 2:1.14, 3:1.22, 4:1.30, 5:1.42 },
-      };
-      // 星級加成（與前端 RARITY_STAR_MULT 一致）
-      const STAR_MULT: Record<number, Record<number, number>> = {
-        1: { 0:0.90, 1:1, 2:1.03, 3:1.06, 4:1.09, 5:1.13, 6:1.18 },
-        2: { 0:0.90, 1:1, 2:1.04, 3:1.08, 4:1.12, 5:1.17, 6:1.24 },
-        3: { 0:0.90, 1:1, 2:1.05, 3:1.10, 4:1.15, 5:1.20, 6:1.30 },
-        4: { 0:0.90, 1:1, 2:1.07, 3:1.14, 4:1.22, 5:1.30, 6:1.42 },
-      };
-
       formation.forEach((instId, slot) => {
         if (!instId) return;
         const inst = instMap.get(instId);
@@ -391,10 +470,10 @@ arena.post('/arena-challenge-start', async (c) => {
         const base = heroMap.get(inst.heroId);
         if (!base) return;
         const rn = RARITY_NUM[base.rarity] ?? 3;
-        const growth = RARITY_GROWTH[base.rarity] ?? 0.04;
+        const growth = RARITY_GROWTH[rn] ?? 0.04;
         const lvScale = 1 + (inst.level - 1) * growth;
         const ascMult = ASC_MULT[rn]?.[inst.ascension] ?? 1.0;
-        const starMult = STAR_MULT[rn]?.[inst.stars ?? 0] ?? 1.0;
+        const starMult = STAR_MUL[rn]?.[inst.stars ?? 0] ?? 1.0;
         heroes.push({
           heroId: inst.heroId,
           HP: Math.floor((base.baseHP || 100) * lvScale * ascMult * starMult),
@@ -414,6 +493,7 @@ arena.post('/arena-challenge-start', async (c) => {
 
   return c.json({
     success: true,
+    targetRank,
     defenderData: {
       displayName: defender.displayName,
       power: defender.power || 0,
@@ -574,7 +654,13 @@ arena.post('/arena-challenge-complete', async (c) => {
   await db.batch(writeStmts);
   const currencies = await getCurrencies(db, playerId);
 
-  return c.json({ success: true, won, newRank, challengesLeft, rewards, milestoneReward, currencies });
+  // 勝利且排名變動 → 自動刷新對手清單（排名改變了，舊清單無效）
+  let opponents: OpponentInfo[] | undefined;
+  if (won && newRank < challengerRank) {
+    opponents = await refreshAndStoreOpponents(db, playerId, newRank);
+  }
+
+  return c.json({ success: true, won, newRank, challengesLeft, rewards, milestoneReward, currencies, opponents });
 });
 
 // ════════════════════════════════════════════
@@ -631,6 +717,45 @@ arena.post('/arena-get-defense', async (c) => {
   const row = await c.env.DB.prepare('SELECT defenseFormation FROM arena_rankings WHERE playerId = ?')
     .bind(playerId).first<{ defenseFormation: string }>();
   return c.json({ success: true, defenseFormation: row?.defenseFormation || '[]' });
+});
+
+// ════════════════════════════════════════════
+// Refresh Opponents — 手動刷新對手清單
+// ════════════════════════════════════════════
+arena.post('/arena-refresh-opponents', async (c) => {
+  const playerId = c.get('playerId');
+  const db = c.env.DB;
+  await ensureArenaInit(db);
+
+  const myRow = await db.prepare('SELECT rank FROM arena_rankings WHERE playerId = ?')
+    .bind(playerId).first<{ rank: number }>();
+  const myRank = myRow?.rank ?? ARENA_MAX_RANK;
+
+  // 檢查每日刷新次數
+  const saveRow = await db.prepare(
+    'SELECT arenaRefreshCount, arenaLastReset FROM save_data WHERE playerId = ?'
+  ).bind(playerId).first<{ arenaRefreshCount?: number; arenaLastReset?: string }>();
+
+  let refreshCount = saveRow?.arenaRefreshCount ?? 0;
+  const today = todayUTC8();
+  const lastReset = (saveRow?.arenaLastReset || '').split('T')[0];
+  if (lastReset !== today) refreshCount = 0; // 跨日歸零
+
+  if (refreshCount >= ARENA_DAILY_REFRESHES) {
+    return c.json({ success: false, error: 'no_refreshes_left', message: '今日免費刷新次數已用完' });
+  }
+
+  // 刷新
+  const opponents = await refreshAndStoreOpponents(db, playerId, myRank);
+  refreshCount += 1;
+  await db.prepare('UPDATE save_data SET arenaRefreshCount = ? WHERE playerId = ?')
+    .bind(refreshCount, playerId).run();
+
+  return c.json({
+    success: true,
+    opponents,
+    refreshesLeft: Math.max(0, ARENA_DAILY_REFRESHES - refreshCount),
+  });
 });
 
 export default arena;

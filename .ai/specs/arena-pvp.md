@@ -1,7 +1,7 @@
 # 競技場排名系統 Spec
 
-> 版本：v1.1 ｜ 狀態：🟢 已實作（全員戰力即時重算 + 掃蕩結算面板）
-> 最後更新：2026-03-05
+> 版本：v2.0 ｜ 狀態：🟢 已實作（動態挑戰範圍 + 對手清單 + 排名變動偵測 + safe-area）
+> 最後更新：2026-03-06
 > 負責角色：🎯 GAME_DESIGN → 🔧 CODING
 
 ## 概述
@@ -22,14 +22,15 @@
 - `.ai/specs/auth-system.md` — 玩家身份
 - `.ai/specs/inventory.md` — 競技幣道具
 
-## 實作對照（待建立）
+## 實作對照
 
 | 原始碼 | 說明 |
 |--------|------|
-| `src/domain/arenaSystem.ts` | Domain 層 — 排名計算、NPC 生成、獎勵公式 |
-| `src/services/arenaService.ts` | Service 層 — GAS API 呼叫、樂觀更新 |
-| `src/components/ArenaPanel.tsx` | UI — 排行榜 + 防守陣型（v1.1 掃蕩結算面板）+ 挑戰 + 獎勵 |
-| `gas/程式碼.js` | GAS Handler — 排行榜 CRUD、挑戰結算、每日/每週獎勵 |
+| `src/domain/arenaSystem.ts` | Domain 層 — 動態挑戰範圍 `getChallengeRange()`、NPC 生成、獎勵公式 |
+| `src/services/arenaService.ts` | Service 層 — Workers API 呼叫（含 `refreshArenaOpponents`）、`ArenaOpponent` 型別 |
+| `src/components/ArenaPanel.tsx` | UI — Top 10 排行榜 + 10 名挑戰對手 + 刷新按鈕 + 防守陣型 + 掃蕩 |
+| `src/hooks/useStageHandlers.ts` | 挑戰開始（`targetUserId`）+ 排名變動偵測處理 |
+| `workers/src/routes/arena.ts` | Workers 後端 — 對手清單生成/儲存/刷新 + 排名變動偵測 + 戰力計算 |
 
 ---
 
@@ -60,19 +61,43 @@
    └─ 敗北 → 排名不變，仍消耗 1 次挑戰次數
 ```
 
-### 1.3 挑戰對象選取
+### 1.3 挑戰對象選取（v2.0 動態範圍 + 對手清單）
+
+#### 動態挑戰範圍
 
 ```typescript
-function getChallengeable(myRank: number): number[] {
-  // 可挑戰自己排名前方（數字更小）的 3 位
-  const targets: number[] = []
-  for (let i = 1; i <= 3; i++) {
-    const targetRank = myRank - i
-    if (targetRank >= 1) targets.push(targetRank)
-  }
-  return targets  // 例：我排 50 → 可挑 49, 48, 47
+function getChallengeRange(myRank: number): number {
+  if (myRank > 100) return 200   // rank 101~500 → 可向上跨 200 名
+  if (myRank > 20)  return 50    // rank 21~100  → 可向上跨 50 名
+  if (myRank > 5)   return 15    // rank 6~20   → 可向上跨 15 名
+  return 5                        // rank 1~5    → 可向上跨 5 名
 }
+// 例：排名 500 → 範圍 200 → 可挑 300~499
+// 例：排名 50  → 範圍 50  → 可挑 1~49
 ```
+
+> 設計理念：讓低排名玩家能快速攀爬（rank 500→300→100→50→1 最少 4 勝即可登頂），高排名則競爭更激烈。
+
+#### 持久化對手清單
+
+- 後端在 `save_data.arenaOpponents` 儲存 JSON 陣列（10 名對手的 playerId）
+- 首次進入競技場或每日重置後自動生成
+- 對手從 `[max(1, myRank - range), myRank - 1]` 範圍內 `ORDER BY RANDOM() LIMIT 10` 隨機抽取
+- 挑戰勝利後自動重新生成（因排名交換後對手池已變）
+
+#### 手動刷新
+
+| 項目 | 值 |
+|------|----|
+| 每日免費刷新次數 | **5 次**（`ARENA_DAILY_REFRESHES`） |
+| 計數器 | `save_data.arenaRefreshCount`（每日 00:00 UTC 重置） |
+| API | `arena-refresh-opponents` |
+
+#### 排名變動偵測
+
+當玩家點擊「挑戰」時，後端檢查目標的**當前排名**：
+- 若 `targetRank >= myRank`（對手已被其他人打下來，不再比自己前面）→ 回傳 `{ error: 'rank_changed' }` + **免費自動刷新對手清單**（不扣刷新次數）
+- 前端收到後顯示 toast「對手排名已變動，已自動刷新對手清單」並返回競技場
 
 > 首次參加的玩家先安排到最末空位（第 500 名或最近的空位），可立即向上挑戰。
 
@@ -94,6 +119,8 @@ function getChallengeable(myRank: number): number[] {
 |------|------|------|
 | `arenaDefenseFormation` | string | 防守陣型 JSON `[heroInstanceId, null, ...]`（6 slots） |
 | `arenaHighestRank` | number | 本週最高排名（用於排名提升獎勵判定） |
+| `arenaOpponents` | string | 對手清單 JSON `[playerId, ...]`（最多 10 名，v2.0 新增） |
+| `arenaRefreshCount` | number | 今日已刷新次數（每日 00:00 UTC 歸零，v2.0 新增） |
 
 ### 2.3 防守戰鬥
 
@@ -260,17 +287,18 @@ function processArenaResult(
 
 ## 七、GAS 端點
 
-### 新增的 handler
+### Workers API 端點
 
-| action | handler | 說明 |
-|--------|---------|------|
-| `arena-get-rankings` | `handleArenaGetRankings_()` | 取得排行榜（支援分頁：top 20 + 自己前後 5 名） |
-| `arena-get-my-rank` | `handleArenaGetMyRank_()` | 取得自己當前排名 + 剩餘挑戰次數 |
-| `arena-challenge` | `handleArenaChallenge_()` | 發起挑戰（驗證次數、排名差距、結算排名交換） |
-| `arena-set-defense` | `handleArenaSetDefense_()` | 設定防守陣型 |
-| `arena-daily-reward` | `handleArenaDailyReward_()` | 每日排名獎勵結算（CronTrigger / 手動呼叫） |
-| `arena-weekly-reset` | `handleArenaWeeklyReset_()` | 每週重置排名（CronTrigger） |
-| `arena-season-reward` | `handleArenaSeasonReward_()` | 賽季結算獎勵（重置前呼叫） |
+| action | 說明 |
+|--------|------|
+| `arena-get-rankings` | 取得 Top 10 排行榜 + 10 名持久化對手 + 我的排名/次數/刷新次數 |
+| `arena-challenge-start` | 發起挑戰（`targetUserId`）— 排名變動偵測 + 回傳防守陣容 |
+| `arena-challenge-complete` | 結算（勝利→排名交換+獎勵+自動重新生成對手） |
+| `arena-set-defense` | 設定防守陣型（以 CP_WEIGHTS 計算並更新 power） |
+| `arena-refresh-opponents` | 手動刷新對手清單（每日 5 次上限） |
+| `arena-daily-reward` | 每日排名獎勵結算（CronTrigger） |
+| `arena-weekly-reset` | 每週重置排名（CronTrigger） |
+| `arena-season-reward` | 賽季結算獎勵（重置前呼叫） |
 
 ### 挑戰流程（handleArenaChallenge_）
 
@@ -290,31 +318,33 @@ function processArenaResult(
 
 ## 八、UI 設計
 
-### 8.1 ArenaPanel 結構
+### 8.1 ArenaPanel 結構（v2.0）
 
 ```
 ┌───────────────────────────────────────────┐
-│  ← 返回        ⚔️ 競技場排名              │
+│  ← 返回        ⚔️ 競技場排名              │  ← safe-area-inset-top
 │  ─────────────────────────────────────── │
-│  我的排名: #48   ⚡ 3,280                  │
+│  我的排名: #48 ⚔️ 3,280  挑戰範圍: 50     │
 │  今日剩餘: 3/5 次                          │
-│  本週最高: #35                             │
 │  ─────────────────────────────────────── │
 │  [🛡️ 防守陣型]  [🏆 排行榜]  [📦 獎勵]     │
-│  ─────────────────────────────────────── │
-│                                           │
-│  --- 排行榜 ---                            │
-│  🥇 #1  暗影獵人(NPC)     ⚡ 10,200  [挑戰] │
-│  🥈 #2  末日戰士(NPC)     ⚡ 9,800   [挑戰] │
-│  ...                                      │
-│  #46  铁血护卫            ⚡ 3,500   [挑戰] │
-│  #47  玩家A               ⚡ 3,400   [挑戰] │
-│  ► #48  我                 ⚡ 3,280         │
-│  #49  玩家B               ⚡ 3,100         │
-│  ...                                      │
-│                                           │
+│  ═══════════════════════════════════════ │
+│  🏆 排行榜 Top 10                         │
+│  🥇 #1  暗影獵人(NPC)     ⚔️ 10,200       │
+│  🥈 #2  末日戰士(NPC)     ⚔️ 9,800        │
+│  ...（僅展示，不可直接挑戰）               │
+│  ═══════════════════════════════════════ │
+│  ⚔️ 挑戰對手          [🔄 刷新 (4/5)]     │
+│  #27  鐵血護衛(NPC)     ⚔️ 5,500  [挑戰]  │
+│  #31  末日指揮官(NPC)   ⚔️ 4,800  [挑戰]  │
+│  #38  玩家A             ⚔️ 3,900  [挑戰]  │
+│  ...（共 10 名隨機對手）                    │
+│  ═══════════════════════════════════════ │
+│  [⚡ 掃蕩]                                 │
 └───────────────────────────────────────────┘
 ```
+
+> Top 10 為唯讀排行榜；挑戰對手為持久化的 10 名隨機對手（從動態範圍內抽取）。
 
 ### 8.2 防守陣型配置
 
@@ -334,7 +364,9 @@ function processArenaResult(
 
 ### 8.3 挑戰按鈕規則
 
-- 只可挑戰**排名比自己高且差距 ≤ 3** 的對手
+- 只可挑戰**對手清單中的 10 名對手**（由後端從動態範圍內隨機生成）
+- 挑戰使用 `targetUserId`（非 `targetRank`），後端驗證目標仍比自己排名前
+- 排名變動時：自動免費刷新對手清單 + toast 提示（不扣次數/刷新數）
 - 剩餘次數 = 0 → 按鈕 disabled + 顯示「明日重置」
 - NPC 名稱旁顯示 `(NPC)` 標籤
 - 點擊挑戰 → 進入 `IDLE`（戰鬥準備），顯示敵我戰力對比
@@ -417,7 +449,10 @@ export type MenuScreen = 'none' | 'heroes' | 'inventory' | 'gacha' | 'stages' | 
 ## 變更歷史
 
 | 版本 | 日期 | 變更內容 |
-|------|------|---------|| v1.0 | 2026-03-05 | **掃蕩+模型修復+防守卡片風格**：①新增掃蕩按鈕（自動勝利後一名玩家，獲取勝利獎勵）②修復挑戰時敵方英雄模型不顯示（_modelId 正規化為 zombie_N 格式 + DEF/CritRate/CritDmg 傳遞）③防守陣型改用卡片風格（稀有度邊框 + 縮圖 + Lv + 星級）④新玩家加入競技場時計算實際防守戰力 |
+|------|------|---------|
+| v2.0 | 2026-03-06 | **動態挑戰範圍 + 對手清單系統重構**：①固定 -3 範圍改為動態 4 階（rank>100→200, 21-100→50, 6-20→15, 1-5→5）②新增持久化對手清單（10 名，存 `save_data.arenaOpponents`）③新增手動刷新（每日 5 次，`arena-refresh-opponents` 端點）④挑戰改用 `targetUserId`，排名變動偵測後免費自動刷新⑤勝利後自動重生對手清單⑥UI 改為 Top 10 排行榜（唯讀）+ 10 名挑戰對手 + 刷新按鈕⑦全專案 safe-area-inset-top 補齊（`.arena-panel` `.battle-prep-top-banner` `.battle-result-banner` `.boss-dmg-bar-wrap` `.bhud-skill-toasts` 共 5 處） |
+| v1.1 | 2026-03-05 | **全員戰力即時重算 + 掃蕩結算面板** |
+| v1.0 | 2026-03-05 | **掃蕩+模型修復+防守卡片風格**：①新增掃蕩按鈕（自動勝利後一名玩家，獲取勝利獎勵）②修復挑戰時敵方英雄模型不顯示（_modelId 正規化為 zombie_N 格式 + DEF/CritRate/CritDmg 傳遞）③防守陣型改用卡片風格（稀有度邊框 + 縮圖 + Lv + 星級）④新玩家加入競技場時計算實際防守戰力 |
 | v0.9 | 2026-03-06 | **防守陣型縮圖 UI**：槽位以 Thumbnail3D 縮圖+英雄名稱取代舊版「位置 N」文字，新增 getHeroModelId helper，更新 CSS 樣式 |
 | v0.8 | 2026-03-06 | **獎勵一致性審計修復**：①pvp_coin ID 統一（`currency_pvp_coin`→`pvp_coin`），D1 遷移合併數據②後端挑戰獎勵/里程碑/每日排名全部補上 exp③每日排名從 5 階擴展為 8 階，與前端 DAILY_REWARD_TIERS 完全對齊④敵方 NPC 補 CritRate/CritDmg⑤真人玩家改用 RARITY_LEVEL_GROWTH × ascMult × starMult⑥stardust 統一寫入 inventory.currency_stardust |
 | v0.5 | 2026-03-01 | ArenaReward 新增 exp 欄位（勝:150/敗:50）、所有獎勵表補上 exp 數值、Spec 差異修復驗證替換原過時差異測試 |

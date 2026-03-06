@@ -125,18 +125,23 @@ export function useStageHandlers(deps: StageHandlerDeps) {
     showToast(`已選擇: ${displayName}`)
   }, [stageMode, heroesList, setStageMode, setSceneTheme, setStageId, updateEnemySlots, restoreFormationFromSave, setMenuScreen, setGameState, setCurtainVisible, setCurtainFading, setCurtainText, curtainClosePromiseRef, closeCurtain, showToast]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  /* ── 競技場挑戰 ── */
+  /* ── 競技場挑戰（新版：用 targetUserId 識別對手） ── */
   const handleArenaStartBattle = useCallback(async (
-    targetRank: number,
+    targetUserId: string,
     defender: { displayName: string; power: number; isNPC: boolean },
   ) => {
-    showToast(`正在載入排名 #${targetRank} ${defender.displayName} 的陣型…`)
+    showToast(`正在載入 ${defender.displayName} 的陣型…`)
     try {
-      const res = await startArenaChallenge(targetRank)
+      const res = await startArenaChallenge(targetUserId)
       if (!res.success) {
-        showToast(`挑戰失敗：${res.error === 'no_challenges_left' ? '今日挑戰次數已用完' : res.error}`)
+        if (res.rankChanged) {
+          showToast('對手排名已變動，已自動刷新對手清單')
+        } else {
+          showToast(`挑戰失敗：${res.error === 'no_challenges_left' ? '今日挑戰次數已用完' : res.error}`)
+        }
         return
       }
+      const targetRank = res.targetRank ?? 0
       const defHeroes: unknown[] = res.defenderData?.heroes ?? []
       const enemySlotsArr: (SlotHero | null)[] = [null, null, null, null, null, null]
       defHeroes.forEach((dh: unknown, i: number) => {
@@ -145,7 +150,6 @@ export function useStageHandlers(deps: StageHandlerDeps) {
         const heroId = Number(d.heroId ?? d.HeroID ?? 0)
         const base = heroesList.find(h => Number(h.HeroID ?? 0) === heroId)
         if (!base) return
-        // 優先使用 API 回傳的 ModelID，正規化為 zombie_N 格式
         const rawMid = String(d.ModelID ?? base.ModelID ?? base.HeroID ?? heroId)
         const zm = rawMid.match(/zombie[_-]?(\d+)/i)
         const nm = rawMid.match(/\d+/)
@@ -187,7 +191,6 @@ export function useStageHandlers(deps: StageHandlerDeps) {
       setStageId(`arena-${targetRank}`)
       updateEnemySlots(() => enemySlotsArr)
       restoreFormationFromSave()
-      // 記住進入戰鬥前的 menuScreen，戰後可返回
       preBattleMenuScreenRef.current = 'arena'
       setMenuScreen('none')
       setGameState('IDLE')
