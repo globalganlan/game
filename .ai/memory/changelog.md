@@ -3,6 +3,23 @@
 > 按時間倒序排列，最新的在最上面。
 
 ---
+### [2026-03-06] 英雄名稱改用 HTML Overlay
+
+- **觸發者**：使用者（「喪屍頭上的名稱字型有點醜，遠處的字型會比較小」）
+- **執行角色**：🔧 CODING + 🧪 QA
+- **變更摘要**：
+
+  將英雄頭上名稱從 drei `<Billboard><Text>`（troika SDF）改用 `<Html>` DOM overlay：
+  1. **`src/components/Hero.tsx`** — 移除 `Billboard`/`Text`/`LOCAL_FONT` 導入，改用 `Html` 元件，以 CSS 渲染名稱
+  2. **`src/App.css`** — 新增 `.hero-name-label` 樣式（系統字型、14px 固定大小、白字黑影描邊）
+
+  **效果**：名稱文字清晰銳利、不隨 3D 距離縮放、前後排英雄字體大小一致。
+
+- **ADR**：ADR-017
+- **Spec 更新**：tech-architecture v2.3 → v2.4
+- **Commit**：`cfb4a92`
+
+---
 ### [2026-03-06] 全專案 safe-area-inset-top 補齊
 
 - **觸發者**：使用者（「所有介面上方都要留手機導航列的空間」）

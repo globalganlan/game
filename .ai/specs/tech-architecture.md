@@ -1,6 +1,6 @@
 # 技術架構 Spec
 
-> 版本：v2.3 ｜ 狀態：🟢 定稿（含 Domain Engine + Services 層 + Optimistic Queue + Audio Engine + CurrencyIcon 統一 icon + PWA + App 模組化拆分 + D1 原子批次寫入 + InfoTip/RedDot/ClickableItemIcon 新元件 + 獎勵一致性修復 + Canvas iOS GPU 紋理保活修復）
+> 版本：v2.4 ｜ 狀態：🟢 定稿（含 Domain Engine + Services 層 + Optimistic Queue + Audio Engine + CurrencyIcon 統一 icon + PWA + App 模組化拆分 + D1 原子批次寫入 + InfoTip/RedDot/ClickableItemIcon 新元件 + 獎勵一致性修復 + Canvas iOS GPU 紋理保活修復 + 英雄名稱 HTML Overlay）
 > 最後更新：2026-03-06
 > 負責角色：🔧 CODING → 🏗️ ARCHITECT
 
@@ -272,7 +272,7 @@ main.tsx
                   <DamagePopup />   飄字傷害
                   <SkillToast3D />  技能名稱 3D 飄字
                   <ElementHint3D /> 屬性提示 3D 飄字
-                  <Billboard><Text /></Billboard>
+                  <Html /> (名稱 HTML Overlay，固定像素大小)
                <DragPlane />
             <ResponsiveCamera />
          HUD

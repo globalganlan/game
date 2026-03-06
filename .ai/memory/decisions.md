@@ -340,3 +340,16 @@
 - **症狀**：iOS PWA 首次開啟 → 進入競技場挑戰 → 預先載入的英雄模型全黑；後載入的模型正常；第二次開 PWA 一切正常。
 - **修復**：`App.tsx` Canvas style 改用 `pointerEvents: (menuScreen !== 'none') ? 'none' : 'auto'`，Canvas 始終保持 visible（被選單面板 DOM 自然遮蓋），避免 iOS GPU 回收紋理。
 - **影響範圍**：`src/App.tsx` Canvas style 屬性
+
+---
+
+### ADR-017: 英雄名稱改用 drei Html Overlay（取代 3D Text）
+
+- **日期**：2026-03-06
+- **決策**：Hero.tsx 中英雄頭上名稱從 drei `<Billboard><Text>` 改為 `<Html>` DOM overlay
+- **根因**：
+  1. drei `<Text>`（troika SDF）渲染中文字型品質不佳，筆畫模糊
+  2. 3D 世界空間文字受透視縮放，遠處英雄名稱變小、難以辨識
+- **修復**：`<Html position={[0, 3.5, 0]} center sprite>` + CSS `.hero-name-label`（系統字型、14px 固定大小、白字黑影描邊）
+- **效果**：名稱文字清晰銳利、不隨距離縮放、支援 CSS 字型與樣式
+- **影響範圍**：`src/components/Hero.tsx`、`src/App.css`
