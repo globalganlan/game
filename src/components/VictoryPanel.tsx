@@ -12,6 +12,8 @@ export interface VictoryRewards {
   exp: number
   drops: { itemId: string; quantity: number }[]
   resourceSpeed: { goldPerHour: number; expPerHour: number } | null
+  /** 獎勵仍在結算中（競技場 API 尚未回應） */
+  loading?: boolean
 }
 
 interface Props {
@@ -41,6 +43,12 @@ export function VictoryPanel({ battleResult, victoryRewards, stageMode, stageId 
           )}
 
           {/* 獎勵明細（可點擊查看道具詳情） */}
+          {victoryRewards.loading ? (
+            <div className="reward-items-list reward-loading">
+              <div className="reward-loading-spinner" />
+              <span className="reward-loading-text">獎勵結算中…</span>
+            </div>
+          ) : (
           <div className="reward-items-list">
             <div className="reward-item">
               <span className="reward-icon gold"><ClickableItemIcon itemId="gold" /></span>
@@ -69,6 +77,7 @@ export function VictoryPanel({ battleResult, victoryRewards, stageMode, stageId 
               </div>
             ))}
           </div>
+          )}
 
           {/* 資源產出速度（僅主線關卡） */}
           {victoryRewards.resourceSpeed && (

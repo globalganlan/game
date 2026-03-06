@@ -88,12 +88,11 @@ describe('battleService', () => {
 
       expect(mockFetch).toHaveBeenCalledTimes(1)
       const [url, options] = mockFetch.mock.calls[0]
-      expect(url).toContain('script.google.com')
+      expect(url).toContain('/api/run-battle')
       expect(options.method).toBe('POST')
-      expect(options.headers['Content-Type']).toBe('text/plain; charset=utf-8')
+      expect(options.headers['Content-Type']).toBe('application/json')
 
       const body = JSON.parse(options.body)
-      expect(body.action).toBe('run-battle')
       expect(body.maxTurns).toBe(30)
       expect(Array.isArray(body.players)).toBe(true)
       expect(Array.isArray(body.enemies)).toBe(true)

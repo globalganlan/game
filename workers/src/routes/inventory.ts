@@ -16,7 +16,7 @@ const SHOP_CATALOG: Record<string, {
   daily_exp_s:      { price: 1000,  currency: 'gold',    rewards: [{ itemId: 'exp', quantity: 500 }], dailyLimit: 10 },
   daily_exp_m:      { price: 5000,  currency: 'gold',    rewards: [{ itemId: 'exp', quantity: 1500 }], dailyLimit: 5 },
   daily_exp_l:      { price: 20,    currency: 'diamond',  rewards: [{ itemId: 'exp', quantity: 2000 }], dailyLimit: 3 },
-  daily_enhance_s:  { price: 2000,  currency: 'gold',    rewards: [{ itemId: 'eqm_enhance_s', quantity: 5 }], dailyLimit: 10 },
+  daily_forge_ore:  { price: 2000,  currency: 'gold',    rewards: [{ itemId: 'forge_ore_common', quantity: 5 }], dailyLimit: 10 },
   mat_class_power:     { price: 10000, currency: 'gold', rewards: [{ itemId: 'asc_class_power', quantity: 1 }], dailyLimit: 0 },
   mat_class_agility:   { price: 10000, currency: 'gold', rewards: [{ itemId: 'asc_class_agility', quantity: 1 }], dailyLimit: 0 },
   mat_class_defense:   { price: 10000, currency: 'gold', rewards: [{ itemId: 'asc_class_defense', quantity: 1 }], dailyLimit: 0 },
@@ -25,7 +25,7 @@ const SHOP_CATALOG: Record<string, {
   sd_exp_5000:        { price: 10,  currency: 'stardust', rewards: [{ itemId: 'exp', quantity: 5000 }], dailyLimit: 0 },
   sd_gold_50k:        { price: 15,  currency: 'stardust', rewards: [{ itemId: 'gold', quantity: 50000 }], dailyLimit: 0 },
   sd_class_universal: { price: 20,  currency: 'stardust', rewards: [{ itemId: 'asc_class_universal', quantity: 2 }], dailyLimit: 0 },
-  sd_enhance_l:       { price: 25,  currency: 'stardust', rewards: [{ itemId: 'eqm_enhance_l', quantity: 3 }], dailyLimit: 0 },
+  sd_forge_rare:      { price: 25,  currency: 'stardust', rewards: [{ itemId: 'forge_ore_rare', quantity: 3 }], dailyLimit: 0 },
   sd_chest_gold:      { price: 50,  currency: 'stardust', rewards: [{ itemId: 'chest_gold', quantity: 1 }], dailyLimit: 3 },
   sd_diamond_100:     { price: 80,  currency: 'stardust', rewards: [{ itemId: 'diamond', quantity: 100 }], dailyLimit: 0 },
   // ── 特殊商店 ──
@@ -36,9 +36,8 @@ const SHOP_CATALOG: Record<string, {
   sd_ticket_equip:      { price: 30,  currency: 'stardust', rewards: [{ itemId: 'gacha_ticket_equip', quantity: 1 }], dailyLimit: 0 },
   // ── 碎片兌換店 ──
   scrap_chest_equip:    { price: 10,  currency: 'equip_scrap', rewards: [{ itemId: 'chest_equipment', quantity: 1 }], dailyLimit: 0 },
-  scrap_enhance_s:      { price: 3,   currency: 'equip_scrap', rewards: [{ itemId: 'eqm_enhance_s', quantity: 5 }], dailyLimit: 0 },
-  scrap_enhance_m:      { price: 8,   currency: 'equip_scrap', rewards: [{ itemId: 'eqm_enhance_m', quantity: 3 }], dailyLimit: 0 },
-  scrap_enhance_l:      { price: 15,  currency: 'equip_scrap', rewards: [{ itemId: 'eqm_enhance_l', quantity: 2 }], dailyLimit: 0 },
+  scrap_forge_common:   { price: 3,   currency: 'equip_scrap', rewards: [{ itemId: 'forge_ore_common', quantity: 5 }], dailyLimit: 0 },
+  scrap_forge_rare:     { price: 10,  currency: 'equip_scrap', rewards: [{ itemId: 'forge_ore_rare', quantity: 2 }], dailyLimit: 0 },
   // ── 競技兌換店 ──
   arena_exp_3000:       { price: 5,   currency: 'arena', rewards: [{ itemId: 'exp', quantity: 3000 }], dailyLimit: 0 },
   arena_gold_20k:       { price: 5,   currency: 'arena', rewards: [{ itemId: 'gold', quantity: 20000 }], dailyLimit: 0 },
@@ -390,19 +389,19 @@ function generateChestRewards(chestId: string, qty: number) {
     if (chestId === 'chest_bronze') {
       gold += 1000 + Math.floor(Math.random() * 2000);
       if (Math.random() < 0.5) exp += 200;
-      if (Math.random() < 0.2) itemMap['eqm_enhance_s'] = (itemMap['eqm_enhance_s'] || 0) + 1;
+      if (Math.random() < 0.2) itemMap['forge_ore_common'] = (itemMap['forge_ore_common'] || 0) + 1;
     } else if (chestId === 'chest_silver') {
       gold += 3000 + Math.floor(Math.random() * 4000);
       diamond += 10 + Math.floor(Math.random() * 20);
       if (Math.random() < 0.8) exp += 1000;
-      if (Math.random() < 0.4) itemMap['eqm_enhance_m'] = (itemMap['eqm_enhance_m'] || 0) + 1;
-      if (Math.random() < 0.2) itemMap['eqm_enhance_s'] = (itemMap['eqm_enhance_s'] || 0) + 2;
+      if (Math.random() < 0.4) itemMap['forge_ore_common'] = (itemMap['forge_ore_common'] || 0) + 2;
+      if (Math.random() < 0.2) itemMap['forge_ore_rare'] = (itemMap['forge_ore_rare'] || 0) + 1;
     } else if (chestId === 'chest_gold') {
       gold += 8000 + Math.floor(Math.random() * 7000);
       diamond += 30 + Math.floor(Math.random() * 50);
       exp += 4000;
-      if (Math.random() < 0.6) itemMap['eqm_enhance_l'] = (itemMap['eqm_enhance_l'] || 0) + 1;
-      if (Math.random() < 0.4) itemMap['eqm_enhance_m'] = (itemMap['eqm_enhance_m'] || 0) + 1;
+      if (Math.random() < 0.6) itemMap['forge_ore_rare'] = (itemMap['forge_ore_rare'] || 0) + 1;
+      if (Math.random() < 0.4) itemMap['forge_ore_common'] = (itemMap['forge_ore_common'] || 0) + 2;
       if (Math.random() < 0.3) itemMap['chest_equipment'] = (itemMap['chest_equipment'] || 0) + 1;
     }
   }

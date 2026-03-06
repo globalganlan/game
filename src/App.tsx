@@ -49,13 +49,13 @@ import { CombatPowerComparison } from './components/CombatPowerHUD'
 import { AcquireToast } from './components/AcquireToast'
 import { TutorialOverlay, useTutorial } from './components/TutorialOverlay'
 import { getCachedStageConfig } from './services/stageService'
-import { getItemName } from './constants/rarity'
+import { getItemName, toRarityNum } from './constants/rarity'
 import { ClickableItemIcon } from './components/ClickableItemIcon'
-import { getTowerReward, getDailyDungeonConfig, getPvPReward, getBossConfig, getBossRewardByBossAndRank } from './domain/stageSystem'
+import { getTowerReward, getDailyDungeonConfig, getPvPReward, getBossConfig, getBossRewardByBossAndRank, isModeUnlocked } from './domain/stageSystem'
 import { getChallengeReward } from './domain/arenaSystem'
 import type { StageReward } from './domain/stageSystem'
 import { useCombatPower, buildHeroCPInputs } from './hooks/useCombatPower'
-import { getTeamCombatPower } from './domain/combatPower'
+import { getTeamCombatPower, getComparisonLevel } from './domain/combatPower'
 import { useAcquireToast } from './hooks/useAcquireToast'
 import type { AcquireItem } from './hooks/useAcquireToast'
 import { registerAcquireHandler, registerTextHandler } from './services/acquireToastBus'
@@ -88,10 +88,24 @@ import { useBgm } from './hooks/useBgm'
    App 主元件
    ══════════════════════════════ */
 
+/** Suspense 內的哨兵元件 — 所有兄弟的 GLB 載入完成後才會掛載，掛載即觸發收幕 */
+function SceneReady({ onReady }: { onReady: (delay?: number) => void }) {
+  const called = useRef(false)
+  useEffect(() => {
+    if (called.current) return
+    called.current = true
+    // 等一幀讓場景實際渲染到畫面後，立即開始收幕（無額外 grace delay）
+    requestAnimationFrame(() => onReady(0))
+  }, [onReady])
+  return null
+}
+
 export default function App() {
   /* ── 認證 ── */
   const authHook = useAuth()
   const [showGame, setShowGame] = useState(false)
+  /** 控制 3D 戰鬥場景（Canvas）是否掛載 — 大廳時不掛載，進入戰鬥準備時才掛載 */
+  const [showBattleScene, setShowBattleScene] = useState(false)
 
   /* ── 存檔 ── */
   const saveHook = useSave()
@@ -120,8 +134,8 @@ export default function App() {
     return heroesList
       .filter(h => ownedIds.has(Number(h.HeroID ?? 0)))
       .sort((a, b) => {
-        const ra = Number((a as Record<string, unknown>).Rarity ?? 0)
-        const rb = Number((b as Record<string, unknown>).Rarity ?? 0)
+        const ra = toRarityNum((a as Record<string, unknown>).Rarity)
+        const rb = toRarityNum((b as Record<string, unknown>).Rarity)
         return rb - ra // SSR(4) > SR(3) > R(2)
       })
   }, [heroesList, saveHook.playerData?.heroes])
@@ -202,8 +216,11 @@ export default function App() {
   const stagesHasDaily = useMemo(() => {
     if (!cachedDailyCounts) return false
     const c = cachedDailyCounts
-    return (c.daily < 3) || (c.pvp < 5) || (c.boss < 3)
-  }, [cachedDailyCounts])
+    const sp = saveHook.playerData?.save?.storyProgress ?? { chapter: 1, stage: 1 }
+    return (isModeUnlocked('daily', sp) && c.daily < 3)
+      || (isModeUnlocked('pvp', sp) && c.pvp < 5)
+      || (isModeUnlocked('boss', sp) && c.boss < 3)
+  }, [cachedDailyCounts, saveHook.playerData?.save?.storyProgress])
   useEffect(() => {
     if (gameState !== 'MAIN_MENU' || !authHook.auth.playerId) return
     let cancelled = false
@@ -257,6 +274,7 @@ export default function App() {
     setStageId('1-1'); setStageMode('story'); setSceneTheme('story')
     setDamagePopups([]); setHitFlashSignals({})
     clearAllPromises()
+    setShowBattleScene(false)
 
     // 2. hooks 守門旗標重設
     gameInit.resetInitRefs()
@@ -293,6 +311,22 @@ export default function App() {
     const inputs = buildHeroCPInputs(formation, heroInstances, heroesList)
     return getTeamCombatPower(inputs)
   }, [isDefenseSetup, playerSlots, saveHook.playerData?.heroes, heroesList])
+
+  /* ── 戰鬥準備即時戰力（根據 playerSlots 即時變動，而非存檔 formation） ── */
+  const battlePrepPower = useMemo(() => {
+    if (gameState !== 'IDLE' || isDefenseSetup) return cpState.currentPower
+    const heroInstances = saveHook.playerData?.heroes ?? []
+    if (heroInstances.length === 0 || heroesList.length === 0) return 0
+    const formation = playerSlots.map(s => s ? String(s.HeroID ?? s.id ?? '') : null)
+    const inputs = buildHeroCPInputs(formation, heroInstances, heroesList)
+    return getTeamCombatPower(inputs)
+  }, [gameState, isDefenseSetup, playerSlots, saveHook.playerData?.heroes, heroesList, cpState.currentPower])
+
+  /** 戰鬥準備中的即時對比等級 */
+  const battlePrepComparison = useMemo(
+    () => getComparisonLevel(battlePrepPower, cpState.enemyPower),
+    [battlePrepPower, cpState.enemyPower],
+  )
 
   // ── 戰力變動 → 統一 toast 提示 ──
   useEffect(() => {
@@ -368,6 +402,7 @@ export default function App() {
     heroInstances: saveHook.playerData?.heroes ?? [],
     saveData: saveHook.playerData?.save ?? null,
     heroesList, gameState,
+    setShowBattleScene,
   })
   const {
     resetBattleState, retryBattle, replayBattle,
@@ -396,6 +431,7 @@ export default function App() {
     setIsDefenseSetup, isDefenseSetupRef,
     heroesListRef,
     preBattleMenuScreenRef,
+    setShowBattleScene,
   })
   const {
     handleMenuNavigate, handleBackToMenu, handleStageSelect,
@@ -437,12 +473,9 @@ export default function App() {
           }}
         >
           {/* ── 3D Canvas ── */}
-          <Canvas
+          {showBattleScene && <Canvas
             style={{
               position: 'absolute', top: 0, left: 0, width: '100%', height: '100%',
-              // ★ 不使用 visibility:hidden — iOS WKWebView 會在 hidden 期間回收 GPU 紋理，
-              //   導致恢復可見時已載入模型變黑。改用 pointer-events 控制觸摸穿透。
-              pointerEvents: (gameState === 'MAIN_MENU' && menuScreen !== 'none') ? 'none' : 'auto',
             }}
             camera={{ position: responsive.camPos, fov: responsive.fov }}
             shadows
@@ -553,8 +586,9 @@ export default function App() {
               )}
 
               <ResponsiveCamera fov={responsive.fov} position={responsive.camPos} target={responsive.camTarget} />
+              <SceneReady onReady={closeCurtain} />
             </Suspense>
-          </Canvas>
+          </Canvas>}
 
           {/* ── 橫屏遮罩（CSS 控制顯示） ── */}
           <div className="landscape-block">
@@ -622,6 +656,7 @@ export default function App() {
               onArenaStartBattle={handleArenaStartBattle}
               onArenaDefenseSetup={handleArenaDefenseSetup}
               initialDailyCounts={cachedDailyCounts}
+              stageMode={stageMode}
             />
           )}
 
@@ -747,9 +782,9 @@ export default function App() {
             return (
               <div className="battle-prep-top-banner">
                 <CombatPowerComparison
-                  myPower={cpState.currentPower}
+                  myPower={battlePrepPower}
                   enemyPower={cpState.enemyPower}
-                  comparison={cpState.comparison}
+                  comparison={battlePrepComparison}
                 />
                 {/* 主線關卡 */}
                 {cfg && (
@@ -886,7 +921,7 @@ export default function App() {
             <div className="bottom-panel">
               {gameState === 'IDLE' && turn === 0 && !isDefenseSetup && (
                 <div className="bottom-panel-btn">
-                  <button onClick={() => { restoreFormationFromSave(true); setMenuScreen(preBattleMenuScreenRef.current); preBattleMenuScreenRef.current = 'none'; setGameState('MAIN_MENU') }} className="btn-back-menu">← 返回</button>
+                  <button onClick={() => { restoreFormationFromSave(true); backToLobby() }} className="btn-back-menu">← 返回</button>
                   <button onClick={startAutoBattle} className="btn-start">開始戰鬥</button>
                 </div>
               )}

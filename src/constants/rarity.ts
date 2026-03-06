@@ -7,6 +7,23 @@
 
 export type Rarity = 'N' | 'R' | 'SR' | 'SSR'
 
+/** 文字/數字 → Rarity 標籤（相容 DB TEXT 欄位 'R'/'SR'/'SSR' 及舊式數字 1-4） */
+export function toRarity(v: unknown): Rarity {
+  const s = String(v).toUpperCase()
+  if (s === 'SSR' || s === '4') return 'SSR'
+  if (s === 'SR' || s === '3') return 'SR'
+  if (s === 'R' || s === '2') return 'R'
+  return 'N'
+}
+
+/** 文字/數字 → 稀有度數字（N=1, R=2, SR=3, SSR=4），供 domain 層使用 */
+const _RARITY_TO_NUM: Record<string, number> = { N: 1, R: 2, SR: 3, SSR: 4 }
+export function toRarityNum(v: unknown): number {
+  const n = Number(v)
+  if (n >= 1 && n <= 4 && Number.isFinite(n)) return Math.round(n)
+  return _RARITY_TO_NUM[String(v).toUpperCase()] ?? 1
+}
+
 /** 基礎邊框/文字顏色 */
 export const RARITY_COLORS: Record<Rarity, string> = {
   N: '#aaa',

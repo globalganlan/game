@@ -1,7 +1,8 @@
 /**
- * useGameInit — 遊戲初始化：資料載入 + 預載 + Phase 0/1/2 Effects
+ * useGameInit — 遊戲初始化：資料載入 + Phase 0/1/2 Effects
  *
- * 從 App.tsx 抽出，管理 fetchData、模型預載、存檔提前載入、PWA 獎勵等。
+ * 從 App.tsx 抽出，管理 fetchData、存檔提前載入、PWA 獎勵等。
+ * GLB 模型與縮圖統一走 Suspense 懶載入，不做背景預載。
  */
 import { useState, useEffect, useRef, useCallback } from 'react'
 import type { RawHeroData, SlotHero, GameState } from '../types'
@@ -10,17 +11,13 @@ import type { HeroSkillConfig } from '../domain/types'
 import type { RawHeroInput } from '../domain'
 import type { MailItem } from '../services/mailService'
 import type { SaveData, HeroInstance } from '../services/saveService'
-import { loadGlbShared } from '../loaders/glbLoader'
-import { loadAllGameData } from '../services'
+import { loadAllGameData, loadRawHeroes } from '../services'
 import { getSaveState } from '../services/saveService'
 import { loadInventory } from '../services/inventoryService'
 import { preloadMail } from '../services/mailService'
 import { isStandalone, claimPwaReward } from '../services/pwaService'
 import { normalizeModelId, clamp01 } from '../game/helpers'
-import { API_URL, INITIAL_CURTAIN_GRACE_MS } from '../game/constants'
-
-/** iOS 裝置偵測 — WKWebView 記憶體上限較低，不可激進預載所有模型 */
-const _isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent)
+import { INITIAL_CURTAIN_GRACE_MS } from '../game/constants'
 
 export interface GameInitDeps {
   /* ── 外部 hooks ── */
@@ -62,68 +59,12 @@ export function useGameInit(deps: GameInitDeps) {
     showGame, gameState,
   } = deps
 
-  /* ── 預載追蹤 ── */
-  const preloadedGlbUrls = useRef(new Set<string>())
-  const preloadedThumbUrls = useRef(new Set<string>())
   const [preloadProgress, setPreloadProgress] = useState<number | null>(null)
   const didInitFetch = useRef(false)
 
   /* ── 提前背景載入（登入期間就開始，不阻塞 loading 畫面） ── */
-  const earlyHeroesRef = useRef<Promise<RawHeroData[]> | null>(null)
   const earlySaveRef = useRef<Promise<unknown> | null>(null)
   const earlySaveStarted = useRef(false)
-
-  /* ── 預載方法 ── */
-  const preloadModelAnimations = useCallback(async (
-    modelIds: string[],
-    onProgress?: (ratio: number) => void,
-  ) => {
-    if (!modelIds.length) { onProgress?.(1); return }
-    const animNames = ['idle', 'attack', 'hurt', 'dying', 'run']
-    const totalSteps = modelIds.length * (1 + animNames.length)
-    let completed = 0
-    for (const mid of modelIds) {
-      const base = `${import.meta.env.BASE_URL}models/${mid}`
-      const meshUrl = `${base}/${mid}.glb`
-      if (!preloadedGlbUrls.current.has(meshUrl)) {
-        try { await loadGlbShared(meshUrl); preloadedGlbUrls.current.add(meshUrl) } catch (e) { console.error('[preload mesh]', meshUrl, e) }
-      }
-      completed++
-      onProgress?.(completed / totalSteps)
-      await new Promise((r) => setTimeout(r, 0))
-      for (const anim of animNames) {
-        const url = `${base}/${mid}_${anim}.glb`
-        if (!preloadedGlbUrls.current.has(url)) {
-          try { await loadGlbShared(url); preloadedGlbUrls.current.add(url) } catch (e) { console.error('[preload anim]', url, e) }
-        }
-        completed++
-        onProgress?.(completed / totalSteps)
-        await new Promise((r) => setTimeout(r, 0))
-      }
-    }
-  }, [])
-
-  const preloadThumbnails = useCallback(async (
-    modelIds: string[],
-    onProgress?: (ratio: number) => void,
-  ) => {
-    if (!modelIds.length) { onProgress?.(1); return }
-    let completed = 0
-    for (const mid of modelIds) {
-      const url = `${import.meta.env.BASE_URL}models/${mid}/thumbnail.png`
-      if (!preloadedThumbUrls.current.has(url)) {
-        await new Promise<void>((resolve) => {
-          const img = new Image()
-          img.onload = img.onerror = () => resolve()
-          img.src = url
-        })
-        preloadedThumbUrls.current.add(url)
-      }
-      completed++
-      onProgress?.(completed / modelIds.length)
-      await new Promise((r) => setTimeout(r, 0))
-    }
-  }, [])
 
   /* ── 資料載入 ── */
   const fetchData = useRef<(() => Promise<void>) | null>(null)
@@ -147,17 +88,14 @@ export function useGameInit(deps: GameInitDeps) {
       setCurtainText('載入資源中...')
       setPreloadProgress(0)
 
-      const [earlyHeroes, gameData] = await Promise.all([
-        earlyHeroesRef.current ?? fetch(API_URL).then(r => r.json()).then(heroRes => {
-          const rawList = Array.isArray(heroRes) ? heroRes : (heroRes?.value ?? [])
-          return (Array.isArray(rawList) ? rawList : []) as RawHeroData[]
-        }),
+      const [gameData] = await Promise.all([
         loadAllGameData((r) => { stageProgress.fetch = r; refresh() }),
         earlySaveRef.current ?? Promise.resolve(),
       ])
       stageProgress.fetch = 1; refresh()
 
-      const data: RawHeroData[] = earlyHeroes
+      // loadAllGameData 內部已呼叫 readSheet('heroes')，這裡直接從 sheetApi 快取取原始資料
+      const data = (await loadRawHeroes()) as RawHeroData[]
       setHeroesList(data)
       heroesListRef.current = data
       skillsRef.current = gameData.skills
@@ -209,13 +147,6 @@ export function useGameInit(deps: GameInitDeps) {
         }
       } catch (e) { console.warn('[speed restore]', e) }
 
-      // 背景非同步預載模型 & 縮圖（iOS 跳過：WKWebView 記憶體有限，改用 Suspense 懶載入）
-      if (!_isIOS) {
-        const preloadIds = Array.from(new Set(data.map((h, i) => normalizeModelId(h, i))))
-        preloadModelAnimations(preloadIds).catch(() => { })
-        preloadThumbnails(preloadIds).catch(() => { })
-      }
-
       stageProgress.finalize = 0.5; refresh()
       setCurtainText('初始化戰場...')
       await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)))
@@ -230,35 +161,9 @@ export function useGameInit(deps: GameInitDeps) {
     }
   }
 
-  // ── Phase 0: 公開資料 — 元件掛載後立刻開始（不需認證）──
+  // ── Phase 0: 公開資料 — 元件掛載後立刻開始（可能因無 token 而失敗，僅作為擴熱快取）──
   useEffect(() => {
-    if (earlyHeroesRef.current) return
-    earlyHeroesRef.current = fetch(API_URL)
-      .then(r => r.json())
-      .then(heroRes => {
-        const rawList = Array.isArray(heroRes) ? heroRes : (heroRes?.value ?? [])
-        return (Array.isArray(rawList) ? rawList : []) as RawHeroData[]
-      })
-      .catch(e => { console.warn('[early] heroes fetch failed:', e); return [] as RawHeroData[] })
     loadAllGameData().catch(() => { })
-    // ★ iOS 跳過全部預載（WKWebView 記憶體上限低，84 個 GLB 並行載入會被 iOS 殺掉）
-    // 改用 Suspense 懶載入：模型在實際上陣時才載入，縮圖在顯示時才請求
-    if (!_isIOS) {
-      earlyHeroesRef.current.then(data => {
-        if (!data.length) return
-        const ids = Array.from(new Set(data.map((h, i) => normalizeModelId(h, i))))
-        const animNames = ['idle', 'attack', 'hurt', 'dying', 'run']
-        for (const mid of ids) {
-          const base = `${import.meta.env.BASE_URL}models/${mid}`
-          loadGlbShared(`${base}/${mid}.glb`).catch(() => { })
-          for (const anim of animNames) {
-            loadGlbShared(`${base}/${mid}_${anim}.glb`).catch(() => { })
-          }
-          const img = new Image()
-          img.src = `${base}/thumbnail.png`
-        }
-      })
-    }
   }, [])
 
   // ── Phase 1: 認證成功 → 背景載入存檔 & 信箱 & 背包 ──
@@ -306,7 +211,6 @@ export function useGameInit(deps: GameInitDeps) {
   const resetInitRefs = useCallback(() => {
     didInitFetch.current = false
     earlySaveStarted.current = false
-    earlyHeroesRef.current = null
     earlySaveRef.current = null
     setPreloadProgress(null)
   }, [])

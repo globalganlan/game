@@ -57,6 +57,7 @@ export interface StageHandlerDeps {
   isDefenseSetupRef: React.MutableRefObject<boolean>
   heroesListRef: React.MutableRefObject<RawHeroData[]>
   preBattleMenuScreenRef: React.MutableRefObject<MenuScreen>
+  setShowBattleScene: (b: boolean) => void
 }
 
 export function useStageHandlers(deps: StageHandlerDeps) {
@@ -67,6 +68,7 @@ export function useStageHandlers(deps: StageHandlerDeps) {
     showToast, acquireShow, heroesList, stageMode, arenaTargetRankRef,
     setIsDefenseSetup, isDefenseSetupRef, heroesListRef,
     preBattleMenuScreenRef,
+    setShowBattleScene,
   } = deps
 
   /* ── 主選單導航 ── */
@@ -84,15 +86,14 @@ export function useStageHandlers(deps: StageHandlerDeps) {
           : mode === 'boss' ? `Boss 挑戰`
             : `關卡 ${sid}`
 
-    const needsCurtain = mode !== stageMode
-    if (needsCurtain) {
-      setCurtainVisible(true)
-      setCurtainFading(false)
-      setCurtainText(`準備${mode === 'tower' ? '挑戰' : ''}${displayName}...`)
-      curtainClosePromiseRef.current = null
-      await waitFrames(2)
-    }
+    // 每次從大廳進入戰鬥場景都需要過場幕（Canvas 正在掛載）
+    setCurtainVisible(true)
+    setCurtainFading(false)
+    setCurtainText(`準備${mode === 'tower' ? '挑戰' : ''}${displayName}...`)
+    curtainClosePromiseRef.current = null
+    await waitFrames(2)
 
+    setShowBattleScene(true)
     setStageMode(mode)
     setStageId(sid)
 
@@ -116,21 +117,28 @@ export function useStageHandlers(deps: StageHandlerDeps) {
 
     updateEnemySlots(() => buildEnemySlotsFromStage(mode, sid, heroesList, injectedEnemies))
     restoreFormationFromSave()
-    // 記住進入戰鬥前的 menuScreen，戰後可返回
-    preBattleMenuScreenRef.current = mode === 'story' ? 'none' : 'stages'
+    // 記住進入戰鬥前的 menuScreen，戰後可返回（一律回到關卡選擇頁）
+    preBattleMenuScreenRef.current = 'stages'
     setMenuScreen('none')
     setGameState('IDLE')
 
-    if (needsCurtain) closeCurtain()
+    // closeCurtain 由 Canvas 內 SceneReady 在 Suspense 解析後觸發
     showToast(`已選擇: ${displayName}`)
-  }, [stageMode, heroesList, setStageMode, setSceneTheme, setStageId, updateEnemySlots, restoreFormationFromSave, setMenuScreen, setGameState, setCurtainVisible, setCurtainFading, setCurtainText, curtainClosePromiseRef, closeCurtain, showToast]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [stageMode, heroesList, setStageMode, setSceneTheme, setStageId, updateEnemySlots, restoreFormationFromSave, setMenuScreen, setGameState, setCurtainVisible, setCurtainFading, setCurtainText, curtainClosePromiseRef, closeCurtain, showToast, setShowBattleScene]) // eslint-disable-line react-hooks/exhaustive-deps
 
   /* ── 競技場挑戰（新版：用 targetUserId 識別對手） ── */
   const handleArenaStartBattle = useCallback(async (
     targetUserId: string,
     defender: { displayName: string; power: number; isNPC: boolean },
   ) => {
-    showToast(`正在載入 ${defender.displayName} 的陣型…`)
+    // 過場幕 + 掛載戰鬥場景
+    setCurtainVisible(true)
+    setCurtainFading(false)
+    setCurtainText(`正在載入 ${defender.displayName} 的陣型…`)
+    curtainClosePromiseRef.current = null
+    await waitFrames(2)
+    setShowBattleScene(true)
+
     try {
       const res = await startArenaChallenge(targetUserId)
       if (!res.success) {
@@ -139,6 +147,8 @@ export function useStageHandlers(deps: StageHandlerDeps) {
         } else {
           showToast(`挑戰失敗：${res.error === 'no_challenges_left' ? '今日挑戰次數已用完' : res.error}`)
         }
+        setShowBattleScene(false)
+        closeCurtain()
         return
       }
       const targetRank = res.targetRank ?? 0
@@ -194,14 +204,24 @@ export function useStageHandlers(deps: StageHandlerDeps) {
       preBattleMenuScreenRef.current = 'arena'
       setMenuScreen('none')
       setGameState('IDLE')
+      // closeCurtain 由 Canvas 內 SceneReady 在 Suspense 解析後觸發
     } catch (e) {
+      setShowBattleScene(false)
+      closeCurtain()
       showToast('挑戰載入失敗：' + String(e))
     }
-  }, [heroesList, showToast, updateEnemySlots, restoreFormationFromSave, setStageMode, setSceneTheme, setStageId, setMenuScreen, setGameState]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [heroesList, showToast, updateEnemySlots, restoreFormationFromSave, setStageMode, setSceneTheme, setStageId, setMenuScreen, setGameState, setCurtainVisible, setCurtainFading, setCurtainText, curtainClosePromiseRef, closeCurtain, setShowBattleScene]) // eslint-disable-line react-hooks/exhaustive-deps
 
   /* ── 競技場防守陣型配置 ── */
   const handleArenaDefenseSetup = useCallback(async () => {
-    showToast('載入防守陣型配置…')
+    // 過場幕 + 掛載戰鬥場景
+    setCurtainVisible(true)
+    setCurtainFading(false)
+    setCurtainText('載入防守陣型配置…')
+    curtainClosePromiseRef.current = null
+    await waitFrames(2)
+    setShowBattleScene(true)
+
     setIsDefenseSetup(true)
     isDefenseSetupRef.current = true
     setStageMode('pvp')
@@ -249,7 +269,8 @@ export function useStageHandlers(deps: StageHandlerDeps) {
     }
     setMenuScreen('none')
     setGameState('IDLE')
-  }, [heroesList, showToast, setIsDefenseSetup, isDefenseSetupRef, heroesListRef, updateEnemySlots, updatePlayerSlots, setStageMode, setSceneTheme, setStageId, setMenuScreen, setGameState]) // eslint-disable-line react-hooks/exhaustive-deps
+    // closeCurtain 由 Canvas 內 SceneReady 在 Suspense 解析後觸發
+  }, [heroesList, showToast, setIsDefenseSetup, isDefenseSetupRef, heroesListRef, updateEnemySlots, updatePlayerSlots, setStageMode, setSceneTheme, setStageId, setMenuScreen, setGameState, setCurtainVisible, setCurtainFading, setCurtainText, curtainClosePromiseRef, closeCurtain, setShowBattleScene]) // eslint-disable-line react-hooks/exhaustive-deps
 
   /* ── 儲存防守陣型並返回 ── */
   const handleSaveDefenseFormation = useCallback(async (currentPlayerSlots: (SlotHero | null)[]) => {
@@ -257,18 +278,20 @@ export function useStageHandlers(deps: StageHandlerDeps) {
     const ok = await setDefenseFormation(formation)
     setIsDefenseSetup(false)
     isDefenseSetupRef.current = false
+    setShowBattleScene(false)
     setMenuScreen('arena')
     setGameState('MAIN_MENU')
     showToast(ok ? '防守陣型已儲存！' : '儲存失敗，請稍後再試')
-  }, [setIsDefenseSetup, isDefenseSetupRef, setMenuScreen, setGameState, showToast])
+  }, [setIsDefenseSetup, isDefenseSetupRef, setMenuScreen, setGameState, showToast, setShowBattleScene])
 
   /* ── 離開防守配置（不儲存） ── */
   const handleCancelDefenseSetup = useCallback(() => {
     setIsDefenseSetup(false)
     isDefenseSetupRef.current = false
+    setShowBattleScene(false)
     setMenuScreen('arena')
     setGameState('MAIN_MENU')
-  }, [setIsDefenseSetup, isDefenseSetupRef, setMenuScreen, setGameState])
+  }, [setIsDefenseSetup, isDefenseSetupRef, setMenuScreen, setGameState, setShowBattleScene])
 
   /* ── 每日簽到 ── */
   const handleCheckin = useCallback(async () => {

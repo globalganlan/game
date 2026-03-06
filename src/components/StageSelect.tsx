@@ -55,6 +55,8 @@ interface StageSelectProps {
   onSelectStage: (mode: 'story' | 'tower' | 'daily' | 'pvp' | 'boss', stageId: string) => void
   /** App.tsx 已預先 fetch 的每日次數，用作初始值避免紅點閃現 */
   initialDailyCounts?: DailyCounts | null
+  /** 從戰鬥返回時，自動切到對應的模式 tab */
+  initialMode?: 'story' | 'tower' | 'daily' | 'pvp' | 'boss'
 }
 
 /* ────────────────────────────
@@ -288,7 +290,7 @@ function StoryStages({
                   <div className="sc-card-rewards">
                     {cfg.rewards.exp > 0 && <span className="sc-reward-tag"><CurrencyIcon type="exp" /> {cfg.rewards.exp}</span>}
                     {cfg.rewards.gold > 0 && <span className="sc-reward-tag"><CurrencyIcon type="gold" /> {cfg.rewards.gold}</span>}
-                    {cfg.rewards.diamond && cfg.rewards.diamond > 0 && <span className="sc-reward-tag"><CurrencyIcon type="diamond" /> {cfg.rewards.diamond}</span>}
+                    {(cfg.rewards.diamond ?? 0) > 0 && <span className="sc-reward-tag"><CurrencyIcon type="diamond" /> {cfg.rewards.diamond}</span>}
                   </div>
                 )}
               </button>
@@ -500,7 +502,7 @@ function PvPPanel({
             <div className="pvp-opponent-rewards" style={{ display: 'flex', flexWrap: 'wrap', gap: '4px 10px', fontSize: '0.75em', marginBottom: 6, alignItems: 'center' }}>
               <span style={{ display: 'inline-flex', alignItems: 'center', gap: 2 }}><CurrencyIcon type="gold" /> 金幣 {oppReward.gold}</span>
               <span style={{ display: 'inline-flex', alignItems: 'center', gap: 2 }}><CurrencyIcon type="exp" /> 經驗 {oppReward.exp}</span>
-              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 2 }}><CurrencyIcon type="diamond" /> 鑽石 {oppReward.diamond}</span>
+              {(oppReward.diamond ?? 0) > 0 && <span style={{ display: 'inline-flex', alignItems: 'center', gap: 2 }}><CurrencyIcon type="diamond" /> 鑽石 {oppReward.diamond}</span>}
               <span style={{ display: 'inline-flex', alignItems: 'center', gap: 2 }}><CurrencyIcon type="pvp_coin" /> 試煉幣 {oppReward.items?.[0]?.quantity ?? 3}</span>
             </div>
             <button
@@ -580,7 +582,7 @@ function BossPanel2({
                     <div key={r} style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 2, color: rankColors[r] }}>
                       <span style={{ fontWeight: 'bold', width: 16 }}>{r}</span>
                       <CurrencyIcon type="gold" /> {rw.gold}
-                      {' '}<CurrencyIcon type="diamond" /> {rw.diamond}
+                      {(rw.diamond ?? 0) > 0 && <>{' '}<CurrencyIcon type="diamond" /> {rw.diamond}</>}
                       {' '}<CurrencyIcon type="exp" /> {rw.exp}
                       {rw.items?.map((it, i) => (
                         <span key={i}> <ClickableItemIcon itemId={it.itemId}>×{it.quantity}</ClickableItemIcon></span>
@@ -614,8 +616,9 @@ export function StageSelect({
   onBack,
   onSelectStage,
   initialDailyCounts,
+  initialMode,
 }: StageSelectProps) {
-  const [activeMode, setActiveMode] = useState<StageMode>('story')
+  const [activeMode, setActiveMode] = useState<StageMode>(initialMode ?? 'story')
   const [lockToast, setLockToast] = useState<string | null>(null)
   const [dailyCounts, setDailyCounts] = useState<DailyCounts | null>(initialDailyCounts ?? null)
 

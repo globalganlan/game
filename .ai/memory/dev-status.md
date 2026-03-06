@@ -1,6 +1,6 @@
 # 開發狀態快照 — Dev Status
 
-> 最後更新：2026-03-06（第五十八次更新 — 競技場動態挑戰範圍 + 對手清單 + 全專案 safe-area 補齊）
+> 最後更新：2026-03-06（第六十二次更新 — 12 項 UX 修正與獎勵清理）
 
 ## 截至 2026-03-06 的開發狀態
 
@@ -13,8 +13,12 @@
 - [x] 提示詞模板集（`.ai/agents/prompt-playbook.md`，P-01~P-07）
 - [x] 模組化規格系統（.ai/specs/）
 - [x] 記憶持久化系統（.ai/memory/）
+- [x] **大廳/戰鬥場景分離** — `showBattleScene` state 控制 Canvas 條件掛載，大廳零 GPU、iOS 紋理問題根絕（ADR-018，取代 ADR-016）
+- [x] **結算面板 z-index 修正** — Hero.tsx `<Html zIndexRange={[1,0]}>` 讓英雄名稱不再遮擋勝利/敗北結算畫面
+- [x] **過場幕等待資源載入** — SceneReady 元件在 Suspense 內所有 GLB 載入後才觸發 closeCurtain，iOS 不再看到空白場景
 - [x] **競技場動態挑戰範圍** — 固定 -3 改為 4 階動態（rank>100→200, 21-100→50, 6-20→15, 1-5→5）
 - [x] **持久化對手清單** — 10 名隨機對手存入 save_data.arenaOpponents，每日/勝利後自動重生
+- [x] **12 項 UX 修正** — backToLobby 移除過場幕、戰鬥準備即時戰力、Boss B/C 段移除重複 EXP、鑽石=0 時隱藏圖示、ItemInfoPopup z-index 99999、簽到描述換行、紅點檢查模式解鎖、背包過濾廢棄強化石、商店/寶箱替換強化石為鍛造礦
 - [x] **對手手動刷新** — 每日 5 次免費，arena-refresh-opponents 新端點
 - [x] **排名變動偵測** — 挑戰時檢查對手排名，變動則免費自動刷新（不扣次數）
 - [x] **全專案 safe-area-inset-top** — 10 個介面全覆蓋（arena-panel/battle-prep/battle-result/boss-dmg/bhud-toasts 5 處新增）

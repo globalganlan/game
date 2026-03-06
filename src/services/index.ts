@@ -7,6 +7,7 @@ export { readSheet, listSheets, clearCache } from './sheetApi'
 
 // 資料服務
 export {
+  loadRawHeroes,
   loadHeroes,
   loadSkillTemplates,
   loadHeroSkills,

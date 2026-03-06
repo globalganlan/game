@@ -30,6 +30,7 @@ import { openEquipmentChest, getEquipDisplayName, SET_NAMES } from '../domain/eq
 import { addEquipmentLocally, equipItem, unequipItem, getHeroEquipment } from '../services/inventoryService'
 import { statZh } from '../constants/statNames'
 import { CodexPanel } from './CodexPanel'
+import { Thumbnail3D } from './UIOverlay'
 
 /* ────────────────────────────
    Props
@@ -133,7 +134,7 @@ function ItemCell({ item, definition, onClick, heroMap }: ItemCellProps & { hero
     >
       {thumbUrl ? (
         <span className="inv-cell-icon inv-cell-thumb-wrap">
-          <img className="inv-cell-thumb" src={thumbUrl} alt={name} />
+          <Thumbnail3D modelId={`zombie_${fragMatch![1]}`} />
           <span className="inv-cell-puzzle">🧩</span>
         </span>
       ) : (
@@ -303,7 +304,7 @@ function ItemDetail({ item, definition, onClose, heroMap }: ItemDetailProps & { 
         <div className="inv-detail-header">
           {thumbUrl ? (
             <span className="inv-detail-icon inv-cell-thumb-wrap">
-              <img className="inv-cell-thumb" src={thumbUrl} alt={name} style={{ width: 48, height: 48 }} />
+              <Thumbnail3D modelId={`zombie_${fragMatch![1]}`} />
               <span className="inv-cell-puzzle">🧩</span>
             </span>
           ) : (
@@ -593,6 +594,9 @@ export function InventoryPanel({ onBack, heroesList, heroInstances }: InventoryP
     } else {
       items = filterItemsByCategory(activeTab)
     }
+    // 過濾已移除的道具（強化石）
+    const DEPRECATED_ITEMS = new Set(['eqm_enhance_s', 'eqm_enhance_m', 'eqm_enhance_l'])
+    items = items.filter(i => !DEPRECATED_ITEMS.has(i.itemId))
     // 排序
     if (sortMode === 'quantity-desc') {
       items = [...items].sort((a, b) => b.quantity - a.quantity)

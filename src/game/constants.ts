@@ -1,7 +1,7 @@
 /**
  * 戰鬥 & 場景常數
  *
- * 從 App.tsx 抽取，集中管理所有戰鬥時序、格子佈局、API 端點等常數。
+ * 從 App.tsx 抽取，集中管理所有戰鬥時序、格子佈局等常數。
  */
 
 import type { Vector3Tuple } from 'three'
@@ -17,10 +17,10 @@ import type { SlotHero } from '../types'
  *   2. 等 CURTAIN_SETTLE_MS（2 rAF ≈ 33ms）確保幕已不透明
  *   3. 在幕後切換 state（敵方/陣型/gameState）
  *   4. closeCurtain(SCENE_RENDER_GRACE_MS) → 給場景渲染 1~2 幀的餘裕
- *   5. delay 後觸發 CSS fade-out（CURTAIN_FADE_MS = 1000，對應 curtainFadeOut 動畫）
+ *   5. delay 後觸發 CSS fade-out（CURTAIN_FADE_MS = 500，對應 curtainFadeOut 動畫）
  *   6. fade 結束 → setCurtainVisible(false)
  */
-export const CURTAIN_FADE_MS = 1000
+export const CURTAIN_FADE_MS = 500
 export const SCENE_RENDER_GRACE_MS = 300
 export const INITIAL_CURTAIN_GRACE_MS = 350
 export const REPLAY_SCENE_SETTLE_MS = 400
@@ -36,13 +36,6 @@ export const BUFF_TYPE_SET = new Set([
   'dmg_reduce', 'shield', 'regen', 'energy_boost',
   'dodge_up', 'reflect', 'taunt', 'immunity',
 ])
-
-/* ────────────────────────────
-   API
-   ──────────────────────────── */
-
-export const API_URL =
-  'https://script.google.com/macros/s/AKfycbxXdy3QCvgX7knCCnxfmVY0CMqmUgcG422nVgFDlx5l9CsyldFZ4bwLVHPHxbtXp0LaTw/exec'
 
 /* ────────────────────────────
    槽位 & 格子佈局

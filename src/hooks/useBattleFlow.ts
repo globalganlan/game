@@ -102,6 +102,9 @@ export interface BattleFlowDeps {
   acquireShow: (items: AcquireItem[]) => void
   showToast: (msg: string) => void
 
+  /* ── Scene control ── */
+  setShowBattleScene: (b: boolean) => void
+
   /* ── Snapshot values ── */
   playerSlots: (SlotHero | null)[]
   enemySlots: (SlotHero | null)[]
@@ -124,6 +127,7 @@ export function useBattleFlow(deps: BattleFlowDeps) {
     setActorStates, setDamagePopups, setHitFlashSignals,
     setCurtainVisible, setCurtainFading, setCurtainText, curtainClosePromiseRef, closeCurtain,
     clearAllPromises, resetBattleHUD, showToast,
+    setShowBattleScene,
     playerSlots, enemySlots, stageMode, stageId, heroesList, gameState,
   } = deps
 
@@ -249,12 +253,13 @@ export function useBattleFlow(deps: BattleFlowDeps) {
     executeBattleLoop(buildBattleCtx(), savedActions)
   }, [stageMode, stageId, heroesList, resetBattleState, buildBattleCtx, updatePlayerSlots, updateEnemySlots, setShowBattleStats, showToast]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  /* ── 回大廳（返回進入戰鬥前的場景） ── */
+  /* ── 回大廳（返回進入戰鬥前的場景，不含過場動畫） ── */
   const backToLobby = useCallback(() => {
     updatePlayerSlots(() => Array(6).fill(null))
     updateEnemySlots(() => Array(6).fill(null))
     resetBattleState()
     setVictoryRewards(null)
+    setShowBattleScene(false)
     // 返回戰前的 menuScreen
     const returnScreen = preBattleMenuScreenRef.current
     if (stageMode === 'pvp' && arenaTargetRankRef.current > 0) {
@@ -282,6 +287,8 @@ export function useBattleFlow(deps: BattleFlowDeps) {
       resetBattleState()
       setVictoryRewards(null)
       setGameState('IDLE')
+      // 多等幾幀讓 React 重渲染 + Three.js 開始載入新模型，再收幕
+      await waitFrames(5)
       closeCurtain()
       return
     }
@@ -308,6 +315,8 @@ export function useBattleFlow(deps: BattleFlowDeps) {
     resetBattleState()
     setVictoryRewards(null)
     setGameState('IDLE')
+    // 多等幾幀讓 React 重渲染 + Three.js 開始載入新模型，再收幕
+    await waitFrames(5)
     closeCurtain()
   }, [stageMode, stageId, heroesList, resetBattleState, backToLobby, updatePlayerSlots, updateEnemySlots, setVictoryRewards, setGameState, setStageId, setCurtainVisible, setCurtainFading, setCurtainText, closeCurtain, showToast]) // eslint-disable-line react-hooks/exhaustive-deps
 

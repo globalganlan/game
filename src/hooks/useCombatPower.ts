@@ -21,6 +21,7 @@ import {
 import type { RawHeroData, SlotHero } from '../types'
 import type { HeroInstance } from '../services/saveService'
 import { getHeroEquipment, onInventoryChange } from '../services/inventoryService'
+import { toRarityNum } from '../constants/rarity'
 
 /* ════════════════════════════════════
    型別
@@ -67,7 +68,7 @@ export function buildHeroCPInputs(
       CritDmg: Number((base as Record<string, unknown>).CritDmg ?? 50),
     }
 
-    const rarity = Number((base as Record<string, unknown>).Rarity ?? 3)
+    const rarity = toRarityNum((base as Record<string, unknown>).Rarity)
 
     // 建構 HeroInstanceData（裝備從 inventoryService 讀取）
     const heroData: HeroInstanceData = {

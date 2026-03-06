@@ -14,12 +14,12 @@ import * as THREE from 'three'
 import type { RawHeroData } from '../types'
 import type { HeroInstance } from '../services/saveService'
 import { PanelInfoTip, PANEL_DESCRIPTIONS } from './PanelInfoTip'
-import { updateHeroLocally, getSaveState, updateProgress, applyCurrenciesFromServer } from '../services/saveService'
+import { updateHeroLocally, getSaveState, applyCurrenciesFromServer } from '../services/saveService'
 import type { SkillTemplate, HeroSkillConfig } from '../domain/types'
 import { getHeroSkillSet } from '../services/dataService'
 import {
   getStarPassiveSlots, getAscensionMultiplier, getStarMultiplier,
-  getStatAtLevel, getLevelCap, consumeExpMaterials, expToNextLevel,
+  getStatAtLevel, getLevelCap, expToNextLevel,
   canAscend, canStarUp, getAscensionCost, getStarUpCost,
   getInitialStars, enhancedMainStat, getEnhanceCost, getMaxEnhanceLevel,
   getActiveSetBonuses, getFinalStats,
@@ -45,34 +45,24 @@ import { Thumbnail3D } from './UIOverlay'
    Rarity Config（共用常數）
    ──────────────────────────── */
 
-import { RARITY_CONFIG } from '../constants/rarity'
+import { RARITY_CONFIG, toRarity, toRarityNum, type Rarity } from '../constants/rarity'
 import { statZh } from '../constants/statNames'
-type RarityLabel = 'SSR' | 'SR' | 'R' | 'N'
-
-function numToRarity(n: number | string | unknown): RarityLabel {
-  const v = Number(n)
-  if (v >= 4) return 'SSR'
-  if (v === 3) return 'SR'
-  if (v === 2) return 'R'
-  return 'N'
-}
 
 /** 稀有度排序權值（高稀有度排前） */
 function raritySortWeight(h: RawHeroData): number {
-  const r = Number((h as Record<string, unknown>).Rarity ?? 1)
-  return -r  // 負數讓高稀有度排前
+  return -toRarityNum((h as Record<string, unknown>).Rarity)
 }
 
 /** 初始星數（使用 domain 函式） */
-function initialStars(rarity: number | string | unknown): number {
-  return getInitialStars(Number(rarity))
+function initialStars(rarity: unknown): number {
+  return getInitialStars(toRarityNum(rarity))
 }
 
 /* ────────────────────────────
    Exp Materials
    ──────────────────────────── */
 
-import { getItemName } from '../constants/rarity'
+// rarity utilities imported above (line 12)
 import { CurrencyIcon, ItemIcon } from './CurrencyIcon'
 import { ClickableItemIcon } from './ClickableItemIcon'
 
@@ -166,10 +156,25 @@ function IdlePreviewModel({ modelId }: { modelId: string }) {
   )
 }
 
+/** 載入完成回報元件（掛在 IdlePreviewModel 旁邊） */
+function NotifyLoaded({ onLoaded }: { onLoaded: () => void }) {
+  useEffect(() => { onLoaded() }, [onLoaded])
+  return null
+}
+
 /** 英雄 3D 模型預覽（獨立 Canvas） */
 function HeroModelPreview({ modelId }: { modelId: string }) {
+  const [loaded, setLoaded] = useState(false)
+  const onLoaded = useCallback(() => setLoaded(true), [])
+
   return (
     <div className="hero-model-preview">
+      {!loaded && (
+        <div className="hero-model-loading">
+          <div className="hero-model-loading-spinner" />
+          <span>模型載入中…</span>
+        </div>
+      )}
       <Canvas
         camera={{ position: [0, 0, 4.5], fov: 28 }}
         className="hero-model-canvas"
@@ -185,6 +190,7 @@ function HeroModelPreview({ modelId }: { modelId: string }) {
         />
         <Suspense fallback={null}>
           <IdlePreviewModel modelId={modelId} />
+          <NotifyLoaded onLoaded={onLoaded} />
         </Suspense>
       </Canvas>
     </div>
@@ -249,7 +255,7 @@ function HeroDetail({ hero, instance, onClose, skills, heroSkills }: HeroDetailP
   const lvl = instance?.level ?? 1
   const asc = instance?.ascension ?? 0
   const heroAny = hero as Record<string, unknown>
-  const rarityNum = Number(heroAny.Rarity ?? 3)
+  const rarityNum = toRarityNum(heroAny.Rarity)
   const ascMult = getAscensionMultiplier(asc, rarityNum)
   const minStars = initialStars((hero as Record<string, unknown>).Rarity)
   const stars = Math.max(instance?.stars ?? minStars, minStars)
@@ -257,7 +263,7 @@ function HeroDetail({ hero, instance, onClose, skills, heroSkills }: HeroDetailP
   const calcStatBase = (base: number | undefined) =>
     base != null ? Math.floor(getStatAtLevel(Number(base), lvl, rarityNum) * ascMult * starMult) : '?'
 
-  const rarity = numToRarity(heroAny.Rarity)
+  const rarity = toRarity(heroAny.Rarity)
   const rcfg = RARITY_CONFIG[rarity]
   const passiveSlots = getStarPassiveSlots(stars)
   const element = String(heroAny.Element ?? '')
@@ -345,7 +351,7 @@ function HeroDetail({ hero, instance, onClose, skills, heroSkills }: HeroDetailP
     } finally {
       setIsProcessing(false)
     }
-  }, [instance, isProcessing, availableExp, lvl, levelCap, heroId, expNeededForLevels])
+  }, [instance, isProcessing, availableExp, lvl, heroId, expNeededForLevels])
 
   // ── 突破 helpers ──
   const ascCost = getAscensionCost(asc)
@@ -390,7 +396,7 @@ function HeroDetail({ hero, instance, onClose, skills, heroSkills }: HeroDetailP
     } finally {
       setIsProcessing(false)
     }
-  }, [instance, canDoAscend, hasAscMaterials, isProcessing, asc, heroId, ascCost, currentGold])
+  }, [instance, canDoAscend, hasAscMaterials, isProcessing, asc, heroId, ascCost, fragmentId, classStoneId])
 
   // ── 升星 helpers ──
   const starCost = stars < 6 ? getStarUpCost(stars) : Infinity
@@ -414,10 +420,14 @@ function HeroDetail({ hero, instance, onClose, skills, heroSkills }: HeroDetailP
     } finally {
       setIsProcessing(false)
     }
-  }, [instance, canDoStarUp, isProcessing, stars, heroId])
+  }, [instance, canDoStarUp, isProcessing, stars, heroId, fragmentId, starCost])
 
   // ── 裝備 helpers ──
-  const heroEquipment = isOwned ? getHeroEquipment(instance!.instanceId) : []
+  const heroEquipment = useMemo(
+    () => isOwned ? getHeroEquipment(instance!.instanceId) : [],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [isOwned, instance?.instanceId],
+  )
   const equippedBySlot = useMemo(() => {
     const map: Record<string, EquipmentInstance | undefined> = {}
     for (const eq of heroEquipment) map[eq.slot] = eq
@@ -1006,7 +1016,7 @@ function HeroCard({ hero, instance, onClick }: HeroCardProps) {
   const lvl = instance?.level ?? 1
   const asc = instance?.ascension ?? 0
   const isOwned = !!instance
-  const rarity = numToRarity((hero as Record<string, unknown>).Rarity)
+  const rarity = toRarity((hero as Record<string, unknown>).Rarity)
   const rcfg = RARITY_CONFIG[rarity]
   const minStars = initialStars((hero as Record<string, unknown>).Rarity)
   const stars = Math.max(instance?.stars ?? minStars, minStars)
@@ -1067,10 +1077,10 @@ export function HeroListPanel({ heroesList, heroInstances, onBack, skills, heroS
 
   /** 依稀有度分組 */
   const groupedHeroes = useMemo(() => {
-    const groups: { label: RarityLabel; heroes: RawHeroData[] }[] = []
-    const order: RarityLabel[] = ['SSR', 'SR', 'R', 'N']
+    const groups: { label: Rarity; heroes: RawHeroData[] }[] = []
+    const order: Rarity[] = ['SSR', 'SR', 'R', 'N']
     for (const r of order) {
-      const heroes = filteredHeroes.filter(h => numToRarity((h as Record<string, unknown>).Rarity) === r)
+      const heroes = filteredHeroes.filter(h => toRarity((h as Record<string, unknown>).Rarity) === r)
       if (heroes.length > 0) groups.push({ label: r, heroes })
     }
     return groups

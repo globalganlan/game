@@ -35,15 +35,7 @@ import {
 import type { RawHeroData } from '../types'
 import type { HeroInstance, SaveData } from '../services/saveService'
 import type { AcquireItem } from '../hooks/useAcquireToast'
-import { getItemName } from '../constants/rarity'
-
-function numToRarity(v: unknown): Rarity {
-  const n = Number(v)
-  if (n === 4) return 'SSR'
-  if (n === 3) return 'SR'
-  if (n === 2) return 'R'
-  return 'N'
-}
+import { getItemName, toRarity } from '../constants/rarity'
 
 function resolveModelId(h: RawHeroData, idx = 0): string {
   const rawId = h._modelId || h.ModelID || h.HeroID || h.ModelId || h.Model || h.id || h.Name
@@ -62,7 +54,7 @@ function resolveModelId(h: RawHeroData, idx = 0): string {
 
 interface ArenaPanelProps {
   onBack: () => void
-  onStartBattle: (targetUserId: string, defender: ArenaEntry | ArenaOpponent) => void
+  onStartBattle: (targetUserId: string, defender: ArenaEntry | ArenaOpponent) => void | Promise<void>
   onSetupDefense: () => void
   saveData: SaveData | null
   heroesList: RawHeroData[]
@@ -95,6 +87,7 @@ export function ArenaPanel({
   const [savingDef, setSavingDef] = useState(false)
   const [sweeping, setSweeping] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
+  const [challenging, setChallenging] = useState(false)
   const [sweepResult, setSweepResult] = useState<{
     rewards: ArenaReward
     milestoneReward: ArenaReward | null
@@ -125,8 +118,14 @@ export function ArenaPanel({
   }, [])
 
   // 挑戰（用 playerId 識別對手）
-  const handleChallenge = (entry: ArenaOpponent) => {
-    onStartBattle(entry.playerId, entry)
+  const handleChallenge = async (entry: ArenaOpponent) => {
+    if (challenging) return
+    setChallenging(true)
+    try {
+      await onStartBattle(entry.playerId, entry)
+    } finally {
+      setChallenging(false)
+    }
   }
 
   // 刷新對手清單
@@ -169,7 +168,7 @@ export function ArenaPanel({
     return {
       name: (raw.Name as string) ?? `英雄#${inst.heroId}`,
       modelId: resolveModelId(raw),
-      rarity: numToRarity((raw as Record<string, unknown>).Rarity),
+      rarity: toRarity((raw as Record<string, unknown>).Rarity),
       level: inst.level ?? 1,
       stars: inst.stars ?? 0,
     }
@@ -295,8 +294,8 @@ export function ArenaPanel({
                     </span>
                     <span className="arena-rank-power">⚔️ {entry.power.toLocaleString()}</span>
                     {canChallenge && (
-                      <button className="arena-challenge-btn" onClick={() => handleChallenge(entry)}>
-                        挑戰
+                      <button className="arena-challenge-btn" onClick={() => handleChallenge(entry)} disabled={challenging}>
+                        {challenging ? '載入中…' : '挑戰'}
                       </button>
                     )}
                   </div>

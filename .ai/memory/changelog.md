@@ -3,6 +3,138 @@
 > 按時間倒序排列，最新的在最上面。
 
 ---
+
+### [2026-03-07] 英雄模型載入指示器 + 全專案 lint 清理
+- **觸發者**：使用者（兩項需求）
+- **執行角色**：🔧 CODING + 🧪 QA
+- **變更 1 — 模型載入指示器**：
+  - 英雄列表點開英雄資訊時，3D idle 模型載入期間顯示旋轉 spinner + 「模型載入中…」文字
+  - 新增 `NotifyLoaded` R3F 元件（掛載時觸發 `onLoaded` callback），修改 `HeroModelPreview` 追蹤 loading 狀態
+  - CSS 新增 `.hero-model-loading`、`.hero-model-loading-spinner`、`@keyframes hml-spin`
+- **變更 2 — Lint 清理（7 項）**：
+  - 移除 HeroListPanel.tsx 未使用的 import（`updateProgress`、`consumeExpMaterials`、`getItemName`）
+  - 修正 3 個 `useCallback` dependency array（`handleUpgradeByLevels`、`handleConfirmAscend`、`handleConfirmStarUp`）
+  - 將 `heroEquipment` 條件表達式包裝為 `useMemo` 避免依賴變動
+- **影響範圍**：
+  - `src/components/HeroListPanel.tsx`（模型載入 UI + lint 修正）
+  - `src/App.css`（新增 3 個 CSS 規則）
+
+---
+
+### [2026-03-06] 修復英雄稀有度全部顯示為 N 的嚴重 Bug
+- **觸發者**：使用者（「英雄列表的英雄通通變成N了」）
+- **執行角色**：🔧 CODING + 🧪 QA
+- **根因**：D1 `heroes.rarity` 欄位是 TEXT 格式（'N'/'R'/'SR'/'SSR'），但前端多處使用 `Number()` 轉換。`Number('SR')` = `NaN`，導致 `numToRarity()` 全部 fallback 回 'N'。
+- **解決方案**：在 `src/constants/rarity.ts` 新增共用 `toRarity(v)` 和 `toRarityNum(v)` 工具函式，同時支援文字和數字輸入。移除各元件中的 inline `numToRarity()` 函式。
+- **影響範圍**：
+  - `src/constants/rarity.ts`（新增 `toRarity`, `toRarityNum`）
+  - `src/components/HeroListPanel.tsx`（稀有度顯示 + 排序）
+  - `src/components/UIOverlay.tsx`（戰鬥選角稀有度）
+  - `src/components/ArenaPanel.tsx`（競技場稀有度）
+  - `src/game/runBattleLoop.ts`（戰鬥數值計算 heroRarity/enemyRarity）
+  - `src/hooks/useCombatPower.ts`（戰力計算）
+  - `src/App.tsx`（英雄排序）
+- **修復連帶效果**：戰鬥數值（`getFinalStats` 成長率）、戰力計算、英雄排序也一併修正，之前因 NaN 而使用錯誤的 fallback 成長率。
+
+---
+
+### [2026-03-06] 12 項 UX 修正與獎勵清理
+- 觸發者：使用者（12 項需求）
+- 執行角色：🔧 CODING + 🧪 QA
+- 變更摘要：
+  1. `backToLobby()` 移除過場動畫（改為直接返回 + `setShowBattleScene(false)` + 返回戰前 menuScreen）
+  2. 戰鬥準備戰力改為即時計算（`battlePrepPower` useMemo 基於 `playerSlots`）
+  3. Boss B/C 段位移除重複 EXP items（前端 + 後端）
+  4. 關卡選擇鑽石為 0 時不顯示圖示（修正 React JSX `{0 && ...}` 渲染 "0" 的 gotcha）
+  5. `ItemInfoPopup` z-index 提升至 99999
+  6. 簽到彈窗描述新增 `white-space: pre-wrap` 支援換行
+  7. MainMenu 紅點增加 `isModeUnlocked` 檢查（未解鎖模式不計入紅點）
+  8. 背包新增 `DEPRECATED_ITEMS` 過濾器（隱藏廢棄的 `eqm_enhance_s/m/l`）
+  9. 商店/寶箱全面替換強化石為鍛造礦（`forge_ore_common`/`forge_ore_rare`）
+- **影響範圍**：`src/hooks/useBattleFlow.ts`、`src/App.tsx`、`src/domain/stageSystem.ts`、`src/components/StageSelect.tsx`、`src/components/InventoryPanel.tsx`、`src/App.css`、`workers/src/routes/battle.ts`、`workers/src/routes/inventory.ts`
+### [2026-03-06] 移除全裝置 GLB/縮圖背景預載，統一走懶載入
+
+- **觸發者**：使用者（將所有裝置統一走 iOS 懶載入邏輯）
+- **執行角色**：🔧 CODING + 🧪 QA
+- **變更摘要**：
+
+  原本非 iOS 裝置會在登入畫面期間背景預載全部 84 個 GLB 模型 + 14 張縮圖，
+  但大多數英雄不會被上陣，等於浪費頻寬與記憶體。
+  現在統一所有裝置走 Suspense 懶載入，模型在實際進戰鬥場景時才下載，縮圖在顯示時才請求。
+
+  刪除了：
+  - `_isIOS` 常數 + 兩處 `if (!_isIOS)` 預載區塊
+  - `preloadModelAnimations()` / `preloadThumbnails()` 兩個方法
+  - `preloadedGlbUrls` / `preloadedThumbUrls` 兩個 ref
+  - `loadGlbShared` import（useGameInit 不再直接引用）
+
+  **效果**：節省頻寬和記憶體，JS bundle 減少 ~1.5 KB，首次進戰鬥過場幕多等幾秒（模型才開始下載）。
+
+- **影響範圍**：`src/hooks/useGameInit.ts`
+
+---
+### [2026-03-06] 修正首次進戰鬥場景模型逐個出現問題
+
+- **觸發者**：使用者（「英雄模型沒有出現 只有英雄名稱文字有顯示，要過一下下 模型才會一個一個出現」）
+- **執行角色**：🔧 CODING + 🧪 QA
+- **變更摘要**：
+
+  `Hero.tsx` 內的 `<ZombieModel>` 被自己的 `<Suspense fallback={null}>` 包住，導致：
+  - 每個 Hero 的名稱、血條立即渲染（不受 Suspense 阻擋）
+  - ZombieModel 的 throw 被內層 Suspense 攔截，模型逐個載入後才出現
+  - App.tsx 外層 Suspense + SceneReady 無法正確等待所有模型就緒
+
+  修正：移除 Hero.tsx 內層 `<Suspense>`，讓 ZombieModel 的 throw 冒泡到 App.tsx 外層 Suspense，
+  確保所有模型載入完成後才一起渲染，過場幕才收起。
+
+- **影響範圍**：`src/components/Hero.tsx`
+
+---
+### [2026-03-06] 過場幕改為等待資源載入完成才收幕
+
+- **觸發者**：使用者（Phase 3 過場幕持續時間是固定的？→ 改）
+- **執行角色**：🔧 CODING + 🧪 QA
+- **變更摘要**：
+
+  過場幕原本使用固定延遲（300ms + 1000ms 淡出）來收幕，不管模型是否載入完成。
+  現在改為由 `SceneReady` 元件在 `<Suspense>` 內所有 GLB 載入完成後才觸發 `closeCurtain()`。
+  1. **`src/App.tsx`** — 新增 `SceneReady` 元件，置於 `<Suspense>` 內尾，掛載時呼叫 `closeCurtain()`
+  2. **`src/hooks/useStageHandlers.ts`** — 成功路徑移除 `closeCurtain()` 呼叫（錯誤/中斷路徑保留）
+
+  **效果**：iOS 無預載時，過場幕會等到模型完全下載完才淡出，避免看到空白場景。
+
+- **影響範圍**：`src/App.tsx`、`src/hooks/useStageHandlers.ts`
+
+---
+### [2026-03-06] 勝利結算面板被英雄名稱遮擋修正
+
+- **觸發者**：使用者（「勝利結算畫面應該要疊在英雄名稱前面」）
+- **執行角色**：🔧 CODING + 🧪 QA
+- **變更摘要**：
+
+  `Hero.tsx` 的 drei `<Html>` 元件預設 `zIndexRange` 為 `[16777271, 0]`，遠高於結算面板的 `z-index: 20`，導致英雄名稱浮在結算畫面上方。
+  修正：加上 `zIndexRange={[1, 0]}`，將英雄名稱限制在 z-index 0~1。
+
+- **影響範圍**：`src/components/Hero.tsx`（1 行）
+
+---
+### [2026-03-06] 大廳/戰鬥場景分離 — Canvas 延遲掛載（ADR-018）
+
+- **觸發者**：使用者（「一開始進入的介面是大廳，戰鬥場景不要載入在大廳後面，等到第一次要進戰鬥準備的時候才切換到戰鬥場景」）
+- **執行角色**：🏗️ TECH_LEAD + 🔧 CODING + 🧪 QA
+- **變更摘要**：
+
+  重構遊戲架構，大廳（MAIN_MENU）不再掛載 `<Canvas>`，僅在進入戰鬥準備時才動態掛載 3D 場景：
+  1. **`src/App.tsx`** — 新增 `showBattleScene` state，`{showBattleScene && <Canvas>}` 條件渲染，移除舊版 `visibility` CSS 切換
+  2. **`src/hooks/useStageHandlers.ts`** — 進入關卡/競技場/防守設定時 `setShowBattleScene(true)` + 過場幕遮蓋載入
+  3. **`src/hooks/useBattleFlow.ts`** — `backToLobby` 時 `setShowBattleScene(false)` 卸載 Canvas
+
+  **效果**：大廳零 GPU 負擔、iOS PWA 紋理變黑問題根絕（不存在 Canvas 就無 GPU context 被回收）、GLB cache 在 module 層級持久不受 Canvas 卸載影響。
+
+- **ADR**：ADR-018（取代 ADR-016）
+- **Spec 更新**：tech-architecture v2.4 → v2.5
+
+---
 ### [2026-03-06] 英雄名稱改用 HTML Overlay
 
 - **觸發者**：使用者（「喪屍頭上的名稱字型有點醜，遠處的字型會比較小」）

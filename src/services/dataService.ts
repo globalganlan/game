@@ -178,7 +178,12 @@ let allDataLoaded = false
    公開 API
    ════════════════════════════════════ */
 
-/** 載入英雄列表 */
+/** 載入英雄原始資料（UI 層格式，欄名 HeroID / ModelID / Name…） */
+export async function loadRawHeroes(): Promise<Record<string, unknown>[]> {
+  return readSheet<Record<string, unknown>>('heroes')
+}
+
+/** 載入英雄列表（domain 層格式） */
 export async function loadHeroes(): Promise<RawHeroInput[]> {
   if (heroesCache) return heroesCache
   const rows = await readSheet<RawHeroRow>('heroes')

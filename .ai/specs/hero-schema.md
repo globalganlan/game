@@ -35,7 +35,7 @@
 | `ModelID` | string | 模型目錄名 | zombie_1 |
 | `Name` | string | 角色名稱 | 女喪屍 |
 | `Type` | string | 職業類型 | 敏捷 / 力量 / 坦克 / 刺客 / 特殊 / 均衡 / 輔助 |
-| `Rarity` | number | 基礎稀有度（1~4） | 4 |
+| `Rarity` | string \| number | 基礎稀有度。D1 存 TEXT（'N'/'R'/'SR'/'SSR'），前端用 `toRarity(v)` 統一轉換 | 'SSR' |
 | `Description` | string | 角色描述 |  |
 
 ### 戰鬥數值欄位
@@ -70,7 +70,7 @@ interface RawHeroData {
   ModelID?: string | number; ModelId?: string | number; Model?: string | number
   Name?: string
   Type?: string
-  Rarity?: number
+  Rarity?: string | number  // D1 存 TEXT，用 toRarity() / toRarityNum() 轉換
   Description?: string
   Element?: string
   HP?: number; ATK?: number; DEF?: number
@@ -349,3 +349,4 @@ public/models/zombie_N/
 | v2.2 | 2026-02-28 | HeroInstance 新增 `stars: number` 欄位，舊存檔自動遷移 |
 | v2.3 | 2026-03-01 | 所有英雄從 ★0 開始培養：初始星級統一 0、加乘數 0.90、GAS appendRow 寫入 stars=0（注意：code 中 ★0 仍有 1 個被動欄位） |
 | v2.4 | 2026-03-01 | Spec 同步：BattleHero 欄位數修正 23→21、createBattleHero 加入 heroInstance/rarity 參數、★0 被動欄修正為 1（非 0）、養成依賴標記為已實作 |
+| v2.5 | 2026-03-06 | 修正 Rarity 欄位型別：D1 存 TEXT 非 number。新增共用 `toRarity(v)` / `toRarityNum(v)` 工具函式於 `constants/rarity.ts`，取代各元件 inline `numToRarity()` |

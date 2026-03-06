@@ -1,6 +1,6 @@
 # 技術架構 Spec
 
-> 版本：v2.4 ｜ 狀態：🟢 定稿（含 Domain Engine + Services 層 + Optimistic Queue + Audio Engine + CurrencyIcon 統一 icon + PWA + App 模組化拆分 + D1 原子批次寫入 + InfoTip/RedDot/ClickableItemIcon 新元件 + 獎勵一致性修復 + Canvas iOS GPU 紋理保活修復 + 英雄名稱 HTML Overlay）
+> 版本：v2.5 ｜ 狀態：🟢 定稿（含 Domain Engine + Services 層 + Optimistic Queue + Audio Engine + CurrencyIcon 統一 icon + PWA + App 模組化拆分 + D1 原子批次寫入 + InfoTip/RedDot/ClickableItemIcon 新元件 + 獎勵一致性修復 + 大廳/戰鬥場景分離架構 + 英雄名稱 HTML Overlay）
 > 最後更新：2026-03-06
 > 負責角色：🔧 CODING → 🏗️ ARCHITECT
 
@@ -261,7 +261,11 @@ public/draco/
 main.tsx
  <StrictMode>
      <App>                           遊戲邏輯 + 狀態管理
-         <Canvas>                    R3F 根
+         {!showBattleScene}           大廳模式（無 Canvas）
+            <MainMenu />             主選單
+            <MenuScreenRouter />     子畫面（英雄/背包/召喚/關卡…）
+         {showBattleScene}            戰鬥場景（Canvas 動態掛載）
+         <Canvas>                     R3F 根（進入戰鬥準備時才掛載）
             <Suspense>
                <Arena />           場景
                <SlotMarker /> 12  格子標記
@@ -614,3 +618,5 @@ POST { "action": "invalidate-cache" }
 | v2.0 | 2026-03-03 | **新元件 + Arena 擴展**：新增 `InfoTip.tsx`（資源說明 Tooltip，min 300px / max 380px）、`RedDot.tsx`（通知紅點 badge）；Arena.tsx SceneMode 從 5 擴展至 13 種（新增 8 個章節專屬場景主題：ruins/forest/desert/glacier/volcano/abyss/sky_temple/doomsday）；sceneTheme 與 stageMode 分離 |
 | v2.1 | 2026-03-06 | **ClickableItemIcon 統一**：5 檔案 10 處 `getItemIcon` → `<ClickableItemIcon>`（App.tsx/StageSelect/CheckinPanel/ShopPanel/HeroListPanel）；CheckinPanel/ShopPanel 移除手動 `previewItemId` 狀態 + `ItemInfoPopup` 渲染（改由 ClickableItemIcon 自帶 popup）；PanelInfoTip 新增 `children?: ReactNode` prop；BattleHUD Boss 條 emoji → CurrencyIcon |
 | v2.3 | 2026-03-06 | **iOS PWA Canvas GPU 紋理保活**：Canvas `visibility:hidden` → `pointerEvents:none`，避免 iOS WKWebView 在 Canvas 隱藏期間回收 GPU 紋理資源導致已載入模型變黑；還原 ZombieModel/HeroListPanel cloneMat metalness 覆寫（非根因） |
+| v2.4 | 2026-03-06 | **英雄名稱 HTML Overlay**：Billboard Text → Html DOM，固定像素大小 |
+| v2.5 | 2026-03-06 | **大廳/戰鬥場景分離架構**：新增 `showBattleScene` 狀態，Canvas（3D 場景）不再常駐掛載 — 大廳模式完全不載入 Canvas，僅在進入戰鬥準備（handleStageSelect/handleArenaStartBattle/handleArenaDefenseSetup）時才動態掛載，並以過場幕遮蔽載入過程；返回大廳時 Canvas 卸載釋放 GPU 資源。還原 v2.3 的 `visibility:hidden → pointerEvents:none` 修改（不再需要），根本解決 iOS WKWebView 紋理回收問題 |

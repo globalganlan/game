@@ -217,6 +217,27 @@
   width: 100%;
 }
 
+/* 獎勵結算中：loading 狀態 */
+.reward-items-list.reward-loading {
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px 0;
+}
+.reward-loading-spinner {
+  width: 24px;
+  height: 24px;
+  border: 2px solid rgba(255,255,255,0.15);
+  border-top-color: #ffd700;
+  border-radius: 50%;
+  animation: bco-spin 0.8s linear infinite;
+}
+.reward-loading-text {
+  font-size: clamp(0.65rem, 1.5vw, 0.8rem);
+  color: #ffd700;
+  animation: bco-pulse 1.2s ease-in-out infinite;
+}
+
 .reward-item {
   display: flex;
   align-items: center;
@@ -633,6 +654,7 @@
   from { opacity: 1; }
   to { opacity: 0; }
 }
+/* duration 需與 CURTAIN_FADE_MS (500ms) 同步 */
 
 @keyframes textFlicker {
   0%, 100% { opacity: 1; }
@@ -1814,6 +1836,28 @@
   width: 100%;
   height: 100%;
 }
+.hero-model-loading {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  color: rgba(255,255,255,0.6);
+  font-size: 0.82rem;
+  pointer-events: none;
+}
+.hero-model-loading-spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid rgba(255,255,255,0.15);
+  border-top-color: rgba(160,160,255,0.7);
+  border-radius: 50%;
+  animation: hml-spin 0.8s linear infinite;
+}
+@keyframes hml-spin { to { transform: rotate(360deg); } }
 .hero-model-canvas {
   position: relative;
   z-index: 1;
@@ -2629,7 +2673,7 @@
 .inv-detail-backdrop {
   position: fixed;
   inset: 0;
-  z-index: 60;
+  z-index: 99999;
   background: rgba(0,0,0,0.7);
   display: flex;
   align-items: center;
@@ -2683,6 +2727,8 @@
 .item-info-popup .inv-detail-desc {
   max-height: 120px;
   overflow-y: auto;
+  white-space: pre-wrap;
+  word-wrap: break-word;
 }
 
 /* ── 簽到道具可點擊 ── */

@@ -446,7 +446,7 @@ type SortMode = 'default' | 'rarity-desc' | 'quantity-desc' | 'name-asc'
 | EXP × 5,000 | 10☆ | 直接加到 save_data.exp |
 | Gold × 50,000 | 15☆ | 直接加到 save_data.gold |
 | 通用職業石 × 2 | 20☆ | asc_class_universal |
-| 大型強化石 × 3 | 25☆ | enhance_l |
+| 稀有鍛造礦 × 3 | 25☆ | forge_ore_rare |
 | 金寶箱 × 1 | 50☆ | chest_gold |
 | Diamond × 100 | 80☆ | 直接加到 save_data.diamond |
 
@@ -488,3 +488,4 @@ type SortMode = 'default' | 'rarity-desc' | 'quantity-desc' | 'name-asc'
 | v2.6 | 2026-03-03 | **裝備圖鑑系統**：①背包新增「📖 圖鑑」tab（第 7 個分頁）②新建 `CodexPanel.tsx`，可擴展 `CodexCategory` 聯合型別（目前 'equipment'，預留 hero/monster/achievement）③EquipmentCodex 子元件：128 種裝備百科（8 套裝 × 4 部位 × 4 稀有度）、收集進度條、套裝效果卡（2pc/4pc）、稀有度篩選、擁有/鎖定卡片視覺 ④匯出 equipmentGacha 常數（SET_IDS/SLOTS/SLOT_MAIN_STAT/MAIN_STAT_BASE）⑤App.css 新增 `.codex-*` 全套樣式 ~200 行含 RWD |
 | v2.7 | 2026-06-19 | **背包功能強化**：①圖鑑面板移除收集進度追蹤（無進度條/X÷Y 計數），所有裝備項目一律顯示不再灰顯 ②背包容量上限完全移除，Header 不再顯示 X/Y 容量（`equipmentCapacity` 欄位 + `expand-inventory` API 棄用）③新增裝備分解功能：`/decompose-equipment` API 端點，回收金幣＋裝備碎片（`equip_scrap`）；商店面板新增「碎片兌換」分頁 ④裝備鎖定功能移除：`/lock-equipment` API 棄用、`locked` 欄位不再使用、UI 移除鎖定按鈕 ⑤裝備可直接從背包裝備詳情彈窗中強化（不必進入英雄詳情頁） || v2.8 | 2026-03-05 | **競技商店 + pvp_coin 貨幣**：①新增 `pvp_coin` 貨幣定義（§2.4），使用 `CurrencyIcon type="pvp_coin"` 顯示（🏅）②商店系統新增「競技商店」分類（6 項商品：arena_exp_3000/arena_gold_20k/arena_diamond_30/arena_class_universal/arena_chest_equip/arena_ticket_hero，以 pvp_coin 定價）③後端 `inventory.ts` SHOP_CATALOG 新增 `arena` 分類④`ShopPanel.tsx` 新增「競技商店」分頁 |
 | v2.9 | 2026-03-05 | **Server-First 庫存操作**：`sellItems` / `useItem` 改為 API 先調、成功後才扣本地庫存；`sellItems` 失敗回傳 0（移除 estimatedGold fallback）；`ShopPanel.handlePurchase` 改為 API 先調、成功後才扣本地貨幣/加道具，失敗顯示「購買失敗」toast |
+| v3.0 | 2026-03-06 | **移除廢棄強化石 + 商店獎勵同步**：①背包新增 `DEPRECATED_ITEMS` 過濾器，隱藏已廢棄的 `eqm_enhance_s/m/l`（前端 InventoryPanel）②雜貨商店 `daily_enhance_s` → `daily_forge_ore`（forge_ore_common ×5）③星塵商店 `sd_enhance_l` → `sd_forge_rare`（forge_ore_rare ×3）④碎片兌換 `scrap_enhance_s/m/l` → `scrap_forge_common`（forge_ore_common ×5）+ `scrap_forge_rare`（forge_ore_rare ×2）⑤寶箱掉落 `generateChestRewards` 全面替換強化石為鍛造礦 ⑥物品資訊彈窗（`ItemInfoPopup`）z-index 提升至 99999，確保永遠在最上層 ⑦簽到彈窗描述新增 `white-space: pre-wrap` 支援換行 |

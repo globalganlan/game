@@ -1,0 +1,232 @@
+- generic [ref=e731]:
+  - generic [ref=e732]:
+    - button "← 返回" [ref=e733] [cursor=pointer]
+    - heading "🗺️ 關卡選擇" [level=2] [ref=e734]
+    - button "ℹ️" [ref=e735] [cursor=pointer]
+  - generic [ref=e736]:
+    - button "📖 主線" [ref=e737] [cursor=pointer]:
+      - generic [ref=e738]: 📖
+      - generic [ref=e739]: 主線
+    - button "🗼 爬塔 🔒" [ref=e740]:
+      - generic [ref=e741]: 🗼
+      - generic [ref=e742]: 爬塔
+      - generic [ref=e743]: 🔒
+    - button "📅 每日副本 🔒" [ref=e744]:
+      - generic [ref=e745]: 📅
+      - generic [ref=e746]: 每日副本
+      - generic [ref=e747]: 🔒
+    - button "⚔️ 試煉場 🔒" [ref=e748]:
+      - generic [ref=e749]: ⚔️
+      - generic [ref=e750]: 試煉場
+      - generic [ref=e751]: 🔒
+    - button "👹 首領 🔒" [ref=e752]:
+      - generic [ref=e753]: 👹
+      - generic [ref=e754]: 首領
+      - generic [ref=e755]: 🔒
+  - generic [ref=e757]:
+    - generic [ref=e758]:
+      - button "🏙️ 🏙️ 廢墟之城" [ref=e759] [cursor=pointer]:
+        - generic [ref=e760]: 🏙️
+        - generic [ref=e761]: 🏙️ 廢墟之城
+      - button "🌲 🌲 暗夜森林" [ref=e762] [cursor=pointer]:
+        - generic [ref=e763]: 🌲
+        - generic [ref=e764]: 🌲 暗夜森林
+      - button "🏜️ 🏜️ 死寂荒原" [ref=e765] [cursor=pointer]:
+        - generic [ref=e766]: 🏜️
+        - generic [ref=e767]: 🏜️ 死寂荒原
+      - button "🏭 🏭 工業廢墟" [ref=e768] [cursor=pointer]:
+        - generic [ref=e769]: 🏭
+        - generic [ref=e770]: 🏭 工業廢墟
+      - button "🏥 🏥 沉默醫院" [ref=e771] [cursor=pointer]:
+        - generic [ref=e772]: 🏥
+        - generic [ref=e773]: 🏥 沉默醫院
+      - button "🏚️ 🏚️ 廢棄住宅區" [ref=e774] [cursor=pointer]:
+        - generic [ref=e775]: 🏚️
+        - generic [ref=e776]: 🏚️ 廢棄住宅區
+      - button "🚇 🚇 地下交通網" [ref=e777] [cursor=pointer]:
+        - generic [ref=e778]: 🚇
+        - generic [ref=e779]: 🚇 地下交通網
+      - button "🌋 🌋 末日核心" [ref=e780] [cursor=pointer]:
+        - generic [ref=e781]: 🌋
+        - generic [ref=e782]: 🌋 末日核心
+    - generic [ref=e783]: 傾斜的路牌指向死寂的高樓群
+    - generic [ref=e784]:
+      - button "1-1 ✅ 城市入口 ⭐ ⭐ ⭐ ⭐ ⭐ Lv.1 👾×1 💚 45 💰 80 0" [disabled] [ref=e785]:
+        - generic [ref=e786]:
+          - generic [ref=e787]: 1-1
+          - generic [ref=e788]: ✅
+        - generic [ref=e789]: 城市入口
+        - generic "難度：簡單" [ref=e790]:
+          - generic [ref=e791]: ⭐
+          - generic [ref=e792]: ⭐
+          - generic [ref=e793]: ⭐
+          - generic [ref=e794]: ⭐
+          - generic [ref=e795]: ⭐
+        - generic [ref=e796]:
+          - generic [ref=e797]: Lv.1
+          - generic [ref=e798]: 👾×1
+        - generic [ref=e799]:
+          - generic [ref=e800]:
+            - generic [ref=e801]: 💚
+            - text: "45"
+          - generic [ref=e802]:
+            - generic [ref=e803]: 💰
+            - text: "80"
+          - text: "0"
+      - button "1-2 📍 廢棄商場 ⭐ ⭐ ⭐ ⭐ ⭐ Lv.2 👾×2 💚 57 💰 98 0" [ref=e804] [cursor=pointer]:
+        - generic [ref=e805]:
+          - generic [ref=e806]: 1-2
+          - generic [ref=e807]: 📍
+        - generic [ref=e808]: 廢棄商場
+        - generic "難度：普通" [ref=e809]:
+          - generic [ref=e810]: ⭐
+          - generic [ref=e811]: ⭐
+          - generic [ref=e812]: ⭐
+          - generic [ref=e813]: ⭐
+          - generic [ref=e814]: ⭐
+        - generic [ref=e815]:
+          - generic [ref=e816]: Lv.2
+          - generic [ref=e817]: 👾×2
+        - generic [ref=e818]:
+          - generic [ref=e819]:
+            - generic [ref=e820]: 💚
+            - text: "57"
+          - generic [ref=e821]:
+            - generic [ref=e822]: 💰
+            - text: "98"
+          - text: "0"
+      - button "1-3 🔒 地下車庫 ⭐ ⭐ ⭐ ⭐ ⭐ Lv.3 👾×2 💚 69 💰 116 0" [ref=e823]:
+        - generic [ref=e824]:
+          - generic [ref=e825]: 1-3
+          - generic [ref=e826]: 🔒
+        - generic [ref=e827]: 地下車庫
+        - generic "難度：中等" [ref=e828]:
+          - generic [ref=e829]: ⭐
+          - generic [ref=e830]: ⭐
+          - generic [ref=e831]: ⭐
+          - generic [ref=e832]: ⭐
+          - generic [ref=e833]: ⭐
+        - generic [ref=e834]:
+          - generic [ref=e835]: Lv.3
+          - generic [ref=e836]: 👾×2
+        - generic [ref=e837]:
+          - generic [ref=e838]:
+            - generic [ref=e839]: 💚
+            - text: "69"
+          - generic [ref=e840]:
+            - generic [ref=e841]: 💰
+            - text: "116"
+          - text: "0"
+      - button "1-4 🔒 斷橋殘垣 ⭐ ⭐ ⭐ ⭐ ⭐ Lv.4 👾×2 💚 81 💰 133 0" [ref=e842]:
+        - generic [ref=e843]:
+          - generic [ref=e844]: 1-4
+          - generic [ref=e845]: 🔒
+        - generic [ref=e846]: 斷橋殘垣
+        - generic "難度：困難" [ref=e847]:
+          - generic [ref=e848]: ⭐
+          - generic [ref=e849]: ⭐
+          - generic [ref=e850]: ⭐
+          - generic [ref=e851]: ⭐
+          - generic [ref=e852]: ⭐
+        - generic [ref=e853]:
+          - generic [ref=e854]: Lv.4
+          - generic [ref=e855]: 👾×2
+        - generic [ref=e856]:
+          - generic [ref=e857]:
+            - generic [ref=e858]: 💚
+            - text: "81"
+          - generic [ref=e859]:
+            - generic [ref=e860]: 💰
+            - text: "133"
+          - text: "0"
+      - button "1-5 🔒 醫院廢墟 ⭐ ⭐ ⭐ ⭐ ⭐ Lv.6 👾×3 💚 93 💰 151 0" [ref=e861]:
+        - generic [ref=e862]:
+          - generic [ref=e863]: 1-5
+          - generic [ref=e864]: 🔒
+        - generic [ref=e865]: 醫院廢墟
+        - generic "難度：極難" [ref=e866]:
+          - generic [ref=e867]: ⭐
+          - generic [ref=e868]: ⭐
+          - generic [ref=e869]: ⭐
+          - generic [ref=e870]: ⭐
+          - generic [ref=e871]: ⭐
+        - generic [ref=e872]:
+          - generic [ref=e873]: Lv.6
+          - generic [ref=e874]: 👾×3
+        - generic [ref=e875]:
+          - generic [ref=e876]:
+            - generic [ref=e877]: 💚
+            - text: "93"
+          - generic [ref=e878]:
+            - generic [ref=e879]: 💰
+            - text: "151"
+          - text: "0"
+      - button "1-6 🔒 警察局 ⭐ ⭐ ⭐ ⭐ ⭐ Lv.7 👾×3 💚 105 💰 169 0" [ref=e880]:
+        - generic [ref=e881]:
+          - generic [ref=e882]: 1-6
+          - generic [ref=e883]: 🔒
+        - generic [ref=e884]: 警察局
+        - generic "難度：6" [ref=e885]:
+          - generic [ref=e886]: ⭐
+          - generic [ref=e887]: ⭐
+          - generic [ref=e888]: ⭐
+          - generic [ref=e889]: ⭐
+          - generic [ref=e890]: ⭐
+        - generic [ref=e891]:
+          - generic [ref=e892]: Lv.7
+          - generic [ref=e893]: 👾×3
+        - generic [ref=e894]:
+          - generic [ref=e895]:
+            - generic [ref=e896]: 💚
+            - text: "105"
+          - generic [ref=e897]:
+            - generic [ref=e898]: 💰
+            - text: "169"
+          - text: "0"
+      - button "1-7 🔒 市政廳 ⭐ ⭐ ⭐ ⭐ ⭐ Lv.8 👾×3 💚 117 💰 187 0" [ref=e899]:
+        - generic [ref=e900]:
+          - generic [ref=e901]: 1-7
+          - generic [ref=e902]: 🔒
+        - generic [ref=e903]: 市政廳
+        - generic "難度：7" [ref=e904]:
+          - generic [ref=e905]: ⭐
+          - generic [ref=e906]: ⭐
+          - generic [ref=e907]: ⭐
+          - generic [ref=e908]: ⭐
+          - generic [ref=e909]: ⭐
+        - generic [ref=e910]:
+          - generic [ref=e911]: Lv.8
+          - generic [ref=e912]: 👾×3
+        - generic [ref=e913]:
+          - generic [ref=e914]:
+            - generic [ref=e915]: 💚
+            - text: "117"
+          - generic [ref=e916]:
+            - generic [ref=e917]: 💰
+            - text: "187"
+          - text: "0"
+      - button "1-8 首領 🔒 鐘樓之巔 ⭐ ⭐ ⭐ ⭐ ⭐ Lv.10 👾×3 💚 129 💰 204 💎 20" [ref=e918]:
+        - generic [ref=e919]:
+          - generic [ref=e920]: 1-8
+          - generic [ref=e921]: 首領
+          - generic [ref=e922]: 🔒
+        - generic [ref=e923]: 鐘樓之巔
+        - generic "難度：8" [ref=e924]:
+          - generic [ref=e925]: ⭐
+          - generic [ref=e926]: ⭐
+          - generic [ref=e927]: ⭐
+          - generic [ref=e928]: ⭐
+          - generic [ref=e929]: ⭐
+        - generic [ref=e930]:
+          - generic [ref=e931]: Lv.10
+          - generic [ref=e932]: 👾×3
+        - generic [ref=e933]:
+          - generic [ref=e934]:
+            - generic [ref=e935]: 💚
+            - text: "129"
+          - generic [ref=e936]:
+            - generic [ref=e937]: 💰
+            - text: "204"
+          - generic [ref=e938]:
+            - generic [ref=e939]: 💎
+            - text: "20"

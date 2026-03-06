@@ -332,14 +332,29 @@
   - `src/hooks/useStageHandlers.ts` — `targetUserId` + `rankChanged` 處理
   - `workers/schema.sql` — `arenaOpponents TEXT`、`arenaRefreshCount INTEGER`
 
-### ADR-016: Canvas 不使用 visibility:hidden（iOS GPU 紋理保活）
+### ADR-016: ~~Canvas 不使用 visibility:hidden~~ → **已被 ADR-018 取代**
+
+- **狀態**：🚫 已廢棄（由 ADR-018 取代）
+- **日期**：2026-03-06
+- **原決策**：Canvas style 從 `visibility: hidden` 改為 `pointerEvents: none`，保持 Canvas 始終 visible
+- **廢棄原因**：ADR-018 採用更根本的解法——大廳不掛載 Canvas，戰鬥時才動態掛載——完全消除 GPU 紋理保活問題
+
+---
+
+### ADR-018: 大廳/戰鬥場景分離 — Canvas 延遲掛載
 
 - **日期**：2026-03-06
-- **決策**：Canvas style 從 `visibility: hidden` 改為 `pointerEvents: none`
-- **根因**：iOS WKWebView 在 Canvas `visibility:hidden` 期間會主動回收 GPU 紋理資源。當選單關閉、Canvas 恢復 visible 時，已載入模型的紋理被清空 → 渲染為黑色剪影。第二次開啟 PWA 不受影響是因為 HTTP cache 使載入速度極快，Canvas hidden 時間極短、紋理尚未被回收。
-- **症狀**：iOS PWA 首次開啟 → 進入競技場挑戰 → 預先載入的英雄模型全黑；後載入的模型正常；第二次開 PWA 一切正常。
-- **修復**：`App.tsx` Canvas style 改用 `pointerEvents: (menuScreen !== 'none') ? 'none' : 'auto'`，Canvas 始終保持 visible（被選單面板 DOM 自然遮蓋），避免 iOS GPU 回收紋理。
-- **影響範圍**：`src/App.tsx` Canvas style 屬性
+- **決策**：大廳（MAIN_MENU）不掛載 `<Canvas>`，僅在進入戰鬥準備（IDLE/BATTLE/GAMEOVER）時才動態掛載
+- **根因**：iOS WKWebView 在 Canvas hidden/遮蓋期間回收 GPU 紋理 → 英雄模型變黑。與其用 CSS 技巧保活 GPU context，不如根本不在大廳建立 WebGL context。
+- **實作**：
+  1. `App.tsx` 新增 `showBattleScene` state，用 `{showBattleScene && <Canvas>}` 條件渲染
+  2. `useStageHandlers.ts` — 進入關卡/競技場/防守設定時 `setShowBattleScene(true)` + 顯示過場幕
+  3. `useBattleFlow.ts` — `backToLobby` 時 `setShowBattleScene(false)`
+  4. GLB loader cache 在 module 層級（`Map<string, GLTF>`），Canvas 卸載不影響快取，再次掛載不需重新下載
+- **注意**：Canvas 卸載時 console 會出現 `THREE.WebGLRenderer: Context Lost` 警告，屬正常行為
+- **效果**：大廳零 GPU 負擔、3D 資源隨戰鬥結束自動釋放、iOS 紋理問題根絕
+- **影響範圍**：`src/App.tsx`、`src/hooks/useStageHandlers.ts`、`src/hooks/useBattleFlow.ts`
+- **Spec 更新**：tech-architecture v2.4 → v2.5
 
 ---
 

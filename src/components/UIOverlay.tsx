@@ -11,16 +11,8 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import type { RawHeroData } from '../types'
 import type { HeroInstance } from '../services/saveService'
 
-import { RARITY_CONFIG, type Rarity } from '../constants/rarity'
-type RarityLabel = Rarity
-function numToRarity(v: unknown): RarityLabel {
-  const n = Number(v)
-  if (n === 4) return 'SSR'
-  if (n === 3) return 'SR'
-  if (n === 2) return 'R'
-  return 'N'
-}
-function initialStars(rarity: RarityLabel): number {
+import { RARITY_CONFIG, toRarity, type Rarity } from '../constants/rarity'
+function initialStars(_rarity: Rarity): number {
   return 0 // 所有英雄從 ★0 開始
 }
 
@@ -54,7 +46,7 @@ export function TransitionOverlay({ visible, fading, text, progress = null }: Tr
         alignItems: 'center',
         justifyContent: 'center',
         opacity: fading ? undefined : 1,
-        animation: fading ? 'curtainFadeOut 1s ease-in forwards' : undefined,
+        animation: fading ? 'curtainFadeOut 0.5s ease-in forwards' : undefined,
         pointerEvents: fading ? 'none' : 'auto',
       }}
     >
@@ -146,6 +138,9 @@ export function TransitionOverlay({ visible, fading, text, progress = null }: Tr
    Thumbnail3D
    ──────────────────────────── */
 
+/** 模組層級快取：避免同一張縮圖重複發請求 */
+const thumbCache = new Map<string, 'loading' | 'ok' | 'fail'>()
+
 interface Thumbnail3DProps {
   modelId: string
 }
@@ -153,26 +148,33 @@ interface Thumbnail3DProps {
 /** 以 PNG 縮圖顯示英雄（若無縮圖顯示 fallback 文字） */
 export function Thumbnail3D({ modelId }: Thumbnail3DProps) {
   const thumbUrl = `${import.meta.env.BASE_URL}models/${modelId}/thumbnail.png`
-  const [imgReady, setImgReady] = useState(false)
-  const [imgFailed, setImgFailed] = useState(false)
+  const cached = thumbCache.get(thumbUrl)
+  const [imgReady, setImgReady] = useState(cached === 'ok')
+  const [imgFailed, setImgFailed] = useState(cached === 'fail')
 
   useEffect(() => {
+    // 已有最終結果 → 直接用快取，不再發請求
+    const status = thumbCache.get(thumbUrl)
+    if (status === 'ok') { setImgReady(true); setImgFailed(false); return }
+    if (status === 'fail') { setImgReady(false); setImgFailed(true); return }
+
+    thumbCache.set(thumbUrl, 'loading')
     let mounted = true
     const img = new Image()
     img.onload = () => {
+      thumbCache.set(thumbUrl, 'ok')
       if (!mounted) return
       setImgReady(true)
       setImgFailed(false)
     }
     img.onerror = () => {
+      thumbCache.set(thumbUrl, 'fail')
       if (!mounted) return
       setImgReady(false)
       setImgFailed(true)
     }
     img.src = thumbUrl
-    return () => {
-      mounted = false
-    }
+    return () => { mounted = false }
   }, [thumbUrl])
 
   return (
@@ -332,7 +334,7 @@ export function ThumbnailList({
           const isSelected = selectedKeys.includes(heroKey)
 
           // 稀有度 & 培養資訊
-          const rarity = numToRarity((h as Record<string, unknown>).Rarity)
+          const rarity = toRarity((h as Record<string, unknown>).Rarity)
           const rcfg = RARITY_CONFIG[rarity]
           const inst = instanceMap.current.get(Number(h.HeroID ?? h.id ?? 0))
           const lvl = inst?.level ?? 1

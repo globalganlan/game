@@ -5,7 +5,7 @@
  * 並透過 useFrame 實現前進 / 後退 / 拖曳位移。
  */
 
-import { useRef, useState, useEffect, Suspense } from 'react'
+import { useRef, useState, useEffect } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { Html } from '@react-three/drei'
 import * as THREE from 'three'
@@ -225,19 +225,17 @@ export function Hero({
           <meshBasicMaterial />
         </mesh>
 
-        <Suspense fallback={null}>
-          <ZombieModel
-            key={`${modelId}_${uid}`}
-            modelId={modelId}
-            isPlayer={isPlayer}
-            state={currentState}
-            onReady={onModelReady}
-            onActionDone={onActionDone}
-            isDragging={amIDragged()}
-            speed={speed}
-            hitFlashSignal={hitFlashSignal}
-          />
-        </Suspense>
+        <ZombieModel
+          key={`${modelId}_${uid}`}
+          modelId={modelId}
+          isPlayer={isPlayer}
+          state={currentState}
+          onReady={onModelReady}
+          onActionDone={onActionDone}
+          isDragging={amIDragged()}
+          speed={speed}
+          hitFlashSignal={hitFlashSignal}
+        />
 
         {damagePopups.map((pop) => (
           <DamagePopup key={pop.id} value={pop.value} damageType={pop.damageType} position={[0, 2.5, 0]} textScale={textScale} />
@@ -266,7 +264,7 @@ export function Hero({
         {/* Buff/Debuff 3D 圖示列 */}
         <BuffIcons3D effects={battleBuffs} textScale={textScale} />
 
-        <Html position={[0, 3.5, 0]} center wrapperClass="hero-name-html" style={{ pointerEvents: 'none' }}>
+        <Html position={[0, 3.5, 0]} center zIndexRange={[1, 0]} wrapperClass="hero-name-html" style={{ pointerEvents: 'none' }}>
           <div className="hero-name-label">{heroData.Name}</div>
         </Html>
 

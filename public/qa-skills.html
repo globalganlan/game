@@ -36,19 +36,18 @@
 </head>
 <body>
   <h1>🔍 QA 驗證 — 英雄技能顯示</h1>
-  <p class="subtitle">此頁面直接從 Google Sheet API 載入資料，模擬前端渲染結果</p>
+  <p class="subtitle">此頁面直接從 Workers API 載入資料，模擬前端渲染結果</p>
   <div id="status" class="status">⏳ 載入中...</div>
   <div id="content"></div>
 
   <script>
-    const POST_URL = 'https://script.google.com/macros/s/AKfycbzy3EHTCyTYjA9j1CvJGvWwDM_RrkCuzNYkMhP7T9DTJ6V6g7Sodrlo4uv3h9yx0HLdsg/exec';
+    const API_BASE = 'https://globalganlan-api.s971153.workers.dev';
 
-    async function post(body) {
-      const res = await fetch(POST_URL, {
+    async function post(endpoint, body) {
+      const res = await fetch(`${API_BASE}/api/${endpoint}`, {
         method: 'POST',
-        headers: { 'Content-Type': 'text/plain; charset=utf-8' },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
-        redirect: 'follow',
       });
       return res.json();
     }
@@ -69,9 +68,9 @@
       try {
         // Load all three sheets
         const [skillRes, heroSkillRes, heroRes] = await Promise.all([
-          post({ action: 'readSheet', sheet: 'skill_templates' }),
-          post({ action: 'readSheet', sheet: 'hero_skills' }),
-          post({ action: 'readSheet', sheet: 'heroes' }),
+          post('readSheet', { sheet: 'skill_templates' }),
+          post('readSheet', { sheet: 'hero_skills' }),
+          post('readSheet', { sheet: 'heroes' }),
         ]);
 
         const skills = skillRes.data || [];

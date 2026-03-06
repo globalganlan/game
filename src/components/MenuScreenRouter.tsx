@@ -79,6 +79,9 @@ interface MenuScreenRouterProps {
 
   /* 關卡每日次數（快取） */
   initialDailyCounts?: { daily: number; pvp: number; boss: number; date: string } | null
+
+  /** 從戰鬥返回時，關卡選擇頁要預設切到哪個模式 tab */
+  stageMode?: 'story' | 'tower' | 'daily' | 'pvp' | 'boss'
 }
 
 /* ────────────────────────────
@@ -138,6 +141,7 @@ export function MenuScreenRouter(props: MenuScreenRouterProps) {
           onBack={onBack}
           onSelectStage={onSelectStage}
           initialDailyCounts={initialDailyCounts ?? null}
+          initialMode={props.stageMode}
         />
       )
 

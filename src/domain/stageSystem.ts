@@ -609,8 +609,8 @@ export function getBossRewardByBossAndRank(bossId: string, rank: string): StageR
   const baseRewards: Record<string, StageReward> = {
     S: { exp: 600, gold: 3000, diamond: 100, items: [{ itemId: 'chest_equipment', quantity: 2, dropRate: 1.0 }] },
     A: { exp: 400, gold: 2000, diamond: 50, items: [{ itemId: 'chest_equipment', quantity: 1, dropRate: 1.0 }] },
-    B: { exp: 200, gold: 1000, diamond: 20, items: [{ itemId: 'exp', quantity: 2000, dropRate: 1.0 }] },
-    C: { exp: 100, gold: 500, diamond: 0, items: [{ itemId: 'exp', quantity: 500, dropRate: 1.0 }] },
+    B: { exp: 200, gold: 1000, diamond: 20 },
+    C: { exp: 100, gold: 500, diamond: 0 },
   }
   const base = baseRewards[rank] ?? baseRewards['C']
   return {

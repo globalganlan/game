@@ -32,7 +32,7 @@ import type { StageReward } from '../domain/stageSystem'
 import { getTimerYield } from '../services/saveService'
 import { addItemsLocally, getHeroEquipment } from '../services/inventoryService'
 import { audioManager } from '../services/audioService'
-import { getItemName } from '../constants/rarity'
+import { getItemName, toRarityNum } from '../constants/rarity'
 import { completeArenaChallenge } from '../services/arenaService'
 import type { SaveData, HeroInstance } from '../services/saveService'
 
@@ -188,8 +188,14 @@ export async function executeBattleLoop(ctx: BattleLoopContext, replayActions?: 
   const heroMap = new Map<string, BattleHero>()
 
   /** 從 SlotHero 建立 RawHeroInput fallback */
-  const slotToInput = (s: SlotHero, heroId: number): RawHeroInput => {
-    return heroInputs.find(h => h.heroId === heroId) ?? {
+  const slotToInput = (s: SlotHero, heroId: number, useSlotStats = false): RawHeroInput => {
+    // 敵方 slot 的 HP/ATK/DEF/Speed 已由 buildEnemySlotsFromStage 套用 multiplier，
+    // 必須直接使用 slot 數值，不可從 heroInputs 覆蓋回基礎值。
+    if (!useSlotStats) {
+      const found = heroInputs.find(h => h.heroId === heroId)
+      if (found) return found
+    }
+    return {
       heroId,
       modelId: s._modelId,
       name: String(s.Name ?? ''),
@@ -227,7 +233,7 @@ export async function executeBattleLoop(ctx: BattleLoopContext, replayActions?: 
       equipment: getHeroEquipment(inst.instanceId),
     } : undefined
     const starLevel = heroInstanceData?.stars ?? 0
-    const heroRarity = Number((p as Record<string, unknown>).Rarity ?? 3)
+    const heroRarity = toRarityNum((p as Record<string, unknown>).Rarity)
 
     const bh = createBattleHero(input, 'player', i, activeSkill, passives, starLevel, p._uid, heroInstanceData, heroRarity)
     playerBH.push(bh)
@@ -238,9 +244,9 @@ export async function executeBattleLoop(ctx: BattleLoopContext, replayActions?: 
     const e = currentEnemySlots[i]
     if (!e) continue
     const heroId = Number(e.HeroID ?? e.id ?? 0)
-    const input = slotToInput(e, heroId)
+    const input = slotToInput(e, heroId, true) // 敵方使用 slot 已套用 multiplier 的數值
     const { activeSkill, passives } = getHeroSkillSet(heroId, skills, heroSkillsMap)
-    const enemyRarity = Number((e as Record<string, unknown>).Rarity ?? 3)
+    const enemyRarity = toRarityNum((e as Record<string, unknown>).Rarity)
     const bh = createBattleHero(input, 'enemy', i, activeSkill, passives, 1, e._uid, undefined, enemyRarity)
     enemyBH.push(bh)
     heroMap.set(bh.uid, bh)
@@ -1047,7 +1053,16 @@ export async function executeBattleLoop(ctx: BattleLoopContext, replayActions?: 
       if (stageMode === 'story') {
         const timerStage = first ? stageId : (saveData?.resourceTimerStage || stageId)
         resourceSpeed = getTimerYield(timerStage)
-      } else if (stageMode === 'pvp') {
+      }
+
+      // 判斷是否為競技場挑戰（後續用於分流獎勵邏輯）
+      const isArenaChallenge = stageMode === 'pvp' && arenaTargetRankRef.current > 0
+
+      if (stageMode === 'pvp') {
+        // 競技場先顯示 loading 狀態，等 arena API 回來再更新
+        if (isArenaChallenge) {
+          setVictoryRewards({ gold: 0, diamond: 0, exp: 0, drops: [], resourceSpeed: null, loading: true })
+        }
         // 競技場結算上報
         if (arenaTargetRankRef.current > 0) {
           completeArenaChallenge(arenaTargetRankRef.current, true).then(async arenaRes => {
@@ -1066,13 +1081,14 @@ export async function executeBattleLoop(ctx: BattleLoopContext, replayActions?: 
                 if (r.pvpCoin > 0) arenaItems.push({ type: 'item', id: 'pvp_coin', name: '競技幣', quantity: r.pvpCoin })
                 if (r.exp > 0) arenaItems.push({ type: 'currency', id: 'exp', name: '經驗', quantity: r.exp })
                 if (arenaItems.length > 0) acquireShow(arenaItems)
-                // 更新勝利面板顯示正確的競技場獎勵
+                // 更新勝利面板顯示正確的競技場獎勵（結束 loading 狀態）
                 setVictoryRewards({
                   gold: r.gold,
                   diamond: r.diamond,
                   exp: r.exp,
                   drops: r.pvpCoin > 0 ? [{ itemId: 'pvp_coin', quantity: r.pvpCoin }] : [],
                   resourceSpeed: null,
+                  loading: false,
                 })
               }
               // 排名里程碑獎勵動畫
@@ -1088,8 +1104,16 @@ export async function executeBattleLoop(ctx: BattleLoopContext, replayActions?: 
                   setTimeout(() => acquireShow(milestoneItems), 1500)
                 }
               }
+            } else {
+              // API 回應不成功 → 清除 loading
+              setVictoryRewards({ gold: 0, diamond: 0, exp: 0, drops: [], resourceSpeed: null, loading: false })
             }
-          }).catch(console.warn)
+          }).catch((err) => {
+            console.warn(err)
+            // API 失敗時清除 loading 狀態，顯示結算失敗
+            setVictoryRewards({ gold: 0, diamond: 0, exp: 0, drops: [], resourceSpeed: null, loading: false })
+            showToast('⚠️ 競技場結算失敗')
+          })
         }
       }
 
@@ -1123,16 +1147,16 @@ export async function executeBattleLoop(ctx: BattleLoopContext, replayActions?: 
       // 掉落物即時寫入本地背包
       if (drops.length > 0) addItemsLocally(drops)
 
-      setVictoryRewards({
-        gold: rewardGold,
-        diamond: rewardDiamond,
-        exp: rewardExp,
-        drops,
-        resourceSpeed,
-      })
-
-      // 觸發獲得物品動畫（競技場挑戰由 arena handler 單獨處理，此處跳過避免重複）
-      const isArenaChallenge = stageMode === 'pvp' && arenaTargetRankRef.current > 0
+      // 非競技場：直接顯示獎勵；競技場：由 arena handler 的 .then() 更新
+      if (!isArenaChallenge) {
+        setVictoryRewards({
+          gold: rewardGold,
+          diamond: rewardDiamond,
+          exp: rewardExp,
+          drops,
+          resourceSpeed,
+        })
+      }
       if (!isArenaChallenge) {
         const acquireItems: AcquireItem[] = []
         if (rewardGold > 0) acquireItems.push({ type: 'currency', id: 'gold', name: '金幣', quantity: rewardGold })

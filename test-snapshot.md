@@ -1,0 +1,225 @@
+- generic [ref=e89]:
+  - generic [ref=e90]:
+    - button "← 返回" [ref=e91] [cursor=pointer]
+    - heading "🗺️ 關卡選擇" [level=2] [ref=e92]
+    - button "ℹ️" [ref=e93] [cursor=pointer]
+  - generic [ref=e94]:
+    - button "📖 主線" [ref=e95] [cursor=pointer]:
+      - generic [ref=e96]: 📖
+      - generic [ref=e97]: 主線
+    - button "🗼 爬塔 🔒" [ref=e98]:
+      - generic [ref=e99]: 🗼
+      - generic [ref=e100]: 爬塔
+      - generic [ref=e101]: 🔒
+    - button "📅 每日副本 🔒" [ref=e102]:
+      - generic [ref=e103]: 📅
+      - generic [ref=e104]: 每日副本
+      - generic [ref=e105]: 🔒
+    - button "⚔️ 試煉場 🔒" [ref=e106]:
+      - generic [ref=e107]: ⚔️
+      - generic [ref=e108]: 試煉場
+      - generic [ref=e109]: 🔒
+    - button "👹 首領 🔒" [ref=e110]:
+      - generic [ref=e111]: 👹
+      - generic [ref=e112]: 首領
+      - generic [ref=e113]: 🔒
+  - generic [ref=e115]:
+    - generic [ref=e116]:
+      - button "🏙️ 🏙️ 廢墟之城" [ref=e117] [cursor=pointer]:
+        - generic [ref=e118]: 🏙️
+        - generic [ref=e119]: 🏙️ 廢墟之城
+      - button "🌲 🌲 暗夜森林" [ref=e120] [cursor=pointer]:
+        - generic [ref=e121]: 🌲
+        - generic [ref=e122]: 🌲 暗夜森林
+      - button "🏜️ 🏜️ 死寂荒原" [ref=e123] [cursor=pointer]:
+        - generic [ref=e124]: 🏜️
+        - generic [ref=e125]: 🏜️ 死寂荒原
+      - button "🏭 🏭 工業廢墟" [ref=e126] [cursor=pointer]:
+        - generic [ref=e127]: 🏭
+        - generic [ref=e128]: 🏭 工業廢墟
+      - button "🏥 🏥 沉默醫院" [ref=e129] [cursor=pointer]:
+        - generic [ref=e130]: 🏥
+        - generic [ref=e131]: 🏥 沉默醫院
+      - button "🏚️ 🏚️ 廢棄住宅區" [ref=e132] [cursor=pointer]:
+        - generic [ref=e133]: 🏚️
+        - generic [ref=e134]: 🏚️ 廢棄住宅區
+      - button "🚇 🚇 地下交通網" [ref=e135] [cursor=pointer]:
+        - generic [ref=e136]: 🚇
+        - generic [ref=e137]: 🚇 地下交通網
+      - button "🌋 🌋 末日核心" [active] [ref=e138] [cursor=pointer]:
+        - generic [ref=e139]: 🌋
+        - generic [ref=e140]: 🌋 末日核心
+    - generic [ref=e141]: 最後防線的殘骸訴說著絕望戰役
+    - generic [ref=e142]:
+      - button "8-1 🔒 外圍防線 ⭐ ⭐ ⭐ ⭐ ⭐ Lv.71 👾×5 💚 716 💰 1076" [ref=e298]:
+        - generic [ref=e299]:
+          - generic [ref=e300]: 8-1
+          - generic [ref=e301]: 🔒
+        - generic [ref=e302]: 外圍防線
+        - generic "難度：57" [ref=e303]:
+          - generic [ref=e304]: ⭐
+          - generic [ref=e305]: ⭐
+          - generic [ref=e306]: ⭐
+          - generic [ref=e307]: ⭐
+          - generic [ref=e308]: ⭐
+        - generic [ref=e309]:
+          - generic [ref=e310]: Lv.71
+          - generic [ref=e311]: 👾×5
+        - generic [ref=e312]:
+          - generic [ref=e313]:
+            - generic [ref=e314]: 💚
+            - text: "716"
+          - generic [ref=e315]:
+            - generic [ref=e316]: 💰
+            - text: "1076"
+      - button "8-2 🔒 生物培養艙 ⭐ ⭐ ⭐ ⭐ ⭐ Lv.72 👾×5 💚 728 💰 1093" [ref=e317]:
+        - generic [ref=e318]:
+          - generic [ref=e319]: 8-2
+          - generic [ref=e320]: 🔒
+        - generic [ref=e321]: 生物培養艙
+        - generic "難度：58" [ref=e322]:
+          - generic [ref=e323]: ⭐
+          - generic [ref=e324]: ⭐
+          - generic [ref=e325]: ⭐
+          - generic [ref=e326]: ⭐
+          - generic [ref=e327]: ⭐
+        - generic [ref=e328]:
+          - generic [ref=e329]: Lv.72
+          - generic [ref=e330]: 👾×5
+        - generic [ref=e331]:
+          - generic [ref=e332]:
+            - generic [ref=e333]: 💚
+            - text: "728"
+          - generic [ref=e334]:
+            - generic [ref=e335]: 💰
+            - text: "1093"
+      - button "8-3 🔒 武器庫 ⭐ ⭐ ⭐ ⭐ ⭐ Lv.73 👾×5 💚 740 💰 1111" [ref=e336]:
+        - generic [ref=e337]:
+          - generic [ref=e338]: 8-3
+          - generic [ref=e339]: 🔒
+        - generic [ref=e340]: 武器庫
+        - generic "難度：59" [ref=e341]:
+          - generic [ref=e342]: ⭐
+          - generic [ref=e343]: ⭐
+          - generic [ref=e344]: ⭐
+          - generic [ref=e345]: ⭐
+          - generic [ref=e346]: ⭐
+        - generic [ref=e347]:
+          - generic [ref=e348]: Lv.73
+          - generic [ref=e349]: 👾×5
+        - generic [ref=e350]:
+          - generic [ref=e351]:
+            - generic [ref=e352]: 💚
+            - text: "740"
+          - generic [ref=e353]:
+            - generic [ref=e354]: 💰
+            - text: "1111"
+      - button "8-4 🔒 反應爐走廊 ⭐ ⭐ ⭐ ⭐ ⭐ Lv.74 👾×6 💚 752 💰 1129" [ref=e355]:
+        - generic [ref=e356]:
+          - generic [ref=e357]: 8-4
+          - generic [ref=e358]: 🔒
+        - generic [ref=e359]: 反應爐走廊
+        - generic "難度：60" [ref=e360]:
+          - generic [ref=e361]: ⭐
+          - generic [ref=e362]: ⭐
+          - generic [ref=e363]: ⭐
+          - generic [ref=e364]: ⭐
+          - generic [ref=e365]: ⭐
+        - generic [ref=e366]:
+          - generic [ref=e367]: Lv.74
+          - generic [ref=e368]: 👾×6
+        - generic [ref=e369]:
+          - generic [ref=e370]:
+            - generic [ref=e371]: 💚
+            - text: "752"
+          - generic [ref=e372]:
+            - generic [ref=e373]: 💰
+            - text: "1129"
+      - button "8-5 🔒 指揮中心 ⭐ ⭐ ⭐ ⭐ ⭐ Lv.76 👾×6 💚 764 💰 1147" [ref=e374]:
+        - generic [ref=e375]:
+          - generic [ref=e376]: 8-5
+          - generic [ref=e377]: 🔒
+        - generic [ref=e378]: 指揮中心
+        - generic "難度：61" [ref=e379]:
+          - generic [ref=e380]: ⭐
+          - generic [ref=e381]: ⭐
+          - generic [ref=e382]: ⭐
+          - generic [ref=e383]: ⭐
+          - generic [ref=e384]: ⭐
+        - generic [ref=e385]:
+          - generic [ref=e386]: Lv.76
+          - generic [ref=e387]: 👾×6
+        - generic [ref=e388]:
+          - generic [ref=e389]:
+            - generic [ref=e390]: 💚
+            - text: "764"
+          - generic [ref=e391]:
+            - generic [ref=e392]: 💰
+            - text: "1147"
+      - button "8-6 🔒 基因改造室 ⭐ ⭐ ⭐ ⭐ ⭐ Lv.77 👾×6 💚 776 💰 1164" [ref=e393]:
+        - generic [ref=e394]:
+          - generic [ref=e395]: 8-6
+          - generic [ref=e396]: 🔒
+        - generic [ref=e397]: 基因改造室
+        - generic "難度：62" [ref=e398]:
+          - generic [ref=e399]: ⭐
+          - generic [ref=e400]: ⭐
+          - generic [ref=e401]: ⭐
+          - generic [ref=e402]: ⭐
+          - generic [ref=e403]: ⭐
+        - generic [ref=e404]:
+          - generic [ref=e405]: Lv.77
+          - generic [ref=e406]: 👾×6
+        - generic [ref=e407]:
+          - generic [ref=e408]:
+            - generic [ref=e409]: 💚
+            - text: "776"
+          - generic [ref=e410]:
+            - generic [ref=e411]: 💰
+            - text: "1164"
+      - button "8-7 🔒 核心通道 ⭐ ⭐ ⭐ ⭐ ⭐ Lv.78 👾×6 💚 788 💰 1182" [ref=e412]:
+        - generic [ref=e413]:
+          - generic [ref=e414]: 8-7
+          - generic [ref=e415]: 🔒
+        - generic [ref=e416]: 核心通道
+        - generic "難度：63" [ref=e417]:
+          - generic [ref=e418]: ⭐
+          - generic [ref=e419]: ⭐
+          - generic [ref=e420]: ⭐
+          - generic [ref=e421]: ⭐
+          - generic [ref=e422]: ⭐
+        - generic [ref=e423]:
+          - generic [ref=e424]: Lv.78
+          - generic [ref=e425]: 👾×6
+        - generic [ref=e426]:
+          - generic [ref=e427]:
+            - generic [ref=e428]: 💚
+            - text: "788"
+          - generic [ref=e429]:
+            - generic [ref=e430]: 💰
+            - text: "1182"
+      - button "8-8 首領 🔒 末日審判者 ⭐ ⭐ ⭐ ⭐ ⭐ Lv.80 👾×6 💚 800 💰 1200 💎 50" [ref=e431]:
+        - generic [ref=e432]:
+          - generic [ref=e433]: 8-8
+          - generic [ref=e434]: 首領
+          - generic [ref=e435]: 🔒
+        - generic [ref=e436]: 末日審判者
+        - generic "難度：64" [ref=e437]:
+          - generic [ref=e438]: ⭐
+          - generic [ref=e439]: ⭐
+          - generic [ref=e440]: ⭐
+          - generic [ref=e441]: ⭐
+          - generic [ref=e442]: ⭐
+        - generic [ref=e443]:
+          - generic [ref=e444]: Lv.80
+          - generic [ref=e445]: 👾×6
+        - generic [ref=e446]:
+          - generic [ref=e447]:
+            - generic [ref=e448]: 💚
+            - text: "800"
+          - generic [ref=e449]:
+            - generic [ref=e450]: 💰
+            - text: "1200"
+          - generic [ref=e451]:
+            - generic [ref=e452]: 💎
+            - text: "50"

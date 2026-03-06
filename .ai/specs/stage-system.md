@@ -1,7 +1,7 @@
 # 關卡系統 Spec
 
-> 版本：v2.9 ｜ 狀態：🟢 已實作
-> 最後更新：2026-03-05
+> 版本：v3.0 ｜ 狀態：🟢 已實作
+> 最後更新：2026-03-06
 > 負責角色：🎯 GAME_DESIGN → 🔧 CODING
 
 ## 概述
@@ -636,3 +636,4 @@ mergeDrops(items: InventoryItem[]): InventoryItem[]   // 合併同 itemId
 | v2.7 | 2026-03-06 | **場景道具品質全面升級**：4 種共用氛圍元件（RubblePile/BloodStain/ScatteredLitter/RustMark）；全部 8 主題 20+ 道具逐一增加末日風化細節 — city(掛線/碎玻璃/鏽斑)、forest(樹皮剝落/菌絲/爪痕/蘑菇發光)、wasteland(缺輪/散落貨物/油漬)、factory(傳送帶殘片/管線洩漏)、hospital(血漬床墊/點滴管/藥瓶散落)、residential(桌面汙漬/碎盤/椅裂縫/灰塵/書籍掉落/電視碎屏)、underground(火損車身/碎玻璃/少輪/鋼筋外露/水漬)、core(碎片衛星增多/地裂光環/螢幕裂紋/管線洩漏)；`generateSceneElements` 為所有 8 主題加入獨立散佈的 RubblePile/BloodStain/ScatteredLitter 氛圍元素 |
 | v2.8 | 2026-06-19 | **星級簡化 + 爬塔獎勵顯示移除**：移除 `calculateStarRating` 函式，關卡評價從三星制（1/2/3）改為二元通關制（通關=1 / 未通關）；`stageStars` 值固定為 `1`（已通關）；勝利面板不再顯示星級評價或首通星級獎勵；爬塔 UI 關卡列表不再顯示金幣/經驗/鑽石獎勵行（後端仍正常發放獎勵） |
 | v2.9 | 2026-03-05 | **每日限制 + 獎勵預覽 + battle.ts 重寫**：①`battle.ts` 完全重寫 — 新增 `DAILY_LIMITS`（daily:3/pvp:5/boss:3）、`DailyCounts` 介面 + `parseDailyCounts()` + `checkDailyLimit()`、後端強制每日限制（超過拒絕，敗北也消耗）、per-mode 獎勵計算（daily=依 tier 發 gold/exp/items、pvp=gold/exp/diamond/pvp_coin、boss=S/A/B/C rank-based gold/diamond）②新 `/daily-counts` API 端點 ③D1 `save_data` 新增 `dailyCounts TEXT` 欄位 ④前端 `stageSystem.ts` 新增 `DAILY_LIMITS` + `getDailyLimit()` ⑤`StageSelect.tsx` 大幅改版 — TowerPanel 獎勵預覽、DailyPanel 獎勵+剩餘次數+耗盡訊息、PvPPanel 獎勵+pvp_coin+剩餘次數、BossPanel2 段位獎勵提示+剩餘次數、全 Tab 紅點 badge ⑥`CurrencyIcon` 新增 `pvp_coin` 類型（🏅）⑦`MainMenu` 新增 `stagesHasDaily` prop + 關卡按鈕紅點 ⑧`App.tsx` 在 MAIN_MENU 時 fetch daily-counts ⑨`App.css` 新增 tower-rewards/sc-reward-tag/daily-attempts/daily-exhausted/daily-tier-rewards/pvp-meta-row/pvp-reward-preview/boss-card-reward-hint 樣式 |
+| v3.0 | 2026-03-06 | **UX 修正+獎勵清理**：①Boss B/C 段位移除重複 EXP items（前端 `getBossRewardByBossAndRank` + 後端 `battle.ts`）②關卡選擇鑽石為 0 時不顯示圖示（修正 React JSX `{0 && ...}` 渲染 "0" 的 gotcha，改用 `(diamond ?? 0) > 0`）③PvP 對手獎勵 + Boss 段位獎勵鑽石顯示同步修正 ④MainMenu 紅點增加 `isModeUnlocked` 檢查（未解鎖的 daily/pvp/boss 不計入紅點）⑤`backToLobby` 移除過場動畫（直接返回 StageSelect/MainMenu）⑥戰鬥準備戰力改為即時計算（`battlePrepPower` useMemo 基於 `playerSlots` 而非 saved `formation`）|

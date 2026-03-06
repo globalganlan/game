@@ -122,8 +122,8 @@ function getBossRewardByRank(bossId: string, rank: string): { exp: number; gold:
   const table: Record<string, { exp: number; gold: number; diamond: number; items: { itemId: string; quantity: number }[] }> = {
     S: { exp: 600, gold: 3000, diamond: 100, items: [{ itemId: 'chest_equipment', quantity: 2 }] },
     A: { exp: 400, gold: 2000, diamond: 50, items: [{ itemId: 'chest_equipment', quantity: 1 }] },
-    B: { exp: 200, gold: 1000, diamond: 20, items: [{ itemId: 'exp', quantity: 2000 }] },
-    C: { exp: 100, gold: 500, diamond: 0, items: [{ itemId: 'exp', quantity: 500 }] },
+    B: { exp: 200, gold: 1000, diamond: 20, items: [] },
+    C: { exp: 100, gold: 500, diamond: 0, items: [] },
   };
   const base = table[rank] ?? table['C'];
   return {
