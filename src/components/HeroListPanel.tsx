@@ -38,6 +38,7 @@ import {
 } from '../services/inventoryService'
 import { getEquipDisplayName, SET_NAMES } from '../domain/equipmentGacha'
 import { getGlbForSuspense } from '../loaders/glbLoader'
+import { RedDot } from './RedDot'
 // 3D idle animation is the hero detail showcase; Thumbnail3D kept for grid cards only
 import { Thumbnail3D } from './UIOverlay'
 
@@ -421,7 +422,7 @@ function HeroDetail({ hero, instance, onClose, skills, heroSkills }: HeroDetailP
       }
       apiStarUpHero(instance.instanceId).catch(console.warn)
       setResultMsg(`升星成功！★${stars} → ★${newStars}`)
-      setTimeout(() => setModalMode('none'), 1200)
+      setTimeout(() => setResultMsg(''), 1200)
     } catch (e) {
       setResultMsg('升星失敗：' + String(e))
     } finally {
@@ -735,6 +736,7 @@ function HeroDetail({ hero, instance, onClose, skills, heroSkills }: HeroDetailP
             onClick={() => { setResultMsg(''); setModalMode('starUp') }}
           >
             <span className="hd2-btn-icon">⭐</span><span>升星</span>
+            {canDoStarUp && <RedDot size="sm" />}
           </button>
         </div>
 
@@ -849,12 +851,34 @@ function HeroDetail({ hero, instance, onClose, skills, heroSkills }: HeroDetailP
         )}
 
         {/* ═══════ 升星 Modal ═══════ */}
-        {modalMode === 'starUp' && (
+        {modalMode === 'starUp' && (() => {
+          const nextStars = Math.min(6, stars + 1)
+          const curMult = getStarMultiplier(stars, rarityNum)
+          const nextMult = getStarMultiplier(nextStars, rarityNum)
+          const curSlots = getStarPassiveSlots(stars)
+          const nextSlots = getStarPassiveSlots(nextStars)
+          const newPassiveUnlocked = nextSlots > curSlots
+          // 計算各屬性預覽
+          const statCalc = (base: unknown) => {
+            if (base == null) return { cur: '?', next: '?' }
+            const b = Number(base)
+            const lv = getStatAtLevel(b, lvl, rarityNum) * ascMult
+            return {
+              cur: Math.floor(lv * curMult),
+              next: Math.floor(lv * nextMult),
+            }
+          }
+          const hpStat = statCalc(heroAny.HP)
+          const atkStat = statCalc(heroAny.ATK)
+          const defStat = statCalc(heroAny.DEF)
+          // 新解鎖的被動技能
+          const unlockPassive = newPassiveUnlocked ? skillSet.passives[curSlots] : null
+          return (
           <div className="hd2-modal-backdrop" onClick={() => setModalMode('none')}>
             <div className="hd2-modal" onClick={e => e.stopPropagation()}>
               <h4 className="hd2-modal-title">⭐ 英雄升星</h4>
               <div className="hd2-modal-info">
-                <StarDisplay count={stars} /> → <StarDisplay count={Math.min(6, stars + 1)} />
+                <StarDisplay count={stars} /> → <StarDisplay count={nextStars} />
               </div>
               <div className="hd2-material-list">
                 <div className="hd2-material-row">
@@ -865,12 +889,59 @@ function HeroDetail({ hero, instance, onClose, skills, heroSkills }: HeroDetailP
                   </span>
                 </div>
               </div>
-              <div className="hd2-star-bonus">
-                升星加成：屬性 ×{getStarMultiplier(stars + 1).toFixed(2)} · 被動欄位 {getStarPassiveSlots(stars + 1)} 個
+
+              {/* 屬性增加預覽 */}
+              <div className="hd2-star-stat-preview">
+                <div className="hd2-star-stat-title">屬性變化</div>
+                {([['❤️ 生命', hpStat], ['⚔️ 攻擊', atkStat], ['🛡️ 防禦', defStat]] as const).map(([label, s]) => (
+                  <div key={label} className="hd2-star-stat-row">
+                    <span className="hd2-star-stat-label">{label}</span>
+                    <span className="hd2-star-stat-val">{s.cur}</span>
+                    <span className="hd2-star-stat-arrow">→</span>
+                    <span className="hd2-star-stat-val hd2-star-stat-new">{s.next}</span>
+                    {typeof s.cur === 'number' && typeof s.next === 'number' && (
+                      <span className="hd2-star-stat-diff">+{s.next - s.cur}</span>
+                    )}
+                  </div>
+                ))}
+                <div className="hd2-star-stat-row" style={{ marginTop: 4 }}>
+                  <span className="hd2-star-stat-label">屬性倍率</span>
+                  <span className="hd2-star-stat-val">×{curMult.toFixed(2)}</span>
+                  <span className="hd2-star-stat-arrow">→</span>
+                  <span className="hd2-star-stat-val hd2-star-stat-new">×{nextMult.toFixed(2)}</span>
+                </div>
               </div>
+
+              {/* 技能解鎖預覽 */}
+              {newPassiveUnlocked && (
+                <div className="hd2-star-skill-unlock">
+                  <div className="hd2-star-skill-title">🔓 解鎖被動技能欄位 {nextSlots}</div>
+                  {unlockPassive ? (
+                    <>
+                      <div className="hd2-star-skill-info">
+                        <span className="hd2-star-skill-icon">{resolveSkillIcon(unlockPassive.icon, 'passive')}</span>
+                        <span className="hd2-star-skill-name">{unlockPassive.name}</span>
+                      </div>
+                      {unlockPassive.description && (
+                        <div className="hd2-star-skill-desc">{unlockPassive.description}</div>
+                      )}
+                    </>
+                  ) : (
+                    <div className="hd2-star-skill-info" style={{ color: '#aaa' }}>
+                      （尚未配置被動技能）
+                    </div>
+                  )}
+                </div>
+              )}
+              {!newPassiveUnlocked && (
+                <div className="hd2-star-bonus">
+                  被動欄位：{curSlots} 個（不變）
+                </div>
+              )}
+
               {resultMsg && <div className="hd2-result-msg">{resultMsg}</div>}
               <div className="hd2-modal-btns">
-                <button className="hd2-modal-cancel" onClick={() => setModalMode('none')}>取消</button>
+                <button className="hd2-modal-cancel" onClick={() => setModalMode('none')}>關閉</button>
                 <button
                   className="hd2-modal-confirm"
                   disabled={!canDoStarUp || isProcessing}
@@ -879,7 +950,8 @@ function HeroDetail({ hero, instance, onClose, skills, heroSkills }: HeroDetailP
               </div>
             </div>
           </div>
-        )}
+          )
+        })()}
 
         {/* ═══════ 裝備選擇 Modal ═══════ */}
         {modalMode === 'equip' && (
@@ -1017,9 +1089,10 @@ interface HeroCardProps {
   hero: RawHeroData
   instance?: HeroInstance
   onClick: () => void
+  showStarUpDot?: boolean
 }
 
-function HeroCard({ hero, instance, onClick }: HeroCardProps) {
+function HeroCard({ hero, instance, onClick, showStarUpDot }: HeroCardProps) {
   const lvl = instance?.level ?? 1
   const asc = instance?.ascension ?? 0
   const isOwned = !!instance
@@ -1049,6 +1122,7 @@ function HeroCard({ hero, instance, onClick }: HeroCardProps) {
         )}
         {!isOwned && <span className="hero-card-locked-text">未獲得</span>}
       </div>
+      {showStarUpDot && <RedDot size="sm" />}
     </button>
   )
 }
@@ -1093,6 +1167,19 @@ export function HeroListPanel({ heroesList, heroInstances, onBack, skills, heroS
     return groups
   }, [filteredHeroes])
 
+  /** 可升星的英雄 ID 集合（用於紅點顯示） */
+  const starUpReadySet = useMemo(() => {
+    const set = new Set<number>()
+    for (const inst of heroInstances) {
+      const hero = heroesList.find(h => Number(h.HeroID ?? h.id ?? 0) === inst.heroId)
+      const minStars = hero ? initialStars((hero as Record<string, unknown>).Rarity) : 0
+      const stars = Math.max(inst.stars ?? minStars, minStars)
+      const fragments = getItemQuantity(`asc_fragment_${inst.heroId}`)
+      if (canStarUp(stars, fragments)) set.add(inst.heroId)
+    }
+    return set
+  }, [heroInstances, heroesList])
+
   const getInstanceFor = (hero: RawHeroData): HeroInstance | undefined => {
     const hid = Number(hero.HeroID ?? hero.id ?? 0)
     return instanceMap.get(hid)
@@ -1133,6 +1220,7 @@ export function HeroListPanel({ heroesList, heroInstances, onBack, skills, heroS
                     key={`${hero.HeroID ?? hero.id ?? i}`}
                     hero={hero}
                     instance={getInstanceFor(hero)}
+                    showStarUpDot={starUpReadySet.has(Number(hero.HeroID ?? hero.id ?? 0))}
                     onClick={() => setSelectedHero(hero)}
                   />
                 ))}

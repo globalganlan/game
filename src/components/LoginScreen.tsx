@@ -9,8 +9,31 @@
  * 風格：末日 CRT 掃描線（與 TransitionOverlay 一致）
  */
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import type { UseAuthReturn } from '../hooks/useAuth'
+
+/* ── 記住帳號工具 ── */
+const SAVED_ACCOUNTS_KEY = 'globalganlan_saved_accounts'
+const MAX_SAVED = 5
+
+function getSavedAccounts(): string[] {
+  try {
+    const raw = localStorage.getItem(SAVED_ACCOUNTS_KEY)
+    return raw ? JSON.parse(raw) : []
+  } catch { return [] }
+}
+
+function saveAccount(email: string) {
+  const list = getSavedAccounts().filter(a => a !== email)
+  list.unshift(email)
+  if (list.length > MAX_SAVED) list.length = MAX_SAVED
+  localStorage.setItem(SAVED_ACCOUNTS_KEY, JSON.stringify(list))
+}
+
+function removeSavedAccount(email: string) {
+  const list = getSavedAccounts().filter(a => a !== email)
+  localStorage.setItem(SAVED_ACCOUNTS_KEY, JSON.stringify(list))
+}
 
 interface LoginScreenProps {
   auth: UseAuthReturn
@@ -23,6 +46,10 @@ export function LoginScreen({ auth, onEnterGame }: LoginScreenProps) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [dots, setDots] = useState('')
+  const [showSaved, setShowSaved] = useState(false)
+  const [savedAccounts, setSavedAccounts] = useState<string[]>(getSavedAccounts)
+
+  const refreshSaved = useCallback(() => setSavedAccounts(getSavedAccounts()), [])
 
   // 自動登入
   useEffect(() => {
@@ -50,7 +77,10 @@ export function LoginScreen({ auth, onEnterGame }: LoginScreenProps) {
     e.preventDefault()
     if (!email.trim() || !password.trim()) return
     const ok = await doLogin(email.trim(), password.trim())
-    if (ok) onEnterGame()
+    if (ok) {
+      saveAccount(email.trim())
+      onEnterGame()
+    }
   }
 
   return (
@@ -100,15 +130,53 @@ export function LoginScreen({ auth, onEnterGame }: LoginScreenProps) {
         {mode === 'login' && (
           <form className="login-form" onSubmit={handleEmailLogin}>
             {error && <div className="login-error">{error}</div>}
-            <input
-              className="login-input"
-              type="email"
-              placeholder="電子郵件"
-              value={email}
-              onChange={e => setEmail(e.target.value)}
-              autoComplete="email"
-              disabled={loading}
-            />
+            <div className="login-input-wrap">
+              <input
+                className="login-input"
+                type="email"
+                placeholder="電子郵件"
+                value={email}
+                onChange={e => setEmail(e.target.value)}
+                autoComplete="email"
+                disabled={loading}
+                onFocus={() => savedAccounts.length > 0 && setShowSaved(true)}
+                onBlur={() => setTimeout(() => setShowSaved(false), 200)}
+              />
+              {savedAccounts.length > 0 && (
+                <button
+                  type="button"
+                  className="login-saved-toggle"
+                  onClick={() => setShowSaved(v => !v)}
+                  tabIndex={-1}
+                >▼</button>
+              )}
+              {showSaved && savedAccounts.length > 0 && (
+                <div className="login-saved-dropdown">
+                  {savedAccounts.map(acc => (
+                    <div key={acc} className="login-saved-item">
+                      <button
+                        type="button"
+                        className="login-saved-name"
+                        onMouseDown={e => {
+                          e.preventDefault()
+                          setEmail(acc)
+                          setShowSaved(false)
+                        }}
+                      >{acc}</button>
+                      <button
+                        type="button"
+                        className="login-saved-remove"
+                        onMouseDown={e => {
+                          e.preventDefault()
+                          removeSavedAccount(acc)
+                          refreshSaved()
+                        }}
+                      >✕</button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
             <input
               className="login-input"
               type="password"

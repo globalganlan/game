@@ -125,6 +125,15 @@ export function useCombatPower(
   const [powerDelta, setPowerDelta] = useState<number | null>(null)
   const deltaTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
+  // 登出時 heroesList 變空 → 清空戰力，下次登入 prevPower=0 → 不觸發動畫
+  useEffect(() => {
+    if (heroesList.length === 0) {
+      prevPowerRef.current = 0
+      setCurrentPower(0)
+      setPowerDelta(null)
+    }
+  }, [heroesList.length])
+
   // 訂閱背包變化（裝備穿脫/強化時即時觸發 CP 重算）
   const [invTick, setInvTick] = useState(0)
   useEffect(() => {

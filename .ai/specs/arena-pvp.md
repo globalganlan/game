@@ -1,6 +1,6 @@
 # 競技場排名系統 Spec
 
-> 版本：v2.0 ｜ 狀態：🟢 已實作（動態挑戰範圍 + 對手清單 + 排名變動偵測 + safe-area）
+> 版本：v2.3 ｜ 狀態：🟢 已實作（動態挑戰範圍 + 對手清單 + 排名變動偵測 + safe-area + pvp_coin 即時同步 + 戰力顯示一致性 + 對手裝備加成）
 > 最後更新：2026-03-06
 > 負責角色：🎯 GAME_DESIGN → 🔧 CODING
 
@@ -450,6 +450,9 @@ export type MenuScreen = 'none' | 'heroes' | 'inventory' | 'gacha' | 'stages' | 
 
 | 版本 | 日期 | 變更內容 |
 |------|------|---------|
+| v2.3 | 2026-03-06 | **對手方裝備加成修復**：後端 `/arena-challenge-start` 真人防守方補上 `equipment_instances` 查詢，完整計算裝備主屬性（含強化）+ 副屬性 flat/percent + 套裝效果（2pc/4pc），與 `calcDefensePower` 戰力計算邏輯一致 |
+| v2.2 | 2026-03-07 | **戰力顯示一致性修復**：戰鬥準備畫面改用伺服器權威戰力值（`arenaEnemyPowerRef` from `defenderData.power`），不再使用前端 `getEnemyTeamPower()` 簡易加權值，確保與對手清單顯示一致 |
+| v2.1 | 2026-03-07 | **pvp_coin 背包即時同步**：①勝利/敗北回報後呼叫 `addItemsLocally` 寫入 pvp_coin（含里程碑）②ArenaPanel 掃蕩後同步呼叫 `addItemsLocally`，不再僅依賴 `loadData()` 延遲同步 |
 | v2.0 | 2026-03-06 | **動態挑戰範圍 + 對手清單系統重構**：①固定 -3 範圍改為動態 4 階（rank>100→200, 21-100→50, 6-20→15, 1-5→5）②新增持久化對手清單（10 名，存 `save_data.arenaOpponents`）③新增手動刷新（每日 5 次，`arena-refresh-opponents` 端點）④挑戰改用 `targetUserId`，排名變動偵測後免費自動刷新⑤勝利後自動重生對手清單⑥UI 改為 Top 10 排行榜（唯讀）+ 10 名挑戰對手 + 刷新按鈕⑦全專案 safe-area-inset-top 補齊（`.arena-panel` `.battle-prep-top-banner` `.battle-result-banner` `.boss-dmg-bar-wrap` `.bhud-skill-toasts` 共 5 處） |
 | v1.1 | 2026-03-05 | **全員戰力即時重算 + 掃蕩結算面板** |
 | v1.0 | 2026-03-05 | **掃蕩+模型修復+防守卡片風格**：①新增掃蕩按鈕（自動勝利後一名玩家，獲取勝利獎勵）②修復挑戰時敵方英雄模型不顯示（_modelId 正規化為 zombie_N 格式 + DEF/CritRate/CritDmg 傳遞）③防守陣型改用卡片風格（稀有度邊框 + 縮圖 + Lv + 星級）④新玩家加入競技場時計算實際防守戰力 |

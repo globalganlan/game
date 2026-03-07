@@ -1,6 +1,6 @@
 # 戰力系統 Spec
 
-> 版本：v0.4 ｜ 狀態：🟢 已實作（HUD 已渲染）
+> 版本：v0.6 ｜ 狀態：🟢 已實作（HUD 已渲染）
 > 最後更新：2026-03-01
 > 負責角色：🎯 GAME_DESIGN → 🔧 CODING
 
@@ -374,7 +374,8 @@ const CP_CACHE_KEY = 'globalganlan_combat_power'
 ## 變更歷史
 
 | 版本 | 日期 | 變更內容 |
-|------|------|---------|| v0.5 | 2026-03-01 | 主選單 CP HUD 實作：MainMenu 新增 combatPower prop + ⚗️ 戰力顯示；App.tsx 傳入 cpState.currentPower |
+|------|------|---------|| v0.6 | 2026-03-07 | **競技場戰力一致性**：App.tsx 新增 `effectiveEnemyPower`——競技場模式使用伺服器權威值（`arenaEnemyPowerRef` from `defenderData.power`），PvE 模式沿用前端 `getEnemyTeamPower()` 計算值 |
+| v0.5 | 2026-03-01 | 主選單 CP HUD 實作：MainMenu 新增 combatPower prop + ⚗️ 戰力顯示；App.tsx 傳入 cpState.currentPower |
 | v0.4 | 2026-03-01 | QA 審計修正：4 件套 CP 描述更明確（SET_2PC + SET_4PC = 280 疊加）、113 單元測試全通過 |
 | v0.3 | 2026-03-01 | App.tsx 整合完成：`useCombatPower()` hook 已呼叫（傳入 formation/heroInstances/heroesList/enemySlots）、`<CombatPowerComparison>` 在 IDLE 狀態顯示我方與敵方戰力對比條、`<CombatPowerToast>` 顯示戰力變動飛行數字 || v0.2 | 2026-03-01 | 完成全部實作：domain/combatPower.ts + useCombatPower hook + CombatPowerHUD + CSS 動畫 + App.tsx 整合 |
 | v0.1 | 2026-03-01 | 初版草案：CP 六維加權公式、技能/套裝加成、隊伍 CP、敵方 CP 估算、HUD 位置（主選單 + IDLE 對比條）、戰力變動飛行動畫（1.5s、綠/紅、合併差值）、useCombatPower hook、CSS keyframes |

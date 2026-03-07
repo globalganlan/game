@@ -152,7 +152,7 @@ export function SettingsPanel({ onBack, onLogout, displayName, isBound: initialB
     const unsub2 = onAppInstalled(() => {
       setPwaInstalled(true)
       setCanInstall(false)
-      // 自動領取 PWA 獎勵
+      // 桌機/Android：appinstalled 在原分頁觸發，即時領獎
       handleClaimPwaReward()
     })
     return () => { unsub1(); unsub2() }
@@ -165,14 +165,12 @@ export function SettingsPanel({ onBack, onLogout, displayName, isBound: initialB
     if (accepted) {
       setPwaInstalled(true)
       setCanInstall(false)
-      handleClaimPwaReward()
     } else {
       setPwaMsg({ ok: false, text: '安裝已取消' })
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  /** 領取 PWA 獎勵 */
+  /** 領取 PWA 獎勵（後端有原子 CAS 防重複） */
   const handleClaimPwaReward = useCallback(async () => {
     if (pwaRewardClaimed) return
     const authState = getAuthState()

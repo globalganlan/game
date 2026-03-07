@@ -486,6 +486,23 @@ arena.post('/arena-challenge-start', async (c) => {
         for (const h of (heroRows.results || [])) heroMap.set((h as any).heroId, h);
       }
 
+      // 查裝備（equippedBy = instanceId）
+      const instanceIds = (instances.results || []).map((r: any) => r.instanceId);
+      let equipRows: any[] = [];
+      if (instanceIds.length > 0) {
+        const eqResult = await db.prepare(
+          `SELECT equipId, setId, slot, rarity, mainStat, mainStatValue, enhanceLevel, subStats, equippedBy
+           FROM equipment_instances WHERE playerId = ? AND equippedBy IN (${instanceIds.map(() => '?').join(',')})`
+        ).bind(defender.playerId, ...instanceIds).all();
+        equipRows = (eqResult.results || []) as any[];
+      }
+      const equipByInst = new Map<string, any[]>();
+      for (const eq of equipRows) {
+        const list = equipByInst.get(eq.equippedBy) || [];
+        list.push(eq);
+        equipByInst.set(eq.equippedBy, list);
+      }
+
       formation.forEach((instId, slot) => {
         if (!instId) return;
         const inst = instMap.get(instId);
@@ -497,14 +514,66 @@ arena.post('/arena-challenge-start', async (c) => {
         const lvScale = 1 + (inst.level - 1) * growth;
         const ascMult = ASC_MULT[rn]?.[inst.ascension] ?? 1.0;
         const starMult = STAR_MUL[rn]?.[inst.stars ?? 0] ?? 1.0;
+
+        const s: CpStats = {
+          HP:       Math.floor((base.baseHP || 100) * lvScale * ascMult * starMult),
+          ATK:      Math.floor((base.baseATK || 10) * lvScale * ascMult * starMult),
+          DEF:      Math.floor((base.baseDEF || 5) * lvScale * ascMult * starMult),
+          SPD:      base.baseSPD || 100,
+          CritRate: base.critRate ?? 5,
+          CritDmg:  base.critDmg ?? 50,
+        };
+
+        // 裝備主屬性 + 副屬性 flat
+        const equips = equipByInst.get(inst.instanceId) || [];
+        for (const eq of equips) {
+          const eRate = EQ_ENHANCE[eq.rarity] ?? 0.10;
+          const mainVal = Math.floor((eq.mainStatValue || 0) * (1 + (eq.enhanceLevel || 0) * eRate));
+          cpAddFlat(s, eq.mainStat, mainVal);
+          let subs: { stat: string; value: number; isPercent: boolean }[] = [];
+          try { subs = typeof eq.subStats === 'string' ? JSON.parse(eq.subStats) : (eq.subStats || []); } catch { subs = []; }
+          for (const sub of subs) { if (!sub.isPercent) cpAddFlat(s, sub.stat, sub.value); }
+        }
+
+        // 副屬性 percent
+        const pctBon: Record<string, number> = {};
+        for (const eq of equips) {
+          let subs: { stat: string; value: number; isPercent: boolean }[] = [];
+          try { subs = typeof eq.subStats === 'string' ? JSON.parse(eq.subStats) : (eq.subStats || []); } catch { subs = []; }
+          for (const sub of subs) {
+            if (sub.isPercent) {
+              if (sub.stat === 'CritRate' || sub.stat === 'CritDmg') cpAddFlat(s, sub.stat, sub.value);
+              else pctBon[sub.stat] = (pctBon[sub.stat] || 0) + sub.value;
+            }
+          }
+        }
+
+        // 套裝效果
+        const setCounts: Record<string, number> = {};
+        for (const eq of equips) { if (eq.setId) setCounts[eq.setId] = (setCounts[eq.setId] || 0) + 1; }
+        const actSets: typeof EQ_SETS = [];
+        for (const [sid, cnt] of Object.entries(setCounts)) {
+          for (const def of EQ_SETS) { if (def.setId === sid && cnt >= def.req) actSets.push(def); }
+        }
+        for (const set of actSets) {
+          if (set.bonusType.endsWith('_percent')) {
+            const st = set.bonusType.replace('_percent', '');
+            if (st === 'CritRate' || st === 'CritDmg') cpAddFlat(s, st, set.bonusValue);
+            else pctBon[st] = (pctBon[st] || 0) + set.bonusValue;
+          } else if (set.bonusType === 'SPD_flat') {
+            s.SPD += set.bonusValue;
+          }
+        }
+        for (const [st, pct] of Object.entries(pctBon)) cpApplyPct(s, st, pct);
+
         heroes.push({
           heroId: inst.heroId,
-          HP: Math.floor((base.baseHP || 100) * lvScale * ascMult * starMult),
-          ATK: Math.floor((base.baseATK || 10) * lvScale * ascMult * starMult),
-          DEF: Math.floor((base.baseDEF || 5) * lvScale * ascMult * starMult),
-          Speed: base.baseSPD || 100,
-          CritRate: base.critRate ?? 5,
-          CritDmg: base.critDmg ?? 50,
+          HP: s.HP,
+          ATK: s.ATK,
+          DEF: s.DEF,
+          Speed: s.SPD,
+          CritRate: s.CritRate,
+          CritDmg: s.CritDmg,
           ModelID: base.modelId || String(inst.heroId),
           slot,
           level: inst.level,

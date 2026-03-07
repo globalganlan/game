@@ -28,7 +28,7 @@ import { enhancedMainStat, getMaxEnhanceLevel, getEnhanceCost } from '../domain/
 import { emitAcquire } from '../services/acquireToastBus'
 import { emitToast } from '../services/acquireToastBus'
 import { openEquipmentChest, getEquipDisplayName, SET_NAMES } from '../domain/equipmentGacha'
-import { addEquipmentLocally, equipItem, unequipItem, getHeroEquipment } from '../services/inventoryService'
+import { addEquipmentLocally, equipItem, unequipItem, getHeroEquipment, getItemQuantity } from '../services/inventoryService'
 import { statZh } from '../constants/statNames'
 import { CodexPanel } from './CodexPanel'
 import { Thumbnail3D } from './UIOverlay'
@@ -86,7 +86,6 @@ const TABS: CategoryTab[] = [
   { key: 'all',                icon: '📦', label: '全部' },
   { key: 'equipment',          icon: '⚔️', label: '裝備' },
   { key: 'ascension_material', icon: '🔥', label: '突破' },
-  { key: 'general_material',   icon: '🧪', label: '素材' },
   { key: 'chest',              icon: '🎁', label: '寶箱' },
   { key: 'currency',           icon: <CurrencyIcon type="gold" />, label: '貨幣' },
   { key: 'codex',              icon: '📖', label: '圖鑑' },
@@ -99,6 +98,7 @@ type SortMode = 'default' | 'rarity-desc' | 'quantity-desc' | 'name-asc'
    ──────────────────────────── */
 
 import { RARITY_COLORS } from '../constants/rarity'
+import { ChestLootPreview } from './ChestLootPreview'
 // getItemIcon, getItemName 已在上方匯入
 
 /* ────────────────────────────
@@ -196,7 +196,7 @@ function ItemDetail({ item, definition, onClose, heroMap }: ItemDetailProps & { 
           return
         }
         const eqName = getEquipDisplayName(eq)
-        setActionMsg(`開啟獲得：${eq.rarity} ${eqName}`)
+        setActionMsg(`🎉 開啟獲得：${eq.rarity} ${eqName}`)
         emitAcquire([{
           type: 'equipment' as const,
           id: eq.equipId,
@@ -204,6 +204,9 @@ function ItemDetail({ item, definition, onClose, heroMap }: ItemDetailProps & { 
           quantity: 1,
           rarity: eq.rarity,
         }])
+        // 若剩餘數量不足 1，自動關閉
+        const newQty = getItemQuantity(item.itemId)
+        if (newQty < 1) { setTimeout(() => onClose(), 1200) }
         return
       }
 
@@ -223,18 +226,22 @@ function ItemDetail({ item, definition, onClose, heroMap }: ItemDetailProps & { 
           applyCurrenciesFromServer(result.currencies)
         }
         // 伺服器回傳實際獎勵 → Toast 動畫 + 道具同步
+        const rewardLines: string[] = []
         if (result.result && typeof result.result === 'object') {
           const r = result.result as Record<string, unknown>
           const { addItemsLocally } = await import('../services/inventoryService')
           const acquireItems: { type: 'currency' | 'item'; id: string; name: string; quantity: number; rarity?: 'N' | 'R' | 'SR' | 'SSR' }[] = []
           if (typeof r.gold === 'number' && r.gold > 0) {
             acquireItems.push({ type: 'currency', id: 'gold', name: '金幣', quantity: r.gold })
+            rewardLines.push(`💰 金幣 ×${r.gold.toLocaleString()}`)
           }
           if (typeof r.diamond === 'number' && r.diamond > 0) {
             acquireItems.push({ type: 'currency', id: 'diamond', name: '鑽石', quantity: r.diamond, rarity: 'SR' })
+            rewardLines.push(`💎 鑽石 ×${r.diamond}`)
           }
           if (typeof r.exp === 'number' && r.exp > 0) {
             acquireItems.push({ type: 'currency', id: 'exp', name: '經驗', quantity: r.exp })
+            rewardLines.push(`💚 經驗 ×${r.exp.toLocaleString()}`)
           }
           if (Array.isArray(r.items)) {
             const toAdd = (r.items as { itemId?: string; quantity?: number }[])
@@ -243,11 +250,15 @@ function ItemDetail({ item, definition, onClose, heroMap }: ItemDetailProps & { 
             if (toAdd.length > 0) addItemsLocally(toAdd)
             for (const ri of toAdd) {
               acquireItems.push({ type: 'item', id: ri.itemId, name: getItemName(ri.itemId), quantity: ri.quantity })
+              rewardLines.push(`${getItemIcon(ri.itemId)} ${getItemName(ri.itemId)} ×${ri.quantity}`)
             }
           }
           if (acquireItems.length > 0) emitAcquire(acquireItems)
         }
-        setActionMsg('寶箱已開啟！')
+        setActionMsg(rewardLines.length > 0 ? `🎉 開啟獲得：${rewardLines.join('、')}` : '寶箱已開啟！')
+        // 若剩餘數量不足 1，自動關閉
+        const newQty = getItemQuantity(item.itemId)
+        if (newQty < 1) { setTimeout(() => onClose(), 1500) }
         return
       }
 
@@ -317,6 +328,7 @@ function ItemDetail({ item, definition, onClose, heroMap }: ItemDetailProps & { 
           </div>
         </div>
         <p className="inv-detail-desc">{desc}</p>
+        {isChest && <ChestLootPreview chestId={item.itemId} />}
         <div className="inv-detail-info">
           <span>數量：{qty}</span>
           {sellPrice > 0 && <span>出售價：金幣 {sellPrice}/個</span>}
@@ -598,7 +610,7 @@ export function InventoryPanel({ onBack, heroesList, heroInstances }: InventoryP
       items = filterItemsByCategory(activeTab)
     }
     // 過濾已移除的道具（強化石）
-    const DEPRECATED_ITEMS = new Set(['eqm_enhance_s', 'eqm_enhance_m', 'eqm_enhance_l'])
+    const DEPRECATED_ITEMS = new Set(['eqm_enhance_s', 'eqm_enhance_m', 'eqm_enhance_l', 'forge_ore_common', 'forge_ore_rare'])
     items = items.filter(i => !DEPRECATED_ITEMS.has(i.itemId))
     // 排序
     if (sortMode === 'quantity-desc') {

@@ -4,6 +4,112 @@
 
 ---
 
+### [2026-03-07] 商店批量購買 + 寶箱獎勵明細 + 升星技能說明 + 素材 Tab 移除
+- **觸發者**：使用者（Aitodolist.txt 3 項需求 + 前次 session 商店批量購買）
+- **執行角色**：🔧 CODING + 🧪 QA
+- **變更摘要**：
+  1. **ShopPanel.tsx — 批量購買 Modal**：點擊「購買」改為彈出批量購買 Modal，含：數量控制（−, −10, 輸入, +10, +, MAX）、滑桿、獎勵預覽、總價計算、餘額不足紅字、每日剩餘次數、確認購買按鈕
+  2. **workers/src/routes/inventory.ts — shop-buy 後端**：新增 `quantity` 參數（1~999），批量扣款+批量發放，每日限量檢查（bought + quantity <= dailyLimit）
+  3. **InventoryPanel.tsx — 寶箱開啟獎勵明細**：開箱後 actionMsg 改為「🎉 開啟獲得：💰 金幣 ×1,973、💚 經驗 ×200」格式，多種獎勵以「、」分隔
+  4. **InventoryPanel.tsx — 寶箱數量歸零自動關閉**：開箱後若 `getItemQuantity < 1`，1.2~1.5 秒後自動關閉詳情面板
+  5. **HeroListPanel.tsx — 升星被動技能說明**：升星 Modal 中解鎖被動預覽新增 `unlockPassive.description` 文字
+  6. **InventoryPanel.tsx — 移除素材 Tab**：`general_material`（🧪 素材）從 TABS 移除（無實際道具用途）
+  7. **App.css**：新增批量購買 Modal 樣式 ~90 行 + `.hd2-star-skill-desc` 樣式
+- **影響範圍**：src/components/ShopPanel.tsx / src/components/InventoryPanel.tsx / src/components/HeroListPanel.tsx / src/App.css / workers/src/routes/inventory.ts
+- **測試結果**：TSC 零錯誤（前端+Workers）、Vite build 成功、Workers 已部署、Playwright 瀏覽器測試通過（登入→戰鬥 1-1/1-2→商店批量購買 10 次→背包開寶箱看獎勵→寶箱歸零自動關閉→確認素材 Tab 已移除→英雄升星面板正常）
+
+### [2026-03-07] 召喚動畫改善：碎片顯示英雄名 + 十連結果合併
+- **觸發者**：使用者（重複英雄碎片沒說是哪個英雄的、十連動畫重複播放）
+- **執行角色**：🔧 CODING + 🧪 QA
+- **變更摘要**：
+  1. **GachaScreen.tsx — ResultCard**：重複英雄的碎片顯示從 `🧩{fragments}` 改為 `🧩{heroName}碎片 ×{fragments}`
+  2. **GachaScreen.tsx — 英雄 toast**：十連結果聚合 — 同英雄合併（`女喪屍 ×3`）、同碎片合併帶英雄名（`無名活屍突破碎片 ×25`）、星塵合併（`星塵 +7`）
+  3. **GachaScreen.tsx — 裝備 toast**：十連結果聚合 — 同名同稀有度裝備合併顯示數量
+  4. 移除不再使用的 `getItemName` import
+- **影響範圍**：src/components/GachaScreen.tsx
+- **測試結果**：TSC 零錯誤、Vite build 成功、Playwright 十連英雄抽卡確認 toast 正確合併（倖存者 ×2、無名活屍 ×5、倖存者突破碎片 ×10、無名活屍突破碎片 ×25、星塵 +7）、十連裝備鍛造 toast 各裝備獨立顯示 ×1
+
+### [2026-03-07] 英雄面板 UX 改善：升星保持開啟 + X 按鈕 sticky
+- **觸發者**：使用者
+- **執行角色**：🔧 CODING + 🧪 QA
+- **變更摘要**：
+  1. **HeroListPanel.tsx** — `handleConfirmStarUp` 升星成功後不再自動關閉升星 modal（`setModalMode('none')` → `setResultMsg('')`），僅清除結果訊息，讓使用者可繼續升星或自行關閉
+  2. **App.css** — `.hd2-close`（英雄詳細面板右上角 ✕ 按鈕）從 `position: absolute` 改為 `position: sticky; top: 0; float: right;`，滾動時 ✕ 始終固定在可見區域
+- **影響範圍**：src/components/HeroListPanel.tsx / src/App.css
+- **測試結果**：TSC 零錯誤、Vite build 成功、Playwright 確認 — 滾動到底部時 ✕ 按鈕仍可見
+
+### [2026-03-06] 登入戰力假動畫修復
+- **觸發者**：使用者（為何帳號登入遊戲會看到戰力減少動畫又看到戰力增加動畫）
+- **執行角色**：🔧 CODING + 🧪 QA
+- **根因**：`useCombatPower` 的 `prevPowerRef`（useRef）在 App 永不卸載的前提下跨 login/logout 不會重置。登出後 `clearInventoryCache()` 清掉裝備快取，重新登入時 `loadSave` 先於 `loadInventory` 完成，第一次算出無裝備戰力 < 舊 prevPowerRef → 假「減少」動畫；裝備到位後重算 → 假「增加」動畫
+- **變更摘要**：
+  1. **useGameInit.ts** — 將 `loadInventory()` 從 fire-and-forget 改為存入 `earlyInvRef`，與 `earlySaveRef` 一起在 `Promise.all` 中等待，確保存檔和裝備都到位後才設定 `heroesList`
+  2. **useCombatPower.ts** — 移除 `suppressUntilRef` 計時器 hack，改為乾淨邏輯：`heroesList` 變空時重置 `prevPowerRef=0`，首次計算 `prevPowerRef===0` 不觸發動畫
+- **影響範圍**：src/hooks/useGameInit.ts / src/hooks/useCombatPower.ts
+- **測試結果**：TSC 零錯誤、Vite build 成功、Playwright 測試 — 登出→重新登入後 ⚔️ 1,528 正常顯示，無任何假戰力動畫
+
+### [2026-03-06] 競技場對手方裝備加成修復
+- **觸發者**：使用者（競技場有載入我方裝備與英雄培養屬性嗎）
+- **執行角色**：🔧 CODING + 🧪 QA
+- **根因**：後端 `/arena-challenge-start` 在建構真人防守方英雄數值時，只查了 `hero_instances`（等級/突破/星級），**沒有查 `equipment_instances`**，導致對手戰鬥數值不含裝備主副屬性和套裝效果。而 `calcDefensePower`（用於排行榜戰力顯示）卻完整計算了裝備，造成戰力數字與實際戰鬥不一致
+- **變更摘要**：
+  1. **workers/src/routes/arena.ts** — 真人防守方區段補上 `equipment_instances` 查詢，完整計算裝備主屬性（含強化）、副屬性 flat/percent、套裝效果（2pc/4pc），與 `calcDefensePower` 保持一致
+- **我方（攻擊方）確認**：前端 `runBattleLoop` → `getHeroEquipment()` → `createBattleHero(heroInstanceData)` → `getFinalStats()` 路徑完整，與 PvE 一致，無需修改
+- **影響範圍**：workers/src/routes/arena.ts
+- **測試結果**：Workers TSC 零錯誤、部署成功
+
+### [2026-03-07] 記住帳號功能（登入畫面帳號切換下拉）
+- **觸發者**：使用者（我想讓玩家帳密登入後記起來）
+- **執行角色**：🔧 CODING + 🧪 QA
+- **變更摘要**：
+  1. **LoginScreen.tsx** — 新增 `getSavedAccounts` / `saveAccount` / `removeSavedAccount` 工具函式，使用 `localStorage` 鍵 `globalganlan_saved_accounts`（最多 5 筆、最近使用排最前）；email 輸入框加入 ▼ 下拉選單，onFocus 自動展開、點擊帳號填入 email、✕ 可逐筆移除
+  2. **App.css** — 新增 `.login-input-wrap` / `.login-saved-toggle` / `.login-saved-dropdown` / `.login-saved-item` / `.login-saved-name` / `.login-saved-remove` 樣式（暗色主題、紅色邊框呼應 CRT 風格）
+- **設計決策**：只儲存 email 不存密碼（安全考量）；登出不清 localStorage，帳號自然保留；最多記 5 筆，新帳號自動排最前
+- **影響範圍**：LoginScreen.tsx / App.css
+- **測試結果**：TSC 零錯誤、Vite build 成功、Playwright 測試 — ▼ 下拉顯示正確、點擊填入 email、✕ 刪除帳號、localStorage 同步正確
+
+---
+
+### [2026-03-06] PWA 加入主畫面獎勵重複發信修復
+- **觸發者**：使用者（加入主畫面的獎勵為什麼會送兩封）
+- **執行角色**：🔧 CODING + 🧪 QA
+- **根因**：`SettingsPanel.tsx` 中 `handlePwaInstall`（使用者點按安裝→接受→呼叫 `handleClaimPwaReward`）和 `onAppInstalled` 事件監聽（瀏覽器安裝完成→呼叫 `handleClaimPwaReward`）幾乎同時觸發。前端 React state `pwaRewardClaimed` 來不及更新擋不住第二次呼叫；後端 `SELECT pwaRewardClaimed` + `UPDATE` 非原子操作存在 TOCTOU 競態，兩個請求同時讀到 0 後各自插入一封信
+- **變更摘要**：
+  1. **SettingsPanel.tsx（前端）** — `handleClaimPwaReward` 新增 `pwaClaimingRef`（useRef<boolean>）作為同步鎖，防止 React state 更新延遲下的並發呼叫
+  2. **workers/src/routes/mail.ts（後端）** — 移除先 SELECT 再 UPDATE 的非原子模式，改用 `UPDATE save_data SET pwaRewardClaimed = 1 WHERE playerId = ? AND pwaRewardClaimed = 0` 原子 CAS，檢查 `meta.changes` 判斷是否已領取，確保只有一個請求能通過
+- **影響範圍**：SettingsPanel.tsx / workers/src/routes/mail.ts
+- **測試結果**：TSC 零錯誤、Vite build 成功、Workers 部署成功、並發 API 測試（同時兩請求）確認只插入一封信
+
+---
+
+### [2026-03-07] 競技場戰力顯示不一致修復
+- **觸發者**：使用者（列表顯示的戰力與進入戰鬥準備上方顯示的戰力不一樣）
+- **執行角色**：🔧 CODING + 🧪 QA
+- **根因**：ArenaPanel 列表使用後端 `calcDefensePower()`（含裝備/技能/套裝加成）的權威戰力值，但戰鬥準備畫面使用前端 `getEnemyTeamPower()`（僅六維加權求和，無裝備加成），兩者公式差異導致數值不一致
+- **變更摘要**：
+  1. **App.tsx** — 新增 `arenaEnemyPowerRef`（useRef）存放伺服器權威戰力值；新增 `effectiveEnemyPower` 計算值，競技場模式使用伺服器值，PvE 模式沿用前端計算
+  2. **useStageHandlers.ts** — `handleArenaStartBattle` 中從 `res.defenderData.power` 取得伺服器戰力並寫入 `arenaEnemyPowerRef.current`
+- **影響範圍**：App.tsx / useStageHandlers.ts
+- **Spec 更新**：arena-pvp.md v2.2 / combat-power.md v0.6
+- **測試結果**：TSC 零錯誤、Vite build 成功、Playwright QA 帳號測試 — 對手 #309 ⚔️4,320 與 #472 ⚔️1,060 列表/戰鬥準備完全一致，0 console errors
+
+---
+
+### [2026-03-07] 簽到道具獲得動畫修復 + 競技場 pvp_coin 背包即時同步
+- **觸發者**：使用者（簽到取得的道具沒有顯示獲得動畫及顯示在背包，重新整理才有）
+- **執行角色**：🔧 CODING + 🧪 QA
+- **變更摘要**：
+  1. **saveService.ts CHECKIN_REWARDS 同步** — 本地獎勵表補齊缺失的 gacha_ticket_hero（Day 3/6）、gacha_ticket_equip（Day 5/7）、gacha_ticket_hero + gacha_ticket_equip（Day 7），與後端 `workers/src/routes/checkin.ts` 完全一致
+  2. **saveService.ts doDailyCheckin** — 返回值改用伺服器回傳的 `serverRes.reward`（權威來源）而非本地 `CHECKIN_REWARDS`，避免前後端獎勵表不同步時動畫缺失或背包漏同步
+  3. **runBattleLoop.ts 競技場勝利** — pvp_coin 獲得後呼叫 `addItemsLocally` 即時寫入本地背包快取（含里程碑獎勵）
+  4. **runBattleLoop.ts 競技場敗北** — pvp_coin 安慰獎同步呼叫 `addItemsLocally`
+  5. **ArenaPanel.tsx 掃蕩** — pvp_coin（含里程碑）掃蕩獲得後呼叫 `addItemsLocally` 即時同步背包
+- **影響範圍**：saveService.ts / runBattleLoop.ts / ArenaPanel.tsx
+- **Spec 更新**：save-system.md / arena-pvp.md / inventory.md 版本號遞增
+- **測試結果**：TSC 零錯誤、Vite build 成功、Playwright 完整流程測試通過（登入→大廳→簽到→獲得動畫→背包更新→關卡→戰鬥→返回，0 errors）
+
+---
+
 ### [2026-03-06] iOS WebGL 深度紋理修復（v2.6）
 - **觸發者**：使用者（iOS PWA 戰鬥場景英雄模型紋理顯示黑色 — 第二輪深度修復）
 - **執行角色**：🔧 CODING + 🧪 QA

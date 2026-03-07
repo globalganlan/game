@@ -238,19 +238,21 @@ mail.post('/claim-pwa-reward', async (c) => {
   const playerId = c.get('playerId');
   const db = c.env.DB;
 
-  const saveData = await db.prepare('SELECT pwaRewardClaimed FROM save_data WHERE playerId = ?')
-    .bind(playerId).first<{ pwaRewardClaimed: number }>();
-  if (!saveData) return c.json({ success: false, error: 'no_save_data' });
-  if (saveData.pwaRewardClaimed) return c.json({ success: false, error: 'already_claimed' });
+  // 原子 CAS：只有 pwaRewardClaimed=0 時才會更新為 1，防止並行請求競態
+  const upd = await db.prepare(
+    'UPDATE save_data SET pwaRewardClaimed = 1 WHERE playerId = ? AND pwaRewardClaimed = 0'
+  ).bind(playerId).run();
+  if (!upd.meta.changes) {
+    // 沒有更新 → 要嘛已領取、要嘛找不到玩家
+    const exists = await db.prepare('SELECT 1 FROM save_data WHERE playerId = ?').bind(playerId).first();
+    return c.json({ success: false, error: exists ? 'already_claimed' : 'no_save_data' });
+  }
 
-  // 標記已領取 + 寄信 — 原子批次
+  // 寄送獎勵信件（已確保只有一個請求能走到這裡）
   const pwaMailId = uuid();
-  await db.batch([
-    db.prepare('UPDATE save_data SET pwaRewardClaimed = 1 WHERE playerId = ?').bind(playerId),
-    insertMailStmt(db, pwaMailId, playerId, '📱 加入主畫面獎勵',
-      '感謝將全球感染加入主畫面！享受更快的載入速度與更穩定的遊戲體驗。這是您的安裝獎勵！',
-      [{ itemId: 'diamond', quantity: 100 }, { itemId: 'gold', quantity: 3000 }]),
-  ]);
+  await insertMailStmt(db, pwaMailId, playerId, '📱 加入主畫面獎勵',
+    '感謝將全球感染加入主畫面！享受更快的載入速度與更穩定的遊戲體驗。這是您的安裝獎勵！',
+    [{ itemId: 'diamond', quantity: 100 }, { itemId: 'gold', quantity: 3000 }]).run();
 
   try {
     await pushToPlayer(

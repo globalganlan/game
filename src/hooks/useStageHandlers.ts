@@ -55,6 +55,7 @@ export interface StageHandlerDeps {
   heroesList: RawHeroData[]
   stageMode: 'story' | 'tower' | 'daily' | 'pvp' | 'boss'
   arenaTargetRankRef: React.MutableRefObject<number>
+  arenaEnemyPowerRef: React.MutableRefObject<number>
   setIsDefenseSetup: (b: boolean) => void
   isDefenseSetupRef: React.MutableRefObject<boolean>
   heroesListRef: React.MutableRefObject<RawHeroData[]>
@@ -67,7 +68,7 @@ export function useStageHandlers(deps: StageHandlerDeps) {
     setStageMode, setSceneTheme, setStageId, setMenuScreen, setGameState,
     setCurtainVisible, setCurtainFading, setCurtainText, curtainClosePromiseRef, closeCurtain,
     updateEnemySlots, updatePlayerSlots, restoreFormationFromSave,
-    showToast, acquireShow, heroesList, stageMode, arenaTargetRankRef,
+    showToast, acquireShow, heroesList, stageMode, arenaTargetRankRef, arenaEnemyPowerRef,
     setIsDefenseSetup, isDefenseSetupRef, heroesListRef,
     preBattleMenuScreenRef,
     setShowBattleScene,
@@ -233,6 +234,7 @@ export function useStageHandlers(deps: StageHandlerDeps) {
       await Promise.all([...arenaModelIds].map(mid => preloadHeroModel(mid).catch(() => {})))
 
       // ── 模型預載完成，現在才掛載 Canvas + 設定戰鬥狀態 ──
+      arenaEnemyPowerRef.current = res.defenderData?.power ?? 0
       setShowBattleScene(true)
       setStageMode('pvp')
       setSceneTheme(pickSceneForStage('pvp', `arena-${targetRank}`))

@@ -16,7 +16,7 @@ const SHOP_CATALOG: Record<string, {
   daily_exp_s:      { price: 1000,  currency: 'gold',    rewards: [{ itemId: 'exp', quantity: 500 }], dailyLimit: 10 },
   daily_exp_m:      { price: 5000,  currency: 'gold',    rewards: [{ itemId: 'exp', quantity: 1500 }], dailyLimit: 5 },
   daily_exp_l:      { price: 20,    currency: 'diamond',  rewards: [{ itemId: 'exp', quantity: 2000 }], dailyLimit: 3 },
-  daily_forge_ore:  { price: 2000,  currency: 'gold',    rewards: [{ itemId: 'forge_ore_common', quantity: 5 }], dailyLimit: 10 },
+
   mat_class_power:     { price: 10000, currency: 'gold', rewards: [{ itemId: 'asc_class_power', quantity: 1 }], dailyLimit: 0 },
   mat_class_agility:   { price: 10000, currency: 'gold', rewards: [{ itemId: 'asc_class_agility', quantity: 1 }], dailyLimit: 0 },
   mat_class_defense:   { price: 10000, currency: 'gold', rewards: [{ itemId: 'asc_class_defense', quantity: 1 }], dailyLimit: 0 },
@@ -25,19 +25,18 @@ const SHOP_CATALOG: Record<string, {
   sd_exp_5000:        { price: 10,  currency: 'stardust', rewards: [{ itemId: 'exp', quantity: 5000 }], dailyLimit: 0 },
   sd_gold_50k:        { price: 15,  currency: 'stardust', rewards: [{ itemId: 'gold', quantity: 50000 }], dailyLimit: 0 },
   sd_class_universal: { price: 20,  currency: 'stardust', rewards: [{ itemId: 'asc_class_universal', quantity: 2 }], dailyLimit: 0 },
-  sd_forge_rare:      { price: 25,  currency: 'stardust', rewards: [{ itemId: 'forge_ore_rare', quantity: 3 }], dailyLimit: 0 },
+
   sd_chest_gold:      { price: 50,  currency: 'stardust', rewards: [{ itemId: 'chest_gold', quantity: 1 }], dailyLimit: 3 },
   sd_diamond_100:     { price: 80,  currency: 'stardust', rewards: [{ itemId: 'diamond', quantity: 100 }], dailyLimit: 0 },
   // ── 特殊商店 ──
-  special_gold_pack: { price: 30,   currency: 'diamond', rewards: [{ itemId: 'gold_pack_10k', quantity: 1 }], dailyLimit: 5 },
+  special_gold_pack: { price: 30,   currency: 'diamond', rewards: [{ itemId: 'gold', quantity: 10000 }], dailyLimit: 5 },
   special_ticket_hero:  { price: 50,  currency: 'diamond', rewards: [{ itemId: 'gacha_ticket_hero', quantity: 1 }], dailyLimit: 3 },
   special_ticket_equip: { price: 50,  currency: 'diamond', rewards: [{ itemId: 'gacha_ticket_equip', quantity: 1 }], dailyLimit: 3 },
   sd_ticket_hero:       { price: 30,  currency: 'stardust', rewards: [{ itemId: 'gacha_ticket_hero', quantity: 1 }], dailyLimit: 0 },
   sd_ticket_equip:      { price: 30,  currency: 'stardust', rewards: [{ itemId: 'gacha_ticket_equip', quantity: 1 }], dailyLimit: 0 },
   // ── 碎片兌換店 ──
   scrap_chest_equip:    { price: 10,  currency: 'equip_scrap', rewards: [{ itemId: 'chest_equipment', quantity: 1 }], dailyLimit: 0 },
-  scrap_forge_common:   { price: 3,   currency: 'equip_scrap', rewards: [{ itemId: 'forge_ore_common', quantity: 5 }], dailyLimit: 0 },
-  scrap_forge_rare:     { price: 10,  currency: 'equip_scrap', rewards: [{ itemId: 'forge_ore_rare', quantity: 2 }], dailyLimit: 0 },
+
   // ── 競技兌換店 ──
   arena_exp_3000:       { price: 5,   currency: 'arena', rewards: [{ itemId: 'exp', quantity: 3000 }], dailyLimit: 0 },
   arena_gold_20k:       { price: 5,   currency: 'arena', rewards: [{ itemId: 'gold', quantity: 20000 }], dailyLimit: 0 },
@@ -227,10 +226,13 @@ inventory.post('/shop-buy', async (c) => {
   const db = c.env.DB;
   const body = getBody(c);
   const shopItemId = body.shopItemId as string;
+  const buyQty = Math.max(1, Math.min(999, Math.floor(Number(body.quantity) || 1)));
   if (!shopItemId) return c.json({ success: false, error: 'missing shopItemId' });
 
   const catalog = SHOP_CATALOG[shopItemId];
   if (!catalog) return c.json({ success: false, error: 'invalid_shop_item' });
+
+  const totalPrice = catalog.price * buyQty;
 
   // 餘額檢查 — 星塵/碎片/競技幣從 inventory，其他從 save_data
   let currentBalance = 0;
@@ -248,17 +250,22 @@ inventory.post('/shop-buy', async (c) => {
     currentBalance = saveData[catalog.currency as 'gold' | 'diamond'];
   }
 
-  if (currentBalance < catalog.price) return c.json({ success: false, error: `insufficient_${catalog.currency}` });
+  if (currentBalance < totalPrice) return c.json({ success: false, error: `insufficient_${catalog.currency}` });
 
   // 每日購買上限檢查
   const today = isoNow().slice(0, 10); // YYYY-MM-DD
+  let remainingToday = Infinity;
   if (catalog.dailyLimit > 0) {
     const row = await db.prepare(
       'SELECT count FROM shop_purchases WHERE playerId = ? AND shopItemId = ? AND purchaseDate = ?'
     ).bind(playerId, shopItemId, today).first<{ count: number }>();
     const bought = row?.count ?? 0;
-    if (bought >= catalog.dailyLimit) {
+    remainingToday = Math.max(0, catalog.dailyLimit - bought);
+    if (remainingToday <= 0) {
       return c.json({ success: false, error: 'daily_limit_reached' });
+    }
+    if (buyQty > remainingToday) {
+      return c.json({ success: false, error: 'exceeds_daily_limit', remaining: remainingToday });
     }
   }
 
@@ -269,28 +276,29 @@ inventory.post('/shop-buy', async (c) => {
   if (catalog.dailyLimit > 0) {
     stmts.push(db.prepare(
       `INSERT INTO shop_purchases (playerId, shopItemId, purchaseDate, count)
-       VALUES (?, ?, ?, 1)
-       ON CONFLICT(playerId, shopItemId, purchaseDate) DO UPDATE SET count = count + 1`
-    ).bind(playerId, shopItemId, today));
+       VALUES (?, ?, ?, ?)
+       ON CONFLICT(playerId, shopItemId, purchaseDate) DO UPDATE SET count = count + ?`
+    ).bind(playerId, shopItemId, today, buyQty, buyQty));
   }
 
   // 扣款
   if (catalog.currency === 'stardust' || catalog.currency === 'equip_scrap' || catalog.currency === 'arena') {
     const invItemId = catalog.currency === 'stardust' ? 'currency_stardust' : catalog.currency === 'arena' ? 'pvp_coin' : 'equip_scrap';
-    stmts.push(upsertItemStmt(db, playerId, invItemId, -catalog.price));
+    stmts.push(upsertItemStmt(db, playerId, invItemId, -totalPrice));
   } else {
     stmts.push(db.prepare(
       `UPDATE save_data SET ${catalog.currency} = ${catalog.currency} - ? WHERE playerId = ?`
-    ).bind(catalog.price, playerId));
+    ).bind(totalPrice, playerId));
   }
 
-  // 發放獎勵
+  // 發放獎勵（乘以購買數量）
   const resDelta: Record<string, number> = {};
   for (const reward of catalog.rewards) {
+    const totalReward = reward.quantity * buyQty;
     if (reward.itemId === 'gold' || reward.itemId === 'diamond' || reward.itemId === 'exp') {
-      resDelta[reward.itemId] = (resDelta[reward.itemId] || 0) + reward.quantity;
+      resDelta[reward.itemId] = (resDelta[reward.itemId] || 0) + totalReward;
     } else {
-      stmts.push(upsertItemStmt(db, playerId, reward.itemId, reward.quantity));
+      stmts.push(upsertItemStmt(db, playerId, reward.itemId, totalReward));
     }
   }
   const resCols = Object.keys(resDelta);
@@ -307,10 +315,11 @@ inventory.post('/shop-buy', async (c) => {
 
   return c.json({
     success: true,
-    spent: catalog.price,
+    quantity: buyQty,
+    spent: totalPrice,
     currency: catalog.currency,
-    rewards: catalog.rewards,
-    newBalance: currentBalance - catalog.price,
+    rewards: catalog.rewards.map(r => ({ ...r, quantity: r.quantity * buyQty })),
+    newBalance: currentBalance - totalPrice,
     currencies,
   });
 });
@@ -389,20 +398,18 @@ function generateChestRewards(chestId: string, qty: number) {
     if (chestId === 'chest_bronze') {
       gold += 1000 + Math.floor(Math.random() * 2000);
       if (Math.random() < 0.5) exp += 200;
-      if (Math.random() < 0.2) itemMap['forge_ore_common'] = (itemMap['forge_ore_common'] || 0) + 1;
+      if (Math.random() < 0.15) diamond += 3 + Math.floor(Math.random() * 5);
     } else if (chestId === 'chest_silver') {
       gold += 3000 + Math.floor(Math.random() * 4000);
       diamond += 10 + Math.floor(Math.random() * 20);
       if (Math.random() < 0.8) exp += 1000;
-      if (Math.random() < 0.4) itemMap['forge_ore_common'] = (itemMap['forge_ore_common'] || 0) + 2;
-      if (Math.random() < 0.2) itemMap['forge_ore_rare'] = (itemMap['forge_ore_rare'] || 0) + 1;
+      if (Math.random() < 0.25) itemMap['chest_equipment'] = (itemMap['chest_equipment'] || 0) + 1;
     } else if (chestId === 'chest_gold') {
       gold += 8000 + Math.floor(Math.random() * 7000);
       diamond += 30 + Math.floor(Math.random() * 50);
       exp += 4000;
-      if (Math.random() < 0.6) itemMap['forge_ore_rare'] = (itemMap['forge_ore_rare'] || 0) + 1;
-      if (Math.random() < 0.4) itemMap['forge_ore_common'] = (itemMap['forge_ore_common'] || 0) + 2;
-      if (Math.random() < 0.3) itemMap['chest_equipment'] = (itemMap['chest_equipment'] || 0) + 1;
+      if (Math.random() < 0.4) itemMap['chest_equipment'] = (itemMap['chest_equipment'] || 0) + 1;
+      if (Math.random() < 0.2) itemMap['gacha_ticket_hero'] = (itemMap['gacha_ticket_hero'] || 0) + 1;
     }
   }
   const items = Object.entries(itemMap).map(([itemId, quantity]) => ({ itemId, name: itemId, quantity }));

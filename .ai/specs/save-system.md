@@ -1,6 +1,6 @@
 # 存檔系統 Spec
 
-> 版本：v2.3 ｜ 狀態：🟢 已實作
+> 版本：v2.4 ｜ 狀態：🟢 已實作
 > 最後更新：2026-03-05
 > 負責角色：🎯 GAME_DESIGN → 🔧 CODING
 
@@ -397,4 +397,5 @@ GAS handleCollectResources_:（包在 executeWithIdempotency_ 中）
 | v2.0 | 2026-03-02 | **移除 `save-progress` 路由**：原本的 debounce 2s + retry 寫入佇列已經完全無用—— 4 個 allowedFields 均已有專用路由（change-name / save-formation / complete-battle / collect-resources）。前端 `enqueueSave` 簡化為 `updateLocal()`（僅更新本地 state + localStorage），不再發送 API 請求 |
 | v2.1 | 2026-06-19 | **欄位調整**：`stageStars` 值改為 `1`（已通關）取代舊版 `1~3` 星級；`equipmentCapacity` 欄位廢棄（不再限制裝備容量）；裝備實例 `locked` 欄位廢棄；新增 `equip_scrap` 可堆疊背包道具（裝備分解產出） |
 | v2.2 | 2026-03-04 | **saveService 狀態刷新修復**：`notify()` 深複製 heroes + save 物件修復 useMemo 偵測；`updateLocal()` 移除 `if (key in currentData.save)` guard 允許寫入 optional fields（lastHeroFreePull/lastEquipFreePull/gachaPity）；`sanitizeSaveData()` 初始化 optional 日期欄位；新增 `updateFreePullLocally()` / `updateGachaPityLocally()` 匯出函式 |
+| v2.4 | 2026-03-07 | **簽到獎勵同步修復**：① `CHECKIN_REWARDS` 補齊缺失的 gacha_ticket_hero（Day 3/6）、gacha_ticket_equip（Day 5/7）與後端一致 ② `doDailyCheckin` 返回值改用 `serverRes.reward`（權威）而非本地 CHECKIN_REWARDS，避免動畫缺失與背包漏同步 |
 | v2.3 | 2026-03-05 | **Server-First 資料一致性**：`collectResources` catch 不再加本地金幣/經驗；`doDailyCheckin` catch 不再發本地獎勵，回傳 `success:false`；移除離線樂觀更新策略 |

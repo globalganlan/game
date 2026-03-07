@@ -64,6 +64,7 @@ export function useGameInit(deps: GameInitDeps) {
 
   /* ── 提前背景載入（登入期間就開始，不阻塞 loading 畫面） ── */
   const earlySaveRef = useRef<Promise<unknown> | null>(null)
+  const earlyInvRef = useRef<Promise<unknown> | null>(null)
   const earlySaveStarted = useRef(false)
 
   /* ── 資料載入 ── */
@@ -91,6 +92,7 @@ export function useGameInit(deps: GameInitDeps) {
       const [gameData] = await Promise.all([
         loadAllGameData((r) => { stageProgress.fetch = r; refresh() }),
         earlySaveRef.current ?? Promise.resolve(),
+        earlyInvRef.current ?? Promise.resolve(),
       ])
       stageProgress.fetch = 1; refresh()
 
@@ -171,7 +173,7 @@ export function useGameInit(deps: GameInitDeps) {
     if (!authIsLoggedIn || earlySaveStarted.current) return
     earlySaveStarted.current = true
     earlySaveRef.current = saveDoLoadSave().catch(e => console.warn('[early] save load failed:', e))
-    loadInventory().catch(e => console.warn('[early] inventory load failed:', e))
+    earlyInvRef.current = loadInventory().catch(e => console.warn('[early] inventory load failed:', e))
     preloadMail()
       .then(({ mails }) => { setMailItems(mails); setMailLoaded(true) })
       .catch(e => console.warn('[early] mail preload failed:', e))

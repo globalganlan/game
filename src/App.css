@@ -1067,6 +1067,83 @@
   color: rgba(255, 255, 255, 0.3);
 }
 
+/* ── 記住帳號下拉 ── */
+.login-input-wrap {
+  position: relative;
+  width: 100%;
+}
+
+.login-saved-toggle {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 0.7rem;
+  cursor: pointer;
+  padding: 4px 6px;
+  line-height: 1;
+}
+
+.login-saved-toggle:hover {
+  color: rgba(255, 80, 80, 0.8);
+}
+
+.login-saved-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  z-index: 20;
+  background: rgba(20, 10, 10, 0.95);
+  border: 1px solid rgba(255, 50, 50, 0.4);
+  border-top: none;
+  border-radius: 0 0 4px 4px;
+  max-height: 160px;
+  overflow-y: auto;
+}
+
+.login-saved-item {
+  display: flex;
+  align-items: center;
+}
+
+.login-saved-name {
+  flex: 1;
+  background: none;
+  border: none;
+  color: #ddd;
+  font-family: monospace;
+  font-size: 0.85rem;
+  padding: 8px 12px;
+  text-align: left;
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.login-saved-name:hover {
+  background: rgba(255, 50, 50, 0.15);
+  color: #fff;
+}
+
+.login-saved-remove {
+  background: none;
+  border: none;
+  color: rgba(255, 255, 255, 0.3);
+  font-size: 0.75rem;
+  padding: 6px 10px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.login-saved-remove:hover {
+  color: #ff4444;
+}
+
 /* Error */
 .login-error {
   width: 100%;
@@ -1699,12 +1776,22 @@
 /* Rarity badge */
 .hero-card-rarity-badge {
   position: absolute;
-  top: 2px;
-  right: 4px;
-  font-size: 0.55rem;
+  top: 3px;
+  right: 3px;
+  font-size: 0.6rem;
   font-weight: bold;
   letter-spacing: 0.5px;
   text-shadow: 0 1px 3px rgba(0,0,0,0.7);
+  background: rgba(0,0,0,0.55);
+  padding: 1px 5px;
+  border-radius: 4px;
+  line-height: 1.3;
+}
+/* RedDot inside hero-card: move to top-left to avoid rarity badge overlap */
+.hero-card > .red-dot {
+  top: 4px;
+  left: 4px;
+  right: auto;
 }
 
 .hero-card {
@@ -1790,10 +1877,10 @@
 .hd2-card::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 2px; }
 
 .hd2-close {
-  position: absolute;
-  top: 6px;
-  right: 6px;
-  background: rgba(30,30,40,0.85);
+  position: sticky;
+  top: 0;
+  float: right;
+  background: rgba(30,30,40,0.92);
   border: 2px solid rgba(255,255,255,0.25);
   color: #eee;
   font-size: 1.5rem;
@@ -1807,6 +1894,9 @@
   z-index: 20;
   transition: color 0.15s, background 0.15s, transform 0.15s;
   touch-action: manipulation;
+  margin-top: -6px;
+  margin-right: -6px;
+  flex-shrink: 0;
 }
 .hd2-close:hover { color: #fff; background: rgba(255,255,255,0.18); transform: scale(1.1); }
 
@@ -2121,6 +2211,7 @@
   color: #ff6b6b;
 }
 .hd2-btn-star {
+  position: relative;
   background: rgba(255, 212, 59, 0.15);
   border-color: rgba(255, 212, 59, 0.4);
   color: #ffd43b;
@@ -2279,6 +2370,73 @@
   font-size: 0.78rem;
   text-align: center;
   margin-bottom: 8px;
+}
+
+/* ── 升星屬性預覽 ── */
+.hd2-star-stat-preview {
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 8px;
+  padding: 8px 12px;
+  margin-bottom: 8px;
+}
+.hd2-star-stat-title {
+  font-size: 0.72rem;
+  color: #aaa;
+  margin-bottom: 6px;
+  font-weight: 600;
+}
+.hd2-star-stat-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.78rem;
+  padding: 2px 0;
+}
+.hd2-star-stat-label {
+  width: 72px;
+  color: #ccc;
+  flex-shrink: 0;
+}
+.hd2-star-stat-val {
+  color: #999;
+  min-width: 40px;
+  text-align: right;
+}
+.hd2-star-stat-arrow { color: #666; font-size: 0.7rem; }
+.hd2-star-stat-new { color: #51cf66; font-weight: bold; }
+.hd2-star-stat-diff {
+  color: #51cf66;
+  font-size: 0.7rem;
+  margin-left: auto;
+}
+
+/* ── 升星技能解鎖預覽 ── */
+.hd2-star-skill-unlock {
+  background: rgba(190,75,219,0.1);
+  border: 1px solid rgba(190,75,219,0.3);
+  border-radius: 8px;
+  padding: 8px 12px;
+  margin-bottom: 8px;
+}
+.hd2-star-skill-title {
+  font-size: 0.78rem;
+  color: #be4bdb;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+.hd2-star-skill-info {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.78rem;
+  color: #ddd;
+}
+.hd2-star-skill-icon { font-size: 1.1rem; }
+.hd2-star-skill-name { font-weight: 600; }
+.hd2-star-skill-desc {
+  color: #bbb; font-size: 0.78rem; margin-top: 4px;
+  line-height: 1.35; padding: 0 2px;
 }
 
 .hd2-result-msg {
@@ -2729,6 +2887,69 @@
   overflow-y: auto;
   white-space: pre-wrap;
   word-wrap: break-word;
+}
+
+/* ── 寶箱內容物預覽 ── */
+.chest-loot-preview {
+  margin-top: 10px;
+  padding: 8px 10px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 8px;
+}
+.chest-loot-title {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #ffd43b;
+  margin-bottom: 4px;
+}
+.chest-loot-subtitle {
+  font-size: 0.7rem;
+  color: #aaa;
+  margin-bottom: 6px;
+}
+.chest-loot-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.72rem;
+}
+.chest-loot-table thead th {
+  color: #999;
+  font-weight: 500;
+  text-align: left;
+  padding: 3px 4px;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+  font-size: 0.68rem;
+}
+.chest-loot-table tbody tr {
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+}
+.chest-loot-table tbody td {
+  padding: 4px;
+  color: #ddd;
+  vertical-align: middle;
+}
+.chest-loot-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.chest-loot-icon {
+  font-size: 0.85rem;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+}
+.chest-loot-amount {
+  color: #bbb;
+  white-space: nowrap;
+}
+.chest-loot-chance {
+  font-weight: 600;
+  white-space: nowrap;
+}
+.chest-loot-rarity {
+  font-weight: 600;
 }
 
 /* ── 簽到道具可點擊 ── */
@@ -3375,6 +3596,90 @@
 .shop-buy-btn:not(:disabled):hover {
   background: rgba(114,176,29,0.3);
 }
+
+/* ── 批量購買彈窗 ── */
+.shop-bulk-overlay {
+  position: fixed; inset: 0; z-index: 9999;
+  background: rgba(0,0,0,0.7);
+  display: flex; align-items: center; justify-content: center;
+  animation: fadeIn .15s;
+}
+.shop-bulk-modal {
+  background: linear-gradient(160deg, #1e1530 60%, #2a1a3a);
+  border: 1px solid rgba(190,75,219,0.35);
+  border-radius: 14px;
+  padding: 20px 22px 18px;
+  width: 92%; max-width: 380px;
+  position: relative;
+  box-shadow: 0 8px 40px rgba(0,0,0,0.6);
+}
+.shop-bulk-close {
+  position: absolute; right: 10px; top: 8px;
+  background: none; border: none; color: #aaa; font-size: 1.2rem; cursor: pointer;
+}
+.shop-bulk-close:hover { color: #fff; }
+.shop-bulk-header {
+  display: flex; align-items: center; gap: 12px; margin-bottom: 14px;
+}
+.shop-bulk-icon { font-size: 2.2rem; flex-shrink: 0; }
+.shop-bulk-name { font-weight: 700; color: #f0e6ff; font-size: 1rem; }
+.shop-bulk-desc { color: #aaa; font-size: 0.78rem; margin-top: 2px; }
+.shop-bulk-price-row {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 4px 0; font-size: 0.85rem; color: #ccc;
+}
+.shop-bulk-price { display: flex; align-items: center; gap: 4px; color: #ffd43b; }
+.shop-bulk-remaining { color: #69db7c; }
+.shop-bulk-label { color: #aaa; }
+.shop-bulk-qty-section {
+  margin-top: 12px; display: flex; flex-direction: column; gap: 8px;
+}
+.shop-bulk-qty-controls {
+  display: flex; align-items: center; gap: 4px; flex-wrap: wrap;
+}
+.shop-bulk-qty-btn {
+  background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15);
+  color: #ddd; border-radius: 6px; padding: 4px 10px; cursor: pointer;
+  font-size: 0.85rem; min-width: 32px; text-align: center;
+  transition: background .15s;
+}
+.shop-bulk-qty-btn:hover:not(:disabled) { background: rgba(255,255,255,0.18); }
+.shop-bulk-qty-btn:disabled { opacity: 0.35; cursor: default; }
+.shop-bulk-max-btn { color: #ffd43b; border-color: rgba(255,212,59,0.3); }
+.shop-bulk-qty-input {
+  width: 52px; text-align: center; background: rgba(0,0,0,0.3);
+  border: 1px solid rgba(255,255,255,0.2); border-radius: 6px;
+  color: #fff; font-size: 0.95rem; padding: 4px;
+  -moz-appearance: textfield;
+}
+.shop-bulk-qty-input::-webkit-inner-spin-button,
+.shop-bulk-qty-input::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+.shop-bulk-slider {
+  width: 100%; margin-top: 2px; accent-color: #be4bdb;
+}
+.shop-bulk-rewards {
+  margin-top: 12px; display: flex; flex-direction: column; gap: 4px;
+}
+.shop-bulk-reward-list {
+  display: flex; flex-wrap: wrap; gap: 6px 14px;
+}
+.shop-bulk-reward-item { color: #69db7c; font-size: 0.85rem; }
+.shop-bulk-footer {
+  margin-top: 16px; display: flex; flex-direction: column; align-items: center; gap: 10px;
+}
+.shop-bulk-total {
+  font-size: 1rem; color: #ffd43b; display: flex; align-items: center; gap: 6px;
+}
+.shop-bulk-total-insufficient { color: #ff6b6b; }
+.shop-bulk-confirm {
+  background: linear-gradient(135deg, #37b24d, #2b8a3e);
+  color: #fff; border: none; border-radius: 8px;
+  padding: 10px 28px; font-size: 0.95rem; font-weight: 600;
+  cursor: pointer; transition: filter .15s;
+  width: 100%;
+}
+.shop-bulk-confirm:hover:not(:disabled) { filter: brightness(1.15); }
+.shop-bulk-confirm:disabled { opacity: 0.4; cursor: default; }
 
 /* ══════════════════════════════════════════════════
    Phase 3 — Gacha Screen

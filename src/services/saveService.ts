@@ -539,13 +539,13 @@ export interface DailyCheckinResult {
  * 每日簽到獎勵表
  */
 const CHECKIN_REWARDS: { gold?: number; diamond?: number; items?: { itemId: string; quantity: number }[] }[] = [
-  { gold: 5000 },
-  { gold: 8000, items: [{ itemId: 'exp', quantity: 500 }] },
-  { diamond: 50 },
-  { gold: 12000, items: [{ itemId: 'chest_bronze', quantity: 1 }] },
-  { diamond: 80, items: [{ itemId: 'exp', quantity: 1500 }] },
-  { gold: 20000, items: [{ itemId: 'chest_silver', quantity: 1 }] },
-  { diamond: 200, items: [{ itemId: 'chest_gold', quantity: 1 }] },
+  /* Day 1 */ { gold: 5000 },
+  /* Day 2 */ { gold: 8000, items: [{ itemId: 'exp', quantity: 500 }] },
+  /* Day 3 */ { diamond: 50, items: [{ itemId: 'gacha_ticket_hero', quantity: 1 }] },
+  /* Day 4 */ { gold: 12000, items: [{ itemId: 'chest_bronze', quantity: 1 }] },
+  /* Day 5 */ { diamond: 80, items: [{ itemId: 'exp', quantity: 1500 }, { itemId: 'gacha_ticket_equip', quantity: 1 }] },
+  /* Day 6 */ { gold: 20000, items: [{ itemId: 'chest_silver', quantity: 1 }, { itemId: 'gacha_ticket_hero', quantity: 1 }] },
+  /* Day 7 */ { diamond: 200, items: [{ itemId: 'chest_gold', quantity: 1 }, { itemId: 'gacha_ticket_hero', quantity: 2 }, { itemId: 'gacha_ticket_equip', quantity: 2 }] },
 ]
 
 /** 取得 UTC+8 (Taipei) 的 YYYY-MM-DD 字串 */
@@ -594,9 +594,12 @@ export async function doDailyCheckin(): Promise<DailyCheckinResult> {
         applyCurrenciesFromServer(serverRes.currencies)
       }
 
+      // 使用伺服器回傳的權威獎勵資料（而非本地 CHECKIN_REWARDS，避免不同步）
+      const serverReward = serverRes.reward ?? reward
+
       // 道具寫入背包（伺服器已處理貨幣，此處只處理背包道具的內存同步）
-      if (reward.items && reward.items.length > 0) {
-        const otherItems = reward.items.filter(i => i.itemId !== 'exp')
+      if (serverReward.items && serverReward.items.length > 0) {
+        const otherItems = serverReward.items.filter(i => i.itemId !== 'exp')
         if (otherItems.length > 0) {
           try {
             const { addItemsLocally } = await import('./inventoryService')
@@ -609,7 +612,7 @@ export async function doDailyCheckin(): Promise<DailyCheckinResult> {
         success: true,
         checkinDay: serverRes.checkinDay ?? newDay,
         checkinLastDate: serverRes.checkinLastDate ?? todayStr,
-        reward,
+        reward: serverReward,
       }
     }
     return { success: false, error: serverRes.error || 'server_error' }

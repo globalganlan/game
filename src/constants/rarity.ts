@@ -76,8 +76,6 @@ export const ITEM_ICONS: Record<string, string> = {
   eqm_enhance_s: '🔨',
   eqm_enhance_m: '🔨',
   eqm_enhance_l: '🔨',
-  forge_ore_common: '⛏️',
-  forge_ore_rare: '💠',
   // 其他
   stamina_potion: '⚡',
   gold_pack_10k: '💰',
@@ -125,8 +123,6 @@ export const ITEM_NAMES: Record<string, string> = {
   eqm_enhance_s: '小型強化石',
   eqm_enhance_m: '中型強化石',
   eqm_enhance_l: '大型強化石',
-  forge_ore_common: '普通鍛造礦',
-  forge_ore_rare: '稀有鍛造礦',
   // 其他
   stamina_potion: '體力藥水',
   gold_pack_10k: '金幣禮包',

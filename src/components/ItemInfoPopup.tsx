@@ -11,6 +11,7 @@ import { createPortal } from 'react-dom'
 import { getItemIcon, getItemName, RARITY_COLORS } from '../constants/rarity'
 import type { Rarity } from '../constants/rarity'
 import { getItemDefinition, loadItemDefinitions } from '../services/inventoryService'
+import { ChestLootPreview } from './ChestLootPreview'
 
 interface ItemInfoPopupProps {
   itemId: string
@@ -31,8 +32,6 @@ const ITEM_DESCRIPTIONS: Record<string, string> = {
   asc_class_agility: '敏捷型英雄突破必備素材。',
   asc_class_defense: '防禦型英雄突破必備素材。',
   asc_class_universal: '可替代任何職業石的通用突破素材。',
-  forge_ore_common: '普通鍛造礦，用於鍛造普通裝備。',
-  forge_ore_rare: '稀有鍛造礦，用於鍛造高品質裝備。',
   stamina_potion: '恢復體力，可用於挑戰更多關卡。',
   gold_pack_10k: '使用後獲得 10,000 金幣。',
   gold: '基礎遊戲貨幣，用於購買道具與強化裝備。',
@@ -77,6 +76,7 @@ export function ItemInfoPopup({ itemId, onClose }: ItemInfoPopupProps) {
           </div>
         </div>
         <p className="inv-detail-desc">{desc}</p>
+        {itemId.startsWith('chest_') && <ChestLootPreview chestId={itemId} />}
       </div>
     </div>,
     document.body

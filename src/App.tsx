@@ -61,9 +61,12 @@ import { useAcquireToast } from './hooks/useAcquireToast'
 import type { AcquireItem } from './hooks/useAcquireToast'
 import { registerAcquireHandler, registerTextHandler } from './services/acquireToastBus'
 import { callApi } from './services/apiClient'
-import { getArenaRankings, getCachedChallengesLeft } from './services/arenaService'
+import { isStandalone, claimPwaReward } from './services/pwaService'
+import { getAuthState } from './services/authService'
 
-/* ── Extracted modules ── */
+import { getArenaRankings, getCachedChallengesLeft } from './services/arenaService'
+import { canStarUp, getInitialStars } from './domain/progressionSystem'
+import { getItemQuantity } from './services/inventoryService'
 import { PLAYER_SLOT_POSITIONS, ENEMY_SLOT_POSITIONS } from './game/constants'
 export type { TargetStrategy } from './game/helpers'
 import { DragPlane } from './components/DragPlane'
@@ -139,6 +142,8 @@ export default function App() {
   const [sceneTheme, setSceneTheme] = useState<import('./components/Arena').SceneMode>('story')
   /** 競技場挑戰目標排名（用於結算上報） */
   const arenaTargetRankRef = useRef<number>(0)
+  /** 競技場對手的伺服器權威戰力（避免前端重算不一致） */
+  const arenaEnemyPowerRef = useRef<number>(0)
   /** 進入戰鬥前的 menuScreen（用於戰後返回） */
   const preBattleMenuScreenRef = useRef<MenuScreen>('none')
   /** 防守陣型配置模式 */
@@ -228,6 +233,19 @@ export default function App() {
   const mail = useMail(authHook.auth.playerId)
   const { mailItems, setMailItems, mailLoaded, setMailLoaded, mailUnclaimedCount, refreshMailData } = mail
 
+  /* ── PWA standalone 自動領獎（登入後執行一次，全平台統一） ── */
+  useEffect(() => {
+    if (!showGame || !saveHook.playerData) return
+    const alreadyClaimed = saveHook.playerData.save.pwaRewardClaimed === true
+      || saveHook.playerData.save.pwaRewardClaimed === ('true' as unknown as boolean)
+    if (!isStandalone() || alreadyClaimed) return
+    const token = getAuthState().guestToken
+    if (!token) return
+    claimPwaReward(token).then(res => {
+      if (res.success) refreshMailData()
+    }).catch(() => {})
+  }, [showGame, saveHook.playerData]) // eslint-disable-line react-hooks/exhaustive-deps
+
   /* ── 每日探索次數紅點（存完整次數物件，供 StageSelect 初始化用） ── */
   const [cachedDailyCounts, setCachedDailyCounts] = useState<{ daily: number; pvp: number; boss: number; date: string } | null>(null)
   const stagesHasDaily = useMemo(() => {
@@ -262,6 +280,19 @@ export default function App() {
     const equipFree = (sd.lastEquipFreePull ?? '') !== today
     return heroFree || equipFree
   }, [saveHook.playerData])
+
+  /* ── 英雄升星紅點 ── */
+  const heroesHasStarUp = useMemo(() => {
+    const heroes = saveHook.playerData?.heroes ?? []
+    if (heroes.length === 0) return false
+    return heroes.some(inst => {
+      const hero = heroesList.find(h => Number(h.HeroID ?? h.id ?? 0) === inst.heroId)
+      const minStars = hero ? getInitialStars(toRarityNum((hero as Record<string, unknown>).Rarity)) : 0
+      const stars = Math.max(inst.stars ?? minStars, minStars)
+      const fragments = getItemQuantity(`asc_fragment_${inst.heroId}`)
+      return canStarUp(stars, fragments)
+    })
+  }, [saveHook.playerData?.heroes, heroesList])
 
   /* ── 競技場剩餘次數紅點 ── */
   const [arenaChallengesLeft, setArenaChallengesLeft] = useState(0)
@@ -339,10 +370,15 @@ export default function App() {
     return getTeamCombatPower(inputs)
   }, [gameState, isDefenseSetup, playerSlots, saveHook.playerData?.heroes, heroesList, cpState.currentPower])
 
+  /** 競技場模式使用伺服器權威戰力，其餘模式使用前端計算值 */
+  const effectiveEnemyPower = stageMode === 'pvp' && stageId.startsWith('arena-') && arenaEnemyPowerRef.current > 0
+    ? arenaEnemyPowerRef.current
+    : cpState.enemyPower
+
   /** 戰鬥準備中的即時對比等級 */
   const battlePrepComparison = useMemo(
-    () => getComparisonLevel(battlePrepPower, cpState.enemyPower),
-    [battlePrepPower, cpState.enemyPower],
+    () => getComparisonLevel(battlePrepPower, effectiveEnemyPower),
+    [battlePrepPower, effectiveEnemyPower],
   )
 
   // ── 戰力變動 → 統一 toast 提示 ──
@@ -444,7 +480,7 @@ export default function App() {
     setCurtainVisible, setCurtainFading, setCurtainText, curtainClosePromiseRef, closeCurtain,
     updateEnemySlots, updatePlayerSlots, restoreFormationFromSave,
     showToast, acquireShow: acquireToast.show,
-    heroesList, stageMode, arenaTargetRankRef,
+    heroesList, stageMode, arenaTargetRankRef, arenaEnemyPowerRef,
     setIsDefenseSetup, isDefenseSetupRef,
     heroesListRef,
     preBattleMenuScreenRef,
@@ -668,6 +704,7 @@ export default function App() {
               stagesHasDaily={stagesHasDaily}
               gachaHasFreePull={gachaHasFreePull}
               arenaChallengesLeft={arenaChallengesLeft}
+              heroesHasStarUp={heroesHasStarUp}
               onCollectResources={async () => {
                 const result = await saveHook.doCollectResources()
                 if (result && (result.gold > 0 || result.exp > 0)) {
@@ -793,7 +830,7 @@ export default function App() {
           )}
 
           {/* ── 戰力對比 + 關卡資訊（IDLE 且有敵人時顯示） ── */}
-          {gameState === 'IDLE' && turn === 0 && !isDefenseSetup && cpState.enemyPower > 0 && (() => {
+          {gameState === 'IDLE' && turn === 0 && !isDefenseSetup && (effectiveEnemyPower > 0 || cpState.enemyPower > 0) && (() => {
             const cfg = getCachedStageConfig(stageId)
 
             // 非主線模式：根據 stageMode 計算獎勵與顯示名
@@ -844,7 +881,7 @@ export default function App() {
               <div className="battle-prep-top-banner">
                 <CombatPowerComparison
                   myPower={battlePrepPower}
-                  enemyPower={cpState.enemyPower}
+                  enemyPower={effectiveEnemyPower}
                   comparison={battlePrepComparison}
                 />
                 {/* 主線關卡 */}

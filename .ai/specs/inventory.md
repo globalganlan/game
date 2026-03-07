@@ -1,7 +1,7 @@
 # 背包與道具系統 Spec
 
-> 版本：v3.0 ｜ 狀態：🟢 已實作
-> 最後更新：2026-03-06
+> 版本：v3.2 ｜ 狀態：🟢 已實作
+> 最後更新：2026-03-07
 > 負賬角色：🎯 GAME_DESIGN → 🔧 CODING
 
 ## 概述
@@ -319,16 +319,19 @@ interface InventoryPanelProps {
 }
 ```
 
-### 分頁（v2.5 更新為 6 個）
+### 分頁（v3.2 更新為 6 個）
 
 | key | icon | label | 內容 |
 |-----|------|-------|------|
 | `all` | 📦 | 全部 | 所有道具 + 裝備 |
 | `equipment` | ⚔️ | 裝備 | 裝備實例（已裝備排前 + 稀有度排序） |
 | `ascension_material` | 🔥 | 突破 | 英雄碎片 + 職業石 |
-| `general_material` | 🧪 | 素材 | 強化石、其他素材 |
 | `chest` | 🎁 | 寶箱 | 裝備寶箱、銅/銀/金寶箱 |
 | `currency` | `CurrencyIcon(gold)` | 貨幣 | 競技幣、星塵等非主貨幣 |
+| `codex` | 📖 | 圖鑑 | 裝備圖鑑百科 |
+
+> **v3.2 移除的分頁**：
+> - `general_material`（🧪 素材）— 強化石已在 v2.0 移除，鍛造礦在 v3.0 替入但無實際用途（強化只消耗金幣），故移除此分頁
 
 > **v2.0 移除的分頁**：`equipment_material`、`forge_material`、`equipment`（裝備管理移至專屬裝備面板）
 
@@ -356,13 +359,13 @@ type SortMode = 'default' | 'rarity-desc' | 'quantity-desc' | 'name-asc'
 | 點擊查看 | 點擊道具 → ItemDetail 彈窗（名稱、稀有度、描述、數量、出售價格） |
 | 英雄碎片辨識 | `asc_fragment_{heroId}` 自動顯示英雄縮圖 + 🧩 角標 + 英雄名稱中文（`resolveFallbackName` 優先於 DB 定義） |
 | 使用按鈕 | 寶箱開啟 / 經驗核心升級（依 item.useAction 判斷） |
-| 寶箱開啟結果 | 寶箱使用後顯示獎勵內容（金幣/鑽石/道具），透過 `updateLocalCurrency()` 同步前端貨幣 |
+| 寶箱開啟結果 | 寶箱使用後顯示詳細獎勵明細（「🎉 開啟獲得：💰 金幣 ×1,973、💚 經驗 ×200」格式），透過 `updateLocalCurrency()` 同步前端貨幣。**v3.2 新增**：數量歸零時自動關閉詳情面板（1.2~1.5 秒延遲） |
 | 出售按鈕 | 道具換金幣（顯示價格 + 確認） |
 | 裝備按鈕 | 裝備詳情中 equip/unequip 操作（彈出英雄選擇 popup，顯示實際英雄名） |
 | 分解按鈕 | 裝備詳情中分解操作（呼叫 `/decompose-equipment`），回收金幣 + 裝備碎片（`equip_scrap`） |
 | 強化按鈕 | 裝備詳情中直接強化（v2.7 新增，不必進入英雄詳情頁即可強化裝備） |
 | 排序功能 | 4 種排序模式（default / rarity-desc / quantity-desc / name-asc） |
-| 6 個分類 Tab | 全部 / 裝備 / 突破 / 素材 / 寶箱 / 貨幣（「全部」含裝備） |
+| 6 個分類 Tab | 全部 / 裝備 / 突破 / 寶箱 / 貨幣 / 圖鑑（「全部」含裝備）（v3.2：移除素材 Tab、圖鑑納入計數） |
 | ~~鎖定按鈕~~ | ~~v2.7 移除：裝備鎖定功能已棄用，`locked` 欄位不再使用~~ |
 
 ### ⚠️ 尚未實作的 UI 操作
@@ -488,4 +491,6 @@ type SortMode = 'default' | 'rarity-desc' | 'quantity-desc' | 'name-asc'
 | v2.6 | 2026-03-03 | **裝備圖鑑系統**：①背包新增「📖 圖鑑」tab（第 7 個分頁）②新建 `CodexPanel.tsx`，可擴展 `CodexCategory` 聯合型別（目前 'equipment'，預留 hero/monster/achievement）③EquipmentCodex 子元件：128 種裝備百科（8 套裝 × 4 部位 × 4 稀有度）、收集進度條、套裝效果卡（2pc/4pc）、稀有度篩選、擁有/鎖定卡片視覺 ④匯出 equipmentGacha 常數（SET_IDS/SLOTS/SLOT_MAIN_STAT/MAIN_STAT_BASE）⑤App.css 新增 `.codex-*` 全套樣式 ~200 行含 RWD |
 | v2.7 | 2026-06-19 | **背包功能強化**：①圖鑑面板移除收集進度追蹤（無進度條/X÷Y 計數），所有裝備項目一律顯示不再灰顯 ②背包容量上限完全移除，Header 不再顯示 X/Y 容量（`equipmentCapacity` 欄位 + `expand-inventory` API 棄用）③新增裝備分解功能：`/decompose-equipment` API 端點，回收金幣＋裝備碎片（`equip_scrap`）；商店面板新增「碎片兌換」分頁 ④裝備鎖定功能移除：`/lock-equipment` API 棄用、`locked` 欄位不再使用、UI 移除鎖定按鈕 ⑤裝備可直接從背包裝備詳情彈窗中強化（不必進入英雄詳情頁） || v2.8 | 2026-03-05 | **競技商店 + pvp_coin 貨幣**：①新增 `pvp_coin` 貨幣定義（§2.4），使用 `CurrencyIcon type="pvp_coin"` 顯示（🏅）②商店系統新增「競技商店」分類（6 項商品：arena_exp_3000/arena_gold_20k/arena_diamond_30/arena_class_universal/arena_chest_equip/arena_ticket_hero，以 pvp_coin 定價）③後端 `inventory.ts` SHOP_CATALOG 新增 `arena` 分類④`ShopPanel.tsx` 新增「競技商店」分頁 |
 | v2.9 | 2026-03-05 | **Server-First 庫存操作**：`sellItems` / `useItem` 改為 API 先調、成功後才扣本地庫存；`sellItems` 失敗回傳 0（移除 estimatedGold fallback）；`ShopPanel.handlePurchase` 改為 API 先調、成功後才扣本地貨幣/加道具，失敗顯示「購買失敗」toast |
+| v3.1 | 2026-03-07 | **pvp_coin 即時同步**：ArenaPanel 掃蕩 + runBattleLoop 競技場勝利/敗北，pvp_coin 獲得後立即呼叫 `addItemsLocally` 寫入本地快取 |
+| v3.2 | 2026-03-07 | **寶箱開啟改善 + 素材 Tab 移除 + 商店批量購買**：①寶箱開啟後顯示詳細獎勵明細（💰/💚/💎 emoji + 名稱 ×數量，多種獎勵以「、」分隔）②寶箱數量歸零時自動關閉詳情面板（1.2~1.5s 延遲）③移除「🧪 素材」Tab（general_material 無實際道具用途）④商店購買按鈕改為彈出批量購買 Modal：數量控制（−/−10/輸入/+10/+/MAX）、滑桿、獎勵預覽、餘額不足紅字、每日剩餘、確認購買⑤後端 shop-buy 支援 `quantity` 參數（1~999），批量扣款+批量發放，每日限量檢查 |
 | v3.0 | 2026-03-06 | **移除廢棄強化石 + 商店獎勵同步**：①背包新增 `DEPRECATED_ITEMS` 過濾器，隱藏已廢棄的 `eqm_enhance_s/m/l`（前端 InventoryPanel）②雜貨商店 `daily_enhance_s` → `daily_forge_ore`（forge_ore_common ×5）③星塵商店 `sd_enhance_l` → `sd_forge_rare`（forge_ore_rare ×3）④碎片兌換 `scrap_enhance_s/m/l` → `scrap_forge_common`（forge_ore_common ×5）+ `scrap_forge_rare`（forge_ore_rare ×2）⑤寶箱掉落 `generateChestRewards` 全面替換強化石為鍛造礦 ⑥物品資訊彈窗（`ItemInfoPopup`）z-index 提升至 99999，確保永遠在最上層 ⑦簽到彈窗描述新增 `white-space: pre-wrap` 支援換行 |

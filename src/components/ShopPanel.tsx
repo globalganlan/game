@@ -133,7 +133,7 @@ const SHOP_ITEMS: ShopItem[] = [
     id: 'special_gold_pack', name: '金幣禮包（10,000 金）', icon: '💰',
     description: '快速獲取大量金幣',
     price: 30, currency: 'diamond',
-    rewards: [{ itemId: 'gold_pack_10k', quantity: 1 }],
+    rewards: [{ itemId: 'gold', quantity: 10000 }],
     dailyLimit: 5, category: 'special',
   },
   {
@@ -242,6 +242,9 @@ export function ShopPanel({ onBack }: ShopPanelProps) {
   const [activeCategory, setActiveCategory] = useState<ShopCategory>('daily')
   const [purchaseMsg, setPurchaseMsg] = useState('')
   const [purchasedToday, setPurchasedToday] = useState<Record<string, number>>({})
+  const [bulkItem, setBulkItem] = useState<ShopItem | null>(null)
+  const [bulkQty, setBulkQty] = useState(1)
+  const [bulkBuying, setBulkBuying] = useState(false)
 
   // 載入今日已購買次數
   useEffect(() => {
@@ -266,14 +269,19 @@ export function ShopPanel({ onBack }: ShopPanelProps) {
     [activeCategory],
   )
 
-  const canAfford = useCallback((item: ShopItem): boolean => {
-    if (item.currency === 'gold') return gold >= item.price
-    if (item.currency === 'diamond') return diamond >= item.price
-    if (item.currency === 'stardust') return stardust >= item.price
-    if (item.currency === 'equip_scrap') return equipScrap >= item.price
-    if (item.currency === 'arena') return pvpCoin >= item.price
-    return false
+  /** 取得某貨幣的目前餘額 */
+  const getBalance = useCallback((currency: ShopItem['currency']): number => {
+    if (currency === 'gold') return gold
+    if (currency === 'diamond') return diamond
+    if (currency === 'stardust') return stardust
+    if (currency === 'equip_scrap') return equipScrap
+    if (currency === 'arena') return pvpCoin
+    return 0
   }, [gold, diamond, stardust, equipScrap, pvpCoin])
+
+  const canAfford = useCallback((item: ShopItem): boolean => {
+    return getBalance(item.currency) >= item.price
+  }, [getBalance])
 
   const getRemainingPurchases = useCallback((item: ShopItem): number | null => {
     if (item.dailyLimit <= 0) return null
@@ -281,21 +289,39 @@ export function ShopPanel({ onBack }: ShopPanelProps) {
     return Math.max(0, item.dailyLimit - bought)
   }, [purchasedToday])
 
-  const handlePurchase = useCallback(async (item: ShopItem) => {
+  /** 計算某商品的最大可購買數量（考慮餘額 + 每日上限） */
+  const getMaxBuyable = useCallback((item: ShopItem): number => {
+    const balance = getBalance(item.currency)
+    const affordMax = item.price > 0 ? Math.floor(balance / item.price) : 999
+    const remaining = getRemainingPurchases(item)
+    const limitMax = remaining !== null ? remaining : 999
+    return Math.max(0, Math.min(affordMax, limitMax))
+  }, [getBalance, getRemainingPurchases])
+
+  /** 打開批量購買彈窗 */
+  const openBulkModal = useCallback((item: ShopItem) => {
+    const max = getMaxBuyable(item)
+    setBulkItem(item)
+    setBulkQty(Math.min(1, max))
+  }, [getMaxBuyable])
+
+  const handlePurchase = useCallback(async (item: ShopItem, quantity: number = 1) => {
     const remaining = getRemainingPurchases(item)
     if (remaining !== null && remaining <= 0) {
       setPurchaseMsg('今日已達購買上限')
       return
     }
-    if (!canAfford(item)) {
+    const totalCost = item.price * quantity
+    if (getBalance(item.currency) < totalCost) {
       const names: Record<string, string> = { gold: '金幣', diamond: '鑽石', stardust: '星塵', equip_scrap: '裝備碎片', arena: '競技幣' }
       setPurchaseMsg(`${names[item.currency] ?? '貨幣'}不足`)
       return
     }
 
     // 先呼叫後端確認購買 → 成功後才更新本地狀態
+    setBulkBuying(true)
     try {
-      const res = await callApi<{ currencies?: { gold?: number; diamond?: number; exp?: number }; inventory?: { itemId: string; quantity: number }[] }>('shop-buy', { shopItemId: item.id })
+      const res = await callApi<{ currencies?: { gold?: number; diamond?: number; exp?: number }; inventory?: { itemId: string; quantity: number }[] }>('shop-buy', { shopItemId: item.id, quantity })
       if (!res.success) {
         setPurchaseMsg('購買失敗，請稍後再試')
         setTimeout(() => setPurchaseMsg(''), 2500)
@@ -309,16 +335,18 @@ export function ShopPanel({ onBack }: ShopPanelProps) {
 
       // 星塵/碎片/競技幣扣款（非 save 貨幣，需本地扣）
       if (item.currency === 'stardust') {
-        removeItemsLocally([{ itemId: 'currency_stardust', quantity: item.price }])
+        removeItemsLocally([{ itemId: 'currency_stardust', quantity: item.price * quantity }])
       } else if (item.currency === 'equip_scrap') {
-        removeItemsLocally([{ itemId: 'equip_scrap', quantity: item.price }])
+        removeItemsLocally([{ itemId: 'equip_scrap', quantity: item.price * quantity }])
       } else if (item.currency === 'arena') {
-        removeItemsLocally([{ itemId: 'pvp_coin', quantity: item.price }])
+        removeItemsLocally([{ itemId: 'pvp_coin', quantity: item.price * quantity }])
       }
 
-      // 非資源類獎勵本地加背包
+      // 非資源類獎勵本地加背包（乘以數量）
       const RESOURCE_REWARDS = ['exp', 'gold', 'diamond', 'stardust'] as const
-      const inventoryItems = item.rewards.filter(r => !(RESOURCE_REWARDS as readonly string[]).includes(r.itemId))
+      const inventoryItems = item.rewards
+        .filter(r => !(RESOURCE_REWARDS as readonly string[]).includes(r.itemId))
+        .map(r => ({ ...r, quantity: r.quantity * quantity }))
       if (inventoryItems.length > 0) addItemsLocally(inventoryItems)
 
       // 獲得物品動畫
@@ -327,24 +355,27 @@ export function ShopPanel({ onBack }: ShopPanelProps) {
         type: r.itemId.startsWith('currency_') || (CURRENCY_IDS as readonly string[]).includes(r.itemId) ? 'currency' as const : 'item' as const,
         id: r.itemId,
         name: getItemName(r.itemId),
-        quantity: r.quantity,
+        quantity: r.quantity * quantity,
       })))
 
       // 更新購買計數
       setPurchasedToday(prev => ({
         ...prev,
-        [item.id]: (prev[item.id] ?? 0) + 1,
+        [item.id]: (prev[item.id] ?? 0) + quantity,
       }))
 
-      const rewardNames = item.rewards.map(r => `${getItemIcon(r.itemId)} ${getItemName(r.itemId)} ×${r.quantity}`).join('、')
+      const rewardNames = item.rewards.map(r => `${getItemIcon(r.itemId)} ${getItemName(r.itemId)} ×${r.quantity * quantity}`).join('、')
       setPurchaseMsg(`購買成功！獲得 ${rewardNames}`)
+      setBulkItem(null)
       setTimeout(() => setPurchaseMsg(''), 2500)
     } catch (e) {
       console.warn('[shop] shop-buy error:', e)
       setPurchaseMsg('購買失敗，請檢查網路連線')
       setTimeout(() => setPurchaseMsg(''), 2500)
+    } finally {
+      setBulkBuying(false)
     }
-  }, [canAfford, getRemainingPurchases, gold, diamond, stardust, equipScrap, pvpCoin])
+  }, [getBalance, getRemainingPurchases, gold, diamond, stardust, equipScrap, pvpCoin])
 
   return (
     <div className="panel-overlay">
@@ -406,7 +437,7 @@ export function ShopPanel({ onBack }: ShopPanelProps) {
                 <button
                   className="shop-buy-btn"
                   disabled={!affordable || soldOut}
-                  onClick={() => handlePurchase(item)}
+                  onClick={() => openBulkModal(item)}
                 >
                   {soldOut ? '售罄' : '購買'}
                 </button>
@@ -414,6 +445,119 @@ export function ShopPanel({ onBack }: ShopPanelProps) {
             )
           })}
         </div>
+
+        {/* ── 批量購買彈窗 ── */}
+        {bulkItem && (() => {
+          const maxQty = getMaxBuyable(bulkItem)
+          const totalCost = bulkItem.price * bulkQty
+          const balance = getBalance(bulkItem.currency)
+          const remaining = getRemainingPurchases(bulkItem)
+          const currencyNames: Record<string, string> = { gold: '金幣', diamond: '鑽石', stardust: '星塵', equip_scrap: '裝備碎片', arena: '競技幣' }
+          const currencyLabel = currencyNames[bulkItem.currency] ?? '貨幣'
+
+          const renderCurrencyIcon = () => {
+            if (bulkItem.currency === 'gold') return <CurrencyIcon type="gold" />
+            if (bulkItem.currency === 'diamond') return <CurrencyIcon type="diamond" />
+            if (bulkItem.currency === 'stardust') return <CurrencyIcon type="stardust" />
+            if (bulkItem.currency === 'equip_scrap') return <span style={{fontSize:'0.85em'}}>🔩</span>
+            if (bulkItem.currency === 'arena') return <CurrencyIcon type="pvp_coin" />
+            return null
+          }
+
+          return (
+            <div className="shop-bulk-overlay" onClick={() => !bulkBuying && setBulkItem(null)}>
+              <div className="shop-bulk-modal" onClick={e => e.stopPropagation()}>
+                <button className="shop-bulk-close" onClick={() => !bulkBuying && setBulkItem(null)}>✕</button>
+                <div className="shop-bulk-header">
+                  <div className="shop-bulk-icon"><ClickableItemIcon itemId={bulkItem.rewards[0]?.itemId ?? ''} /></div>
+                  <div className="shop-bulk-info">
+                    <div className="shop-bulk-name">{bulkItem.name}</div>
+                    <div className="shop-bulk-desc">{bulkItem.description}</div>
+                  </div>
+                </div>
+
+                <div className="shop-bulk-price-row">
+                  <span className="shop-bulk-label">單價</span>
+                  <span className="shop-bulk-price">{renderCurrencyIcon()} {bulkItem.price.toLocaleString()}</span>
+                </div>
+
+                <div className="shop-bulk-price-row">
+                  <span className="shop-bulk-label">{currencyLabel}餘額</span>
+                  <span className="shop-bulk-price">{renderCurrencyIcon()} {balance.toLocaleString()}</span>
+                </div>
+
+                {remaining !== null && (
+                  <div className="shop-bulk-price-row">
+                    <span className="shop-bulk-label">今日剩餘</span>
+                    <span className="shop-bulk-remaining">{remaining} 次</span>
+                  </div>
+                )}
+
+                {/* 數量選擇器 */}
+                <div className="shop-bulk-qty-section">
+                  <span className="shop-bulk-label">購買數量</span>
+                  <div className="shop-bulk-qty-controls">
+                    <button className="shop-bulk-qty-btn" disabled={bulkQty <= 1} onClick={() => setBulkQty(q => Math.max(1, q - 1))}>−</button>
+                    <button className="shop-bulk-qty-btn" disabled={bulkQty <= 1} onClick={() => setBulkQty(q => Math.max(1, q - 10))}>−10</button>
+                    <input
+                      className="shop-bulk-qty-input"
+                      type="number"
+                      min={1}
+                      max={maxQty}
+                      value={bulkQty}
+                      onChange={e => {
+                        const v = Math.max(1, Math.min(maxQty, Math.floor(Number(e.target.value) || 1)))
+                        setBulkQty(v)
+                      }}
+                    />
+                    <button className="shop-bulk-qty-btn" disabled={bulkQty >= maxQty} onClick={() => setBulkQty(q => Math.min(maxQty, q + 10))}>+10</button>
+                    <button className="shop-bulk-qty-btn" disabled={bulkQty >= maxQty} onClick={() => setBulkQty(q => Math.min(maxQty, q + 1))}>+</button>
+                    <button className="shop-bulk-qty-btn shop-bulk-max-btn" disabled={bulkQty >= maxQty} onClick={() => setBulkQty(maxQty)}>MAX</button>
+                  </div>
+                </div>
+
+                {/* 滑桿 */}
+                {maxQty > 1 && (
+                  <input
+                    className="shop-bulk-slider"
+                    type="range"
+                    min={1}
+                    max={maxQty}
+                    value={bulkQty}
+                    onChange={e => setBulkQty(Number(e.target.value))}
+                  />
+                )}
+
+                {/* 獎勵預覽 */}
+                <div className="shop-bulk-rewards">
+                  <span className="shop-bulk-label">獲得</span>
+                  <div className="shop-bulk-reward-list">
+                    {bulkItem.rewards.map(r => (
+                      <span key={r.itemId} className="shop-bulk-reward-item">
+                        {getItemIcon(r.itemId)} {getItemName(r.itemId)} ×{(r.quantity * bulkQty).toLocaleString()}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+
+                {/* 總價 + 確認 */}
+                <div className="shop-bulk-footer">
+                  <div className={`shop-bulk-total ${totalCost > balance ? 'shop-bulk-total-insufficient' : ''}`}>
+                    <span>總計：</span>
+                    {renderCurrencyIcon()} <strong>{totalCost.toLocaleString()}</strong>
+                  </div>
+                  <button
+                    className="shop-bulk-confirm"
+                    disabled={bulkBuying || bulkQty <= 0 || maxQty <= 0 || totalCost > balance}
+                    onClick={() => handlePurchase(bulkItem, bulkQty)}
+                  >
+                    {bulkBuying ? '購買中...' : `確認購買 ×${bulkQty}`}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )
+        })()}
       </div>
     </div>
   )

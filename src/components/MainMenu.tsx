@@ -36,6 +36,8 @@ interface MainMenuProps {
   gachaHasFreePull?: boolean
   /** 競技場剩餘挑戰次數（>0 顯示紅點） */
   arenaChallengesLeft?: number
+  /** 是否有英雄可升星（顯示紅點） */
+  heroesHasStarUp?: boolean
 }
 
 /* ────────────────────────────
@@ -83,6 +85,7 @@ export function MainMenu({
   stagesHasDaily = false,
   gachaHasFreePull = false,
   arenaChallengesLeft = 0,
+  heroesHasStarUp = false,
 }: MainMenuProps) {
   // 每 30 秒刷新離線獎勵預覽
   const [resourcePreview, setResourcePreview] = useState(
@@ -231,6 +234,9 @@ export function MainMenu({
                 <RedDot size="sm" />
               )}
               {item.key === 'arena' && !locked && arenaChallengesLeft > 0 && (
+                <RedDot size="sm" />
+              )}
+              {item.key === 'heroes' && !locked && heroesHasStarUp && (
                 <RedDot size="sm" />
               )}
             </button>

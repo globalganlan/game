@@ -36,6 +36,7 @@ import type { RawHeroData } from '../types'
 import type { HeroInstance, SaveData } from '../services/saveService'
 import type { AcquireItem } from '../hooks/useAcquireToast'
 import { getItemName, toRarity } from '../constants/rarity'
+import { addItemsLocally } from '../services/inventoryService'
 
 function resolveModelId(h: RawHeroData, idx = 0): string {
   const rawId = h._modelId || h.ModelID || h.HeroID || h.ModelId || h.Model || h.id || h.Name
@@ -200,6 +201,11 @@ export function ArenaPanel({
           if (rw.pvpCoin > 0) items.push({ type: 'item', id: 'pvp_coin', name: getItemName('pvp_coin'), quantity: rw.pvpCoin + (ml?.pvpCoin ?? 0) })
           else if (ml?.pvpCoin) items.push({ type: 'item', id: 'pvp_coin', name: getItemName('pvp_coin'), quantity: ml.pvpCoin })
           if (items.length > 0) showAcquire(items)
+        }
+        // 即時同步 pvp_coin 到本地背包快取
+        const totalPvp = (res.rewards.pvpCoin ?? 0) + (res.milestoneReward?.pvpCoin ?? 0)
+        if (totalPvp > 0) {
+          addItemsLocally([{ itemId: 'pvp_coin', quantity: totalPvp }])
         }
         await loadData()
       }

@@ -32,7 +32,6 @@ import { translateError } from '../utils/errorMessages'
 import { Thumbnail3D } from './UIOverlay'
 import { addItemsLocally, removeItemsLocally, addEquipmentLocally, getItemQuantity } from '../services/inventoryService'
 import { emitAcquire } from '../services/acquireToastBus'
-import { getItemName } from '../constants/rarity'
 import type { AcquireItem } from '../hooks/useAcquireToast'
 import { callApi } from '../services/apiClient'
 import { applyCurrenciesFromServer, getSaveState, updateFreePullLocally, updateGachaPityLocally } from '../services/saveService'
@@ -111,7 +110,7 @@ function ResultCard({ result, hero, onClick }: { result: PullResult; hero?: RawH
       {!result.isNew && (result.stardust > 0 || result.fragments > 0) && (
         <span className="gacha-dupe-reward">
           {result.stardust > 0 && <span><CurrencyIcon type="stardust" />{result.stardust}</span>}
-          {result.fragments > 0 && <span>🧩{result.fragments}</span>}
+          {result.fragments > 0 && <span>🧩{name}碎片 ×{result.fragments}</span>}
         </span>
       )}
     </div>
@@ -447,16 +446,45 @@ export function GachaScreen({
       if (totalStardust > 0) dupeItems.push({ itemId: 'currency_stardust', quantity: totalStardust })
       if (dupeItems.length > 0) addItemsLocally(dupeItems)
 
-      const toastItems: AcquireItem[] = pullResults.map((r: PullResult) => ({
-        type: 'hero' as const,
-        id: String(r.heroId),
-        name: heroesList.find(h => Number(h.HeroID) === r.heroId)?.Name || `英雄#${r.heroId}`,
-        quantity: 1,
-        rarity: r.rarity as 'N' | 'R' | 'SR' | 'SSR',
-        isNew: r.isNew,
-      }))
+      // ── 聚合 toast：英雄合併、碎片帶英雄名、星塵合併 ──
+      const heroAgg = new Map<string, AcquireItem>()
+      for (const r of pullResults) {
+        const heroName = heroesList.find(h => Number(h.HeroID) === r.heroId)?.Name || `英雄#${r.heroId}`
+        const key = `hero_${r.heroId}_${r.isNew ? 'new' : 'dupe'}`
+        const existing = heroAgg.get(key)
+        if (existing) {
+          existing.quantity += 1
+        } else {
+          heroAgg.set(key, {
+            type: 'hero' as const,
+            id: String(r.heroId),
+            name: heroName,
+            quantity: 1,
+            rarity: r.rarity as 'N' | 'R' | 'SR' | 'SSR',
+            isNew: r.isNew,
+          })
+        }
+      }
+      const fragAgg = new Map<string, AcquireItem>()
       for (const d of dupeItems) {
-        toastItems.push({ type: 'item' as const, id: d.itemId, name: getItemName(d.itemId), quantity: d.quantity })
+        if (d.itemId === 'currency_stardust') continue
+        const heroId = d.itemId.replace('asc_fragment_', '')
+        const heroName = heroesList.find(h => String(h.HeroID) === heroId)?.Name || `英雄#${heroId}`
+        const existing = fragAgg.get(d.itemId)
+        if (existing) {
+          existing.quantity += d.quantity
+        } else {
+          fragAgg.set(d.itemId, {
+            type: 'fragment' as const,
+            id: d.itemId,
+            name: `${heroName}突破碎片`,
+            quantity: d.quantity,
+          })
+        }
+      }
+      const toastItems: AcquireItem[] = [...heroAgg.values(), ...fragAgg.values()]
+      if (totalStardust > 0) {
+        toastItems.push({ type: 'currency' as const, id: 'currency_stardust', name: '星塵', quantity: totalStardust })
       }
       emitAcquire(toastItems)
     } catch (err) {
@@ -550,15 +578,25 @@ export function GachaScreen({
         setRevealPhase(true)
       }, PULL_ANIM_MS)
 
-      // 獲得物品動畫
-      const toastItems: AcquireItem[] = pullResults.map(r => ({
-        type: 'equipment' as const,
-        id: r.equipment.equipId,
-        name: getEquipDisplayName(r.equipment),
-        quantity: 1,
-        rarity: r.equipment.rarity,
-      }))
-      emitAcquire(toastItems)
+      // 獲得物品動畫 — 同名同稀有度裝備合併
+      const equipAgg = new Map<string, AcquireItem>()
+      for (const r of pullResults) {
+        const eName = getEquipDisplayName(r.equipment)
+        const key = `${eName}_${r.equipment.rarity}`
+        const existing = equipAgg.get(key)
+        if (existing) {
+          existing.quantity += 1
+        } else {
+          equipAgg.set(key, {
+            type: 'equipment' as const,
+            id: r.equipment.equipId,
+            name: eName,
+            quantity: 1,
+            rarity: r.equipment.rarity,
+          })
+        }
+      }
+      emitAcquire([...equipAgg.values()])
     } catch (err) {
       setIsPulling(false)
       setError('網路錯誤，請稍後再試')

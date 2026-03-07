@@ -1081,6 +1081,10 @@ export async function executeBattleLoop(ctx: BattleLoopContext, replayActions?: 
                 if (r.pvpCoin > 0) arenaItems.push({ type: 'item', id: 'pvp_coin', name: '競技幣', quantity: r.pvpCoin })
                 if (r.exp > 0) arenaItems.push({ type: 'currency', id: 'exp', name: '經驗', quantity: r.exp })
                 if (arenaItems.length > 0) acquireShow(arenaItems)
+                // 即時同步 pvp_coin 到本地背包快取
+                if (r.pvpCoin > 0) {
+                  addItemsLocally([{ itemId: 'pvp_coin', quantity: r.pvpCoin }])
+                }
                 // 更新勝利面板顯示正確的競技場獎勵（結束 loading 狀態）
                 setVictoryRewards({
                   gold: r.gold,
@@ -1102,6 +1106,10 @@ export async function executeBattleLoop(ctx: BattleLoopContext, replayActions?: 
                 if (milestoneItems.length > 0) {
                   showToast(`🎯 排名里程碑獎勵！`)
                   setTimeout(() => acquireShow(milestoneItems), 1500)
+                }
+                // 即時同步里程碑 pvp_coin 到本地背包快取
+                if (mr.pvpCoin > 0) {
+                  addItemsLocally([{ itemId: 'pvp_coin', quantity: mr.pvpCoin }])
                 }
               }
             } else {
@@ -1187,6 +1195,10 @@ export async function executeBattleLoop(ctx: BattleLoopContext, replayActions?: 
             if (r.pvpCoin > 0) arenaItems.push({ type: 'item', id: 'pvp_coin', name: '競技幣', quantity: r.pvpCoin })
             if (r.exp > 0) arenaItems.push({ type: 'currency', id: 'exp', name: '經驗', quantity: r.exp })
             if (arenaItems.length > 0) acquireShow(arenaItems)
+            // 即時同步 pvp_coin 到本地背包快取
+            if (r.pvpCoin > 0) {
+              addItemsLocally([{ itemId: 'pvp_coin', quantity: r.pvpCoin }])
+            }
           }
         }
       }).catch(console.warn)
