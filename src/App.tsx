@@ -98,8 +98,8 @@ function SceneReady({ onReady }: { onReady: (delay?: number) => void }) {
   useEffect(() => {
     if (called.current) return
     called.current = true
-    // 等一幀讓場景實際渲染到畫面後，立即開始收幕（無額外 grace delay）
-    requestAnimationFrame(() => onReady(0))
+    // ★ 用 setTimeout 而非 rAF — iOS WKWebView 對被 overlay 遮蓋的 canvas 會節流 rAF
+    setTimeout(() => onReady(0), 50)
   }, [onReady])
   return null
 }
@@ -532,7 +532,6 @@ export default function App() {
             }}
             camera={{ position: responsive.camPos, fov: responsive.fov }}
             shadows={!/iPhone|iPad|iPod/.test(navigator.userAgent)}
-            flat={/iPhone|iPad|iPod/.test(navigator.userAgent)}
             frameloop="always"
             dpr={responsive.dpr}
             gl={(/iPhone|iPad|iPod/.test(navigator.userAgent))
@@ -540,12 +539,15 @@ export default function App() {
                   // ★ iOS 強制 WebGL1 — WKWebView 的 WebGL2 有紋理分配 bug
                   const cvs = defaultProps.canvas as HTMLCanvasElement
                   const context = cvs.getContext('webgl', {
-                    alpha: true,
+                    alpha: false,
                     antialias: false,
                     powerPreference: 'default',
                     preserveDrawingBuffer: false,
-                  })!
-                  const renderer = new THREE.WebGLRenderer({ canvas: cvs, context })
+                  })
+                  // context 可能為 null（iOS 記憶體壓力或 context 數量上限）
+                  const opts: THREE.WebGLRendererParameters = { canvas: cvs }
+                  if (context) opts.context = context
+                  const renderer = new THREE.WebGLRenderer(opts)
                   renderer.outputColorSpace = THREE.SRGBColorSpace
                   renderer.toneMapping = THREE.NoToneMapping
                   return renderer

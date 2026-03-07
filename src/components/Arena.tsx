@@ -10,7 +10,7 @@
  */
 
 import { useRef, useMemo } from 'react'
-import { useFrame } from '@react-three/fiber'
+import { useFrame, useThree } from '@react-three/fiber'
 import { Sky, Sparkles } from '@react-three/drei'
 import * as THREE from 'three'
 import type { DebrisItem, DebrisType } from '../types'
@@ -723,6 +723,13 @@ function createGroundGeometry(theme: SceneTheme): THREE.PlaneGeometry {
    Arena（場景主元件）
    ──────────────────────────── */
 
+/** iOS 替代天空 — 直接設定 scene.background 為純色，避免 Sky shader 在 WebGL1 編譯失敗 */
+function IOSBackground({ color }: { color: string }) {
+  const { scene } = useThree()
+  useMemo(() => { scene.background = new THREE.Color(color) }, [scene, color])
+  return null
+}
+
 interface ArenaProps {
   sceneMode?: SceneMode
   stageId?: string
@@ -739,16 +746,19 @@ export function Arena({ sceneMode = 'story', stageId = '1-1' }: ArenaProps) {
 
   return (
     <>
-      <Sky
-        distance={450000}
-        sunPosition={[0, theme.skyConfig.sunY, 0]}
-        inclination={0}
-        azimuth={1.25}
-        rayleigh={theme.skyConfig.rayleigh}
-        turbidity={theme.skyConfig.turbidity}
-      />
+      {/* ★ iOS WebGL1 不保證 Sky 的自訂 shader 正常編譯，改用 scene.background 純色 */}
+      {isIOS ? <IOSBackground color={theme.fogColor} /> : (
+        <Sky
+          distance={450000}
+          sunPosition={[0, theme.skyConfig.sunY, 0]}
+          inclination={0}
+          azimuth={1.25}
+          rayleigh={theme.skyConfig.rayleigh}
+          turbidity={theme.skyConfig.turbidity}
+        />
+      )}
       <Sparkles
-        count={theme.sparkleCount}
+        count={isIOS ? Math.min(theme.sparkleCount, 30) : theme.sparkleCount}
         scale={20}
         size={1.5}
         speed={0.4}
