@@ -33,6 +33,16 @@ loader.setDRACOLoader(dracoLoader)
 const cache = new Map<string, GlbAsset>()
 const pending = new Map<string, Promise<GlbAsset>>()
 
+/**
+ * 建立空的 fallback asset（載入失敗時使用）。
+ * 避免 Suspense 無限重試導致 iOS 過場卡死。
+ */
+function createFallbackAsset(): GlbAsset {
+  const group = new THREE.Group()
+  group.name = '__glb_load_failed__'
+  return { scene: group, animations: [] }
+}
+
 /** 非同步載入 GLB；重複 URL 只會請求一次 */
 export function loadGlbShared(url: string): Promise<GlbAsset> {
   const cached = cache.get(url)
@@ -51,7 +61,11 @@ export function loadGlbShared(url: string): Promise<GlbAsset> {
     return asset
   }).catch((error: unknown) => {
     pending.delete(url)
-    throw error
+    // ★ 載入失敗 → 快取空 fallback，避免 Suspense 無限重試卡死（iOS 常見）
+    console.warn('[glbLoader] Failed to load:', url, error)
+    const fallback = createFallbackAsset()
+    cache.set(url, fallback)
+    return fallback
   })
 
   pending.set(url, task)

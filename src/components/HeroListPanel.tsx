@@ -174,6 +174,7 @@ function NotifyLoaded({ onLoaded }: { onLoaded: () => void }) {
 function HeroModelPreview({ modelId }: { modelId: string }) {
   const [loaded, setLoaded] = useState(false)
   const onLoaded = useCallback(() => setLoaded(true), [])
+  const isIOS = useMemo(() => /iPhone|iPad|iPod/.test(navigator.userAgent), [])
 
   return (
     <div className="hero-model-preview">
@@ -186,7 +187,28 @@ function HeroModelPreview({ modelId }: { modelId: string }) {
       <Canvas
         camera={{ position: [0, 0, 4.5], fov: 28 }}
         className="hero-model-canvas"
-        gl={{ alpha: true, antialias: true, powerPreference: 'low-power' }}
+        flat={isIOS}
+        gl={isIOS
+          ? ((defaultProps) => {
+              // ★ iOS 強制 WebGL1 — 與戰鬥場景一致，避免 WKWebView WebGL2 紋理分配 bug
+              const cvs = defaultProps.canvas as HTMLCanvasElement
+              const context = cvs.getContext('webgl', {
+                alpha: true,
+                antialias: false,
+                powerPreference: 'low-power',
+                preserveDrawingBuffer: false,
+              })!
+              const renderer = new THREE.WebGLRenderer({ canvas: cvs, context })
+              renderer.outputColorSpace = THREE.SRGBColorSpace
+              renderer.toneMapping = THREE.NoToneMapping
+              return renderer
+            }) as NonNullable<React.ComponentProps<typeof Canvas>['gl']>
+          : { alpha: true, antialias: true, powerPreference: 'low-power' }
+        }
+        onCreated={({ gl }) => {
+          gl.outputColorSpace = THREE.SRGBColorSpace
+          if (isIOS) gl.toneMapping = THREE.NoToneMapping
+        }}
       >
         <ambientLight intensity={0.7} />
         <directionalLight position={[3, 5, 2]} intensity={0.9} />
@@ -299,6 +321,9 @@ function HeroDetail({ hero, instance, onClose, skills, heroSkills }: HeroDetailP
   const [isProcessing, setIsProcessing] = useState(false)
   const [resultMsg, setResultMsg] = useState('')
   const [equipSelectSlot, setEquipSelectSlot] = useState<string>('')
+  // 裝備篩選
+  const [equipFilterRarity, setEquipFilterRarity] = useState<Rarity | 'all'>('all')
+  const [equipFilterSet, setEquipFilterSet] = useState<string>('all')
   // 背包訂閱（用於讀取素材數量 + 裝備變更即時刷新）
   const [invTick, setInvTick] = useState(0)
   useEffect(() => {
@@ -367,11 +392,13 @@ function HeroDetail({ hero, instance, onClose, skills, heroSkills }: HeroDetailP
   const fragmentId = `asc_fragment_${heroId}`
   const ownedFragments = getItemQuantity(fragmentId)
   const heroClassType = String(heroAny.Type ?? '').toLowerCase()
-  const classStoneId = heroClassType === '力量' ? 'asc_class_power'
-    : heroClassType === '敏捷' ? 'asc_class_agility'
-    : heroClassType === '防禦' ? 'asc_class_defense'
+  const classStoneId = heroClassType === 'power' || heroClassType === '力量' ? 'asc_class_power'
+    : heroClassType === 'agility' || heroClassType === '敏捷' ? 'asc_class_agility'
+    : heroClassType === 'defense' || heroClassType === '防禦' ? 'asc_class_defense'
     : 'asc_class_universal'
-  const ownedClassStones = getItemQuantity(classStoneId) + getItemQuantity('asc_class_universal')
+  const ownedClassStones = classStoneId === 'asc_class_universal'
+    ? getItemQuantity('asc_class_universal')
+    : getItemQuantity(classStoneId) + getItemQuantity('asc_class_universal')
   const currentGold = getSaveState()?.save.gold ?? 0
   const hasAscMaterials = ascCost
     ? ownedFragments >= ascCost.fragments
@@ -396,7 +423,16 @@ function HeroDetail({ hero, instance, onClose, skills, heroSkills }: HeroDetailP
         }
         setResultMsg(`突破成功！突破 ${asc} → ${res.newAscension}，等級上限 ${getLevelCap(res.newAscension)}`)
       } else {
-        setResultMsg('突破失敗')
+        const errMap: Record<string, string> = {
+          insufficient_fragments: '碎片不足',
+          insufficient_class_stones: '職業石不足',
+          insufficient_gold: '金幣不足',
+          level_not_at_cap: '等級未達上限',
+          max_ascension: '已達最高突破',
+          hero_not_found: '找不到英雄',
+        }
+        const reason = errMap[(res as unknown as Record<string, unknown>).error as string] ?? '伺服器拒絕'
+        setResultMsg(`突破失敗：${reason}`)
       }
       setTimeout(() => setModalMode('none'), 1200)
     } catch (e) {
@@ -414,21 +450,33 @@ function HeroDetail({ hero, instance, onClose, skills, heroSkills }: HeroDetailP
     if (!instance || !canDoStarUp || isProcessing) return
     setIsProcessing(true)
     try {
-      const newStars = stars + 1
-      updateHeroLocally(heroId, { stars: newStars })
-      // 樂觀扣除升星碎片
-      if (starCost > 0 && starCost !== Infinity) {
-        removeItemsLocally([{ itemId: fragmentId, quantity: starCost }])
+      const res = await apiStarUpHero(instance.instanceId)
+      if (res.success) {
+        updateHeroLocally(heroId, { stars: res.newStars })
+        if (res.fragmentsConsumed > 0) {
+          removeItemsLocally([{ itemId: fragmentId, quantity: res.fragmentsConsumed }])
+        }
+        setResultMsg(`升星成功！★${stars} → ★${res.newStars}`)
+        // 滿星自動關閉升星 modal
+        if (res.newStars >= 6) {
+          setTimeout(() => setModalMode('none'), 1200)
+        }
+      } else {
+        const errMap: Record<string, string> = {
+          insufficient_fragments: '碎片不足',
+          max_stars: '已達最高星級',
+          hero_not_found: '找不到英雄',
+        }
+        const reason = errMap[(res as unknown as Record<string, unknown>).error as string] ?? '伺服器拒絕'
+        setResultMsg(`升星失敗：${reason}`)
       }
-      apiStarUpHero(instance.instanceId).catch(console.warn)
-      setResultMsg(`升星成功！★${stars} → ★${newStars}`)
       setTimeout(() => setResultMsg(''), 1200)
     } catch (e) {
       setResultMsg('升星失敗：' + String(e))
     } finally {
       setIsProcessing(false)
     }
-  }, [instance, canDoStarUp, isProcessing, stars, heroId, fragmentId, starCost])
+  }, [instance, canDoStarUp, isProcessing, stars, heroId, fragmentId])
 
   // ── 裝備 helpers ──
   const heroEquipment = useMemo(
@@ -443,14 +491,27 @@ function HeroDetail({ hero, instance, onClose, skills, heroSkills }: HeroDetailP
   }, [heroEquipment])
 
   // 不使用 useMemo — 裝備/卸下會改變 inventoryState，需要每次 render 重新取得
-  const availableForSlot = equipSelectSlot
+  const availableForSlotRaw = equipSelectSlot
     ? getUnequippedEquipment().filter(eq => eq.slot === equipSelectSlot)
     : []
+  const availableForSlot = availableForSlotRaw.filter(eq => {
+    if (equipFilterRarity !== 'all' && eq.rarity !== equipFilterRarity) return false
+    if (equipFilterSet !== 'all' && eq.setId !== equipFilterSet) return false
+    return true
+  })
+  // 收集可用的套裝列表（用於篩選下拉）
+  const availableSets = useMemo(() => {
+    const sets = new Set<string>()
+    for (const eq of availableForSlotRaw) if (eq.setId) sets.add(eq.setId)
+    return [...sets].sort()
+  }, [availableForSlotRaw])
 
   const handleSlotClick = useCallback((slotKey: string) => {
     if (!isOwned) return
     // 無論有無裝備，都打開部位編輯介面
     setEquipSelectSlot(slotKey)
+    setEquipFilterRarity('all')
+    setEquipFilterSet('all')
     setResultMsg('')
     setModalMode('equip')
   }, [isOwned])
@@ -993,12 +1054,50 @@ function HeroDetail({ hero, instance, onClose, skills, heroSkills }: HeroDetailP
                 )
               })()}
 
+              {/* ── 篩選控制 ── */}
+              {availableForSlotRaw.length > 0 && (
+                <div className="hd2-equip-filters">
+                  <div className="hd2-equip-filter-group">
+                    <span className="hd2-equip-filter-label">稀有度</span>
+                    <div className="hd2-equip-filter-btns">
+                      {(['all', 'N', 'R', 'SR', 'SSR'] as const).map(r => (
+                        <button
+                          key={r}
+                          className={`hd2-equip-filter-btn${equipFilterRarity === r ? ' active' : ''}${r !== 'all' ? ` rarity-${r.toLowerCase()}` : ''}`}
+                          onClick={() => setEquipFilterRarity(r)}
+                        >{r === 'all' ? '全部' : r}</button>
+                      ))}
+                    </div>
+                  </div>
+                  {availableSets.length > 1 && (
+                    <div className="hd2-equip-filter-group">
+                      <span className="hd2-equip-filter-label">套裝</span>
+                      <div className="hd2-equip-filter-btns">
+                        <button
+                          className={`hd2-equip-filter-btn${equipFilterSet === 'all' ? ' active' : ''}`}
+                          onClick={() => setEquipFilterSet('all')}
+                        >全部</button>
+                        {availableSets.map(s => (
+                          <button
+                            key={s}
+                            className={`hd2-equip-filter-btn${equipFilterSet === s ? ' active' : ''}`}
+                            onClick={() => setEquipFilterSet(s)}
+                          >{SET_NAMES[s] || s}</button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* ── 可選裝備列表 ── */}
               {availableForSlot.length > 0 && equippedBySlot[equipSelectSlot!] && (
-                <div style={{ fontSize: '0.75rem', color: '#aaa', marginBottom: 4 }}>可更換裝備</div>
+                <div style={{ fontSize: '0.75rem', color: '#aaa', marginBottom: 4 }}>可更換裝備 ({availableForSlot.length})</div>
               )}
               {availableForSlot.length === 0 && !equippedBySlot[equipSelectSlot!] ? (
-                <div className="hd2-modal-info">沒有可用的裝備</div>
+                <div className="hd2-modal-info">{
+                  availableForSlotRaw.length > 0 ? '沒有符合篩選條件的裝備' : '沒有可用的裝備'
+                }</div>
               ) : (
                 <div className="hd2-equip-list">
                   {availableForSlot.map(eq => (

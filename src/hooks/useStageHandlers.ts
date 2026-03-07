@@ -144,6 +144,10 @@ export function useStageHandlers(deps: StageHandlerDeps) {
     setGameState('IDLE')
 
     // closeCurtain 由 Canvas 內 SceneReady 在 Suspense 解析後觸發
+    // ★ 安全網：若 SceneReady 15 秒內未觸發（iOS 模型載入卡住），強制收幕
+    setTimeout(() => {
+      if (!curtainClosePromiseRef.current) closeCurtain()
+    }, 15000)
     showToast(`已選擇: ${displayName}`)
   }, [stageMode, heroesList, setStageMode, setSceneTheme, setStageId, updateEnemySlots, restoreFormationFromSave, setMenuScreen, setGameState, setCurtainVisible, setCurtainFading, setCurtainText, curtainClosePromiseRef, closeCurtain, showToast, setShowBattleScene]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -245,6 +249,10 @@ export function useStageHandlers(deps: StageHandlerDeps) {
       setMenuScreen('none')
       setGameState('IDLE')
       // closeCurtain 由 Canvas 內 SceneReady 在 Suspense 解析後觸發
+      // ★ 安全網：若 SceneReady 15 秒內未觸發，強制收幕
+      setTimeout(() => {
+        if (!curtainClosePromiseRef.current) closeCurtain()
+      }, 15000)
     } catch (e) {
       setShowBattleScene(false)
       closeCurtain()
@@ -314,6 +322,10 @@ export function useStageHandlers(deps: StageHandlerDeps) {
     setMenuScreen('none')
     setGameState('IDLE')
     // closeCurtain 由 Canvas 內 SceneReady 在 Suspense 解析後觸發
+    // ★ 安全網：若 SceneReady 15 秒內未觸發，強制收幕
+    setTimeout(() => {
+      if (!curtainClosePromiseRef.current) closeCurtain()
+    }, 15000)
   }, [heroesList, showToast, setIsDefenseSetup, isDefenseSetupRef, heroesListRef, updateEnemySlots, updatePlayerSlots, setStageMode, setSceneTheme, setStageId, setMenuScreen, setGameState, setCurtainVisible, setCurtainFading, setCurtainText, curtainClosePromiseRef, closeCurtain, setShowBattleScene]) // eslint-disable-line react-hooks/exhaustive-deps
 
   /* ── 儲存防守陣型並返回 ── */
