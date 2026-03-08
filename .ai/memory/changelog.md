@@ -4,6 +4,18 @@
 
 ---
 
+### [2026-03-08] iOS 模型可見性保底 — emissiveMap=map 技巧
+- **觸發者**：使用者（分享 CSDN 文章 emissiveMap 修復方案）
+- **執行角色**：🔧 CODING + 🧪 QA
+- **變更摘要**：
+  1. **ZombieModel.tsx**：`cloneMat()` 新增 `emissiveMap = map`、`emissive.set(1,1,1)`、`emissiveIntensity = 0.4`（iOS）/ `0.15`（桌面），確保模型即使光照缺失也不會全黑
+  2. **HeroListPanel.tsx**：英雄預覽 Canvas 同步套用 `emissiveMap = map`，`emissiveIntensity = 0.15`
+  3. **Hit flash 效果**：改用 `origEmissive`（各材質原始 emissive 色）取代已移除的 `BLACK` 常量，受擊閃光結束後正確還原為帶 emissive 的狀態
+- **參考來源**：https://blog.csdn.net/qq_40712151/article/details/128693976
+- **影響範圍**：src/components/ZombieModel.tsx / src/components/HeroListPanel.tsx
+- **測試結果**：TSC 零錯誤、Vite build 成功、Playwright 1-1 → 1-2 完整戰鬥流程正常
+- **commit**：`59fc4bc`
+
 ### [2026-03-08] iOS 模型載入健壯化 — 超時重試 + fallback 佔位 + frustumCulled 關閉
 - **觸發者**：使用者（iOS 4G 進入關卡過場卡很久後，模型完全不顯示）
 - **執行角色**：🔧 CODING + 🧪 QA

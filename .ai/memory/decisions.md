@@ -407,6 +407,11 @@
   - glbLoader：20 秒超時 + 自動重試 2 次 + fallback 30 秒過期可重試
   - ZombieModel：偵測 fallback → 顯示半透明線框膠囊佔位體 + `frustumCulled=false`
   - useStageHandlers/useBattleFlow：所有預載入加入 12 秒 race timeout，超時仍進場
+- **第五次修復（59fc4bc）— emissiveMap=map 可見性保底**：
+  - 參考來源：CSDN 文章（GLTF 模型重新載入後黑色問題）
+  - ZombieModel/HeroListPanel：`cloneMat()` 設定 `emissiveMap = map`，`emissive.set(1,1,1)`，`emissiveIntensity = 0.4`（iOS）/ `0.15`（桌面）
+  - 即使光照缺失或材質狀態異常，模型自發光貼圖確保永遠不會全黑
+  - Hit flash 效果改用 `origEmissive` 取代已移除的 `BLACK` 常量
 - **影響範圍**：`src/App.tsx`、`src/components/HeroListPanel.tsx`
 - **教訓**：不要試圖在 R3F 外部搶先取得 WebGL context，讓框架自行管理 GPU 初始化
 
