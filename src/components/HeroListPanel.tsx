@@ -610,9 +610,9 @@ function HeroDetail({ hero, instance, onClose, skills, heroSkills }: HeroDetailP
                 return (
                   <div key={key} className="hd2-stat">
                     <span className="hd2-stat-label">{label}</span>
-                    <span className="hd2-stat-val">
+                    <span className="hd2-stat-val" style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0 }}>
                       {final}{suffix ?? ''}
-                      {bonus > 0 && <span style={{ color: '#4ade80', fontSize: '0.8em', marginLeft: 4 }}>(+{bonus}{suffix ?? ''})</span>}
+                      {bonus > 0 && <span style={{ color: '#4ade80', fontSize: '0.75em', marginLeft: 2 }}>(+{bonus}{suffix ?? ''})</span>}
                     </span>
                   </div>
                 )

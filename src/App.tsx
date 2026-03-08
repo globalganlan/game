@@ -525,14 +525,16 @@ export default function App() {
             overflow: 'hidden',
           }}
         >
-          {/* ── 3D Canvas ── */}
-          {showBattleScene && <Canvas
+          {/* ── 3D Canvas（常駐掛載 — 避免 iOS WebGL context 反覆建銷導致 reload/黑紋理） ── */}
+          <Canvas
             style={{
               position: 'absolute', top: 0, left: 0, width: '100%', height: '100%',
+              visibility: showBattleScene ? 'visible' : 'hidden',
+              pointerEvents: showBattleScene ? 'auto' : 'none',
             }}
             camera={{ position: responsive.camPos, fov: responsive.fov }}
             shadows
-            frameloop="always"
+            frameloop={showBattleScene ? 'always' : 'never'}
             dpr={responsive.dpr}
             gl={{
               antialias: true,
@@ -554,7 +556,9 @@ export default function App() {
                 console.info('[WebGL] Context Restored — reinitializing renderer')
                 gl.shadowMap.enabled = true
                 gl.shadowMap.type = THREE.PCFShadowMap
-                // ★ Context Restored: 重新上傳所有紋理（GPU 資料遺失）
+                // ★ 重設 GL 狀態機
+                gl.resetState()
+                // ★ Context Restored: 重新上傳所有材質+紋理+幾何（GPU 資料遺失）
                 scene.traverse((obj) => {
                   if ((obj as THREE.Mesh).isMesh) {
                     const mesh = obj as THREE.Mesh
@@ -562,14 +566,23 @@ export default function App() {
                     mats.forEach((mat) => {
                       if (!mat) return
                       mat.needsUpdate = true
-                      const basicMat = mat as THREE.MeshBasicMaterial
-                      if (basicMat.map) basicMat.map.needsUpdate = true
+                      const anyMat = mat as any
+                      if (anyMat.map) anyMat.map.needsUpdate = true
+                      if (anyMat.alphaMap) anyMat.alphaMap.needsUpdate = true
                     })
+                    // geometry buffer 也需要重新上傳
+                    if (mesh.geometry) {
+                      for (const attr of Object.values(mesh.geometry.attributes)) {
+                        (attr as THREE.BufferAttribute).needsUpdate = true
+                      }
+                      if (mesh.geometry.index) mesh.geometry.index.needsUpdate = true
+                    }
                   }
                 })
               })
             }}
           >
+            {showBattleScene && (
             <Suspense fallback={null}>
               <Arena sceneMode={sceneTheme} stageId={stageId} />
 
@@ -661,7 +674,8 @@ export default function App() {
               <ResponsiveCamera fov={responsive.fov} position={responsive.camPos} target={responsive.camTarget} />
               <SceneReady onReady={closeCurtain} />
             </Suspense>
-          </Canvas>}
+            )}
+          </Canvas>
 
           {/* ── 橫屏遮罩（CSS 控制顯示） ── */}
           <div className="landscape-block">

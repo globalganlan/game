@@ -2049,13 +2049,17 @@
 .hd2-stat {
   display: flex;
   justify-content: space-between;
+  align-items: baseline;
   padding: 3px 0;
   border-bottom: 1px solid rgba(255,255,255,0.05);
   font-size: 0.8rem;
+  gap: 4px;
+  min-width: 0;
+  overflow: hidden;
 }
 
-.hd2-stat-label { color: #999; }
-.hd2-stat-val { color: #eee; font-weight: 600; }
+.hd2-stat-label { color: #999; flex-shrink: 0; }
+.hd2-stat-val { color: #eee; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 
 /* ── Skills ── */
 .hd2-skills {
@@ -4413,6 +4417,10 @@
   color: #eee;
   font-weight: 600;
   font-size: 0.85rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
 }
 
 /* ── Equipment Info specific ── */

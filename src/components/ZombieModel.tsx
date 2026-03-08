@@ -92,7 +92,7 @@ export function ZombieModel({
     cloned.traverse((child) => {
       if ((child as THREE.Mesh).isMesh) {
         const mesh = child as THREE.Mesh
-        mesh.castShadow = false
+        mesh.castShadow = true
         mesh.receiveShadow = false
         // ★ 關閉視錐剔除 — SkinnedMesh 骨架動畫的包圍盒可能不準確，
         //   在 iOS 上會導致模型被錯誤剔除（完全不渲染）
