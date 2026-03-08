@@ -422,12 +422,10 @@ export function GachaScreen({
         fragments: r.fragments || 0,
       }))
 
-      setTimeout(() => {
-        setIsPulling(false)
-        setResults(pullResults)
-        setShowResults(true)
-        setRevealPhase(true)
-      }, PULL_ANIM_MS)
+      setIsPulling(false)
+      setResults(pullResults)
+      setShowResults(true)
+      setRevealPhase(true)
 
       // 使用 server 回傳的真實 instanceId（而非前端自行生成 local_ ID）
       const newHeroes: { heroId: number; instanceId: string }[] = res.newHeroes || []
