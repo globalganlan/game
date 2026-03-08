@@ -4,6 +4,20 @@
 
 ---
 
+### [2026-03-08] iOS 模型黑色根治 — GLB 內嵌 PNG 紋理轉 JPEG
+- **觸發者**：使用者（發現 zombie_11 是唯一在 iOS 正常顯示的模型）
+- **執行角色**：🔧 CODING + 🧪 QA
+- **變更摘要**：
+  1. 分析發現 7 個模型（zombie_1,4,5,7,8,9,10）在 GLB 內含 5~7 MB PNG diffuse 紋理
+  2. iOS Safari 解碼超大 PNG 到 WebGL GPU 時 silent fail → 紋理為空 → 模型全黑
+  3. zombie_11（全 JPEG、無 PNG）是唯一正常顯示的模型 — 確認根因
+  4. 寫 `.ai/scripts/fix_glb_png_to_jpeg.mjs`（sharp 轉換）修復所有 7 個 GLB
+  5. 模型總大小 70.4 MB → ~25 MB（減少 64%）
+- **根因**：FBX→GLB Blender 轉換時，有些 diffuse 貼圖保留 PNG 格式（帶 alpha 通道），iOS Safari WebGL 無法正確解碼 5~7 MB 的 PNG 到 GPU
+- **影響範圍**：public/models/zombie_{1,4,5,7,8,9,10}/zombie_*.glb
+- **測試結果**：TSC 零錯誤、Vite build 成功、Playwright 1-1 戰鬥正常
+- **commit**：`3b339df`
+
 ### [2026-03-08] iOS 模型可見性保底 — emissiveMap=map 技巧
 - **觸發者**：使用者（分享 CSDN 文章 emissiveMap 修復方案）
 - **執行角色**：🔧 CODING + 🧪 QA
