@@ -4,6 +4,19 @@
 
 ---
 
+### [2026-03-08] iOS 3D 全黑根治 — 移除自訂 gl factory
+- **觸發者**：使用者（iOS Safari 進入戰鬥 3D 場景完全黑色）
+- **執行角色**：🔧 CODING + 🧪 QA
+- **變更摘要**：
+  1. **App.tsx — 戰鬥 Canvas**：完全移除 iOS 自訂 `gl` factory function（強制 WebGL1 的 `getContext('webgl')`），改用簡單 object config `{ antialias: !isIOS, powerPreference: isIOS ? 'default' : 'high-performance' }`
+  2. **HeroListPanel.tsx — 模型預覽 Canvas**：同上移除 gl factory + `flat={isIOS}`，改用 `{ alpha: true, antialias: !isIOS, powerPreference: 'low-power' }`
+  3. iOS 專屬微調（sRGB、NoToneMapping、無陰影）改為僅在 `onCreated` callback 處理
+  4. 讓 R3F/Three.js 自然選擇 WebGL 版本，不再預先鎖定 WebGL1
+- **根本原因**：`canvas.getContext('webgl')` 會將 canvas 鎖定為 WebGL1，導致 R3F 內部的 WebGL2 初始化路徑失敗，渲染器無法正常輸出畫面（整個 3D 區域全黑）
+- **影響範圍**：src/App.tsx / src/components/HeroListPanel.tsx
+- **測試結果**：TSC 零錯誤、Vite build 成功、Playwright 戰鬥場景截圖確認地面/模型/雨/殘骸/霧效果全部正確渲染
+- **commit**：`2b71836`
+
 ### [2026-03-07] 商店批量購買 + 寶箱獎勵明細 + 升星技能說明 + 素材 Tab 移除
 - **觸發者**：使用者（Aitodolist.txt 3 項需求 + 前次 session 商店批量購買）
 - **執行角色**：🔧 CODING + 🧪 QA

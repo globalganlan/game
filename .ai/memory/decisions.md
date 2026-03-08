@@ -358,6 +358,49 @@
 
 ---
 
+### ADR-019: iOS Canvas gl 配置 — 禁止自訂 gl factory，僅用 object config
+
+- **狀態**：✅ 已定案
+- **日期**：2026-03-08
+- **決策**：R3F `<Canvas gl={...}>` 在 iOS 上**禁止使用 factory function**，只能用 object config
+- **根因**：
+  1. 自訂 `gl` factory 中呼叫 `canvas.getContext('webgl', opts)` 會**鎖定 canvas 為 WebGL1**
+  2. R3F/Three.js 內部嘗試 `getContext('webgl2')` 時因 canvas 已被鎖定而失敗
+  3. 即使 WebGL1 context 成功取得，傳給 `THREE.WebGLRenderer({ canvas, context })` 的渲染器也可能無法正常整合 R3F 的 animation loop
+  4. 結果：整個 3D 區域全黑，只有 2D HUD overlay 可見
+- **正確做法**：
+  ```tsx
+  // ✅ Object config — R3F 自行建立 renderer
+  <Canvas gl={{ antialias: !isIOS, powerPreference: isIOS ? 'default' : 'high-performance' }}>
+  
+  // ✅ onCreated callback — iOS 專屬微調
+  onCreated={({ gl }) => {
+    if (isIOS) {
+      gl.outputColorSpace = THREE.SRGBColorSpace
+      gl.toneMapping = THREE.NoToneMapping
+    }
+  }}
+  ```
+- **禁止做法**：
+  ```tsx
+  // ❌ 絕對禁止：自訂 gl factory 強制 WebGL1
+  gl={(defaultProps) => {
+    const cvs = defaultProps.canvas
+    const context = cvs.getContext('webgl', { ... })
+    return new THREE.WebGLRenderer({ canvas: cvs, context })
+  }}
+  
+  // ❌ 禁止：flat prop（會停用 ColorManagement → 材質全黑）
+  <Canvas flat={true}>
+  ```
+- **修復歷程**：
+  - 第一次嘗試（e69a17f）：移除 `flat` + Sky→background + setTimeout — 不夠
+  - 第二次修復（2b71836）：**移除 gl factory** → 根治
+- **影響範圍**：`src/App.tsx`、`src/components/HeroListPanel.tsx`
+- **教訓**：不要試圖在 R3F 外部搶先取得 WebGL context，讓框架自行管理 GPU 初始化
+
+---
+
 ### ADR-017: 英雄名稱改用 drei Html Overlay（取代 3D Text）
 
 - **日期**：2026-03-06

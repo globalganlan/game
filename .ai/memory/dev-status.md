@@ -1,8 +1,12 @@
 # 開發狀態快照 — Dev Status
 
-> 最後更新：2026-03-07（第六十三次更新 — 9 項穩定性與 UI 修復）
+> 最後更新：2026-03-08（第六十四次更新 — iOS 3D 全黑根治）
 
-## 截至 2026-03-06 的開發狀態
+## 截至 2026-03-08 的開發狀態
+
+### iOS 3D 渲染修復歷程
+- [x] 第一次修復（e69a17f）：移除 `flat` prop + iOS Sky 替換為 scene.background + SceneReady setTimeout + 安全超時 5s — **不夠**，iOS 仍全黑
+- [x] 第二次修復（2b71836）：**移除自訂 gl factory**（根本原因：`getContext('webgl')` 鎖定 canvas 導致 WebGL2 路徑失敗）→ 改用簡單 gl object config + onCreated iOS 微調
 
 ### 已完成
 - [x] 3D 喪屍對戰場景（React 19 + Vite 5 + R3F 9 + Three.js 0.183 + TypeScript 5.9）
