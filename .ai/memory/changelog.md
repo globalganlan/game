@@ -4,6 +4,18 @@
 
 ---
 
+### [2026-03-08] iOS 模型載入健壯化 — 超時重試 + fallback 佔位 + frustumCulled 關閉
+- **觸發者**：使用者（iOS 4G 進入關卡過場卡很久後，模型完全不顯示）
+- **執行角色**：🔧 CODING + 🧪 QA
+- **變更摘要**：
+  1. **glbLoader.ts**：新增 20 秒單次載入超時（防 iOS WASM/4G hang）+ 載入失敗自動重試 2 次 + fallback 30 秒過期後可重試 + `isFallback` 標記
+  2. **ZombieModel.tsx**：偵測 fallback asset → 顯示半透明線框膠囊佔位體；所有 Mesh 設定 `frustumCulled=false`（防 SkinnedMesh 被 iOS 視錐剔除）
+  3. **useStageHandlers.ts + useBattleFlow.ts**：所有預載入加入 12 秒 race timeout，超時仍進入戰鬥（由 Suspense 繼續載入）
+- **根因推斷**：iOS 4G 下 GLB 載入因網路超時/Draco WASM 失敗 → 首次載入失敗後永久快取空 fallback → 模型完全不可見；同時 SkinnedMesh 動畫骨架包圍盒不準確可能被 iOS 視錐剔除
+- **影響範圍**：src/loaders/glbLoader.ts / src/components/ZombieModel.tsx / src/hooks/useStageHandlers.ts / src/hooks/useBattleFlow.ts
+- **測試結果**：TSC 零錯誤、Vite build 成功、Playwright 1-1 → 1-2 戰鬥流程全正常
+- **commit**：`1e52671`
+
 ### [2026-03-08] iOS 3D 全黑根治 — 移除自訂 gl factory
 - **觸發者**：使用者（iOS Safari 進入戰鬥 3D 場景完全黑色）
 - **執行角色**：🔧 CODING + 🧪 QA

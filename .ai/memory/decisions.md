@@ -402,6 +402,11 @@
   - `onCreated` 不再設定 `toneMapping = NoToneMapping`（使用 R3F 預設 ACES）
   - 模型材質 `metalness: 0.5 → 0`（FBX → Blender 轉換殘留值，角色不應是金屬）
   - 移除 `tex.needsUpdate = true`（避免 iOS 紋理重新上傳問題）
+- **第四次修復（1e52671）— iOS 模型載入健壯化**：
+  - 根因推斷：iOS 4G 網路下 GLB 載入失敗 → 永久快取空 fallback → 模型完全不可見
+  - glbLoader：20 秒超時 + 自動重試 2 次 + fallback 30 秒過期可重試
+  - ZombieModel：偵測 fallback → 顯示半透明線框膠囊佔位體 + `frustumCulled=false`
+  - useStageHandlers/useBattleFlow：所有預載入加入 12 秒 race timeout，超時仍進場
 - **影響範圍**：`src/App.tsx`、`src/components/HeroListPanel.tsx`
 - **教訓**：不要試圖在 R3F 外部搶先取得 WebGL context，讓框架自行管理 GPU 初始化
 
