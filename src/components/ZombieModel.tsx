@@ -73,7 +73,7 @@ export function ZombieModel({
       placeholder.name = '__fallback_placeholder__'
       const capsule = new THREE.Mesh(
         new THREE.CapsuleGeometry(0.3, 1.2, 8, 12),
-        new THREE.MeshStandardMaterial({
+        new THREE.MeshBasicMaterial({
           color: 0x6688cc,
           transparent: true,
           opacity: 0.6,
@@ -88,35 +88,35 @@ export function ZombieModel({
 
     const cloned = SkeletonUtils.clone(meshAsset.scene)
 
-    // 材質獨立化 — GLB 已是 MeshStandardMaterial，只需 clone 確保實例獨立
-    // 並確保 emissive 乾淨以支援受擊紅色閃光
+    // 材質轉換 — GLB 原始為 MeshStandardMaterial，轉為 MeshBasicMaterial（不受光照、效能更好）
     cloned.traverse((child) => {
       if ((child as THREE.Mesh).isMesh) {
         const mesh = child as THREE.Mesh
-        mesh.castShadow = true
-        mesh.receiveShadow = true
+        mesh.castShadow = false
+        mesh.receiveShadow = false
         // ★ 關閉視錐剔除 — SkinnedMesh 骨架動畫的包圍盒可能不準確，
         //   在 iOS 上會導致模型被錯誤剔除（完全不渲染）
         mesh.frustumCulled = false
-        const cloneMat = (m: THREE.Material): THREE.MeshStandardMaterial => {
-          const c = m.clone() as THREE.MeshStandardMaterial
-          // emissive 歸零 — 受擊閃光由 useFrame 控制
-          if (c.emissive) c.emissive.set(0, 0, 0)
-          c.emissiveIntensity = 0
-          c.emissiveMap = null
-          // ★ metalness 修正 — GLB 預設 0.5（FBX→Blender 匯入殘留值），
-          //   角色模型不應是金屬材質，強制歸零避免無環境反射時過暗
-          c.metalness = 0
-          c.roughness = Math.max(c.roughness, 0.6)
-          // ★ 不再強制 tex.needsUpdate=true — 共享紋理已由 GLTFLoader 上傳，
-          //   重複 re-upload 在 iOS Safari 會觸發 unpackColorSpace 導致雙重 sRGB 轉換
-          c.needsUpdate = true
-          return c
+        const convertMat = (m: THREE.Material): THREE.MeshBasicMaterial => {
+          const src = m as THREE.MeshStandardMaterial
+          const basic = new THREE.MeshBasicMaterial({
+            color: src.color?.clone() ?? new THREE.Color(0xffffff),
+            map: src.map ?? null,
+            transparent: src.transparent,
+            opacity: src.opacity,
+            alphaMap: src.alphaMap ?? null,
+            side: src.side,
+            wireframe: src.wireframe,
+          })
+          // 釋放舊 PBR 材質（不 dispose 共享紋理）
+          // m.dispose() — 這裡不 dispose 因為是 clone 前的引用
+          basic.needsUpdate = true
+          return basic
         }
         if (Array.isArray(mesh.material)) {
-          mesh.material = mesh.material.map(cloneMat)
+          mesh.material = mesh.material.map(convertMat)
         } else if (mesh.material) {
-          mesh.material = cloneMat(mesh.material)
+          mesh.material = convertMat(mesh.material)
         }
       }
     })
@@ -348,21 +348,20 @@ export function ZombieModel({
   const flashTimerRef = useRef(0)
   const prevFlashSignalRef = useRef(hitFlashSignal)
   const FLASH_DURATION = 0.28 // 秒
-  const FLASH_EMISSIVE = new THREE.Color(2.0, 0.0, 0.0)
   const FLASH_TINT = new THREE.Color(1.0, 0.0, 0.0) // color tint 目標（純紅）
 
-  // 收集場景中所有 MeshStandardMaterial 及其原始 color + 原始 emissive
+  // 收集場景中所有 MeshBasicMaterial 及其原始 color
   const matData = useMemo(() => {
-    const result: { mat: THREE.MeshStandardMaterial; origColor: THREE.Color }[] = []
+    const result: { mat: THREE.MeshBasicMaterial; origColor: THREE.Color }[] = []
     scene.traverse((child) => {
       if ((child as THREE.Mesh).isMesh) {
         const rawMat = (child as THREE.Mesh).material
         const materials = Array.isArray(rawMat) ? rawMat : [rawMat]
         for (const m of materials) {
-          if (m && (m as THREE.MeshStandardMaterial).isMeshStandardMaterial) {
+          if (m && (m as THREE.MeshBasicMaterial).isMeshBasicMaterial) {
             result.push({
-              mat: m as THREE.MeshStandardMaterial,
-              origColor: (m as THREE.MeshStandardMaterial).color.clone(),
+              mat: m as THREE.MeshBasicMaterial,
+              origColor: (m as THREE.MeshBasicMaterial).color.clone(),
             })
           }
         }
@@ -386,16 +385,13 @@ export function ZombieModel({
     const intensity = t > 0.5 ? (1 - t) / 0.5 : t / 0.5
 
     for (const { mat, origColor } of matData) {
-      // emissive：疊加紅色自發光
-      mat.emissive.set(0, 0, 0).lerp(FLASH_EMISSIVE, intensity)
-      // color tint：原始色混合亮紅，雙重確保可見
-      mat.color.copy(origColor).lerp(FLASH_TINT, intensity * 0.5)
+      // color tint：原始色混合亮紅
+      mat.color.copy(origColor).lerp(FLASH_TINT, intensity * 0.7)
     }
 
     // 結束時確保完全歸零
     if (flashTimerRef.current <= 0) {
       for (const { mat, origColor } of matData) {
-        mat.emissive.set(0, 0, 0)
         mat.color.copy(origColor)
       }
     }

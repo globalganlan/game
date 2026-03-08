@@ -3,3 +3,5 @@ IOS PWA 戰鬥場景 英雄模組紋理顯示為黑色
 以下還沒有告訴AI
 
 競技場NPC強度明顯過高 請大幅調低 NPC 強度
+
+把所有 MeshStandardMaterial, MeshPhongMaterial 改成 MeshStandardMaterial

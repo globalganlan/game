@@ -114,7 +114,7 @@ function HeroLoadingPlaceholder({ position }: { position: [number, number, numbe
     <group position={position}>
       <mesh ref={ref} position={[0, 1, 0]}>
         <boxGeometry args={[0.6, 0.6, 0.6]} />
-        <meshStandardMaterial color="#4488ff" transparent opacity={0.5} wireframe />
+        <meshBasicMaterial color="#4488ff" transparent opacity={0.5} wireframe />
       </mesh>
     </group>
   )
@@ -562,12 +562,8 @@ export default function App() {
                     mats.forEach((mat) => {
                       if (!mat) return
                       mat.needsUpdate = true
-                      const stdMat = mat as THREE.MeshStandardMaterial
-                      if (stdMat.map) stdMat.map.needsUpdate = true
-                      if (stdMat.normalMap) stdMat.normalMap.needsUpdate = true
-                      if (stdMat.roughnessMap) stdMat.roughnessMap.needsUpdate = true
-                      if (stdMat.metalnessMap) stdMat.metalnessMap.needsUpdate = true
-                      if (stdMat.aoMap) stdMat.aoMap.needsUpdate = true
+                      const basicMat = mat as THREE.MeshBasicMaterial
+                      if (basicMat.map) basicMat.map.needsUpdate = true
                     })
                   }
                 })

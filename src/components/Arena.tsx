@@ -471,11 +471,8 @@ function Debris({ position, scale, rotation, color = '#222', type = 'box' }: Deb
     geo.setAttribute('color', new THREE.BufferAttribute(colors, 3))
     geo.computeVertexNormals()
 
-    const mat = new THREE.MeshStandardMaterial({
+    const mat = new THREE.MeshBasicMaterial({
       vertexColors: true,
-      roughness: 0.85 + Math.random() * 0.15,
-      metalness: type === 'rebar' ? 0.55 : 0.02,
-      flatShading: true,
     })
 
     return { geometry: geo, material: mat }
@@ -762,11 +759,8 @@ export function Arena({ sceneMode = 'story', stageId = '1-1' }: ArenaProps) {
 
       {/* 地面 */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} geometry={groundGeo} receiveShadow>
-        <meshStandardMaterial
+        <meshBasicMaterial
           vertexColors
-          roughness={theme.groundRoughness}
-          metalness={theme.groundMetalness}
-          flatShading
         />
       </mesh>
 

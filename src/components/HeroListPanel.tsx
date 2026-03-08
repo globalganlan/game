@@ -122,22 +122,22 @@ function IdlePreviewModel({ modelId }: { modelId: string }) {
     cloned.traverse((child) => {
       if ((child as THREE.Mesh).isMesh) {
         const mesh = child as THREE.Mesh
-        const cloneMat = (m: THREE.Material): THREE.MeshStandardMaterial => {
-          const c = m.clone() as THREE.MeshStandardMaterial
-          // emissive 歸零
-          if (c.emissive) c.emissive.set(0, 0, 0)
-          c.emissiveIntensity = 0
-          c.emissiveMap = null
-          // ★ metalness 修正 — GLB 預設 0.5（FBX→Blender 殘留值），角色不應金屬
-          c.metalness = 0
-          c.roughness = Math.max(c.roughness, 0.6)
-          // ★ 不強制 tex.needsUpdate — 共享紋理已由 GLTFLoader 上傳，
-          //   重複 re-upload 在 iOS Safari 會觸發 unpackColorSpace 雙重 sRGB 轉換
-          c.needsUpdate = true
-          return c
+        const convertMat = (m: THREE.Material): THREE.MeshBasicMaterial => {
+          const src = m as THREE.MeshStandardMaterial
+          const basic = new THREE.MeshBasicMaterial({
+            color: src.color?.clone() ?? new THREE.Color(0xffffff),
+            map: src.map ?? null,
+            transparent: src.transparent,
+            opacity: src.opacity,
+            alphaMap: src.alphaMap ?? null,
+            side: src.side,
+            wireframe: src.wireframe,
+          })
+          basic.needsUpdate = true
+          return basic
         }
-        if (Array.isArray(mesh.material)) mesh.material = mesh.material.map(cloneMat)
-        else if (mesh.material) mesh.material = cloneMat(mesh.material)
+        if (Array.isArray(mesh.material)) mesh.material = mesh.material.map(convertMat)
+        else if (mesh.material) mesh.material = convertMat(mesh.material)
       }
     })
     const bbox = new THREE.Box3().setFromObject(cloned)
