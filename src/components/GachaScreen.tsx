@@ -10,6 +10,7 @@ import { useState, useCallback, useEffect } from 'react'
 import {
   SINGLE_PULL_COST,
   TEN_PULL_COST,
+  HUNDRED_PULL_COST,
   STANDARD_BANNER,
   type GachaRarity,
 } from '../domain/gachaSystem'
@@ -17,6 +18,7 @@ import { STAT_ZH } from '../constants/statNames'
 import {
   equipSinglePull,
   equipTenPull,
+  equipHundredPull,
   getEquipPullCost,
   getEquipDisplayName,
   getEquipPoolRates,
@@ -355,7 +357,7 @@ export function GachaScreen({
   }
 
   /* ── 英雄抽卡（直接呼叫後端） ── */
-  const doPull = useCallback(async (count: 1 | 10, isFree = false) => {
+  const doPull = useCallback(async (count: 1 | 10 | 100, isFree = false) => {
     // 免費抽：不需檢查鑽石
     if (!isFree) {
       // 計算實際花費：券不足以鑽石補
@@ -363,9 +365,10 @@ export function GachaScreen({
       if (count === 1) {
         diamondNeeded = heroTickets >= 1 ? 0 : SINGLE_PULL_COST
       } else {
-        const ticketsUse = Math.min(heroTickets, 10)
-        const remaining = 10 - ticketsUse
-        diamondNeeded = remaining > 0 ? (remaining === 10 ? TEN_PULL_COST : remaining * SINGLE_PULL_COST) : 0
+        const ticketsUse = Math.min(heroTickets, count)
+        const remaining = count - ticketsUse
+        const bulkCost = count === 100 ? HUNDRED_PULL_COST : TEN_PULL_COST
+        diamondNeeded = remaining > 0 ? (remaining === count ? bulkCost : remaining * SINGLE_PULL_COST) : 0
       }
       if (diamondNeeded > 0 && diamond < diamondNeeded) {
         setError(`鑽石不足！需要 ${diamondNeeded} 鑽石，目前 ${diamond} 鑽石`)
@@ -492,7 +495,7 @@ export function GachaScreen({
   }, [diamond, heroTickets, banner.id, onPullSuccess, heroesList])
 
   /* ── 裝備抽卡 ── */
-  const doEquipPull = useCallback(async (count: 1 | 10, isFree = false) => {
+  const doEquipPull = useCallback(async (count: 1 | 10 | 100, isFree = false) => {
     // 免費抽：限鑽石池單抽
     if (!isFree) {
       if (equipPool === 'diamond') {
@@ -500,11 +503,11 @@ export function GachaScreen({
         if (count === 1) {
           diamondNeeded = equipTickets >= 1 ? 0 : getEquipPullCost('diamond', 1).amount
         } else {
-          const ticketsUse = Math.min(equipTickets, 10)
-          const remaining = 10 - ticketsUse
+          const ticketsUse = Math.min(equipTickets, count)
+          const remaining = count - ticketsUse
           const singleCost = getEquipPullCost('diamond', 1).amount
-          const tenCost = getEquipPullCost('diamond', 10).amount
-          diamondNeeded = remaining > 0 ? (remaining === 10 ? tenCost : remaining * singleCost) : 0
+          const bulkCost = getEquipPullCost('diamond', count).amount
+          diamondNeeded = remaining > 0 ? (remaining === count ? bulkCost : remaining * singleCost) : 0
         }
         if (diamondNeeded > diamond) {
           setError(`鑽石不足！需要 ${diamondNeeded.toLocaleString()} 鑽石，目前 ${diamond.toLocaleString()} 鑽石`)
@@ -523,7 +526,7 @@ export function GachaScreen({
     setIsPulling(true)
     setRevealPhase(false)
 
-    const pullResults = count === 10 ? equipTenPull(equipPool) : [equipSinglePull(equipPool)]
+    const pullResults = count === 100 ? equipHundredPull(equipPool) : count === 10 ? equipTenPull(equipPool) : [equipSinglePull(equipPool)]
     const newEquipment = pullResults.map(r => r.equipment)
 
     try {
@@ -602,6 +605,7 @@ export function GachaScreen({
 
   const equipCostSingle = getEquipPullCost(equipPool, 1)
   const equipCostTen = getEquipPullCost(equipPool, 10)
+  const equipCostHundred = getEquipPullCost(equipPool, 100)
   const equipRates = getEquipPoolRates(equipPool)
   const currencyForEquip = equipPool === 'gold' ? gold : diamond
 
@@ -704,6 +708,24 @@ export function GachaScreen({
                   {heroTickets >= 10 ? '🎟️ ×10' : heroTickets > 0 ? <>🎟️ ×{heroTickets} + <CurrencyIcon type="diamond" /> {(10 - heroTickets) * SINGLE_PULL_COST}</> : <><CurrencyIcon type="diamond" /> {TEN_PULL_COST}</>}
                 </span>
               </button>
+              {/* 百連抽：鑽石或券達門檻才顯示 */}
+              {(heroTickets >= 100 || diamond >= HUNDRED_PULL_COST || heroTickets + Math.floor(diamond / SINGLE_PULL_COST) >= 100) && (
+                <button
+                  className="gacha-pull-btn gacha-pull-hundred"
+                  disabled={(() => {
+                    const ticketsUse = Math.min(heroTickets, 100)
+                    const remaining = 100 - ticketsUse
+                    const cost = remaining > 0 ? (remaining === 100 ? HUNDRED_PULL_COST : remaining * SINGLE_PULL_COST) : 0
+                    return cost > diamond
+                  })() || isPulling}
+                  onClick={() => doPull(100)}
+                >
+                  <span className="gacha-btn-label">百連抽</span>
+                  <span className="gacha-btn-cost">
+                    {heroTickets >= 100 ? '🎟️ ×100' : heroTickets > 0 ? <>🎟️ ×{heroTickets} + <CurrencyIcon type="diamond" /> {(100 - heroTickets) * SINGLE_PULL_COST}</> : <><CurrencyIcon type="diamond" /> {HUNDRED_PULL_COST.toLocaleString()}</>}
+                  </span>
+                </button>
+              )}
             </div>
             {/* 免費抽倒數 */}
             {freePullUsedToday && (
@@ -812,8 +834,34 @@ export function GachaScreen({
                   }
                 </span>
               </button>
+              {/* 百連抽：資源達門檻才顯示 */}
+              {(() => {
+                if (equipPool === 'gold') return gold >= equipCostHundred.amount
+                return equipTickets >= 100 || diamond >= equipCostHundred.amount || equipTickets + Math.floor(diamond / equipCostSingle.amount) >= 100
+              })() && (
+                <button
+                  className="gacha-pull-btn gacha-pull-hundred"
+                  disabled={(() => {
+                    if (equipPool === 'gold') return gold < equipCostHundred.amount
+                    const ticketsUse = Math.min(equipTickets, 100)
+                    const remaining = 100 - ticketsUse
+                    const cost = remaining > 0 ? (remaining === 100 ? equipCostHundred.amount : remaining * equipCostSingle.amount) : 0
+                    return cost > diamond
+                  })() || isPulling}
+                  onClick={() => doEquipPull(100)}
+                >
+                  <span className="gacha-btn-label">百連抽</span>
+                  <span className="gacha-btn-cost">
+                    {equipPool === 'diamond' && equipTickets >= 100
+                      ? '🔧 ×100'
+                      : equipPool === 'diamond' && equipTickets > 0
+                        ? <>🔧 ×{equipTickets} + <CurrencyIcon type="diamond" /> {(100 - equipTickets) * equipCostSingle.amount}</>
+                        : <><CurrencyIcon type={equipPool === 'gold' ? 'gold' : 'diamond'} /> {equipCostHundred.amount.toLocaleString()}</>
+                    }
+                  </span>
+                </button>
+              )}
             </div>
-            {/* 鑽石池免費抽倒數 */}
             {equipPool === 'diamond' && freeEquipPullUsedToday && (
               <div className="gacha-free-countdown">
                 距離下次免費鍛造：{countdown}

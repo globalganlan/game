@@ -17,10 +17,12 @@ import { EQUIPMENT_SUB_STAT_COUNT, randomSubStats } from './progressionSystem'
 /** 金幣池費用 */
 export const EQUIP_GOLD_SINGLE = 10_000
 export const EQUIP_GOLD_TEN = 90_000
+export const EQUIP_GOLD_HUNDRED = 900_000
 
 /** 鑽石池費用 */
 export const EQUIP_DIAMOND_SINGLE = 200
 export const EQUIP_DIAMOND_TEN = 2_000
+export const EQUIP_DIAMOND_HUNDRED = 20_000
 
 /** 8 套裝 */
 export const SET_IDS = [
@@ -176,15 +178,24 @@ export function equipTenPull(pool: EquipPoolType, rng = Math.random): EquipPullR
   return results
 }
 
+/** 百連抽：每 10 件保底 SR+（等於跑 10 次 equipTenPull） */
+export function equipHundredPull(pool: EquipPoolType, rng = Math.random): EquipPullResult[] {
+  const results: EquipPullResult[] = []
+  for (let batch = 0; batch < 10; batch++) {
+    results.push(...equipTenPull(pool, rng))
+  }
+  return results
+}
+
 /* ════════════════════════════════════
    費用計算
    ════════════════════════════════════ */
 
-export function getEquipPullCost(pool: EquipPoolType, count: 1 | 10): { type: 'gold' | 'diamond'; amount: number } {
+export function getEquipPullCost(pool: EquipPoolType, count: 1 | 10 | 100): { type: 'gold' | 'diamond'; amount: number } {
   if (pool === 'gold') {
-    return { type: 'gold', amount: count === 10 ? EQUIP_GOLD_TEN : EQUIP_GOLD_SINGLE }
+    return { type: 'gold', amount: count === 100 ? EQUIP_GOLD_HUNDRED : count === 10 ? EQUIP_GOLD_TEN : EQUIP_GOLD_SINGLE }
   }
-  return { type: 'diamond', amount: count === 10 ? EQUIP_DIAMOND_TEN : EQUIP_DIAMOND_SINGLE }
+  return { type: 'diamond', amount: count === 100 ? EQUIP_DIAMOND_HUNDRED : count === 10 ? EQUIP_DIAMOND_TEN : EQUIP_DIAMOND_SINGLE }
 }
 
 /** 裝備顯示名稱 */

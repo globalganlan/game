@@ -78,6 +78,7 @@ export const DEFAULT_PITY_CONFIG: PityConfig = {
 /** 抽卡成本 */
 export const SINGLE_PULL_COST = 160    // 鑽石
 export const TEN_PULL_COST = 1600      // 鑽石（無折扣 = 10 × 160）
+export const HUNDRED_PULL_COST = 16000 // 鑽石（無折扣 = 100 × 160）
 
 /** 重複轉換星塵 */
 export const DUPLICATE_STARDUST: Record<GachaRarity, number> = {

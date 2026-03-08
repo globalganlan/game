@@ -97,7 +97,7 @@ gacha.post('/gacha-pull', async (c) => {
   const body = getBody(c);
 
   const count = Number(body.count) || 1;
-  if (count !== 1 && count !== 10) return c.json({ success: false, error: 'invalid_count' });
+  if (![1, 10, 100].includes(count)) return c.json({ success: false, error: 'invalid_count' });
   const isFree = body.isFree === true;  // 每日免費單抽
 
   const saveData = await db.prepare('SELECT diamond, gachaPity, lastHeroFreePull FROM save_data WHERE playerId = ?')
@@ -127,11 +127,12 @@ gacha.post('/gacha-pull', async (c) => {
         diamondCost = HERO_SINGLE_DIAMOND;
       }
     } else {
-      // 十連：券不足以鑽石補（每張券抵 160 鑽）
-      const use = Math.min(tickets, 10);
+      // 多連：券不足以鑽石補（每張券抵 160 鑽）
+      const use = Math.min(tickets, count);
       ticketsUsed = use;
-      const remaining = 10 - use;
-      diamondCost = remaining > 0 ? (remaining === 10 ? HERO_TEN_DIAMOND : remaining * HERO_SINGLE_DIAMOND) : 0;
+      const remaining = count - use;
+      const bulkCost = count * HERO_SINGLE_DIAMOND; // 無折扣
+      diamondCost = remaining > 0 ? (remaining === count ? bulkCost : remaining * HERO_SINGLE_DIAMOND) : 0;
     }
 
     if (diamondCost > 0 && (saveData.diamond || 0) < diamondCost) {
@@ -246,7 +247,7 @@ gacha.post('/equip-gacha-pull', async (c) => {
   const body = getBody(c);
 
   const count = Number(body.count) || 1;
-  if (count !== 1 && count !== 10) return c.json({ success: false, error: 'invalid_count' });
+  if (![1, 10, 100].includes(count)) return c.json({ success: false, error: 'invalid_count' });
   const poolType = body.poolType as string;
   if (poolType !== 'gold' && poolType !== 'diamond') return c.json({ success: false, error: 'invalid_pool_type' });
   const isFree = body.isFree === true;  // 每日免費單抽
@@ -270,7 +271,7 @@ gacha.post('/equip-gacha-pull', async (c) => {
     currencyField = 'diamond';
   } else if (poolType === 'gold') {
     // 金幣池：不用券，直接扣金幣
-    cost = count === 10 ? 90000 : 10000;
+    cost = count === 100 ? 900000 : count === 10 ? 90000 : 10000;
     currencyField = 'gold';
     if ((saveData.gold || 0) < cost) return c.json({ success: false, error: 'insufficient_gold' });
   } else {
@@ -286,10 +287,11 @@ gacha.post('/equip-gacha-pull', async (c) => {
         cost = EQUIP_DIAMOND_SINGLE;
       }
     } else {
-      const use = Math.min(tickets, 10);
+      const use = Math.min(tickets, count);
       ticketsUsed = use;
-      const remaining = 10 - use;
-      cost = remaining > 0 ? (remaining === 10 ? EQUIP_DIAMOND_TEN : remaining * EQUIP_DIAMOND_SINGLE) : 0;
+      const remaining = count - use;
+      const bulkCost = count === 100 ? 20000 : EQUIP_DIAMOND_TEN;
+      cost = remaining > 0 ? (remaining === count ? bulkCost : remaining * EQUIP_DIAMOND_SINGLE) : 0;
     }
 
     if (cost > 0 && (saveData.diamond || 0) < cost) {

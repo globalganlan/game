@@ -3965,6 +3965,14 @@
   color: #eee;
 }
 
+.gacha-pull-hundred {
+  background: linear-gradient(135deg, #ffd43b, #e67700);
+  color: #1a1a2e;
+  border: 1px solid rgba(255, 212, 59, 0.5);
+  box-shadow: 0 0 8px rgba(255, 212, 59, 0.3);
+  font-weight: bold;
+}
+
 .gacha-pull-free {
   background: linear-gradient(135deg, #2a9d8f, #1a6b60);
   color: #eee;
