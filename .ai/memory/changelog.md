@@ -4,6 +4,22 @@
 
 ---
 
+### [2026-03-08] 進入戰鬥旋轉方塊載入佔位符消除
+- **觸發者**：使用者（Bug 報告：第一次載入進入戰鬥時英雄攻擊前有旋轉方塊）
+- **執行角色**：🔧 CODING + 🧪 QA
+- **根因**：`SceneReady` 在外層 `<Suspense>` 解析（Arena 載入完成）後就觸發 `closeCurtain()`，但各英雄的獨立 `<Suspense>` 邊界可能仍在載入模型（preload 的 12s 超時先到），導致過場幕提前開啟、使用者看到 `HeroLoadingPlaceholder`（旋轉藍色方塊）
+- **修復方式**：
+  1. **App.tsx**：移除 `SceneReady` 元件及其 JSX 引用（不再由外層 Suspense 觸發收幕）
+  2. **useStageHandlers.ts**：`selectStage`/`enterArena`/`defenseSetup` — 立即掛載 3D 場景（過場幕遮蓋 Suspense 佔位符），`await preloadPromise` 完成後再 `closeCurtain()`（25s 安全網）
+  3. **useBattleFlow.ts**：`goNextStage` tower/story 預載超時從 12s 提升至 25s
+- **Commit**：`a9e97b7`
+
+### [2026-03-08] Toast z-index 提升（寶箱/物品詳情彈窗遮擋修復）
+- **觸發者**：使用者（Bug 報告：開啟寶箱的獲得物品動畫沒有在介面上方）
+- **執行角色**：🔧 CODING
+- **變更摘要**：`.acquire-toast-stack` z-index 從 9000 提升至 200000，確保顯示在 `.inv-detail-backdrop`(99999) 等彈窗上方
+- **Commit**：`6b9db96`
+
 ### [2026-03-08] 英雄模型陰影 + iOS Canvas 常駐 + 暴擊傷害 UI 跑版修復
 - **觸發者**：使用者（雙 Bug 報告 + Aitodolist）
 - **執行角色**：🔧 CODING + 🧪 QA

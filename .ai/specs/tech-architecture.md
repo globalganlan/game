@@ -264,12 +264,12 @@ main.tsx
          {!showBattleScene}           大廳模式（無 Canvas）
             <MainMenu />             主選單
             <MenuScreenRouter />     子畫面（英雄/背包/召喚/關卡…）
-         {showBattleScene}            戰鬥場景（Canvas 動態掛載）
-         <Canvas>                     R3F 根（進入戰鬥準備時才掛載）
+         {showBattleScene}            戰鬥場景（Canvas 常駐，內容條件掛載）
+         <Canvas>                     R3F 根（常駐，CSS visibility 控制可見性）
             <Suspense>
                <Arena />           場景
                <SlotMarker /> 12  格子標記
-               <Hero /> N         場上英雄
+               <Hero /> N         場上英雄（各自獨立 Suspense 邊界）
                   <ZombieModel />   GLB + 骨骼動畫 + visibilitychange 補時
                   <HealthBar3D />   3D 血條
                   <EnergyBar3D />   3D 能量條
@@ -621,3 +621,4 @@ POST { "action": "invalidate-cache" }
 | v2.4 | 2026-03-06 | **英雄名稱 HTML Overlay**：Billboard Text → Html DOM，固定像素大小 |
 | v2.5 | 2026-03-06 | **大廳/戰鬥場景分離架構**：新增 `showBattleScene` 狀態，Canvas（3D 場景）不再常駐掛載 — 大廳模式完全不載入 Canvas，僅在進入戰鬥準備（handleStageSelect/handleArenaStartBattle/handleArenaDefenseSetup）時才動態掛載，並以過場幕遮蔽載入過程；返回大廳時 Canvas 卸載釋放 GPU 資源。還原 v2.3 的 `visibility:hidden → pointerEvents:none` 修改（不再需要），根本解決 iOS WKWebView 紋理回收問題 |
 | v2.6 | 2026-03-06 | **iOS WebGL 深度紋理修復**：(1) ZombieModel/HeroListPanel `cloneMat` 新增所有紋理貼圖 `needsUpdate=true`（map/normalMap/roughnessMap/metalnessMap/aoMap），diffuse map 強制 `SRGBColorSpace`；(2) Canvas iOS 強制 WebGL1 渲染器（WKWebView WebGL2 紋理分配 bug）、`shadows=false`、`flat` 模式、`NoToneMapping`（避免 ACES 壓暗）；(3) ZombieModel useEffect cleanup — unmount 時 dispose cloned materials 防止 VRAM 洩漏；(4) glbLoader 新增 `disposeDracoDecoder()` 釋放 WASM 記憶體；(5) Context restored handler 加入紋理 colorSpace 修正 |
+| v2.7 | 2026-03-08 | **Canvas 常駐 + 過場幕等模型就緒**：(1) Canvas 改為常駐掛載（CSS visibility + frameloop 切換），避免 iOS Safari 反覆建立/銷毀 WebGL context；(2) 移除 `SceneReady` 元件 — 不再由外層 Suspense 觸發收幕，改由 `selectStage`/`enterArena`/`defenseSetup` 等 await `preloadPromise` 完成後才呼叫 `closeCurtain()`（25s 安全網），確保過場幕遮蓋所有 Suspense 載入佔位符；(3) `goNextStage` 預載超時從 12s 提升至 25s |
