@@ -4,6 +4,21 @@
 
 ---
 
+### [2026-03-08] 移除所有 iOS 渲染降級設定
+- **觸發者**：使用者（「把所有針對 IOS 的降級設定全部移除」）
+- **執行角色**：🔧 CODING + 🧪 QA
+- **變更摘要**：
+  PNG→JPEG 根因修復後，iOS 不再需要降級保護。移除全部 5 個檔案中的 iOS 渲染降級：
+  1. **useResponsive.ts**：DPR 從 iOS 固定 `[1,1]` 恢復為 mobile 標準 `[1,1.5]`
+  2. **ZombieModel.tsx**：`castShadow`/`receiveShadow` 從 `!isIOS` 改為 `true`
+  3. **App.tsx**：shadows、antialias、powerPreference、shadowMap 全部恢復為完整品質
+  4. **Arena.tsx**：移除 `IOSBackground` 純色替代、恢復 `Sky` shader、sparkles 全量、directionalLight shadow 完整 2048
+  5. **HeroListPanel.tsx**：antialias 恢復為 `true`
+- **未變更**：pwaService.ts/main.tsx 的 iOS SW 禁用邏輯（PWA 相關，非渲染降級）
+- **影響範圍**：src/hooks/useResponsive.ts, src/App.tsx, src/components/{Arena,ZombieModel,HeroListPanel}.tsx
+- **測試結果**：TSC 零錯誤、Vite build 成功、Playwright 完整流程（登入→選關→1-1 戰鬥→勝利）正常
+- **commit**：`0bff921`
+
 ### [2026-03-08] iOS 模型黑色根治 — GLB 內嵌 PNG 紋理轉 JPEG
 - **觸發者**：使用者（發現 zombie_11 是唯一在 iOS 正常顯示的模型）
 - **執行角色**：🔧 CODING + 🧪 QA

@@ -427,3 +427,19 @@
 - **修復**：`<Html position={[0, 3.5, 0]} center sprite>` + CSS `.hero-name-label`（系統字型、14px 固定大小、白字黑影描邊）
 - **效果**：名稱文字清晰銳利、不隨距離縮放、支援 CSS 字型與樣式
 - **影響範圍**：`src/components/Hero.tsx`、`src/App.css`
+
+### ADR-020: 移除所有 iOS 渲染降級 — PNG→JPEG 修復後不再需要
+
+- **日期**：2026-03-08
+- **決策**：全面移除 iOS 專用的渲染品質降級，讓 iOS 與桌面使用相同品質設定
+- **根因**：GLB 內嵌 PNG 紋理才是 iOS 黑色模型的真正原因（ADR-019 的各種降級只是症狀緩解方案）。PNG→JPEG 根因修復後（commit `3b339df`），iOS Safari 能正常載入模型，所有降級措施成為多餘的品質犧牲
+- **移除項目**（5 檔案 12 處）：
+  1. DPR 鎖定 `[1,1]` → 恢復 mobile `[1,1.5]`
+  2. castShadow/receiveShadow 關閉 → 恢復為 true
+  3. Canvas shadows/antialias 關閉 → 恢復為 true
+  4. powerPreference 'default' → 恢復為 'high-performance'
+  5. IOSBackground 純色替代 Sky shader → 恢復完整 Sky
+  6. sparkles 限制 30 → 恢復主題全量
+  7. shadowMap 512 → 恢復 2048
+- **保留項目**：pwaService.ts 的 iOS 平台偵測（PWA 安裝邏輯）、main.tsx 的 iOS SW 禁用（ADR-009）
+- **commit**：`0bff921`
