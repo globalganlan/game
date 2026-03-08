@@ -11,6 +11,26 @@
     <meta name="apple-mobile-web-app-title" content="全球感染" />
     <link rel="apple-touch-icon" href="/game/icons/apple-touch-icon.png" />
     <link rel="manifest" href="manifest.json" />
+    <script>
+      (function() {
+        var ua = navigator.userAgent || ''
+        var isIOS = /iPhone|iPad|iPod/.test(ua)
+        var isStandalone = (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || (navigator.standalone === true)
+        if (isIOS || isStandalone) {
+          if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.getRegistrations().then(function(regs) {
+              regs.forEach(function(reg) { reg.unregister() })
+            })
+          }
+          if ('caches' in window) {
+            caches.keys().then(function(names) {
+              names.forEach(function(name) { caches.delete(name) })
+            })
+          }
+          console.log('[SW] preflight disable for iOS/standalone')
+        }
+      })()
+    </script>
     <title>全球感染 - GlobalGanLan</title>
   </head>
   <body>
