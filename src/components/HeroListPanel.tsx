@@ -127,12 +127,11 @@ function IdlePreviewModel({ modelId }: { modelId: string }) {
           if (c.emissive) c.emissive.set(0, 0, 0)
           c.emissiveIntensity = 1
           c.emissiveMap = null
-          // ★ iOS 紋理修復：強制所有紋理 re-upload + 正確色彩空間
-          if (c.map) { c.map.needsUpdate = true; c.map.colorSpace = THREE.SRGBColorSpace }
-          if (c.normalMap) c.normalMap.needsUpdate = true
-          if (c.roughnessMap) c.roughnessMap.needsUpdate = true
-          if (c.metalnessMap) c.metalnessMap.needsUpdate = true
-          if (c.aoMap) c.aoMap.needsUpdate = true
+          // ★ metalness 修正 — GLB 預設 0.5（FBX→Blender 殘留值），角色不應金屬
+          c.metalness = 0
+          c.roughness = Math.max(c.roughness, 0.6)
+          // ★ 不強制 tex.needsUpdate — 共享紋理已由 GLTFLoader 上傳，
+          //   重複 re-upload 在 iOS Safari 會觸發 unpackColorSpace 雙重 sRGB 轉換
           c.needsUpdate = true
           return c
         }
@@ -188,9 +187,8 @@ function HeroModelPreview({ modelId }: { modelId: string }) {
         camera={{ position: [0, 0, 4.5], fov: 28 }}
         className="hero-model-canvas"
         gl={{ alpha: true, antialias: !isIOS, powerPreference: 'low-power' }}
-        onCreated={({ gl }) => {
-          gl.outputColorSpace = THREE.SRGBColorSpace
-          if (isIOS) gl.toneMapping = THREE.NoToneMapping
+        onCreated={() => {
+          // ★ 使用 R3F 預設 (ACES + sRGB) — 不覆寫，避免 iOS 紋理色彩問題
         }}
       >
         <ambientLight intensity={0.7} />

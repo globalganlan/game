@@ -540,12 +540,11 @@ export default function App() {
             }}
             onCreated={({ gl, scene }) => {
               const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent)
-              // ★ 色彩空間 — 所有平台統一 sRGB
-              gl.outputColorSpace = THREE.SRGBColorSpace
-              if (isIOS) {
-                // iOS: 關閉 tone mapping 避免 ACES 壓暗
-                gl.toneMapping = THREE.NoToneMapping
-              } else {
+              // ★ 不設定 outputColorSpace / toneMapping — 使用 R3F 預設值
+              // R3F 預設: outputColorSpace=SRGBColorSpace, toneMapping=ACESFilmicToneMapping
+              // 手動設定 outputColorSpace 會觸發 Three.js setter 重設 unpackColorSpace，
+              // 在 iOS Safari 可能導致紋理 sRGB 雙重轉換 → 模型全黑
+              if (!isIOS) {
                 gl.shadowMap.enabled = true
                 gl.shadowMap.type = THREE.PCFShadowMap
               }
@@ -553,7 +552,7 @@ export default function App() {
               // ── WebGL Context Lost / Restored 處理 ──
               const canvas = gl.domElement
               canvas.addEventListener('webglcontextlost', (e) => {
-                e.preventDefault()  // 允許瀏覽器嘗試恢復 context
+                e.preventDefault()
                 console.warn('[WebGL] Context Lost — waiting for restore…')
               })
               canvas.addEventListener('webglcontextrestored', () => {
@@ -562,7 +561,7 @@ export default function App() {
                   gl.shadowMap.enabled = true
                   gl.shadowMap.type = THREE.PCFShadowMap
                 }
-                // ★ 重新上傳所有紋理 + 色彩空間修正（context lost 後 GPU 資料遺失）
+                // ★ Context Restored: 重新上傳所有紋理（GPU 資料遺失）
                 scene.traverse((obj) => {
                   if ((obj as THREE.Mesh).isMesh) {
                     const mesh = obj as THREE.Mesh
@@ -571,7 +570,7 @@ export default function App() {
                       if (!mat) return
                       mat.needsUpdate = true
                       const stdMat = mat as THREE.MeshStandardMaterial
-                      if (stdMat.map) { stdMat.map.needsUpdate = true; stdMat.map.colorSpace = THREE.SRGBColorSpace }
+                      if (stdMat.map) stdMat.map.needsUpdate = true
                       if (stdMat.normalMap) stdMat.normalMap.needsUpdate = true
                       if (stdMat.roughnessMap) stdMat.roughnessMap.needsUpdate = true
                       if (stdMat.metalnessMap) stdMat.metalnessMap.needsUpdate = true

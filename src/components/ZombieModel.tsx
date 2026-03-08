@@ -68,38 +68,30 @@ export function ZombieModel({
   const { scene, modelScale } = useMemo(() => {
     const cloned = SkeletonUtils.clone(meshAsset.scene)
 
-    // iOS 偵測 — iOS Safari/WebView 有較嚴格的 GPU 記憶體限制
+    // iOS 偵測
     const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent)
-
-    // ★ 強制紋理重新上傳（iOS WKWebView 紋理 eviction 防護）
-    const markTextureForUpload = (tex: THREE.Texture | null, isSRGB = false) => {
-      if (!tex) return
-      tex.needsUpdate = true
-      if (isSRGB) tex.colorSpace = THREE.SRGBColorSpace
-    }
 
     // 材質獨立化 — GLB 已是 MeshStandardMaterial，只需 clone 確保實例獨立
     // 並確保 emissive 乾淨以支援受擊紅色閃光
     cloned.traverse((child) => {
       if ((child as THREE.Mesh).isMesh) {
         const mesh = child as THREE.Mesh
-        // 啟用投射陰影（iOS 降級：不投射以節省 GPU 記憶體）
         mesh.castShadow = !isIOS
         mesh.receiveShadow = !isIOS
         const cloneMat = (m: THREE.Material): THREE.MeshStandardMaterial => {
-          const cloned = m.clone() as THREE.MeshStandardMaterial
+          const c = m.clone() as THREE.MeshStandardMaterial
           // 確保 emissive 乾淨
-          if (cloned.emissive) cloned.emissive.set(0, 0, 0)
-          cloned.emissiveIntensity = 1
-          cloned.emissiveMap = null
-          // ★ 強制所有紋理 re-upload（iOS WebGL 必須）
-          markTextureForUpload(cloned.map, true)  // diffuse → sRGB
-          markTextureForUpload(cloned.normalMap)
-          markTextureForUpload(cloned.roughnessMap)
-          markTextureForUpload(cloned.metalnessMap)
-          markTextureForUpload(cloned.aoMap)
-          cloned.needsUpdate = true
-          return cloned
+          if (c.emissive) c.emissive.set(0, 0, 0)
+          c.emissiveIntensity = 1
+          c.emissiveMap = null
+          // ★ metalness 修正 — GLB 預設 0.5（FBX→Blender 匯入殘留值），
+          //   角色模型不應是金屬材質，強制歸零避免無環境反射時過暗
+          c.metalness = 0
+          c.roughness = Math.max(c.roughness, 0.6)
+          // ★ 不再強制 tex.needsUpdate=true — 共享紋理已由 GLTFLoader 上傳，
+          //   重複 re-upload 在 iOS Safari 會觸發 unpackColorSpace 導致雙重 sRGB 轉換
+          c.needsUpdate = true
+          return c
         }
         if (Array.isArray(mesh.material)) {
           mesh.material = mesh.material.map(cloneMat)
