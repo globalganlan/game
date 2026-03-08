@@ -395,7 +395,13 @@
   ```
 - **修復歷程**：
   - 第一次嘗試（e69a17f）：移除 `flat` + Sky→background + setTimeout — 不夠
-  - 第二次修復（2b71836）：**移除 gl factory** → 根治
+  - 第二次修復（2b71836）：**移除 gl factory** → 3D 場景恢復，但模型紋理仍為黑色剪影
+  - 第三次修復（d3e5e74）：移除 **所有 iOS 色彩覆寫** + metalness歸零 + 移除 tex.needsUpdate
+- **第三次修復細節**：
+  - `onCreated` 不再設定 `outputColorSpace`（觸發 Three.js r183 setter 重設 `unpackColorSpace`）
+  - `onCreated` 不再設定 `toneMapping = NoToneMapping`（使用 R3F 預設 ACES）
+  - 模型材質 `metalness: 0.5 → 0`（FBX → Blender 轉換殘留值，角色不應是金屬）
+  - 移除 `tex.needsUpdate = true`（避免 iOS 紋理重新上傳問題）
 - **影響範圍**：`src/App.tsx`、`src/components/HeroListPanel.tsx`
 - **教訓**：不要試圖在 R3F 外部搶先取得 WebGL context，讓框架自行管理 GPU 初始化
 

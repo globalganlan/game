@@ -17,6 +17,18 @@
 - **測試結果**：TSC 零錯誤、Vite build 成功、Playwright 戰鬥場景截圖確認地面/模型/雨/殘骸/霧效果全部正確渲染
 - **commit**：`2b71836`
 
+### [2026-03-08] iOS 黑色紋理修復 — 移除色彩管線覆寫 + metalness歸零
+- **觸發者**：使用者（iOS 戰鬥場景模型只剩黑色剪影）
+- **執行角色**：🔧 CODING + 🧪 QA
+- **變更摘要**：
+  1. **App.tsx onCreated**：移除所有 iOS 色彩管線覆寫（`outputColorSpace`、`toneMapping`），使用 R3F 預設值（ACES+sRGB）。手動設定 `outputColorSpace` 會觸發 Three.js r183 setter 重設 `unpackColorSpace`，iOS Safari 可能導致雙重 sRGB 轉換
+  2. **ZombieModel.tsx**：`metalness: 0.5→0`、`roughness ≥ 0.6` — GLB 預設 metalness=0.5 是 FBX→Blender 殘留值，角色不應是金屬材質，無環境反射時 metalness>0 極暗
+  3. **ZombieModel+HeroListPanel**：移除 `tex.needsUpdate=true` 強制重新上傳 — 共享紋理已由 GLTFLoader 上傳，重複 re-upload 在 iOS 可能觸發色彩空間問題
+  4. **HeroListPanel onCreated**：同樣移除 iOS 色彩覆寫
+- **影響範圍**：src/App.tsx / src/components/ZombieModel.tsx / src/components/HeroListPanel.tsx
+- **測試結果**：TSC 零錯誤、Vite build 成功、Playwright 戰鬥截圖確認模型紋理清晰明亮
+- **commit**：`d3e5e74`
+
 ### [2026-03-07] 商店批量購買 + 寶箱獎勵明細 + 升星技能說明 + 素材 Tab 移除
 - **觸發者**：使用者（Aitodolist.txt 3 項需求 + 前次 session 商店批量購買）
 - **執行角色**：🔧 CODING + 🧪 QA
