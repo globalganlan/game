@@ -3044,8 +3044,10 @@
 
 .inv-sort-bar {
   display: flex;
-  justify-content: flex-end;
+  justify-content: space-between;
+  align-items: center;
   padding: 0 16px 6px;
+  gap: 8px;
 }
 .inv-sort-select {
   background: rgba(255,255,255,0.06);
@@ -3152,6 +3154,98 @@
   color: #aaa;
 }
 .inv-cancel-btn:hover { background: rgba(150,150,150,0.2); }
+
+/* ── 一鍵分解按鈕（sort bar 內） ── */
+.inv-bulk-decompose-trigger {
+  margin-left: auto;
+  padding: 4px 12px;
+  font-size: 0.82rem;
+  white-space: nowrap;
+}
+
+/* ── 一鍵分解彈窗 ── */
+.inv-bulk-decompose-panel {
+  max-width: 380px;
+  width: 90vw;
+}
+.inv-bulk-title {
+  font-size: 1.1rem;
+  color: #e8b830;
+  margin: 0 0 6px;
+}
+.inv-bulk-desc {
+  font-size: 0.82rem;
+  color: #aaa;
+  margin: 0 0 12px;
+}
+.inv-bulk-rarity-checks {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+.inv-bulk-rarity-label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 12px;
+  border: 1.5px solid rgba(150,150,150,0.3);
+  border-radius: 8px;
+  background: rgba(255,255,255,0.03);
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: background 0.15s, border-color 0.15s;
+  user-select: none;
+}
+.inv-bulk-rarity-label input[type="checkbox"] {
+  accent-color: #e8b830;
+  width: 16px;
+  height: 16px;
+}
+.inv-bulk-rarity-label.inv-bulk-rarity-active {
+  background: rgba(200,150,50,0.12);
+  border-color: rgba(200,150,50,0.5);
+}
+.inv-bulk-rarity-count {
+  font-size: 0.78rem;
+  color: #888;
+}
+.inv-bulk-preview {
+  background: rgba(0,0,0,0.25);
+  border-radius: 8px;
+  padding: 10px 14px;
+  margin-bottom: 10px;
+}
+.inv-bulk-preview-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 3px 0;
+  font-size: 0.88rem;
+  color: #ccc;
+}
+.inv-bulk-preview-val {
+  color: #ffd43b;
+  font-weight: 600;
+}
+.inv-bulk-result {
+  text-align: center;
+  padding: 8px;
+  margin-bottom: 8px;
+  font-size: 0.88rem;
+  color: #ddd;
+  background: rgba(0,0,0,0.2);
+  border-radius: 6px;
+}
+.inv-bulk-actions {
+  display: flex;
+  gap: 8px;
+}
+.inv-bulk-actions .inv-action-btn {
+  flex: 1;
+  padding: 8px 0;
+  font-size: 0.9rem;
+}
 
 .inv-equip-cell {
   cursor: pointer;

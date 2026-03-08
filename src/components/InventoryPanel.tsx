@@ -578,6 +578,10 @@ export function InventoryPanel({ onBack, heroesList, heroInstances }: InventoryP
   const [selectedEquip, setSelectedEquip] = useState<EquipmentInstance | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [sortMode, setSortMode] = useState<SortMode>('default')
+  const [showBulkDecompose, setShowBulkDecompose] = useState(false)
+  const [bulkRarities, setBulkRarities] = useState<Set<string>>(new Set(['N', 'R']))
+  const [isBulkProcessing, setIsBulkProcessing] = useState(false)
+  const [bulkResult, setBulkResult] = useState<string | null>(null)
 
   const saveState = getSaveState()
   const gold = saveState?.save.gold ?? 0
@@ -647,6 +651,56 @@ export function InventoryPanel({ onBack, heroesList, heroInstances }: InventoryP
 
   const showEquipment = activeTab === 'all' || activeTab === 'equipment'
 
+  // ── 一鍵分解：篩選可分解裝備 ──
+  const bulkDecomposeTargets = useMemo(() => {
+    if (!invState) return []
+    return invState.equipment.filter(eq =>
+      bulkRarities.has(eq.rarity) && !eq.equippedBy && !eq.locked
+    )
+  }, [invState, bulkRarities])
+
+  const DECOMPOSE_REWARDS_TABLE: Record<string, { gold: number; scrap: number }> = {
+    N: { gold: 100, scrap: 1 }, R: { gold: 300, scrap: 2 },
+    SR: { gold: 800, scrap: 5 }, SSR: { gold: 2000, scrap: 10 },
+  }
+
+  const bulkDecomposePreview = useMemo(() => {
+    let totalGold = 0, totalScrap = 0
+    for (const eq of bulkDecomposeTargets) {
+      const reward = DECOMPOSE_REWARDS_TABLE[eq.rarity] || DECOMPOSE_REWARDS_TABLE['N']
+      totalGold += reward.gold + (eq.enhanceLevel ?? 0) * 50
+      totalScrap += reward.scrap
+    }
+    return { count: bulkDecomposeTargets.length, gold: totalGold, scrap: totalScrap }
+  }, [bulkDecomposeTargets])
+
+  const toggleBulkRarity = useCallback((r: string) => {
+    setBulkRarities(prev => {
+      const next = new Set(prev)
+      if (next.has(r)) next.delete(r); else next.add(r)
+      return next
+    })
+  }, [])
+
+  const handleBulkDecompose = useCallback(async () => {
+    if (isBulkProcessing || bulkDecomposeTargets.length === 0) return
+    setIsBulkProcessing(true)
+    setBulkResult(null)
+    const ids = bulkDecomposeTargets.map(eq => eq.equipId)
+    const res = await decomposeEquipment(ids)
+    setIsBulkProcessing(false)
+    if (res.success) {
+      setBulkResult(`✅ 分解 ${res.decomposed} 件裝備，獲得 ${res.goldGained} 金幣 + ${res.scrapGained} 碎片`)
+      emitToast(`♻️ 批量分解 ${res.decomposed} 件，獲得 ${res.goldGained} 金幣 + ${res.scrapGained} 碎片`)
+      emitAcquire([
+        { type: 'currency', id: 'gold', name: '金幣', quantity: res.goldGained ?? 0 },
+        { type: 'item', id: 'equip_scrap', name: '裝備碎片', quantity: res.scrapGained ?? 0 },
+      ])
+    } else {
+      setBulkResult(`❌ ${res.error === 'cannot_decompose_equipped' ? '含有穿戴中裝備' : res.error ?? '分解失敗'}`)
+    }
+  }, [isBulkProcessing, bulkDecomposeTargets])
+
   const getDef = useCallback(
     (itemId: string): ItemDefinition | undefined => invState?.definitions.get(itemId),
     [invState],
@@ -693,6 +747,14 @@ export function InventoryPanel({ onBack, heroesList, heroInstances }: InventoryP
             <option value="quantity-desc">數量↓</option>
             <option value="name-asc">名稱排序</option>
           </select>
+          {showEquipment && (
+            <button
+              className="inv-action-btn inv-decompose-btn inv-bulk-decompose-trigger"
+              onClick={() => { setShowBulkDecompose(true); setBulkResult(null) }}
+            >
+              ♻️ 一鍵分解
+            </button>
+          )}
         </div>
 
         {/* Items Grid */}
@@ -758,6 +820,55 @@ export function InventoryPanel({ onBack, heroesList, heroInstances }: InventoryP
           heroInstances={heroInstances}
           heroNameMap={heroNameMap}
         />
+      )}
+
+      {/* 一鍵分解彈窗 */}
+      {showBulkDecompose && createPortal(
+        <div className="inv-detail-backdrop" onClick={() => !isBulkProcessing && setShowBulkDecompose(false)}>
+          <div className="inv-detail-card inv-bulk-decompose-panel" onClick={e => e.stopPropagation()}>
+            <button className="inv-detail-close" onClick={() => !isBulkProcessing && setShowBulkDecompose(false)}>✕</button>
+            <h3 className="inv-bulk-title">♻️ 一鍵分解裝備</h3>
+            <p className="inv-bulk-desc">勾選要分解的稀有度（穿戴中、已鎖定的裝備會自動排除）</p>
+            <div className="inv-bulk-rarity-checks">
+              {(['N', 'R', 'SR', 'SSR'] as const).map(r => {
+                const count = invState?.equipment.filter(eq => eq.rarity === r && !eq.equippedBy && !eq.locked).length ?? 0
+                return (
+                  <label key={r} className={`inv-bulk-rarity-label${bulkRarities.has(r) ? ' inv-bulk-rarity-active' : ''}`}
+                    style={{ borderColor: RARITY_COLORS[r] ?? '#666' }}>
+                    <input type="checkbox" checked={bulkRarities.has(r)} onChange={() => toggleBulkRarity(r)} />
+                    <span style={{ color: RARITY_COLORS[r] ?? '#aaa' }}>{r}</span>
+                    <span className="inv-bulk-rarity-count">({count})</span>
+                  </label>
+                )
+              })}
+            </div>
+            <div className="inv-bulk-preview">
+              <div className="inv-bulk-preview-row">
+                <span>符合裝備</span><span className="inv-bulk-preview-val">{bulkDecomposePreview.count} 件</span>
+              </div>
+              <div className="inv-bulk-preview-row">
+                <span><CurrencyIcon type="gold" /> 金幣</span><span className="inv-bulk-preview-val">+{bulkDecomposePreview.gold.toLocaleString()}</span>
+              </div>
+              <div className="inv-bulk-preview-row">
+                <span>🔩 裝備碎片</span><span className="inv-bulk-preview-val">+{bulkDecomposePreview.scrap}</span>
+              </div>
+            </div>
+            {bulkResult && <div className="inv-bulk-result">{bulkResult}</div>}
+            <div className="inv-bulk-actions">
+              <button
+                className="inv-action-btn inv-decompose-btn"
+                disabled={isBulkProcessing || bulkDecomposePreview.count === 0}
+                onClick={handleBulkDecompose}
+              >
+                {isBulkProcessing ? '分解中...' : `確認分解 (${bulkDecomposePreview.count} 件)`}
+              </button>
+              <button className="inv-action-btn inv-cancel-btn" onClick={() => setShowBulkDecompose(false)} disabled={isBulkProcessing}>
+                取消
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
       )}
     </div>
   )
