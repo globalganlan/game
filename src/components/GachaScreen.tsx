@@ -345,7 +345,6 @@ export function GachaScreen({
   // ─── Pull Animation state ───
   const [isPulling, setIsPulling] = useState(false)
   const [revealPhase, setRevealPhase] = useState(false) // true = cards revealed
-  const PULL_ANIM_MS = 1600 // pull animation duration
 
   const banner = STANDARD_BANNER
 
@@ -567,14 +566,10 @@ export function GachaScreen({
         updateFreePullLocally('lastEquipFreePull', getTaipeiDateStr())
       }
 
-      // Delay reveal for animation
-      const captured = pullResults
-      setTimeout(() => {
-        setIsPulling(false)
-        setEquipResults(captured)
-        setShowEquipResults(true)
-        setRevealPhase(true)
-      }, PULL_ANIM_MS)
+      setIsPulling(false)
+      setEquipResults(pullResults)
+      setShowEquipResults(true)
+      setRevealPhase(true)
 
       // 獲得物品動畫 — 同名同稀有度裝備合併
       const equipAgg = new Map<string, AcquireItem>()
