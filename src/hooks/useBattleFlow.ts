@@ -285,9 +285,9 @@ export function useBattleFlow(deps: BattleFlowDeps) {
       updatePlayerSlots(() => restored)
       setStageId(String(nextFloor))
       const nextEnemySlots = buildEnemySlotsFromStage('tower', String(nextFloor), heroesList)
-      // ── 預載入下一層敵人模型（12 秒超時安全網）──
+      // ── 預載入下一層敵人模型（25 秒超時安全網）──
       const towerModelIds = nextEnemySlots.filter(Boolean).map(s => s!._modelId).filter(Boolean) as string[]
-      await Promise.race([Promise.all(towerModelIds.map(mid => preloadHeroModel(mid).catch(() => {}))), new Promise<void>(r => setTimeout(r, 12_000))])
+      await Promise.race([Promise.all(towerModelIds.map(mid => preloadHeroModel(mid).catch(() => {}))), new Promise<void>(r => setTimeout(r, 25_000))])
       updateEnemySlots(() => nextEnemySlots)
       resetBattleState()
       setVictoryRewards(null)
@@ -316,9 +316,9 @@ export function useBattleFlow(deps: BattleFlowDeps) {
       try { const cfg = await getStageConfig(nextId); if (cfg) injectedEnemies = cfg.enemies } catch {}
     }
     const nextEnemySlots = buildEnemySlotsFromStage(stageMode, nextId, heroesList, injectedEnemies)
-    // ── 預載入下一關敵人模型（12 秒超時安全網）──
+    // ── 預載入下一關敵人模型（25 秒超時安全網）──
     const nextModelIds = nextEnemySlots.filter(Boolean).map(s => s!._modelId).filter(Boolean) as string[]
-    await Promise.race([Promise.all(nextModelIds.map(mid => preloadHeroModel(mid).catch(() => {}))), new Promise<void>(r => setTimeout(r, 12_000))])
+    await Promise.race([Promise.all(nextModelIds.map(mid => preloadHeroModel(mid).catch(() => {}))), new Promise<void>(r => setTimeout(r, 25_000))])
     updateEnemySlots(() => nextEnemySlots)
 
     resetBattleState()

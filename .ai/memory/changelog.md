@@ -4,6 +4,20 @@
 
 ---
 
+### [2026-03-08] 英雄模型陰影 + iOS Canvas 常駐 + 暴擊傷害 UI 跑版修復
+- **觸發者**：使用者（雙 Bug 報告 + Aitodolist）
+- **執行角色**：🔧 CODING + 🧪 QA
+- **變更摘要**：
+  1. **ZombieModel.tsx**：`castShadow = true` 讓英雄模型投射陰影到地面
+  2. **Arena.tsx**：Ground/Debris 材質從 `MeshBasicMaterial` 升級為 `MeshLambertMaterial`，可接收陰影+光照
+  3. **App.tsx**：Canvas 從條件掛載 `{showBattleScene && <Canvas>}` 改為**常駐**（CSS `visibility` + `frameloop` 切換），避免 iOS Safari WebGL context 累積耗盡上限（~8-16 個）導致重載/黑紋理
+  4. **App.tsx**：增強 `webglcontextrestored` handler — 新增 `gl.resetState()`、geometry buffer `needsUpdate`、`alphaMap` 紋理重新上傳
+  5. **HeroListPanel.tsx**：暴擊傷害等高數值加 `text-overflow: ellipsis` 防跑版
+  6. **App.css**：`.hd2-stat` / `.gacha-info-stat-val` 加 overflow 保護
+- **影響範圍**：src/App.tsx, src/App.css, src/components/{Arena,ZombieModel,HeroListPanel}.tsx
+- **測試結果**：TSC 零錯誤、Vite build 成功、Playwright 三輪連續戰鬥（1-1→1-2→1-3）陰影正常、無黑紋理、無白畫面
+- **commit**：`f4e9f6a`
+
 ### [2026-03-08] 移除所有 iOS 渲染降級設定
 - **觸發者**：使用者（「把所有針對 IOS 的降級設定全部移除」）
 - **執行角色**：🔧 CODING + 🧪 QA

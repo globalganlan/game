@@ -114,8 +114,7 @@ export function useStageHandlers(deps: StageHandlerDeps) {
       setSceneTheme(pickSceneForStage(mode, sid))
     }
 
-    // ── 預載入所有英雄 3D 模型，避免 Canvas 掛載後 Suspense 黑屏 ──
-    // ★ iOS 4G 安全策略：設定 12 秒上限，超時仍進入戰鬥（模型由 Suspense 繼續載入）
+    // ── 預載入所有英雄 3D 模型 ──
     const builtEnemySlots = buildEnemySlotsFromStage(mode, sid, heroesList, injectedEnemies)
     const modelIds = new Set<string>()
     builtEnemySlots.forEach(s => { if (s?._modelId) modelIds.add(s._modelId) })
@@ -132,9 +131,8 @@ export function useStageHandlers(deps: StageHandlerDeps) {
       }
     } catch { /* ignore save read errors */ }
     const preloadPromise = Promise.all([...modelIds].map(mid => preloadHeroModel(mid).catch(() => {})))
-    const preloadTimeout = new Promise<void>(r => setTimeout(r, 12_000))
-    await Promise.race([preloadPromise, preloadTimeout])
 
+    // ★ 立即掛載 3D 場景（過場幕遮蓋 Suspense 載入佔位符）
     setShowBattleScene(true)
     setStageMode(mode)
     setStageId(sid)
@@ -146,11 +144,11 @@ export function useStageHandlers(deps: StageHandlerDeps) {
     setMenuScreen('none')
     setGameState('IDLE')
 
-    // closeCurtain 由 Canvas 內 SceneReady 在 Suspense 解析後觸發
-    // ★ 安全網：若 SceneReady 5 秒內未觸發（iOS 模型載入卡住），強制收幕
-    setTimeout(() => {
-      if (!curtainClosePromiseRef.current) closeCurtain()
-    }, 5000)
+    // ★ 等待所有模型預載完成再收幕，避免使用者看到 Suspense 旋轉方塊
+    //   安全網：最多等 25 秒（loadGlbShared 內建 20s/次 + 2 次重試）
+    await Promise.race([preloadPromise, new Promise<void>(r => setTimeout(r, 25_000))])
+    await waitFrames(5)
+    closeCurtain()
     showToast(`已選擇: ${displayName}`)
   }, [stageMode, heroesList, setStageMode, setSceneTheme, setStageId, updateEnemySlots, restoreFormationFromSave, setMenuScreen, setGameState, setCurtainVisible, setCurtainFading, setCurtainText, curtainClosePromiseRef, closeCurtain, showToast, setShowBattleScene]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -223,8 +221,7 @@ export function useStageHandlers(deps: StageHandlerDeps) {
       }
       arenaTargetRankRef.current = targetRank
 
-      // ── 預載入所有英雄 3D 模型，避免 Suspense 黑屏 ──
-      // ★ iOS 安全策略：12 秒上限
+      // ── 預載入所有英雄 3D 模型 ──
       const arenaModelIds = new Set<string>()
       enemySlotsArr.forEach(s => { if (s?._modelId) arenaModelIds.add(s._modelId) })
       try {
@@ -240,9 +237,8 @@ export function useStageHandlers(deps: StageHandlerDeps) {
         }
       } catch { /* ignore */ }
       const arenaPreload = Promise.all([...arenaModelIds].map(mid => preloadHeroModel(mid).catch(() => {})))
-      await Promise.race([arenaPreload, new Promise<void>(r => setTimeout(r, 12_000))])
 
-      // ── 模型預載完成，現在才掛載 Canvas + 設定戰鬥狀態 ──
+      // ── 立即掛載 Canvas + 設定戰鬥狀態（過場幕遮蓋 Suspense 佔位符）──
       arenaEnemyPowerRef.current = res.defenderData?.power ?? 0
       setShowBattleScene(true)
       setStageMode('pvp')
@@ -253,11 +249,10 @@ export function useStageHandlers(deps: StageHandlerDeps) {
       preBattleMenuScreenRef.current = 'arena'
       setMenuScreen('none')
       setGameState('IDLE')
-      // closeCurtain 由 Canvas 內 SceneReady 在 Suspense 解析後觸發
-      // ★ 安全網：若 SceneReady 5 秒內未觸發，強制收幕
-      setTimeout(() => {
-        if (!curtainClosePromiseRef.current) closeCurtain()
-      }, 5000)
+      // ★ 等待所有模型預載完成再收幕，避免使用者看到 Suspense 旋轉方塊
+      await Promise.race([arenaPreload, new Promise<void>(r => setTimeout(r, 25_000))])
+      await waitFrames(5)
+      closeCurtain()
     } catch (e) {
       setShowBattleScene(false)
       closeCurtain()
@@ -307,32 +302,39 @@ export function useStageHandlers(deps: StageHandlerDeps) {
           }
         })
         // ── 預載入防守陣型模型 ──
-        // ★ iOS 安全策略：12 秒上限
         const defModelIds = restored.filter(Boolean).map(h => h!._modelId).filter(Boolean) as string[]
         const defPreload = Promise.all(defModelIds.map(mid => preloadHeroModel(mid).catch(() => {})))
-        await Promise.race([defPreload, new Promise<void>(r => setTimeout(r, 12_000))])
         if (restored.some(Boolean)) {
           updatePlayerSlots(() => restored)
         } else {
           updatePlayerSlots(() => [...EMPTY_SLOTS])
         }
+        // ── 立即掛載 Canvas（過場幕遮蓋載入佔位符）──
+        setShowBattleScene(true)
+        setMenuScreen('none')
+        setGameState('IDLE')
+        // ★ 等待模型預載完成再收幕
+        await Promise.race([defPreload, new Promise<void>(r => setTimeout(r, 25_000))])
+        await waitFrames(5)
+        closeCurtain()
       } else {
         // 沒有已儲存的防守陣型，清空
         updatePlayerSlots(() => [...EMPTY_SLOTS])
+        setShowBattleScene(true)
+        setMenuScreen('none')
+        setGameState('IDLE')
+        await waitFrames(3)
+        closeCurtain()
       }
     } catch {
       // API 失敗，清空
       updatePlayerSlots(() => [...EMPTY_SLOTS])
+      setShowBattleScene(true)
+      setMenuScreen('none')
+      setGameState('IDLE')
+      await waitFrames(3)
+      closeCurtain()
     }
-    // ── API + 模型預載完成，現在才掛載 Canvas ──
-    setShowBattleScene(true)
-    setMenuScreen('none')
-    setGameState('IDLE')
-    // closeCurtain 由 Canvas 內 SceneReady 在 Suspense 解析後觸發
-    // ★ 安全網：若 SceneReady 5 秒內未觸發，強制收幕
-    setTimeout(() => {
-      if (!curtainClosePromiseRef.current) closeCurtain()
-    }, 5000)
   }, [heroesList, showToast, setIsDefenseSetup, isDefenseSetupRef, heroesListRef, updateEnemySlots, updatePlayerSlots, setStageMode, setSceneTheme, setStageId, setMenuScreen, setGameState, setCurtainVisible, setCurtainFading, setCurtainText, curtainClosePromiseRef, closeCurtain, setShowBattleScene]) // eslint-disable-line react-hooks/exhaustive-deps
 
   /* ── 儲存防守陣型並返回 ── */

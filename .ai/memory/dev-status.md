@@ -1,12 +1,19 @@
 # 開發狀態快照 — Dev Status
 
-> 最後更新：2026-03-08（第六十四次更新 — iOS 3D 全黑根治）
+> 最後更新：2026-03-08（第六十五次更新 — 陰影+iOS Canvas常駐+暴擊UI）
 
 ## 截至 2026-03-08 的開發狀態
 
 ### iOS 3D 渲染修復歷程
 - [x] 第一次修復（e69a17f）：移除 `flat` prop + iOS Sky 替換為 scene.background + SceneReady setTimeout + 安全超時 5s — **不夠**，iOS 仍全黑
 - [x] 第二次修復（2b71836）：**移除自訂 gl factory**（根本原因：`getContext('webgl')` 鎖定 canvas 導致 WebGL2 路徑失敗）→ 改用簡單 gl object config + onCreated iOS 微調
+
+### 陰影 + iOS Canvas 常駐修復（f4e9f6a）
+- [x] ZombieModel `castShadow=true` — 英雄 SkinnedMesh 投射陰影到地面
+- [x] Arena Ground/Debris `MeshLambertMaterial` — 從 BasicMaterial 升級，可接收陰影+光照
+- [x] App.tsx Canvas 常駐 — 從 `{showBattleScene && <Canvas>}` 改為 CSS visibility+frameloop 控制；inner 3D content 仍條件掛載
+- [x] webglcontextrestored 增強 — `gl.resetState()` + geometry buffer needsUpdate + alphaMap 重上傳
+- [x] 暴擊傷害 UI 跑版 — text-overflow:ellipsis + flex-shrink:0 防止高數值撐爆佈局
 
 ### 已完成
 - [x] 3D 喪屍對戰場景（React 19 + Vite 5 + R3F 9 + Three.js 0.183 + TypeScript 5.9）

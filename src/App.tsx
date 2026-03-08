@@ -93,17 +93,6 @@ import { useBgm } from './hooks/useBgm'
    ══════════════════════════════ */
 
 /** Suspense 內的哨兵元件 — 所有兄弟的 GLB 載入完成後才會掛載，掛載即觸發收幕 */
-function SceneReady({ onReady }: { onReady: (delay?: number) => void }) {
-  const called = useRef(false)
-  useEffect(() => {
-    if (called.current) return
-    called.current = true
-    // ★ 用 setTimeout 而非 rAF — iOS WKWebView 對被 overlay 遮蓋的 canvas 會節流 rAF
-    setTimeout(() => onReady(0), 50)
-  }, [onReady])
-  return null
-}
-
 /** 英雄模型載入中佔位符 — 半透明旋轉方塊 */
 function HeroLoadingPlaceholder({ position }: { position: [number, number, number] }) {
   const ref = useRef<THREE.Mesh>(null)
@@ -672,7 +661,6 @@ export default function App() {
               )}
 
               <ResponsiveCamera fov={responsive.fov} position={responsive.camPos} target={responsive.camTarget} />
-              <SceneReady onReady={closeCurtain} />
             </Suspense>
             )}
           </Canvas>
