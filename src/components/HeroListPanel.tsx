@@ -124,16 +124,10 @@ function IdlePreviewModel({ modelId }: { modelId: string }) {
         const mesh = child as THREE.Mesh
         const cloneMat = (m: THREE.Material): THREE.MeshStandardMaterial => {
           const c = m.clone() as THREE.MeshStandardMaterial
-          // ★ emissiveMap = map — 確保模型即便在光照不足時也能顯示紋理
-          if (c.map) {
-            c.emissiveMap = c.map
-            if (c.emissive) c.emissive.set(1, 1, 1)
-            c.emissiveIntensity = 0.15
-          } else {
-            if (c.emissive) c.emissive.set(0, 0, 0)
-            c.emissiveIntensity = 0
-            c.emissiveMap = null
-          }
+          // emissive 歸零
+          if (c.emissive) c.emissive.set(0, 0, 0)
+          c.emissiveIntensity = 0
+          c.emissiveMap = null
           // ★ metalness 修正 — GLB 預設 0.5（FBX→Blender 殘留值），角色不應金屬
           c.metalness = 0
           c.roughness = Math.max(c.roughness, 0.6)
