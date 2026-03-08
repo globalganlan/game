@@ -11,7 +11,7 @@ import { useAnimations } from '@react-three/drei'
 import { useFrame } from '@react-three/fiber'
 import * as SkeletonUtils from 'three/examples/jsm/utils/SkeletonUtils'
 import * as THREE from 'three'
-import { getGlbForSuspense } from '../loaders/glbLoader'
+import { getGlbForSuspense, isGlbFallback } from '../loaders/glbLoader'
 import type { AnimationState } from '../types'
 
 /* ────────────────────────────
@@ -65,7 +65,27 @@ export function ZombieModel({
   const runAnim    = getGlbForSuspense(`${modelFolder}/${zombieId}_run.glb`)
 
   // 用 SkeletonUtils.clone 正確克隆 SkinnedMesh + 骨骼
+  const isMeshFallback = isGlbFallback(meshAsset)
   const { scene, modelScale } = useMemo(() => {
+    // ★ 如果是 fallback（載入失敗），建立可見的佔位膠囊體
+    if (isMeshFallback) {
+      const placeholder = new THREE.Group()
+      placeholder.name = '__fallback_placeholder__'
+      const capsule = new THREE.Mesh(
+        new THREE.CapsuleGeometry(0.3, 1.2, 8, 12),
+        new THREE.MeshStandardMaterial({
+          color: 0x6688cc,
+          transparent: true,
+          opacity: 0.6,
+          wireframe: true,
+        }),
+      )
+      capsule.position.y = 0.9
+      capsule.frustumCulled = false
+      placeholder.add(capsule)
+      return { scene: placeholder, modelScale: 1 }
+    }
+
     const cloned = SkeletonUtils.clone(meshAsset.scene)
 
     // iOS 偵測
@@ -78,6 +98,9 @@ export function ZombieModel({
         const mesh = child as THREE.Mesh
         mesh.castShadow = !isIOS
         mesh.receiveShadow = !isIOS
+        // ★ 關閉視錐剔除 — SkinnedMesh 骨架動畫的包圍盒可能不準確，
+        //   在 iOS 上會導致模型被錯誤剔除（完全不渲染）
+        mesh.frustumCulled = false
         const cloneMat = (m: THREE.Material): THREE.MeshStandardMaterial => {
           const c = m.clone() as THREE.MeshStandardMaterial
           // 確保 emissive 乾淨
@@ -108,7 +131,7 @@ export function ZombieModel({
     const height = bbox.max.z - bbox.min.z
     const s = height > 0 ? 2.5 / height : 1
     return { scene: cloned, modelScale: s }
-  }, [meshAsset, zombieId])
+  }, [meshAsset, zombieId, isMeshFallback])
 
   // 合併全部動畫 clip（從各 animation-only GLB 取出）
   const animations = useMemo(() => {

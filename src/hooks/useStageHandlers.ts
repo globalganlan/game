@@ -115,6 +115,7 @@ export function useStageHandlers(deps: StageHandlerDeps) {
     }
 
     // ── 預載入所有英雄 3D 模型，避免 Canvas 掛載後 Suspense 黑屏 ──
+    // ★ iOS 4G 安全策略：設定 12 秒上限，超時仍進入戰鬥（模型由 Suspense 繼續載入）
     const builtEnemySlots = buildEnemySlotsFromStage(mode, sid, heroesList, injectedEnemies)
     const modelIds = new Set<string>()
     builtEnemySlots.forEach(s => { if (s?._modelId) modelIds.add(s._modelId) })
@@ -130,7 +131,9 @@ export function useStageHandlers(deps: StageHandlerDeps) {
         })
       }
     } catch { /* ignore save read errors */ }
-    await Promise.all([...modelIds].map(mid => preloadHeroModel(mid).catch(() => {})))
+    const preloadPromise = Promise.all([...modelIds].map(mid => preloadHeroModel(mid).catch(() => {})))
+    const preloadTimeout = new Promise<void>(r => setTimeout(r, 12_000))
+    await Promise.race([preloadPromise, preloadTimeout])
 
     setShowBattleScene(true)
     setStageMode(mode)
@@ -221,6 +224,7 @@ export function useStageHandlers(deps: StageHandlerDeps) {
       arenaTargetRankRef.current = targetRank
 
       // ── 預載入所有英雄 3D 模型，避免 Suspense 黑屏 ──
+      // ★ iOS 安全策略：12 秒上限
       const arenaModelIds = new Set<string>()
       enemySlotsArr.forEach(s => { if (s?._modelId) arenaModelIds.add(s._modelId) })
       try {
@@ -235,7 +239,8 @@ export function useStageHandlers(deps: StageHandlerDeps) {
           })
         }
       } catch { /* ignore */ }
-      await Promise.all([...arenaModelIds].map(mid => preloadHeroModel(mid).catch(() => {})))
+      const arenaPreload = Promise.all([...arenaModelIds].map(mid => preloadHeroModel(mid).catch(() => {})))
+      await Promise.race([arenaPreload, new Promise<void>(r => setTimeout(r, 12_000))])
 
       // ── 模型預載完成，現在才掛載 Canvas + 設定戰鬥狀態 ──
       arenaEnemyPowerRef.current = res.defenderData?.power ?? 0
@@ -302,8 +307,10 @@ export function useStageHandlers(deps: StageHandlerDeps) {
           }
         })
         // ── 預載入防守陣型模型 ──
+        // ★ iOS 安全策略：12 秒上限
         const defModelIds = restored.filter(Boolean).map(h => h!._modelId).filter(Boolean) as string[]
-        await Promise.all(defModelIds.map(mid => preloadHeroModel(mid).catch(() => {})))
+        const defPreload = Promise.all(defModelIds.map(mid => preloadHeroModel(mid).catch(() => {})))
+        await Promise.race([defPreload, new Promise<void>(r => setTimeout(r, 12_000))])
         if (restored.some(Boolean)) {
           updatePlayerSlots(() => restored)
         } else {

@@ -7,9 +7,14 @@
  * - `getGlbForSuspense(url)`: 若已快取直接回傳，否則 throw Promise 觸發 Suspense。
  *
  * 回傳的物件包含 `scene` (THREE.Group) 和 `animations` (THREE.AnimationClip[])。
+ *
+ * ★ 載入失敗時的重試策略：
+ *   - 第一次失敗：不快取，允許 Suspense 或下次呼叫自動重試
+ *   - 重試也失敗：快取 fallback（避免無限重試），但在 30 秒後過期可再試
+ *   - iOS 特別加入 20 秒超時，防止 WASM 解碼/網路 hang 住
  */
 
-import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader'
+import { GLTFLoader, type GLTF } from 'three/examples/jsm/loaders/GLTFLoader'
 import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader'
 import * as THREE from 'three'
 
@@ -19,6 +24,8 @@ THREE.Cache.enabled = true
 export interface GlbAsset {
   scene: THREE.Group
   animations: THREE.AnimationClip[]
+  /** 是否為載入失敗的空白替代品 */
+  isFallback?: boolean
 }
 
 // Draco 解碼器（Draco 壓縮的 GLB 必須）
@@ -32,37 +39,85 @@ loader.setDRACOLoader(dracoLoader)
 
 const cache = new Map<string, GlbAsset>()
 const pending = new Map<string, Promise<GlbAsset>>()
+/** 已失敗的 URL 記錄：url → { 失敗次數, 最後失敗時間 } */
+const failedUrls = new Map<string, { count: number; lastFail: number }>()
+
+const MAX_RETRIES = 2
+const FALLBACK_EXPIRE_MS = 30_000 // fallback 快取 30 秒後過期可重試
+const LOAD_TIMEOUT_MS = 20_000    // 單次載入超時（iOS WASM/4G 安全網）
 
 /**
  * 建立空的 fallback asset（載入失敗時使用）。
- * 避免 Suspense 無限重試導致 iOS 過場卡死。
  */
 function createFallbackAsset(): GlbAsset {
   const group = new THREE.Group()
   group.name = '__glb_load_failed__'
-  return { scene: group, animations: [] }
+  return { scene: group, animations: [], isFallback: true }
 }
 
-/** 非同步載入 GLB；重複 URL 只會請求一次 */
+/** 帶超時的 loadAsync 包裝 */
+function loadWithTimeout(url: string, timeoutMs: number): Promise<GLTF> {
+  return new Promise<GLTF>((resolve, reject) => {
+    const timer = setTimeout(() => {
+      reject(new Error(`[glbLoader] Load timeout after ${timeoutMs}ms: ${url}`))
+    }, timeoutMs)
+    loader.loadAsync(url).then((gltf) => {
+      clearTimeout(timer)
+      resolve(gltf)
+    }).catch((err) => {
+      clearTimeout(timer)
+      reject(err)
+    })
+  })
+}
+
+/** 非同步載入 GLB；重複 URL 只會請求一次，失敗自動重試 */
 export function loadGlbShared(url: string): Promise<GlbAsset> {
   const cached = cache.get(url)
-  if (cached) return Promise.resolve(cached)
+  if (cached) {
+    // ★ 如果快取的是 fallback 且已過期，允許重試
+    if (cached.isFallback) {
+      const info = failedUrls.get(url)
+      if (info && Date.now() - info.lastFail > FALLBACK_EXPIRE_MS) {
+        cache.delete(url)
+        failedUrls.delete(url)
+        // 繼續向下執行載入
+      } else {
+        return Promise.resolve(cached)
+      }
+    } else {
+      return Promise.resolve(cached)
+    }
+  }
 
   const inflight = pending.get(url)
   if (inflight) return inflight
 
-  const task = loader.loadAsync(url).then((gltf) => {
+  const task = loadWithTimeout(url, LOAD_TIMEOUT_MS).then((gltf) => {
     const asset: GlbAsset = {
       scene: gltf.scene,
       animations: gltf.animations || [],
     }
     cache.set(url, asset)
     pending.delete(url)
+    failedUrls.delete(url)
     return asset
   }).catch((error: unknown) => {
     pending.delete(url)
-    // ★ 載入失敗 → 快取空 fallback，避免 Suspense 無限重試卡死（iOS 常見）
-    console.warn('[glbLoader] Failed to load:', url, error)
+    const info = failedUrls.get(url) || { count: 0, lastFail: 0 }
+    info.count += 1
+    info.lastFail = Date.now()
+    failedUrls.set(url, info)
+
+    if (info.count < MAX_RETRIES) {
+      // ★ 重試前不快取 fallback — 讓下次 getGlbForSuspense 或 loadGlbShared 可自動重試
+      console.warn(`[glbLoader] Load failed (attempt ${info.count}/${MAX_RETRIES}), will retry:`, url, error)
+      // 不放入 cache，下次呼叫會觸發新的載入
+      return createFallbackAsset() // 本次呼叫者拿到 fallback，但不影響 cache
+    }
+
+    // ★ 多次重試都失敗 → 快取 fallback 避免無限重試，但 30 秒後可過期重試
+    console.warn(`[glbLoader] All ${MAX_RETRIES} retries failed, caching fallback:`, url, error)
     const fallback = createFallbackAsset()
     cache.set(url, fallback)
     return fallback
@@ -75,16 +130,29 @@ export function loadGlbShared(url: string): Promise<GlbAsset> {
 /**
  * Suspense 版本：同步讀快取，若未載入則 throw Promise。
  * 必須在 `<Suspense>` 內使用。
+ * ★ 如果快取的是過期 fallback，會清除並重新載入。
  */
 export function getGlbForSuspense(url: string): GlbAsset {
   const cached = cache.get(url)
-  if (cached) return cached
+  if (cached) {
+    // 過期 fallback → 清除並重新載入
+    if (cached.isFallback) {
+      const info = failedUrls.get(url)
+      if (info && Date.now() - info.lastFail > FALLBACK_EXPIRE_MS) {
+        cache.delete(url)
+        failedUrls.delete(url)
+        throw loadGlbShared(url)
+      }
+    }
+    return cached
+  }
   throw loadGlbShared(url)
 }
 
 /**
  * 預載入一個英雄的所有 GLB（mesh + 5 animations）。
  * 在 Canvas 掛載前呼叫，確保模型進入快取後 getGlbForSuspense 可同步讀取。
+ * ★ 並行載入所有檔案；每個檔案內建 20 秒超時 + 自動重試。
  */
 export function preloadHeroModel(modelId: string): Promise<void> {
   const folder = `${import.meta.env.BASE_URL}models/${modelId}`
@@ -96,6 +164,11 @@ export function preloadHeroModel(modelId: string): Promise<void> {
     loadGlbShared(`${folder}/${modelId}_dying.glb`),
     loadGlbShared(`${folder}/${modelId}_run.glb`),
   ]).then(() => {})
+}
+
+/** 判斷一個 asset 是否為載入失敗的 fallback */
+export function isGlbFallback(asset: GlbAsset): boolean {
+  return !!asset.isFallback || asset.scene.name === '__glb_load_failed__'
 }
 
 /**
