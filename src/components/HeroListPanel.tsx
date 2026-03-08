@@ -187,24 +187,7 @@ function HeroModelPreview({ modelId }: { modelId: string }) {
       <Canvas
         camera={{ position: [0, 0, 4.5], fov: 28 }}
         className="hero-model-canvas"
-        flat={isIOS}
-        gl={isIOS
-          ? ((defaultProps) => {
-              // ★ iOS 強制 WebGL1 — 與戰鬥場景一致，避免 WKWebView WebGL2 紋理分配 bug
-              const cvs = defaultProps.canvas as HTMLCanvasElement
-              const context = cvs.getContext('webgl', {
-                alpha: true,
-                antialias: false,
-                powerPreference: 'low-power',
-                preserveDrawingBuffer: false,
-              })!
-              const renderer = new THREE.WebGLRenderer({ canvas: cvs, context })
-              renderer.outputColorSpace = THREE.SRGBColorSpace
-              renderer.toneMapping = THREE.NoToneMapping
-              return renderer
-            }) as NonNullable<React.ComponentProps<typeof Canvas>['gl']>
-          : { alpha: true, antialias: true, powerPreference: 'low-power' }
-        }
+        gl={{ alpha: true, antialias: !isIOS, powerPreference: 'low-power' }}
         onCreated={({ gl }) => {
           gl.outputColorSpace = THREE.SRGBColorSpace
           if (isIOS) gl.toneMapping = THREE.NoToneMapping

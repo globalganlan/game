@@ -534,35 +534,21 @@ export default function App() {
             shadows={!/iPhone|iPad|iPod/.test(navigator.userAgent)}
             frameloop="always"
             dpr={responsive.dpr}
-            gl={(/iPhone|iPad|iPod/.test(navigator.userAgent))
-              ? ((defaultProps) => {
-                  // ★ iOS 強制 WebGL1 — WKWebView 的 WebGL2 有紋理分配 bug
-                  const cvs = defaultProps.canvas as HTMLCanvasElement
-                  const context = cvs.getContext('webgl', {
-                    alpha: false,
-                    antialias: false,
-                    powerPreference: 'default',
-                    preserveDrawingBuffer: false,
-                  })
-                  // context 可能為 null（iOS 記憶體壓力或 context 數量上限）
-                  const opts: THREE.WebGLRendererParameters = { canvas: cvs }
-                  if (context) opts.context = context
-                  const renderer = new THREE.WebGLRenderer(opts)
-                  renderer.outputColorSpace = THREE.SRGBColorSpace
-                  renderer.toneMapping = THREE.NoToneMapping
-                  return renderer
-                }) as NonNullable<React.ComponentProps<typeof Canvas>['gl']>
-              : { antialias: true }
-            }
+            gl={{
+              antialias: !/iPhone|iPad|iPod/.test(navigator.userAgent),
+              powerPreference: /iPhone|iPad|iPod/.test(navigator.userAgent) ? 'default' : 'high-performance',
+            }}
             onCreated={({ gl, scene }) => {
               const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent)
-              if (!isIOS) {
+              // ★ 色彩空間 — 所有平台統一 sRGB
+              gl.outputColorSpace = THREE.SRGBColorSpace
+              if (isIOS) {
+                // iOS: 關閉 tone mapping 避免 ACES 壓暗
+                gl.toneMapping = THREE.NoToneMapping
+              } else {
                 gl.shadowMap.enabled = true
                 gl.shadowMap.type = THREE.PCFShadowMap
               }
-              // ★ 顯式設定 sRGB 色彩空間 + 關閉 tone mapping（避免 ACES 壓暗）
-              gl.outputColorSpace = THREE.SRGBColorSpace
-              if (isIOS) gl.toneMapping = THREE.NoToneMapping
 
               // ── WebGL Context Lost / Restored 處理 ──
               const canvas = gl.domElement
