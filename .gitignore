@@ -29,3 +29,6 @@ dist-ssr
 
 # QA screenshots
 .ai/qa_screenshots/
+
+# GLB PNG backup files (from PNG→JPEG conversion)
+*.png-backup

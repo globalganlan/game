@@ -174,8 +174,6 @@ function NotifyLoaded({ onLoaded }: { onLoaded: () => void }) {
 function HeroModelPreview({ modelId }: { modelId: string }) {
   const [loaded, setLoaded] = useState(false)
   const onLoaded = useCallback(() => setLoaded(true), [])
-  const isIOS = useMemo(() => /iPhone|iPad|iPod/.test(navigator.userAgent), [])
-
   return (
     <div className="hero-model-preview">
       {!loaded && (
@@ -187,7 +185,7 @@ function HeroModelPreview({ modelId }: { modelId: string }) {
       <Canvas
         camera={{ position: [0, 0, 4.5], fov: 28 }}
         className="hero-model-canvas"
-        gl={{ alpha: true, antialias: !isIOS, powerPreference: 'low-power' }}
+        gl={{ alpha: true, antialias: true, powerPreference: 'low-power' }}
         onCreated={() => {
           // ★ 使用 R3F 預設 (ACES + sRGB) — 不覆寫，避免 iOS 紋理色彩問題
         }}

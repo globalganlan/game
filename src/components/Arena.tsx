@@ -10,7 +10,7 @@
  */
 
 import { useRef, useMemo } from 'react'
-import { useFrame, useThree } from '@react-three/fiber'
+import { useFrame } from '@react-three/fiber'
 import { Sky, Sparkles } from '@react-three/drei'
 import * as THREE from 'three'
 import type { DebrisItem, DebrisType } from '../types'
@@ -723,13 +723,6 @@ function createGroundGeometry(theme: SceneTheme): THREE.PlaneGeometry {
    Arena（場景主元件）
    ──────────────────────────── */
 
-/** iOS 替代天空 — 直接設定 scene.background 為純色，避免 Sky shader 在 WebGL1 編譯失敗 */
-function IOSBackground({ color }: { color: string }) {
-  const { scene } = useThree()
-  useMemo(() => { scene.background = new THREE.Color(color) }, [scene, color])
-  return null
-}
-
 interface ArenaProps {
   sceneMode?: SceneMode
   stageId?: string
@@ -737,8 +730,6 @@ interface ArenaProps {
 
 export function Arena({ sceneMode = 'story', stageId = '1-1' }: ArenaProps) {
   const theme = THEMES[sceneMode]
-  // iOS 偵測 — 降低 shadow map 尺寸以節省 GPU 記憶體
-  const isIOS = useMemo(() => /iPhone|iPad|iPod/.test(navigator.userAgent), [])
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const debris = useMemo(() => generateDebris(theme), [sceneMode])
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -746,19 +737,16 @@ export function Arena({ sceneMode = 'story', stageId = '1-1' }: ArenaProps) {
 
   return (
     <>
-      {/* ★ iOS WebGL1 不保證 Sky 的自訂 shader 正常編譯，改用 scene.background 純色 */}
-      {isIOS ? <IOSBackground color={theme.fogColor} /> : (
-        <Sky
-          distance={450000}
-          sunPosition={[0, theme.skyConfig.sunY, 0]}
-          inclination={0}
-          azimuth={1.25}
-          rayleigh={theme.skyConfig.rayleigh}
-          turbidity={theme.skyConfig.turbidity}
-        />
-      )}
+      <Sky
+        distance={450000}
+        sunPosition={[0, theme.skyConfig.sunY, 0]}
+        inclination={0}
+        azimuth={1.25}
+        rayleigh={theme.skyConfig.rayleigh}
+        turbidity={theme.skyConfig.turbidity}
+      />
       <Sparkles
-        count={isIOS ? Math.min(theme.sparkleCount, 30) : theme.sparkleCount}
+        count={theme.sparkleCount}
         scale={20}
         size={1.5}
         speed={0.4}
@@ -801,9 +789,9 @@ export function Arena({ sceneMode = 'story', stageId = '1-1' }: ArenaProps) {
         position={theme.dirLights[0]?.pos ?? [5, 25, 15]}
         intensity={theme.dirLights[0]?.intensity ?? 5}
         color={theme.dirLights[0]?.color ?? '#ffffff'}
-        castShadow={!isIOS}
-        shadow-mapSize-width={isIOS ? 512 : 2048}
-        shadow-mapSize-height={isIOS ? 512 : 2048}
+        castShadow
+        shadow-mapSize-width={2048}
+        shadow-mapSize-height={2048}
         shadow-camera-left={-15}
         shadow-camera-right={15}
         shadow-camera-top={15}

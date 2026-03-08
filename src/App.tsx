@@ -531,23 +531,18 @@ export default function App() {
               position: 'absolute', top: 0, left: 0, width: '100%', height: '100%',
             }}
             camera={{ position: responsive.camPos, fov: responsive.fov }}
-            shadows={!/iPhone|iPad|iPod/.test(navigator.userAgent)}
+            shadows
             frameloop="always"
             dpr={responsive.dpr}
             gl={{
-              antialias: !/iPhone|iPad|iPod/.test(navigator.userAgent),
-              powerPreference: /iPhone|iPad|iPod/.test(navigator.userAgent) ? 'default' : 'high-performance',
+              antialias: true,
+              powerPreference: 'high-performance',
             }}
             onCreated={({ gl, scene }) => {
-              const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent)
               // ★ 不設定 outputColorSpace / toneMapping — 使用 R3F 預設值
               // R3F 預設: outputColorSpace=SRGBColorSpace, toneMapping=ACESFilmicToneMapping
-              // 手動設定 outputColorSpace 會觸發 Three.js setter 重設 unpackColorSpace，
-              // 在 iOS Safari 可能導致紋理 sRGB 雙重轉換 → 模型全黑
-              if (!isIOS) {
-                gl.shadowMap.enabled = true
-                gl.shadowMap.type = THREE.PCFShadowMap
-              }
+              gl.shadowMap.enabled = true
+              gl.shadowMap.type = THREE.PCFShadowMap
 
               // ── WebGL Context Lost / Restored 處理 ──
               const canvas = gl.domElement
@@ -557,10 +552,8 @@ export default function App() {
               })
               canvas.addEventListener('webglcontextrestored', () => {
                 console.info('[WebGL] Context Restored — reinitializing renderer')
-                if (!isIOS) {
-                  gl.shadowMap.enabled = true
-                  gl.shadowMap.type = THREE.PCFShadowMap
-                }
+                gl.shadowMap.enabled = true
+                gl.shadowMap.type = THREE.PCFShadowMap
                 // ★ Context Restored: 重新上傳所有紋理（GPU 資料遺失）
                 scene.traverse((obj) => {
                   if ((obj as THREE.Mesh).isMesh) {

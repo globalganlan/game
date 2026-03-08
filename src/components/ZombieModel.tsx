@@ -88,16 +88,13 @@ export function ZombieModel({
 
     const cloned = SkeletonUtils.clone(meshAsset.scene)
 
-    // iOS 偵測
-    const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent)
-
     // 材質獨立化 — GLB 已是 MeshStandardMaterial，只需 clone 確保實例獨立
     // 並確保 emissive 乾淨以支援受擊紅色閃光
     cloned.traverse((child) => {
       if ((child as THREE.Mesh).isMesh) {
         const mesh = child as THREE.Mesh
-        mesh.castShadow = !isIOS
-        mesh.receiveShadow = !isIOS
+        mesh.castShadow = true
+        mesh.receiveShadow = true
         // ★ 關閉視錐剔除 — SkinnedMesh 骨架動畫的包圍盒可能不準確，
         //   在 iOS 上會導致模型被錯誤剔除（完全不渲染）
         mesh.frustumCulled = false
