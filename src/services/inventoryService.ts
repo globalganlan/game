@@ -273,11 +273,17 @@ export async function enhanceEquipment(equipId: string): Promise<{
   notify()
 
   const res = await callApi<{
-    newLevel: number; newMainStatValue: number; goldConsumed: number; error?: string
+    newLevel: number; newMainStatValue: number; goldConsumed: number; error?: string;
+    currencies?: { gold: number; diamond: number; exp: number }
   }>('enhance-equipment', { equipId })
 
   if (res.success) {
     eq.enhanceLevel = res.newLevel ?? eq.enhanceLevel
+    // 同步後端返回的最新貨幣值（強化扣除金幣）
+    if (res.currencies) {
+      const { applyCurrenciesFromServer } = await import('./saveService')
+      applyCurrenciesFromServer(res.currencies)
+    }
     notify()
     return { success: true, newLevel: res.newLevel, newMainStatValue: res.newMainStatValue, goldConsumed: res.goldConsumed }
   } else {

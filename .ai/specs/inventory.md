@@ -1,6 +1,6 @@
 # 背包與道具系統 Spec
 
-> 版本：v3.3 ｜ 狀態：🟢 已實作
+> 版本：v3.4 ｜ 狀態：🟢 已實作
 > 最後更新：2026-03-08
 > 負賬角色：🎯 GAME_DESIGN → 🔧 CODING
 
@@ -363,7 +363,8 @@ type SortMode = 'default' | 'rarity-desc' | 'quantity-desc' | 'name-asc'
 | 點擊查看 | 點擊道具 → ItemDetail 彈窗（名稱、稀有度、描述、數量、出售價格） |
 | 英雄碎片辨識 | `asc_fragment_{heroId}` 自動顯示英雄縮圖 + 🧩 角標 + 英雄名稱中文（`resolveFallbackName` 優先於 DB 定義） |
 | 使用按鈕 | 寶箱開啟 / 經驗核心升級（依 item.useAction 判斷） |
-| 寶箱開啟結果 | 寶箱使用後顯示詳細獎勵明細（「🎉 開啟獲得：💰 金幣 ×1,973、💚 經驗 ×200」格式），透過 `updateLocalCurrency()` 同步前端貨幣。**v3.2 新增**：數量歸零時自動關閉詳情面板（1.2~1.5 秒延遲） |
+| 寶箱開啟結果 | 寶箱使用後顯示詳細獎勵明細（「🎉 開啟獲得：💰 金幣 ×1,973、💚 經驗 ×200」格式），透過 `updateLocalCurrency()` 同步前端貨幣。**v3.2 新增**：數量歸零時自動關閉詳情面板（1.2~1.5 秒延遲）。**v3.4 新增**：裝備寶箱批量開啟後顯示稀有度統計（「🎉 開啟 N 個獲得：SR×1、R×2、N×2」格式） |
+| 寶箱批量開啟 | **v3.4 新增**：寶箱數量 > 1 時顯示數量選擇器（−/−10/輸入框/+10/+/MAX 按鈕 + 滑桿），支援一次開啟多個寶箱。裝備寶箱前端批量生成 N 件裝備 → `addEquipmentLocally` → `useItem` 帶 equipment extra；一般寶箱直接傳 quantity 給後端。CSS：`.inv-chest-qty-*` 系列 |
 | 出售按鈕 | 道具換金幣（顯示價格 + 確認） |
 | 裝備按鈕 | 裝備詳情中 equip/unequip 操作（彈出英雄選擇 popup，顯示實際英雄名） |
 | 分解按鈕 | 裝備詳情中分解操作（呼叫 `/decompose-equipment`），回收金幣 + 裝備碎片（`equip_scrap`） |
@@ -377,7 +378,7 @@ type SortMode = 'default' | 'rarity-desc' | 'quantity-desc' | 'name-asc'
 | 操作 | 狀態 |
 |------|------|
 | 批量出售 | ❌ 未實作（單件出售已實作） |
-| 批量使用 | ❌ 未實作 |
+| 批量使用（寶箱） | ✅ 已實作（v3.4 寶箱批量開啟） |
 
 ---
 
@@ -498,5 +499,6 @@ type SortMode = 'default' | 'rarity-desc' | 'quantity-desc' | 'name-asc'
 | v2.9 | 2026-03-05 | **Server-First 庫存操作**：`sellItems` / `useItem` 改為 API 先調、成功後才扣本地庫存；`sellItems` 失敗回傳 0（移除 estimatedGold fallback）；`ShopPanel.handlePurchase` 改為 API 先調、成功後才扣本地貨幣/加道具，失敗顯示「購買失敗」toast |
 | v3.1 | 2026-03-07 | **pvp_coin 即時同步**：ArenaPanel 掃蕩 + runBattleLoop 競技場勝利/敗北，pvp_coin 獲得後立即呼叫 `addItemsLocally` 寫入本地快取 |
 | v3.2 | 2026-03-07 | **寶箱開啟改善 + 素材 Tab 移除 + 商店批量購買**：①寶箱開啟後顯示詳細獎勵明細（💰/💚/💎 emoji + 名稱 ×數量，多種獎勵以「、」分隔）②寶箱數量歸零時自動關閉詳情面板（1.2~1.5s 延遲）③移除「🧪 素材」Tab（general_material 無實際道具用途）④商店購買按鈕改為彈出批量購買 Modal：數量控制（−/−10/輸入/+10/+/MAX）、滑桿、獎勵預覽、餘額不足紅字、每日剩餘、確認購買⑤後端 shop-buy 支援 `quantity` 參數（1~999），批量扣款+批量發放，每日限量檢查 |
+| v3.4 | 2026-03-08 | **寶箱批量開啟**：①ItemDetail 新增數量選擇器（`openQty` state）：−/−10/輸入框/+10/+/MAX 按鈕 + range slider，僅在寶箱且數量>1 時顯示 ②`handleUse` 支援批量：裝備寶箱前端 `Array.from({length: useQty}, () => openEquipmentChest())` 批量生成裝備 → `addEquipmentLocally` → `useItem` 帶 equipment extra；一般寶箱直接傳 quantity 給後端 ③裝備寶箱開啟結果顯示稀有度統計（「🎉 開啟 N 個獲得：SR×1、R×2」）④按鈕文字動態切換（「開啟」/「開啟 ×N」）⑤新增 `.inv-chest-qty-*` CSS 樣式（section/label/controls/btn/max-btn/input/slider） |
 | v3.3 | 2026-03-08 | **裝備鎖定恢復 + 批次分解 SQL 修復**：①恢復裝備鎖定/解鎖 UI（EquipmentDetail 彈窗新增 🔓鎖定/🔒已鎖定 切換按鈕）②裝備格子顯示 🔒 鎖定徽章（`.inv-equip-lock-badge`）③鎖定裝備隱藏分解按鈕 + 一鍵分解自動排除（前端+後端雙重檢查）④`/decompose-equipment` 改為分段 SELECT/batch（CHUNK_SIZE=80），修復 `D1_ERROR: too many SQL variables` 溢位⑤後端額外過濾 `locked` 裝備，回傳 `skippedLocked` 計數⑥新增 `.inv-lock-btn` / `.inv-lock-btn-active` CSS 樣式 |
 | v3.0 | 2026-03-06 | **移除廢棄強化石 + 商店獎勵同步**：①背包新增 `DEPRECATED_ITEMS` 過濾器，隱藏已廢棄的 `eqm_enhance_s/m/l`（前端 InventoryPanel）②雜貨商店 `daily_enhance_s` → `daily_forge_ore`（forge_ore_common ×5）③星塵商店 `sd_enhance_l` → `sd_forge_rare`（forge_ore_rare ×3）④碎片兌換 `scrap_enhance_s/m/l` → `scrap_forge_common`（forge_ore_common ×5）+ `scrap_forge_rare`（forge_ore_rare ×2）⑤寶箱掉落 `generateChestRewards` 全面替換強化石為鍛造礦 ⑥物品資訊彈窗（`ItemInfoPopup`）z-index 提升至 99999，確保永遠在最上層 ⑦簽到彈窗描述新增 `white-space: pre-wrap` 支援換行 |

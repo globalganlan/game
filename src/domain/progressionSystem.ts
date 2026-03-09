@@ -365,6 +365,15 @@ export function getEnhanceCost(currentLevel: number, rarity: Rarity): number {
   return Math.floor(baseCost[rarity] * (1 + currentLevel * 0.3))
 }
 
+/** 從 Lv.0 強化到指定等級的累計金幣消耗（分解時 100% 返還用） */
+export function getTotalEnhanceCost(enhanceLevel: number, rarity: Rarity): number {
+  let total = 0
+  for (let lv = 0; lv < enhanceLevel; lv++) {
+    total += getEnhanceCost(lv, rarity)
+  }
+  return total
+}
+
 /** 計算裝備容量上限 */
 export function getEquipmentCapacity(expandCount: number): number {
   return Math.min(EQUIPMENT_SLOT_MAX, EQUIPMENT_SLOT_BASE + expandCount * EQUIPMENT_SLOT_EXPAND)

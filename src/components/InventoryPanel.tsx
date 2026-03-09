@@ -23,7 +23,7 @@ import {
   type InventoryState,
 } from '../services/inventoryService'
 import type { EquipmentInstance } from '../domain/progressionSystem'
-import { enhancedMainStat, getMaxEnhanceLevel, getEnhanceCost } from '../domain/progressionSystem'
+import { enhancedMainStat, getMaxEnhanceLevel, getEnhanceCost, getTotalEnhanceCost } from '../domain/progressionSystem'
 import { emitAcquire } from '../services/acquireToastBus'
 import { emitToast } from '../services/acquireToastBus'
 import { openEquipmentChest, getEquipDisplayName, SET_NAMES } from '../domain/equipmentGacha'
@@ -487,8 +487,10 @@ function EquipmentDetail({ equip, onClose, heroInstances, heroNameMap }: Equipme
   }
   const decomposePreview = useMemo(() => {
     const reward = DECOMPOSE_REWARDS[localEquip.rarity] || DECOMPOSE_REWARDS['N']
+    const enhanceRefund = getTotalEnhanceCost(localEquip.enhanceLevel ?? 0, localEquip.rarity as 'N' | 'R' | 'SR' | 'SSR')
     return {
-      gold: reward.gold + (localEquip.enhanceLevel ?? 0) * 50,
+      gold: reward.gold + enhanceRefund,
+      enhanceRefund,
       scrap: reward.scrap,
     }
   }, [localEquip.rarity, localEquip.enhanceLevel])
@@ -587,9 +589,9 @@ function EquipmentDetail({ equip, onClose, heroInstances, heroNameMap }: Equipme
           <div className="inv-decompose-confirm">
             <div className="inv-decompose-confirm-title">確定要分解此裝備？</div>
             <div className="inv-decompose-confirm-rewards">
-              <span>返還：<CurrencyIcon type="gold" /> {decomposePreview.gold} 金幣</span>
-              {localEquip.enhanceLevel > 0 && (
-                <span className="inv-decompose-enhance-note">（含強化補償 +{localEquip.enhanceLevel * 50}）</span>
+              <span>返還：<CurrencyIcon type="gold" /> {decomposePreview.gold.toLocaleString()} 金幣</span>
+              {decomposePreview.enhanceRefund > 0 && (
+                <span className="inv-decompose-enhance-note">（含強化金幣 100% 返還 +{decomposePreview.enhanceRefund.toLocaleString()}）</span>
               )}
               <span>返還：🔩 {decomposePreview.scrap} 裝備碎片</span>
             </div>

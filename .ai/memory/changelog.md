@@ -4,6 +4,27 @@
 
 ---
 
+### [2026-03-09] 裝備寶箱 toast 合併同名同稀有度
+- **觸發者**：使用者需求
+- **執行角色**：🔧 CODING + 🧪 QA
+- **變更內容**：
+  1. **InventoryPanel.tsx**：`handleUse` 的裝備寶箱路徑，`emitAcquire` 前以 `Map<displayName_rarity, AcquireItem>` 合併同名+同稀有度裝備，quantity 累加。Toast 從每件裝備一條改為合併後一條附帶數量（如「疾風武器 ×3」）
+- **Commit**：`972e751`
+
+---
+
+### [2026-03-08] 寶箱批量開啟 — 數量選擇器
+- **觸發者**：使用者需求
+- **執行角色**：🔧 CODING + 🧪 QA
+- **變更內容**：
+  1. **InventoryPanel.tsx**：ItemDetail 新增 `openQty` state + 數量選擇器 UI（−/−10/輸入框/+10/+/MAX 按鈕 + range slider），僅在寶箱且數量>1 時顯示；`handleUse` 支援批量：裝備寶箱前端 `Array.from({length}, openEquipmentChest)` 批量生成 → `addEquipmentLocally` → `useItem` 帶 equipment extra；一般寶箱直接傳 quantity 給後端；開啟結果顯示稀有度統計（「🎉 開啟 N 個獲得：SR×1、R×2」）；按鈕文字動態切換（「開啟」/「開啟 ×N」）
+  2. **App.css**：新增 `.inv-chest-qty-section` / `.inv-chest-qty-label` / `.inv-chest-qty-controls` / `.inv-chest-qty-btn` / `.inv-chest-max-btn` / `.inv-chest-qty-input` / `.inv-chest-qty-slider` 樣式
+- **後端**：無需修改（`/use-item` 已支援 `quantity > 1` + equipment 陣列）
+- **Spec 更新**：`inventory.md` v3.3→v3.4
+- **Commit**：`c8961b4`
+
+---
+
 ### [2026-03-08] 裝備鎖定恢復 + 批次分解 SQL 溢位修復
 - **觸發者**：使用者需求
 - **執行角色**：🔧 CODING + 🧪 QA

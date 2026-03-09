@@ -572,8 +572,14 @@ inventory.post('/decompose-equipment', async (c) => {
 
   for (const eq of decomposable) {
     const reward = DECOMPOSE_REWARDS[eq.rarity] || DECOMPOSE_REWARDS['N'];
-    // 強化等級額外金幣
-    totalGold += reward.gold + eq.enhanceLevel * 50;
+    // 強化等級：100% 返還實際強化消耗金幣
+    const enhBaseGold: Record<string, number> = { N: 200, R: 500, SR: 1000, SSR: 2000 };
+    const ebg = enhBaseGold[eq.rarity] || 500;
+    let enhanceRefund = 0;
+    for (let lv = 0; lv < eq.enhanceLevel; lv++) {
+      enhanceRefund += Math.floor(ebg * (1 + lv * 0.3));
+    }
+    totalGold += reward.gold + enhanceRefund;
     totalScrap += reward.scrap;
     stmts.push(db.prepare(
       'DELETE FROM equipment_instances WHERE equipId = ? AND playerId = ?'
