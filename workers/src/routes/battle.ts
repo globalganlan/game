@@ -253,7 +253,8 @@ battle.post('/complete-battle', async (c) => {
     if (isBoss) {
       rewards.items.push({ itemId: 'chest_equipment', quantity: 1 });
     } else if (floor % 5 === 0) {
-      if (Math.random() < 0.5) rewards.items.push({ itemId: 'exp', quantity: 500 });
+      // 每 5 層（非 Boss）50% 機率額外 +500 exp，直接併入 exp
+      if (Math.random() < 0.5) rewards.exp += 500;
     }
     newFloor = floor + 1;  // 下一層（已通關 floor，下次從 floor+1 開始）
 

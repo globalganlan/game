@@ -35,7 +35,6 @@ export interface StageConfig {
   enemies: StageEnemy[]
   recommendedLevel: number
   rewards: StageReward
-  firstClearRewards: StageReward
 }
 
 export interface TowerFloorConfig {
@@ -199,15 +198,15 @@ export function getTowerFloorConfig(floor: number): TowerFloorConfig {
 
 export function getTowerReward(floor: number): StageReward {
   const isBossFloor = floor % 10 === 0
+  // 每 5 層（非 Boss）50% 機率額外 +500 exp，直接併入 exp 欄位
+  const bonusExp = (!isBossFloor && floor % 5 === 0 && Math.random() < 0.5) ? 500 : 0
   return {
-    exp: 50 + floor * 10,
+    exp: 50 + floor * 10 + bonusExp,
     gold: 100 + floor * 20,
     diamond: isBossFloor ? 50 : 0,
     items: isBossFloor
       ? [{ itemId: 'chest_equipment', quantity: 1, dropRate: 1.0 }]
-      : floor % 5 === 0
-        ? [{ itemId: 'exp', quantity: 500, dropRate: 0.5 }]
-        : [],
+      : [],
   }
 }
 
