@@ -1,4 +1,4 @@
-/**
+﻿/**
  * ChestLootPreview — 寶箱可開出內容物 & 機率預覽
  *
  * 根據寶箱 ID 顯示完整獎勵表。
@@ -6,7 +6,7 @@
  */
 
 import { getChestRates } from '../domain/equipmentGacha'
-import { CurrencyIcon } from './CurrencyIcon'
+import { CurrencyIcon, ItemIcon } from './CurrencyIcon'
 
 /* ────────────────────────────
    獎勵表資料定義
@@ -40,7 +40,7 @@ const CHEST_LOOT_TABLES: Record<string, LootEntry[]> = {
     { icon: <CurrencyIcon type="diamond" />,  name: '鑽石',     amount: '30~79',        chance: 1 },
     { icon: <CurrencyIcon type="exp" />,      name: '經驗',     amount: '4,000',        chance: 1 },
     { icon: '📦',                             name: '裝備寶箱',  amount: '×1',          chance: 0.4, rarity: 'SR' },
-    { icon: '�️',                             name: '英雄召喚券', amount: '×1',          chance: 0.2, rarity: 'SR' },
+    { icon: <ItemIcon itemId="gacha_ticket_hero" />, name: '英雄召喚券', amount: '×1',          chance: 0.2, rarity: 'SR' },
   ],
   chest_equipment: [], // 由下方動態建立
 }
