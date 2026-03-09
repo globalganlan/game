@@ -342,17 +342,28 @@ inventory.post('/use-item', async (c) => {
     const equipment = body.equipment;
     const chestStmts: D1PreparedStatement[] = [upsertItemStmt(db, playerId, itemId, -qty)];
     if (equipment) {
-      const saveData = await db.prepare(
-        'SELECT equipment FROM save_data WHERE playerId = ?'
-      ).bind(playerId).first<Pick<SaveDataRow, 'equipment'>>();
-      const equipArr = safeJsonParse<unknown[]>(saveData?.equipment, []);
-      const newEquips = Array.isArray(equipment) ? equipment : [equipment];
-      equipArr.push(...newEquips);
-      chestStmts.push(db.prepare(
-        'UPDATE save_data SET equipment = ? WHERE playerId = ?'
-      ).bind(JSON.stringify(equipArr), playerId));
+      const newEquips: any[] = Array.isArray(equipment) ? equipment : [equipment];
+      const now = isoNow();
+      // 同步寫入 equipment_instances 表（與 gacha 路線一致，確保 decompose/equip 等操作可查詢）
+      for (const eq of newEquips) {
+        chestStmts.push(db.prepare(
+          `INSERT OR IGNORE INTO equipment_instances
+           (playerId, equipId, templateId, setId, slot, rarity, mainStat, mainStatValue, enhanceLevel, subStats, equippedBy, locked, obtainedAt)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        ).bind(
+          playerId, eq.equipId || `eq_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+          eq.templateId || '', eq.setId || '', eq.slot || '', eq.rarity || 'N',
+          eq.mainStat || '', eq.mainStatValue ?? eq.mainValue ?? 0,
+          eq.enhanceLevel ?? eq.level ?? 0, JSON.stringify(eq.subStats || []),
+          '', eq.locked ? 1 : 0, now,
+        ));
+      }
     }
-    await db.batch(chestStmts);
+    // 分批 batch（D1 單批約 80 條上限）
+    const BATCH_LIMIT = 50;
+    for (let i = 0; i < chestStmts.length; i += BATCH_LIMIT) {
+      await db.batch(chestStmts.slice(i, i + BATCH_LIMIT));
+    }
     return c.json({ success: true, result: { used: itemId, quantity: qty, type: 'equipment', equipment } });
   }
 
