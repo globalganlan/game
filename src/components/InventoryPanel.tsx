@@ -398,7 +398,9 @@ interface EquipmentDetailProps {
 function EquipmentDetail({ equip, onClose, heroInstances, heroNameMap }: EquipmentDetailProps) {
   const [actionMsg, setActionMsg] = useState('')
   const [showHeroSelect, setShowHeroSelect] = useState(false)
-  const [isProcessing, setIsProcessing] = useState(false)
+  const [lockingBusy, setLockingBusy] = useState(false)
+  const [enhanceBusy, setEnhanceBusy] = useState(false)
+  const [decomposeBusy, setDecomposeBusy] = useState(false)
   const [localEquip, setLocalEquip] = useState(equip)
   const [showDecomposeConfirm, setShowDecomposeConfirm] = useState(false)
   const slotLabel = localEquip.slot === 'weapon' ? '武器' : localEquip.slot === 'armor' ? '護甲'
@@ -438,12 +440,12 @@ function EquipmentDetail({ equip, onClose, heroInstances, heroNameMap }: Equipme
   }, [localEquip.equipId, localEquip.slot])
 
   const handleToggleLock = useCallback(async () => {
-    if (isProcessing) return
-    setIsProcessing(true)
+    if (lockingBusy) return
+    setLockingBusy(true)
     const newLocked = !localEquip.locked
     emitToast(newLocked ? '⏳ 鎖定中...' : '⏳ 解鎖中...')
     const ok = await lockEquipment(localEquip.equipId, newLocked)
-    setIsProcessing(false)
+    setLockingBusy(false)
     if (ok) {
       setLocalEquip(prev => ({ ...prev, locked: newLocked }))
       emitToast(newLocked ? '🔒 裝備已鎖定' : '🔓 裝備已解鎖')
@@ -452,17 +454,17 @@ function EquipmentDetail({ equip, onClose, heroInstances, heroNameMap }: Equipme
       setActionMsg('操作失敗')
       emitToast('❌ 鎖定操作失敗')
     }
-  }, [localEquip.equipId, localEquip.locked, isProcessing])
+  }, [localEquip.equipId, localEquip.locked, lockingBusy])
 
   const handleDecompose = useCallback(async () => {
-    if (isProcessing) return
+    if (decomposeBusy) return
     if (localEquip.equippedBy) { setActionMsg('請先卸下裝備再分解'); return }
     if (localEquip.locked) { setActionMsg('請先解鎖裝備再分解'); return }
     if (!showDecomposeConfirm) { setShowDecomposeConfirm(true); return }
-    setIsProcessing(true)
+    setDecomposeBusy(true)
     emitToast('⏳ 分解中...')
     const res = await decomposeEquipment([localEquip.equipId])
-    setIsProcessing(false)
+    setDecomposeBusy(false)
     if (res.success) {
       emitToast(`♻️ 分解獲得 ${res.goldGained} 金幣 + ${res.scrapGained} 裝備碎片`)
       emitAcquire([
@@ -476,7 +478,7 @@ function EquipmentDetail({ equip, onClose, heroInstances, heroNameMap }: Equipme
       emitToast(`❌ 分解失敗：${errMsg}`)
       setShowDecomposeConfirm(false)
     }
-  }, [localEquip, isProcessing, onClose, showDecomposeConfirm])
+  }, [localEquip, decomposeBusy, onClose, showDecomposeConfirm])
 
   // 分解預覽獎勵
   const DECOMPOSE_REWARDS: Record<string, { gold: number; scrap: number }> = {
@@ -492,11 +494,11 @@ function EquipmentDetail({ equip, onClose, heroInstances, heroNameMap }: Equipme
   }, [localEquip.rarity, localEquip.enhanceLevel])
 
   const handleEnhance = useCallback(async () => {
-    if (isProcessing || !canEnhance) return
-    setIsProcessing(true)
+    if (enhanceBusy || !canEnhance) return
+    setEnhanceBusy(true)
     emitToast('⏳ 強化中...')
     const res = await enhanceEquipment(localEquip.equipId)
-    setIsProcessing(false)
+    setEnhanceBusy(false)
     if (res.success) {
       setLocalEquip(prev => ({ ...prev, enhanceLevel: res.newLevel ?? prev.enhanceLevel + 1 }))
       setActionMsg(`強化成功！+${res.newLevel}`)
@@ -506,7 +508,7 @@ function EquipmentDetail({ equip, onClose, heroInstances, heroNameMap }: Equipme
       setActionMsg(`強化失敗：${errMsg}`)
       emitToast(`❌ 強化失敗：${errMsg}`)
     }
-  }, [localEquip.equipId, isProcessing, canEnhance])
+  }, [localEquip.equipId, enhanceBusy, canEnhance])
 
   // 英雄名稱解析
   const getHeroName = useCallback((instId: string) => {
@@ -557,8 +559,8 @@ function EquipmentDetail({ equip, onClose, heroInstances, heroNameMap }: Equipme
         )}
         {actionMsg && <div className="inv-action-msg">{actionMsg}</div>}
         <div className="inv-detail-actions">
-          <button className={`inv-action-btn ${localEquip.locked ? 'inv-lock-btn-active' : 'inv-lock-btn'}`} onClick={handleToggleLock} disabled={isProcessing}>
-            {localEquip.locked ? '🔒 已鎖定' : '🔓 鎖定'}
+          <button className={`inv-action-btn ${localEquip.locked ? 'inv-lock-btn-active' : 'inv-lock-btn'}`} onClick={handleToggleLock} disabled={lockingBusy}>
+            {lockingBusy ? '⏳ 處理中...' : localEquip.locked ? '🔒 已鎖定' : '🔓 鎖定'}
           </button>
           {localEquip.equippedBy ? (
             <button className="inv-action-btn inv-sell-btn" onClick={handleUnequip}>
@@ -570,13 +572,13 @@ function EquipmentDetail({ equip, onClose, heroInstances, heroNameMap }: Equipme
             </button>
           )}
           {canEnhance && (
-            <button className="inv-action-btn inv-use-btn" onClick={handleEnhance} disabled={isProcessing}>
-              {isProcessing ? '強化中...' : `⚒️ 強化（${enhanceCost} 金）`}
+            <button className="inv-action-btn inv-use-btn" onClick={handleEnhance} disabled={enhanceBusy}>
+              {enhanceBusy ? '⏳ 強化中...' : `⚒️ 強化（${enhanceCost} 金）`}
             </button>
           )}
           {!localEquip.equippedBy && !localEquip.locked && !showDecomposeConfirm && (
-            <button className="inv-action-btn inv-decompose-btn" onClick={handleDecompose} disabled={isProcessing}>
-              {isProcessing ? '分解中...' : '♻️ 分解'}
+            <button className="inv-action-btn inv-decompose-btn" onClick={handleDecompose} disabled={decomposeBusy}>
+              {decomposeBusy ? '⏳ 分解中...' : '♻️ 分解'}
             </button>
           )}
         </div>
@@ -592,8 +594,8 @@ function EquipmentDetail({ equip, onClose, heroInstances, heroNameMap }: Equipme
               <span>返還：🔩 {decomposePreview.scrap} 裝備碎片</span>
             </div>
             <div className="inv-decompose-confirm-btns">
-              <button className="inv-action-btn inv-decompose-btn" onClick={handleDecompose} disabled={isProcessing}>
-                {isProcessing ? '分解中...' : '確認分解'}
+              <button className="inv-action-btn inv-decompose-btn" onClick={handleDecompose} disabled={decomposeBusy}>
+                {decomposeBusy ? '⏳ 分解中...' : '確認分解'}
               </button>
               <button className="inv-action-btn inv-cancel-btn" onClick={() => setShowDecomposeConfirm(false)}>
                 取消
