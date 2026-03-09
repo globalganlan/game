@@ -415,7 +415,10 @@ function EquipmentDetail({ equip, onClose, heroInstances, heroNameMap }: Equipme
       await unequipItem(localEquip.equipId)
       setActionMsg('已卸下裝備')
       emitToast('✅ 已卸下裝備')
-    } catch { setActionMsg('卸下失敗') }
+    } catch {
+      setActionMsg('卸下失敗')
+      emitToast('❌ 卸下裝備失敗')
+    }
   }, [localEquip.equipId])
 
   const handleEquipTo = useCallback(async (heroInstId: string, heroName: string) => {
@@ -426,7 +429,10 @@ function EquipmentDetail({ equip, onClose, heroInstances, heroNameMap }: Equipme
       setActionMsg(`已裝備給 ${heroName}`)
       emitToast(`✅ 已裝備給 ${heroName}${conflict ? '（舊裝備已自動卸下）' : ''}`)
       setShowHeroSelect(false)
-    } catch { setActionMsg('裝備失敗') }
+    } catch {
+      setActionMsg('裝備失敗')
+      emitToast('❌ 裝備失敗')
+    }
   }, [localEquip.equipId, localEquip.slot])
 
   const handleToggleLock = useCallback(async () => {
@@ -441,6 +447,7 @@ function EquipmentDetail({ equip, onClose, heroInstances, heroNameMap }: Equipme
       setActionMsg(newLocked ? '已鎖定' : '已解鎖')
     } else {
       setActionMsg('操作失敗')
+      emitToast('❌ 鎖定操作失敗')
     }
   }, [localEquip.equipId, localEquip.locked, isProcessing])
 
@@ -460,7 +467,9 @@ function EquipmentDetail({ equip, onClose, heroInstances, heroNameMap }: Equipme
       ])
       onClose()
     } else {
-      setActionMsg(`分解失敗：${res.error === 'cannot_decompose_equipped' ? '請先卸下裝備' : res.error}`)
+      const errMsg = res.error === 'cannot_decompose_equipped' ? '請先卸下裝備' : (res.error ?? '未知錯誤')
+      setActionMsg(`分解失敗：${errMsg}`)
+      emitToast(`❌ 分解失敗：${errMsg}`)
       setShowDecomposeConfirm(false)
     }
   }, [localEquip, isProcessing, onClose, showDecomposeConfirm])
@@ -488,7 +497,9 @@ function EquipmentDetail({ equip, onClose, heroInstances, heroNameMap }: Equipme
       setActionMsg(`強化成功！+${res.newLevel}`)
       emitToast(`⚒️ 強化成功！+${res.newLevel}`)
     } else {
-      setActionMsg(`強化失敗：${res.error === 'insufficient_gold' ? '金幣不足' : res.error === 'max_enhance_level' ? '已達最高等級' : res.error}`)
+      const errMsg = res.error === 'insufficient_gold' ? '金幣不足' : res.error === 'max_enhance_level' ? '已達最高等級' : (res.error ?? '未知錯誤')
+      setActionMsg(`強化失敗：${errMsg}`)
+      emitToast(`❌ 強化失敗：${errMsg}`)
     }
   }, [localEquip.equipId, isProcessing, canEnhance])
 
@@ -748,7 +759,9 @@ export function InventoryPanel({ onBack, heroesList, heroInstances }: InventoryP
         { type: 'item', id: 'equip_scrap', name: '裝備碎片', quantity: res.scrapGained ?? 0 },
       ])
     } else {
-      setBulkResult(`❌ ${res.error === 'cannot_decompose_equipped' ? '含有穿戴中裝備' : res.error ?? '分解失敗'}`)
+      const errMsg = res.error === 'cannot_decompose_equipped' ? '含有穿戴中裝備' : (res.error ?? '分解失敗')
+      setBulkResult(`❌ ${errMsg}`)
+      emitToast(`❌ 批量分解失敗：${errMsg}`)
     }
   }, [isBulkProcessing, bulkDecomposeTargets])
 
