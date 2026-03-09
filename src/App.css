@@ -3286,6 +3286,28 @@
   text-shadow: 0 1px 2px rgba(0,0,0,0.4);
 }
 
+.inv-equip-lock-badge {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  font-size: 0.6rem;
+  line-height: 1;
+  filter: drop-shadow(0 1px 2px rgba(0,0,0,0.6));
+}
+
+/* 鎖定/解鎖按鈕 */
+.inv-lock-btn {
+  background: rgba(255,255,255,0.06) !important;
+  border-color: rgba(255,255,255,0.15) !important;
+  color: #aaa !important;
+}
+.inv-lock-btn:hover { background: rgba(255,255,255,0.12) !important; }
+.inv-lock-btn-active {
+  background: rgba(255,200,50,0.15) !important;
+  border-color: rgba(255,200,50,0.4) !important;
+  color: #ffc832 !important;
+}
+
 .inv-equip-detail .inv-equip-main-stat {
   display: flex;
   justify-content: space-between;

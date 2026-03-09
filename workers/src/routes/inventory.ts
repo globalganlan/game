@@ -527,23 +527,35 @@ inventory.post('/decompose-equipment', async (c) => {
   const equipIds = body.equipIds as string[];
   if (!equipIds?.length) return c.json({ success: false, error: 'missing equipIds' });
 
-  // 查詢所有待分解裝備
-  const placeholders = equipIds.map(() => '?').join(',');
-  const equipRows = await db.prepare(
-    `SELECT equipId, rarity, equippedBy, enhanceLevel FROM equipment_instances WHERE playerId = ? AND equipId IN (${placeholders})`
-  ).bind(playerId, ...equipIds).all<{ equipId: string; rarity: string; equippedBy: string; enhanceLevel: number }>();
+  // 分批查詢避免 SQL 變數過多（D1 限制約 100 個綁定變數）
+  const CHUNK_SIZE = 80;
+  const allRows: { equipId: string; rarity: string; equippedBy: string; locked: number; enhanceLevel: number }[] = [];
+  for (let i = 0; i < equipIds.length; i += CHUNK_SIZE) {
+    const chunk = equipIds.slice(i, i + CHUNK_SIZE);
+    const placeholders = chunk.map(() => '?').join(',');
+    const rows = await db.prepare(
+      `SELECT equipId, rarity, equippedBy, locked, enhanceLevel FROM equipment_instances WHERE playerId = ? AND equipId IN (${placeholders})`
+    ).bind(playerId, ...chunk).all<{ equipId: string; rarity: string; equippedBy: string; locked: number; enhanceLevel: number }>();
+    allRows.push(...rows.results);
+  }
 
-  if (equipRows.results.length === 0) return c.json({ success: false, error: 'no_valid_equipment' });
+  if (allRows.length === 0) return c.json({ success: false, error: 'no_valid_equipment' });
 
-  // 不能分解穿戴中的裝備
-  const wearing = equipRows.results.find(e => e.equippedBy);
-  if (wearing) return c.json({ success: false, error: 'cannot_decompose_equipped' });
+  // 過濾掉穿戴中和已鎖定的裝備
+  const decomposable = allRows.filter(e => !e.equippedBy && !e.locked);
+  if (decomposable.length === 0) {
+    const hasEquipped = allRows.some(e => !!e.equippedBy);
+    const hasLocked = allRows.some(e => !!e.locked);
+    const reason = hasEquipped && hasLocked ? 'all_equipped_or_locked'
+      : hasEquipped ? 'cannot_decompose_equipped' : 'cannot_decompose_locked';
+    return c.json({ success: false, error: reason });
+  }
 
   let totalGold = 0;
   let totalScrap = 0;
   const stmts: D1PreparedStatement[] = [];
 
-  for (const eq of equipRows.results) {
+  for (const eq of decomposable) {
     const reward = DECOMPOSE_REWARDS[eq.rarity] || DECOMPOSE_REWARDS['N'];
     // 強化等級額外金幣
     totalGold += reward.gold + eq.enhanceLevel * 50;
@@ -559,14 +571,19 @@ inventory.post('/decompose-equipment', async (c) => {
   ).bind(totalGold, playerId));
   stmts.push(upsertItemStmt(db, playerId, 'equip_scrap', totalScrap));
 
-  await db.batch(stmts);
+  // D1 batch 限制：分批執行（每批最多 80 條語句）
+  for (let i = 0; i < stmts.length; i += CHUNK_SIZE) {
+    await db.batch(stmts.slice(i, i + CHUNK_SIZE));
+  }
+
   const currencies = await getCurrencies(db, playerId);
 
   return c.json({
     success: true,
-    decomposed: equipRows.results.length,
+    decomposed: decomposable.length,
     goldGained: totalGold,
     scrapGained: totalScrap,
+    skippedLocked: allRows.length - decomposable.length,
     currencies,
   });
 });

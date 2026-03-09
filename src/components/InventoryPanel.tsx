@@ -28,7 +28,7 @@ import { enhancedMainStat, getMaxEnhanceLevel, getEnhanceCost } from '../domain/
 import { emitAcquire } from '../services/acquireToastBus'
 import { emitToast } from '../services/acquireToastBus'
 import { openEquipmentChest, getEquipDisplayName, SET_NAMES } from '../domain/equipmentGacha'
-import { addEquipmentLocally, equipItem, unequipItem, getHeroEquipment, getItemQuantity } from '../services/inventoryService'
+import { addEquipmentLocally, equipItem, unequipItem, getHeroEquipment, getItemQuantity, lockEquipment } from '../services/inventoryService'
 import { statZh } from '../constants/statNames'
 import { CodexPanel } from './CodexPanel'
 import { Thumbnail3D } from './UIOverlay'
@@ -397,9 +397,25 @@ function EquipmentDetail({ equip, onClose, heroInstances, heroNameMap }: Equipme
     } catch { setActionMsg('裝備失敗') }
   }, [localEquip.equipId, localEquip.slot])
 
+  const handleToggleLock = useCallback(async () => {
+    if (isProcessing) return
+    setIsProcessing(true)
+    const newLocked = !localEquip.locked
+    const ok = await lockEquipment(localEquip.equipId, newLocked)
+    setIsProcessing(false)
+    if (ok) {
+      setLocalEquip(prev => ({ ...prev, locked: newLocked }))
+      emitToast(newLocked ? '🔒 裝備已鎖定' : '🔓 裝備已解鎖')
+      setActionMsg(newLocked ? '已鎖定' : '已解鎖')
+    } else {
+      setActionMsg('操作失敗')
+    }
+  }, [localEquip.equipId, localEquip.locked, isProcessing])
+
   const handleDecompose = useCallback(async () => {
     if (isProcessing) return
     if (localEquip.equippedBy) { setActionMsg('請先卸下裝備再分解'); return }
+    if (localEquip.locked) { setActionMsg('請先解鎖裝備再分解'); return }
     if (!showDecomposeConfirm) { setShowDecomposeConfirm(true); return }
     setIsProcessing(true)
     const res = await decomposeEquipment([localEquip.equipId])
@@ -493,6 +509,9 @@ function EquipmentDetail({ equip, onClose, heroInstances, heroNameMap }: Equipme
         )}
         {actionMsg && <div className="inv-action-msg">{actionMsg}</div>}
         <div className="inv-detail-actions">
+          <button className={`inv-action-btn ${localEquip.locked ? 'inv-lock-btn-active' : 'inv-lock-btn'}`} onClick={handleToggleLock} disabled={isProcessing}>
+            {localEquip.locked ? '🔒 已鎖定' : '🔓 鎖定'}
+          </button>
           {localEquip.equippedBy ? (
             <button className="inv-action-btn inv-sell-btn" onClick={handleUnequip}>
               ⬇️ 卸下
@@ -507,7 +526,7 @@ function EquipmentDetail({ equip, onClose, heroInstances, heroNameMap }: Equipme
               {isProcessing ? '強化中...' : `⚒️ 強化（${enhanceCost} 金）`}
             </button>
           )}
-          {!localEquip.equippedBy && !showDecomposeConfirm && (
+          {!localEquip.equippedBy && !localEquip.locked && !showDecomposeConfirm && (
             <button className="inv-action-btn inv-decompose-btn" onClick={handleDecompose} disabled={isProcessing}>
               {isProcessing ? '分解中...' : '♻️ 分解'}
             </button>
@@ -790,6 +809,7 @@ export function InventoryPanel({ onBack, heroesList, heroInstances }: InventoryP
               <span className="inv-cell-qty">
                 +{eq.enhanceLevel}
               </span>
+              {eq.locked && <span className="inv-equip-lock-badge">🔒</span>}
               {eq.equippedBy && <span className="inv-equip-badge">使用中</span>}
             </button>
           ))}
