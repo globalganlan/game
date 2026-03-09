@@ -179,31 +179,37 @@ function ItemDetail({ item, definition, onClose, heroMap }: ItemDetailProps & { 
   const [loading, setLoading] = useState(false)
 
   const isChest = item.itemId.startsWith('chest_')
+  const [openQty, setOpenQty] = useState(1)
+  // 當擁有數量變化時，clamp openQty
+  useEffect(() => { setOpenQty(q => Math.min(q, Math.max(1, qty))) }, [qty])
 
   const handleUse = useCallback(async () => {
     if (!canUse || loading) return
+    const useQty = isChest ? Math.min(openQty, qty) : 1
+    if (useQty < 1) return
     try {
       // 裝備寶箱 — 本地生成裝備（裝備 ID 需前端產生以綁定 equipId）
       if (item.itemId === 'chest_equipment') {
-        const eq = openEquipmentChest()
-        addEquipmentLocally([eq])
+        const eqs = Array.from({ length: useQty }, () => openEquipmentChest())
+        addEquipmentLocally(eqs)
         setLoading(true)
-        setActionMsg('開啟中...')
-        const result = await useItem(item.itemId, 1, undefined, { equipment: [eq] })
+        setActionMsg(`開啟 ${useQty} 個中...`)
+        const result = await useItem(item.itemId, useQty, undefined, { equipment: eqs })
         setLoading(false)
         if (!result.success) {
           setActionMsg('使用失敗')
           return
         }
-        const eqName = getEquipDisplayName(eq)
-        setActionMsg(`🎉 開啟獲得：${eq.rarity} ${eqName}`)
-        emitAcquire([{
-          type: 'equipment' as const,
-          id: eq.equipId,
-          name: eqName,
-          quantity: 1,
-          rarity: eq.rarity,
-        }])
+        // 統計各稀有度數量
+        const rarityCounts: Record<string, number> = {}
+        const acquireItems: { type: 'equipment'; id: string; name: string; quantity: number; rarity: 'N' | 'R' | 'SR' | 'SSR' }[] = []
+        for (const eq of eqs) {
+          rarityCounts[eq.rarity] = (rarityCounts[eq.rarity] || 0) + 1
+          acquireItems.push({ type: 'equipment', id: eq.equipId, name: getEquipDisplayName(eq), quantity: 1, rarity: eq.rarity })
+        }
+        emitAcquire(acquireItems)
+        const summaryParts = Object.entries(rarityCounts).map(([r, c]) => `${r}×${c}`)
+        setActionMsg(`🎉 開啟 ${useQty} 個獲得：${summaryParts.join('、')}`)
         // 若剩餘數量不足 1，自動關閉
         const newQty = getItemQuantity(item.itemId)
         if (newQty < 1) { setTimeout(() => onClose(), 1200) }
@@ -213,8 +219,8 @@ function ItemDetail({ item, definition, onClose, heroMap }: ItemDetailProps & { 
       // 銅/銀/金寶箱 — 伺服器開獎（防作弊，結果以伺服器為準）
       if (item.itemId === 'chest_bronze' || item.itemId === 'chest_silver' || item.itemId === 'chest_gold') {
         setLoading(true)
-        setActionMsg('開啟中...')
-        const result = await useItem(item.itemId, 1)
+        setActionMsg(`開啟 ${useQty} 個中...`)
+        const result = await useItem(item.itemId, useQty)
         setLoading(false)
         if (!result.success) {
           setActionMsg('使用失敗')
@@ -255,7 +261,7 @@ function ItemDetail({ item, definition, onClose, heroMap }: ItemDetailProps & { 
           }
           if (acquireItems.length > 0) emitAcquire(acquireItems)
         }
-        setActionMsg(rewardLines.length > 0 ? `🎉 開啟獲得：${rewardLines.join('、')}` : '寶箱已開啟！')
+        setActionMsg(rewardLines.length > 0 ? `🎉 開啟 ${useQty} 個獲得：${rewardLines.join('、')}` : '寶箱已開啟！')
         // 若剩餘數量不足 1，自動關閉
         const newQty = getItemQuantity(item.itemId)
         if (newQty < 1) { setTimeout(() => onClose(), 1500) }
@@ -301,7 +307,7 @@ function ItemDetail({ item, definition, onClose, heroMap }: ItemDetailProps & { 
         setActionMsg('使用失敗')
       }
     } catch { setActionMsg('使用失敗') }
-  }, [item.itemId, canUse, loading])
+  }, [item.itemId, canUse, loading, openQty, qty])
 
   const handleSell = useCallback(async () => {
     if (!canSell) return
@@ -334,10 +340,43 @@ function ItemDetail({ item, definition, onClose, heroMap }: ItemDetailProps & { 
           {sellPrice > 0 && <span>出售價：金幣 {sellPrice}/個</span>}
         </div>
         {actionMsg && <div className="inv-action-msg">{actionMsg}</div>}
+        {/* 寶箱數量選擇器 */}
+        {isChest && canUse && qty > 1 && (
+          <div className="inv-chest-qty-section">
+            <span className="inv-chest-qty-label">開啟數量</span>
+            <div className="inv-chest-qty-controls">
+              <button className="inv-chest-qty-btn" disabled={openQty <= 1 || loading} onClick={() => setOpenQty(q => Math.max(1, q - 1))}>−</button>
+              <button className="inv-chest-qty-btn" disabled={openQty <= 1 || loading} onClick={() => setOpenQty(q => Math.max(1, q - 10))}>−10</button>
+              <input
+                className="inv-chest-qty-input"
+                type="number"
+                min={1}
+                max={qty}
+                value={openQty}
+                disabled={loading}
+                onChange={e => setOpenQty(Math.max(1, Math.min(qty, Math.floor(Number(e.target.value) || 1))))}
+              />
+              <button className="inv-chest-qty-btn" disabled={openQty >= qty || loading} onClick={() => setOpenQty(q => Math.min(qty, q + 10))}>+10</button>
+              <button className="inv-chest-qty-btn" disabled={openQty >= qty || loading} onClick={() => setOpenQty(q => Math.min(qty, q + 1))}>+</button>
+              <button className="inv-chest-qty-btn inv-chest-max-btn" disabled={openQty >= qty || loading} onClick={() => setOpenQty(qty)}>MAX</button>
+            </div>
+            {qty > 2 && (
+              <input
+                className="inv-chest-qty-slider"
+                type="range"
+                min={1}
+                max={qty}
+                value={openQty}
+                disabled={loading}
+                onChange={e => setOpenQty(Number(e.target.value))}
+              />
+            )}
+          </div>
+        )}
         <div className="inv-detail-actions">
           {canUse && (
             <button className="inv-action-btn inv-use-btn" onClick={handleUse} disabled={loading}>
-              {loading ? '開啟中...' : (isChest ? '開啟' : '使用')}
+              {loading ? '開啟中...' : (isChest ? (openQty > 1 ? `開啟 ×${openQty}` : '開啟') : '使用')}
             </button>
           )}
           {canSell && (

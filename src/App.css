@@ -3077,6 +3077,56 @@
   margin-top: 10px;
 }
 
+/* ── 寶箱數量選擇器 ── */
+.inv-chest-qty-section {
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.inv-chest-qty-label {
+  color: #aaa;
+  font-size: 0.78rem;
+}
+.inv-chest-qty-controls {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.inv-chest-qty-btn {
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.15);
+  color: #ccc;
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-size: 0.78rem;
+  cursor: pointer;
+  min-width: 30px;
+  text-align: center;
+}
+.inv-chest-qty-btn:hover:not(:disabled) { background: rgba(255,255,255,0.18); }
+.inv-chest-qty-btn:disabled { opacity: 0.35; cursor: default; }
+.inv-chest-max-btn { color: #ffd43b; border-color: rgba(255,212,59,0.3); }
+.inv-chest-qty-input {
+  width: 48px;
+  text-align: center;
+  background: rgba(0,0,0,0.4);
+  border: 1px solid rgba(255,255,255,0.2);
+  color: #fff;
+  border-radius: 6px;
+  padding: 4px 4px;
+  font-size: 0.82rem;
+  -moz-appearance: textfield;
+}
+.inv-chest-qty-input::-webkit-inner-spin-button,
+.inv-chest-qty-input::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+.inv-chest-qty-slider {
+  width: 100%;
+  accent-color: #51cf66;
+  height: 6px;
+}
+
 .inv-action-btn {
   flex: 1;
   padding: 8px;
