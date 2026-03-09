@@ -202,11 +202,17 @@ auth.post('/change-name', async (c) => {
   if (!newName || newName.length < 1 || newName.length > 20)
     return c.json({ success: false, error: 'name must be 1-20 chars' });
 
-  const res = await c.env.DB.prepare(
-    'UPDATE players SET displayName = ? WHERE guestToken = ?'
-  ).bind(newName, token).run();
+  // 先查 playerId，再批次更新 players + arena_rankings
+  const player = await c.env.DB.prepare(
+    'SELECT playerId FROM players WHERE guestToken = ?'
+  ).bind(token).first<{ playerId: string }>();
+  if (!player) return c.json({ success: false, error: 'token_not_found' });
 
-  if (!res.meta.changes) return c.json({ success: false, error: 'token_not_found' });
+  await c.env.DB.batch([
+    c.env.DB.prepare('UPDATE players SET displayName = ? WHERE playerId = ?').bind(newName, player.playerId),
+    c.env.DB.prepare('UPDATE arena_rankings SET displayName = ? WHERE playerId = ?').bind(newName, player.playerId),
+  ]);
+
   return c.json({ success: true });
 });
 
