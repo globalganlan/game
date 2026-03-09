@@ -73,9 +73,6 @@ export const ITEM_ICONS: Record<string, string> = {
   chest_bronze: '🥉',
   chest_silver: '🥈',
   chest_gold: '🥇',
-  eqm_enhance_s: '🔨',
-  eqm_enhance_m: '🔨',
-  eqm_enhance_l: '🔨',
   // 其他
   stamina_potion: '⚡',
   gold_pack_10k: '💰',
@@ -120,9 +117,6 @@ export const ITEM_NAMES: Record<string, string> = {
   chest_bronze: '銅寶箱',
   chest_silver: '銀寶箱',
   chest_gold: '金寶箱',
-  eqm_enhance_s: '小型強化石',
-  eqm_enhance_m: '中型強化石',
-  eqm_enhance_l: '大型強化石',
   // 其他
   stamina_potion: '體力藥水',
   gold_pack_10k: '金幣禮包',

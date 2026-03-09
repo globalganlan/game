@@ -22,12 +22,9 @@ interface ItemInfoPopupProps {
 const ITEM_DESCRIPTIONS: Record<string, string> = {
   exp: '經驗資源，用於提升英雄等級。',
   chest_bronze: '銅級寶箱，可開啟獲得金幣與隨機素材。',
-  chest_silver: '銀級寶箱，獎勵更豐厚，含鑽石與強化石。',
+  chest_silver: '銀級寶箱，獎勵更豐厚，含鑽石與隨機素材。',
   chest_gold: '金級寶箱，頂級獎勵，有機會獲得裝備寶箱。',
   chest_equipment: '隨機獲得一件 R~SSR 裝備。',
-  eqm_enhance_s: '裝備強化用基礎素材。',
-  eqm_enhance_m: '裝備強化用中級素材。',
-  eqm_enhance_l: '裝備強化用高級素材。',
   asc_class_power: '力量型英雄突破必備素材。',
   asc_class_agility: '敏捷型英雄突破必備素材。',
   asc_class_defense: '防禦型英雄突破必備素材。',

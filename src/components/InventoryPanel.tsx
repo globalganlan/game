@@ -2,7 +2,7 @@
  * InventoryPanel — 背包面板
  *
  * 顯示玩家目前擁有的道具與裝備。
- * 支援分類篩選、排序、道具詳情、使用/出售操作。
+ * 支援分類篩選、排序、道具詳情、使用操作。
  */
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react'
@@ -15,7 +15,6 @@ import {
   getInventoryState,
   filterItemsByCategory,
   onInventoryChange,
-  sellItems,
   useItem,
   decomposeEquipment,
   enhanceEquipment,
@@ -164,7 +163,6 @@ function ItemDetail({ item, definition, onClose, heroMap }: ItemDetailProps & { 
   const rawDesc = definition?.description || '無描述'
   const desc = isFragment ? '可用於英雄突破升星的專屬碎片' : rawDesc
   const rarity = definition?.rarity || 'N'
-  const sellPrice = definition?.sellPrice || 0
   const qty = Math.round(item.quantity)
   const [actionMsg, setActionMsg] = useState('')
 
@@ -175,7 +173,6 @@ function ItemDetail({ item, definition, onClose, heroMap }: ItemDetailProps & { 
     : null
 
   const canUse = !!definition?.useAction
-  const canSell = sellPrice > 0 && qty > 0
   const [loading, setLoading] = useState(false)
 
   const isChest = item.itemId.startsWith('chest_')
@@ -317,12 +314,6 @@ function ItemDetail({ item, definition, onClose, heroMap }: ItemDetailProps & { 
     } catch { setActionMsg('使用失敗') }
   }, [item.itemId, canUse, loading, openQty, qty])
 
-  const handleSell = useCallback(async () => {
-    if (!canSell) return
-    const gold = await sellItems([{ itemId: item.itemId, quantity: 1 }])
-    setActionMsg(`出售獲得 ${gold} 金幣`)
-  }, [item.itemId, canSell])
-
   return createPortal(
     <div className="inv-detail-backdrop" onClick={onClose}>
       <div className="inv-detail-card" onClick={(e) => e.stopPropagation()}>
@@ -345,7 +336,6 @@ function ItemDetail({ item, definition, onClose, heroMap }: ItemDetailProps & { 
         {isChest && <ChestLootPreview chestId={item.itemId} />}
         <div className="inv-detail-info">
           <span>數量：{qty}</span>
-          {sellPrice > 0 && <span>出售價：金幣 {sellPrice}/個</span>}
         </div>
         {actionMsg && <div className="inv-action-msg">{actionMsg}</div>}
         {/* 寶箱數量選擇器 */}
@@ -385,11 +375,6 @@ function ItemDetail({ item, definition, onClose, heroMap }: ItemDetailProps & { 
           {canUse && (
             <button className="inv-action-btn inv-use-btn" onClick={handleUse} disabled={loading}>
               {loading ? '開啟中...' : (isChest ? (openQty > 1 ? `開啟 ×${openQty}` : '開啟') : '使用')}
-            </button>
-          )}
-          {canSell && (
-            <button className="inv-action-btn inv-sell-btn" onClick={handleSell}>
-              出售 (+{sellPrice}<CurrencyIcon type="gold" />)
             </button>
           )}
         </div>
@@ -930,7 +915,7 @@ export function InventoryPanel({ onBack, heroesList, heroInstances }: InventoryP
                 {isBulkProcessing ? '分解中...' : `確認分解 (${bulkDecomposePreview.count} 件)`}
               </button>
               <button className="inv-action-btn inv-cancel-btn" onClick={() => setShowBulkDecompose(false)} disabled={isBulkProcessing}>
-                取消
+                關閉
               </button>
             </div>
           </div>

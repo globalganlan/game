@@ -59,7 +59,6 @@ export {
   loadInventory,
   addItems,
   removeItems,
-  sellItems,
   useItem,
   equipItem,
   unequipItem,
