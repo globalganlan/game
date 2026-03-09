@@ -202,12 +202,20 @@ function ItemDetail({ item, definition, onClose, heroMap }: ItemDetailProps & { 
         }
         // 統計各稀有度數量
         const rarityCounts: Record<string, number> = {}
-        const acquireItems: { type: 'equipment'; id: string; name: string; quantity: number; rarity: 'N' | 'R' | 'SR' | 'SSR' }[] = []
+        // 合併同名+同稀有度裝備為一筆 toast（例：吸血護甲 R ×2）
+        const mergedMap = new Map<string, { type: 'equipment'; id: string; name: string; quantity: number; rarity: 'N' | 'R' | 'SR' | 'SSR' }>()
         for (const eq of eqs) {
           rarityCounts[eq.rarity] = (rarityCounts[eq.rarity] || 0) + 1
-          acquireItems.push({ type: 'equipment', id: eq.equipId, name: getEquipDisplayName(eq), quantity: 1, rarity: eq.rarity })
+          const displayName = getEquipDisplayName(eq)
+          const key = `${displayName}_${eq.rarity}`
+          const existing = mergedMap.get(key)
+          if (existing) {
+            existing.quantity += 1
+          } else {
+            mergedMap.set(key, { type: 'equipment', id: eq.equipId, name: displayName, quantity: 1, rarity: eq.rarity })
+          }
         }
-        emitAcquire(acquireItems)
+        emitAcquire(Array.from(mergedMap.values()))
         const summaryParts = Object.entries(rarityCounts).map(([r, c]) => `${r}×${c}`)
         setActionMsg(`🎉 開啟 ${useQty} 個獲得：${summaryParts.join('、')}`)
         // 若剩餘數量不足 1，自動關閉
