@@ -327,11 +327,11 @@ gacha.post('/equip-gacha-pull', async (c) => {
     : [];
   for (const eq of newEquips) {
     eqStmts.push(db.prepare(
-      `INSERT INTO equipment_instances
+      `INSERT OR IGNORE INTO equipment_instances
        (playerId, equipId, templateId, setId, slot, rarity, mainStat, mainStatValue, enhanceLevel, subStats, equippedBy, locked, obtainedAt)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).bind(
-      playerId, eq.equipId || `eq_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+      playerId, eq.equipId || `eq_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
       eq.templateId || '', eq.setId || '', eq.slot || '', eq.rarity || 'N',
       eq.mainStat || '', eq.mainStatValue ?? eq.mainValue ?? 0,
       eq.enhanceLevel ?? eq.level ?? 0, JSON.stringify(eq.subStats || []),

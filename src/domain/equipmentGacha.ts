@@ -108,6 +108,9 @@ function rollRarity(pool: EquipPoolType, rng = Math.random): Rarity {
    裝備生成
    ════════════════════════════════════ */
 
+/** 模組級序號，與時間戳+隨機碼組合確保同批次 100 連抽不碰撞 */
+let _equipSeq = 0
+
 /** 生成一件隨機裝備 */
 export function generateEquipment(rarity: Rarity, rng = Math.random): EquipmentInstance {
   const setId = SET_IDS[Math.floor(rng() * SET_IDS.length)]
@@ -118,10 +121,11 @@ export function generateEquipment(rarity: Rarity, rng = Math.random): EquipmentI
   const subStats: SubStat[] = randomSubStats(subStatCount, mainStat, rng)
 
   const now = Date.now()
-  const rand = Math.floor(rng() * 0xFFFF).toString(16).padStart(4, '0')
+  const seq = (++_equipSeq & 0xFFFF).toString(16).padStart(4, '0')
+  const rand = Math.floor(rng() * 0xFFFFFFFF).toString(16).padStart(8, '0')
 
   return {
-    equipId: `EQ_${now}_${rand}`,
+    equipId: `EQ_${now}_${seq}${rand}`,
     templateId: `eq_${setId}_${slot}_${rarity}`,
     setId,
     slot,

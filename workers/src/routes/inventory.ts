@@ -527,19 +527,23 @@ inventory.post('/decompose-equipment', async (c) => {
   const equipIds = body.equipIds as string[];
   if (!equipIds?.length) return c.json({ success: false, error: 'missing equipIds' });
 
-  // 分批查詢避免 SQL 變數過多（D1 限制約 100 個綁定變數）
-  const CHUNK_SIZE = 80;
+  // 分批查詢避免 SQL 變數過多（D1 限制 100 個綁定變數，留餘裕量）
+  const CHUNK_SIZE = 50;
   const allRows: { equipId: string; rarity: string; equippedBy: string; locked: number; enhanceLevel: number }[] = [];
   for (let i = 0; i < equipIds.length; i += CHUNK_SIZE) {
     const chunk = equipIds.slice(i, i + CHUNK_SIZE);
     const placeholders = chunk.map(() => '?').join(',');
-    const rows = await db.prepare(
-      `SELECT equipId, rarity, equippedBy, locked, enhanceLevel FROM equipment_instances WHERE playerId = ? AND equipId IN (${placeholders})`
-    ).bind(playerId, ...chunk).all<{ equipId: string; rarity: string; equippedBy: string; locked: number; enhanceLevel: number }>();
-    allRows.push(...rows.results);
+    try {
+      const rows = await db.prepare(
+        `SELECT equipId, rarity, equippedBy, locked, enhanceLevel FROM equipment_instances WHERE playerId = ? AND equipId IN (${placeholders})`
+      ).bind(playerId, ...chunk).all<{ equipId: string; rarity: string; equippedBy: string; locked: number; enhanceLevel: number }>();
+      allRows.push(...rows.results);
+    } catch (e) {
+      console.error(`decompose chunk query failed (offset=${i}, size=${chunk.length}):`, e);
+    }
   }
 
-  if (allRows.length === 0) return c.json({ success: false, error: 'no_valid_equipment' });
+  if (allRows.length === 0) return c.json({ success: false, error: 'no_valid_equipment', requestedCount: equipIds.length });
 
   // 過濾掉穿戴中和已鎖定的裝備
   const decomposable = allRows.filter(e => !e.equippedBy && !e.locked);
@@ -571,9 +575,10 @@ inventory.post('/decompose-equipment', async (c) => {
   ).bind(totalGold, playerId));
   stmts.push(upsertItemStmt(db, playerId, 'equip_scrap', totalScrap));
 
-  // D1 batch 限制：分批執行（每批最多 80 條語句）
-  for (let i = 0; i < stmts.length; i += CHUNK_SIZE) {
-    await db.batch(stmts.slice(i, i + CHUNK_SIZE));
+  // D1 batch 限制：分批執行（每批最多 50 條語句）
+  const BATCH_SIZE = 50;
+  for (let i = 0; i < stmts.length; i += BATCH_SIZE) {
+    await db.batch(stmts.slice(i, i + BATCH_SIZE));
   }
 
   const currencies = await getCurrencies(db, playerId);
