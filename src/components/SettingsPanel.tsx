@@ -6,6 +6,7 @@
 
 import { useState, useCallback, useEffect } from 'react'
 import { bindAccount, changeName, changePassword, getAuthState } from '../services/authService'
+import { updateProgress } from '../services/saveService'
 import { audioManager } from '../services/audioService'
 import { useLogout } from '../hooks/useLogout'
 import { translateError } from '../utils/errorMessages'
@@ -111,6 +112,7 @@ export function SettingsPanel({ onBack, onLogout, displayName, isBound: initialB
     try {
       const res = await changeName(trimmed)
       if (res.success) {
+        updateProgress({ displayName: trimmed })
         setNameMsg({ ok: true, text: '暱稱已更新！' })
       } else {
         setNameMsg({ ok: false, text: translateError(res.error, '暱稱更新失敗') })
