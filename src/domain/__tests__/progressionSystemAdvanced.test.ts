@@ -6,8 +6,6 @@ import {
   getFinalStats,
   getActiveSetBonuses,
   getSetBonus,
-  getEquipmentCapacity,
-  getExpandCost,
   randomSubStats,
   consumeExpMaterials,
   expToNextLevel,
@@ -16,9 +14,6 @@ import {
   getAscensionMultiplier,
   enhancedMainStat,
   EQUIPMENT_SETS,
-  EQUIPMENT_SLOT_BASE,
-  EQUIPMENT_SLOT_EXPAND,
-  EQUIPMENT_SLOT_MAX,
 } from '../progressionSystem'
 import type { HeroInstanceData, BaseStats, EquipmentInstance, Rarity } from '../progressionSystem'
 
@@ -136,36 +131,6 @@ describe('progressionSystem - 進階測試', () => {
 
     it('查不到 → undefined', () => {
       expect(getSetBonus('nonexistent_set')).toBeUndefined()
-    })
-  })
-
-  /* ═══════ getEquipmentCapacity ═══════ */
-
-  describe('getEquipmentCapacity', () => {
-    it('expandCount=0 → EQUIPMENT_SLOT_BASE (200)', () => {
-      expect(getEquipmentCapacity(0)).toBe(EQUIPMENT_SLOT_BASE)
-    })
-
-    it('expandCount=1 → 200 + 50 = 250', () => {
-      expect(getEquipmentCapacity(1)).toBe(EQUIPMENT_SLOT_BASE + EQUIPMENT_SLOT_EXPAND)
-    })
-
-    it('expandCount=6 → min(200+300, 500) = 500', () => {
-      const result = getEquipmentCapacity(6)
-      expect(result).toBeLessThanOrEqual(EQUIPMENT_SLOT_MAX)
-    })
-
-    it('非常大的 expandCount 不超過 EQUIPMENT_SLOT_MAX', () => {
-      const result = getEquipmentCapacity(100)
-      expect(result).toBeLessThanOrEqual(EQUIPMENT_SLOT_MAX)
-    })
-  })
-
-  /* ═══════ getExpandCost ═══════ */
-
-  describe('getExpandCost', () => {
-    it('回傳固定值 100', () => {
-      expect(getExpandCost()).toBe(100)
     })
   })
 

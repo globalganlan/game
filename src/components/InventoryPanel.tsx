@@ -562,7 +562,7 @@ function EquipmentDetail({ equip, onClose, heroInstances, heroNameMap }: Equipme
             {lockingBusy ? '⏳ 處理中...' : localEquip.locked ? '🔒 已鎖定' : '🔓 鎖定'}
           </button>
           {localEquip.equippedBy ? (
-            <button className="inv-action-btn inv-sell-btn" onClick={handleUnequip}>
+            <button className="inv-action-btn inv-unequip-btn" onClick={handleUnequip}>
               ⬇️ 卸下
             </button>
           ) : (

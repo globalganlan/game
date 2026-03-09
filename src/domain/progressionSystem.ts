@@ -180,12 +180,6 @@ export const EQUIPMENT_SUB_STAT_COUNT: Record<Rarity, number> = {
   SSR: 3,
 }
 
-/** 裝備容量 */
-export const EQUIPMENT_SLOT_BASE = 200
-export const EQUIPMENT_SLOT_EXPAND = 50
-export const EQUIPMENT_SLOT_COST = 100   // 鑽石
-export const EQUIPMENT_SLOT_MAX = 500
-
 /** 初始星級（依稀有度）— 所有英雄從 ★0 開始培養 */
 export const RARITY_INITIAL_STARS: Record<number, number> = {
   1: 0,  // N  → 初始 ★0
@@ -372,16 +366,6 @@ export function getTotalEnhanceCost(enhanceLevel: number, rarity: Rarity): numbe
     total += getEnhanceCost(lv, rarity)
   }
   return total
-}
-
-/** 計算裝備容量上限 */
-export function getEquipmentCapacity(expandCount: number): number {
-  return Math.min(EQUIPMENT_SLOT_MAX, EQUIPMENT_SLOT_BASE + expandCount * EQUIPMENT_SLOT_EXPAND)
-}
-
-/** 擴容所需鑽石 */
-export function getExpandCost(): number {
-  return EQUIPMENT_SLOT_COST
 }
 
 /** 生成隨機副屬性（用於裝備掉落/鍛造） */

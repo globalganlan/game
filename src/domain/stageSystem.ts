@@ -77,8 +77,6 @@ export interface BossConfig {
   damageThresholds: { S: number; A: number; B: number; C: number }
 }
 
-export type StarRating = 1 | 2 | 3
-
 /* ════════════════════════════════════
    共用工具
    ════════════════════════════════════ */
@@ -135,16 +133,6 @@ export function isModeUnlocked(
   const playerProgress = (storyProgress.chapter - 1) * 8 + storyProgress.stage
   const reqProgress = (req.chapter - 1) * 8 + req.stage
   return playerProgress >= reqProgress
-}
-
-/* ════════════════════════════════════
-   星級評價
-   ════════════════════════════════════ */
-
-export function calculateStarRating(totalHeroes: number, survivingHeroes: number): StarRating {
-  if (survivingHeroes >= totalHeroes) return 3         // 全員存活
-  if (totalHeroes - survivingHeroes <= 2) return 2     // ≤2 人陣亡
-  return 1                                              // 通關即可
 }
 
 /* ════════════════════════════════════

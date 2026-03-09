@@ -1,7 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import {
   isModeUnlocked,
-  calculateStarRating,
   getTowerFloorConfig,
   getTowerReward,
   DAILY_DUNGEONS,
@@ -42,31 +41,6 @@ describe('stageSystem — isModeUnlocked', () => {
   it('超過進度永遠解鎖', () => {
     expect(isModeUnlocked('tower', { chapter: 5, stage: 1 })).toBe(true)
     expect(isModeUnlocked('boss', { chapter: 10, stage: 1 })).toBe(true)
-  })
-})
-
-/* ════════════════════════════════════
-   星級評價
-   ════════════════════════════════════ */
-describe('stageSystem — calculateStarRating', () => {
-  it('全員存活 → 3星', () => {
-    expect(calculateStarRating(5, 5)).toBe(3)
-  })
-
-  it('死1人 → 2星', () => {
-    expect(calculateStarRating(5, 4)).toBe(2)
-  })
-
-  it('死2人 → 2星', () => {
-    expect(calculateStarRating(5, 3)).toBe(2)
-  })
-
-  it('死3人 → 1星', () => {
-    expect(calculateStarRating(5, 2)).toBe(1)
-  })
-
-  it('只剩1人 → 1星', () => {
-    expect(calculateStarRating(5, 1)).toBe(1)
   })
 })
 

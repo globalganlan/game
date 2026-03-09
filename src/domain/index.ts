@@ -91,8 +91,6 @@ export {
   enhancedMainStat,
   getMaxEnhanceLevel,
   getEnhanceCost,
-  getEquipmentCapacity,
-  getExpandCost,
   randomSubStats,
   getSetBonus,
   getActiveSetBonuses,
@@ -105,8 +103,6 @@ export {
   ASCENSION_COSTS,
   EQUIPMENT_MAX_ENHANCE,
   EQUIPMENT_SETS,
-  EQUIPMENT_SLOT_BASE,
-  EQUIPMENT_SLOT_MAX,
 } from './progressionSystem'
 
 export type {
@@ -123,7 +119,6 @@ export type {
 // 關卡系統
 export {
   isModeUnlocked,
-  calculateStarRating,
   getTowerFloorConfig,
   getTowerReward,
   getTodayDungeons,
@@ -142,7 +137,6 @@ export type {
   DailyDungeon,
   DungeonDifficulty,
   BossConfig,
-  StarRating,
   UnlockConditions,
 } from './stageSystem'
 

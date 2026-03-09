@@ -7,7 +7,6 @@ import {
   getDailyDungeonConfig,
   getDailyDungeonDisplayName,
   getTodayDungeons,
-  calculateStarRating,
   getBossConfig,
   getBossEnemies,
   getBossReward,
@@ -246,27 +245,6 @@ describe('stageSystem - 進階測試', () => {
 
     it('1-1 進度 1-1 → true（首次就是首通）', () => {
       expect(isFirstClear('1-1', { chapter: 1, stage: 1 })).toBe(true)
-    })
-  })
-
-  /* ═══════ calculateStarRating 邊界 ═══════ */
-
-  describe('calculateStarRating 邊界', () => {
-    it('全滅 → 1 星', () => {
-      expect(calculateStarRating(3, 0)).toBe(1)
-    })
-
-    it('全存活 → 3 星', () => {
-      expect(calculateStarRating(3, 3)).toBe(3)
-    })
-
-    it('1 人全存活 → 3 星', () => {
-      expect(calculateStarRating(1, 1)).toBe(3)
-    })
-
-    it('6 人存活 4 → 2 星', () => {
-      // 4/6 = 66.7% → 2 星
-      expect(calculateStarRating(6, 4)).toBe(2)
     })
   })
 

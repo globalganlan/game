@@ -16,15 +16,11 @@ import {
   enhancedMainStat,
   getMaxEnhanceLevel,
   getEnhanceCost,
-  getEquipmentCapacity,
-  getExpandCost,
   randomSubStats,
   getSetBonus,
   getActiveSetBonuses,
   getFinalStats,
   ASCENSION_LEVEL_CAP,
-  EQUIPMENT_SLOT_BASE,
-  EQUIPMENT_SLOT_MAX,
   EQUIPMENT_SETS,
   RARITY_LEVEL_GROWTH,
   RARITY_ASC_MULT,
@@ -243,18 +239,6 @@ describe('progressionSystem — 裝備', () => {
     const c0 = getEnhanceCost(0, 'R')
     const c10 = getEnhanceCost(10, 'R')
     expect(c10).toBeGreaterThan(c0)
-  })
-
-  it('getEquipmentCapacity(0) = 基礎容量', () => {
-    expect(getEquipmentCapacity(0)).toBe(EQUIPMENT_SLOT_BASE)
-  })
-
-  it('getEquipmentCapacity 不超上限', () => {
-    expect(getEquipmentCapacity(100)).toBe(EQUIPMENT_SLOT_MAX)
-  })
-
-  it('getExpandCost 回傳固定值', () => {
-    expect(getExpandCost()).toBe(100)
   })
 })
 

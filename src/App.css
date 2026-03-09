@@ -189,15 +189,6 @@
   100% { transform: scale(1); }
 }
 
-.reward-first-clear {
-  font-size: clamp(0.6rem, 1.5vw, 0.75rem);
-  color: #ffd700;
-  background: rgba(255, 215, 0, 0.12);
-  padding: 2px 10px;
-  border-radius: 10px;
-  border: 1px solid rgba(255, 215, 0, 0.25);
-  letter-spacing: 1px;
-}
 
 .reward-floor-clear {
   font-size: clamp(0.7rem, 1.8vw, 0.9rem);
@@ -3195,12 +3186,12 @@
 }
 .inv-use-btn:hover { background: rgba(81,207,102,0.25); }
 
-.inv-sell-btn {
+.inv-unequip-btn {
   border-color: rgba(255,107,107,0.4);
   background: rgba(255,107,107,0.1);
   color: #ff6b6b;
 }
-.inv-sell-btn:hover { background: rgba(255,107,107,0.2); }
+.inv-unequip-btn:hover { background: rgba(255,107,107,0.2); }
 
 .inv-lock-btn {
   border-color: rgba(77,171,247,0.4);

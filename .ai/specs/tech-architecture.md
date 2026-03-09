@@ -522,7 +522,6 @@ export default defineConfig({
 | `bind-account` | auth.ts | UPDATE players + INSERT mailbox 獎勵信 |
 | `add-items` | inventory.ts | N× upsertItemStmt |
 | `remove-items` | inventory.ts | N× upsertItemStmt |
-| `sell-items` | inventory.ts | 扣物品 + 加金幣 |
 | `shop-buy` | inventory.ts | 扣貨幣 + 購買次數 + 發放獎勵 |
 | `use-item` | inventory.ts | 扣道具 + 加資源 / 裝備 |
 | `equip-item` | inventory.ts | 卸舊裝 + 穿新裝 |
@@ -574,7 +573,7 @@ export default defineConfig({
 
 | 資料 | 原因 |
 |------|------|
-| save_data (load-save) | 含 gachaPool JSON，可超過 100KB；且頻繁變動 |
+| save_data (load-save) | 頻繁變動 |
 | hero_instances | 抽卡/升級隨時新增修改 |
 | inventory | 交易型資料，每次操作都會變 |
 | mailbox | 每位玩家不同且隨時有新郵件 |
