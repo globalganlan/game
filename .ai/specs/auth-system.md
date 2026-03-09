@@ -1,6 +1,6 @@
 # 帳號系統 Spec
 
-> 版本：v1.4 ｜ 狀態：🟢 已實作
+> 版本：v1.5 ｜ 狀態：🟢 已實作
 > 最後更新：2026-03-01
 > 負責角色：🎯 GAME_DESIGN → 🔧 CODING
 
@@ -162,7 +162,7 @@ authService.bindAccount(email, password)
 | `login-guest` | `{ guestToken }` | `{ playerId, displayName, isBound }` | `handleLoginGuest_` |
 | `login` | `{ email, password }` | `{ playerId, guestToken, displayName }` | `handleLogin_` |
 | `bind-account` | `{ guestToken, email, password }` | `{ success, message }` | `handleBindAccount_` |
-| `change-name` | `{ guestToken, newName }` | `{ success }` | `handleChangeName_` |
+| `change-name` | `{ guestToken, newName }` | `{ success, diamond?, nameChangeCount?, cost? }` 或 `{ error: 'insufficient_diamond', cost, diamond }` | Workers `auth.ts` — 首次免費，之後每次 200💎；同步更新 players + save_data + arena_rankings |
 | `change-password` | `{ guestToken, oldPassword, newPassword }` | `{ success }` | `handleChangePassword_` |
 
 ### Token 快取（resolvePlayerId_）
@@ -273,3 +273,4 @@ LoginScreen（mount 時自動執行 doAutoLogin）
 | v1.2 | 2026-03-01 | 新用戶歡迎禮包：`handleRegisterGuest_` 註冊後自動寄送歡迎信件（鑽石 300 / 金幣 10,000 / 中經驗石 5 / 大經驗石 2） |
 | v1.3 | 2026-03-01 | 帳號綁定獎勵：`handleBindAccount_` 首次綁定成功寄送獎勵信件（鑽石 200 / 金幣 5,000） |
 | v1.4 | 2026-03-01 | Spec 修正：自動登入流程修正為 no-token/login-fail 回傳 `isLoggedIn:false`（不自動註冊）；「訪客模式進入」改呼叫 `registerGuest()`；`logout()` 保留 guestToken 改設 `globalganlan_logged_out` flag；新增 `registerGuest()` / `onAuthChange()` 至導出函式；新增 `globalganlan_logged_out` localStorage key 文件 |
+| v1.5 | 2026-03-02 | 改名費用系統：`save_data.nameChangeCount` 欄位；`/change-name` API 首次免費、之後每次 200💎（`NAME_CHANGE_COST`）；後端驗證鑽石餘額、batch 更新 players + save_data + arena_rankings；前端 SettingsPanel 顯示費用規則與已改次數；`authService.ts` 新增 `NAME_CHANGE_COST` 常數 |

@@ -4,6 +4,19 @@
 
 ---
 
+### [2026-03-08] 改名費用系統：首次免費、之後每次 200💎
+- **觸發者**：使用者需求
+- **執行角色**：🔧 CODING + 🧪 QA
+- **變更內容**：
+  1. **D1 schema**：`save_data` 新增 `nameChangeCount INTEGER NOT NULL DEFAULT 0`
+  2. **Workers `auth.ts`**：`/change-name` 改為讀取 `nameChangeCount` + `diamond`，首次免費、之後每次扣 `NAME_CHANGE_COST`（200💎），batch 同步更新 `players` + `save_data` + `arena_rankings`
+  3. **`authService.ts`**：新增 `NAME_CHANGE_COST = 200` 常數，`changeName()` 回傳擴充為 `{ success, diamond?, nameChangeCount?, cost? }`
+  4. **`saveService.ts`**：`SaveData` 介面新增 `nameChangeCount`，`updateProgress` 接受 `nameChangeCount` 欄位
+  5. **`SettingsPanel.tsx`**：顯示改名費用規則（「📝 首次改名免費」/「💎 每次改名需花費 200 鑽石（已改 N 次）」），按鈕顯示「更新（免費）」或「更新（200 💎）」，鑽石不足時禁用
+  6. **`MenuScreenRouter.tsx`**：傳遞 `nameChangeCount` + `diamond` props 給 SettingsPanel
+- **Commit**：`734100f`
+- **Spec 更新**：`auth-system.md` v1.4 → v1.5
+
 ### [2026-03-08] 戰鬥開始被動技能旋轉方塊閃現修復（字型預載）
 - **觸發者**：使用者（Bug 報告：有被動技能的英雄在開始戰鬥時短暫出現旋轉方塊）
 - **執行角色**：🔧 CODING + 🧪 QA
