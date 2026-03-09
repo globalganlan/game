@@ -1224,7 +1224,7 @@
   display: flex;
   justify-content: center;
   flex-wrap: wrap;
-  gap: 6px 12px;
+  gap: 4px;
   margin: 6px 0;
   max-width: 400px;
   width: 100%;
@@ -1643,13 +1643,19 @@
 
 /* ── PanelInfoTip — 面板說明按鈕 ── */
 .panel-infotip-btn {
-  background: none;
-  border: none;
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.18);
+  border-radius: 50%;
   cursor: pointer;
-  font-size: 0.85em;
-  padding: 2px 4px;
-  opacity: 0.6;
-  transition: opacity 0.2s;
+  font-size: 0.8em;
+  width: 24px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  opacity: 0.65;
+  transition: opacity 0.2s, background 0.2s;
   vertical-align: middle;
   line-height: 1;
   flex-shrink: 0;
@@ -1657,6 +1663,7 @@
 .panel-infotip-btn:hover,
 .panel-infotip-btn:active {
   opacity: 1;
+  background: rgba(255,255,255,0.15);
 }
 .panel-infotip-popup {
   position: fixed;
@@ -2931,6 +2938,7 @@
   max-width: 280px;
   padding: 16px;
   border: 2px solid #ffd43b;
+  border-radius: 12px;
   box-shadow: 0 0 16px rgba(255, 212, 59, 0.35);
   overflow-wrap: break-word;
   word-break: break-word;
