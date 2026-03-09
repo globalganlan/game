@@ -154,6 +154,8 @@ export function MenuScreenRouter(props: MenuScreenRouterProps) {
           isBound={isBound}
           onRefreshMail={onRefreshMail}
           pwaRewardClaimed={pwaRewardClaimed}
+          nameChangeCount={saveData?.nameChangeCount}
+          diamond={diamond}
         />
       )
 

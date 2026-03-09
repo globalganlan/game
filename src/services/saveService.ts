@@ -34,6 +34,7 @@ export interface SaveData {
   pwaRewardClaimed?: boolean
   checkinDay?: number
   checkinLastDate?: string
+  nameChangeCount?: number
 }
 
 export interface HeroInstance {
@@ -300,7 +301,7 @@ function stripPlayerId(h: HeroInstance & { playerId?: string }): HeroInstance {
  */
 export function updateProgress(changes: Partial<Pick<SaveData,
   'gold' | 'diamond' | 'exp' | 'displayName' |
-  'towerFloor' | 'resourceTimerStage'
+  'towerFloor' | 'resourceTimerStage' | 'nameChangeCount'
 >>): void {
   const serialized: Record<string, unknown> = {}
   for (const [key, val] of Object.entries(changes)) {

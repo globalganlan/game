@@ -243,16 +243,26 @@ export async function bindAccount(email: string, password: string): Promise<{ su
 }
 
 /**
- * 修改暱稱
+ * 修改暱稱（第一次免費，之後每次 200 鑽石）
  */
-export async function changeName(newName: string): Promise<{ success: boolean; error?: string }> {
+export const NAME_CHANGE_COST = 200
+
+export async function changeName(newName: string): Promise<{
+  success: boolean; error?: string;
+  diamond?: number; nameChangeCount?: number; cost?: number;
+}> {
   if (!currentAuth.guestToken) return { success: false, error: 'not_logged_in' }
-  const res = await callAuthApi<ApiResponse>('change-name', { guestToken: currentAuth.guestToken, newName })
+  const res = await callAuthApi<ApiResponse & { diamond?: number; nameChangeCount?: number; cost?: number }>(
+    'change-name', { guestToken: currentAuth.guestToken, newName }
+  )
   if (res.success) {
     currentAuth = { ...currentAuth, displayName: newName }
     notify()
   }
-  return { success: res.success, error: res.error }
+  return {
+    success: res.success, error: res.error,
+    diamond: res.diamond, nameChangeCount: res.nameChangeCount, cost: res.cost,
+  }
 }
 
 /**

@@ -5,7 +5,7 @@
  */
 
 import { useState, useCallback, useEffect } from 'react'
-import { bindAccount, changeName, changePassword, getAuthState } from '../services/authService'
+import { bindAccount, changeName, changePassword, getAuthState, NAME_CHANGE_COST } from '../services/authService'
 import { updateProgress } from '../services/saveService'
 import { audioManager } from '../services/audioService'
 import { useLogout } from '../hooks/useLogout'
@@ -36,13 +36,17 @@ interface SettingsPanelProps {
   onRefreshMail?: () => void
   /** PWA 安裝獎勵是否已領取（from save_data） */
   pwaRewardClaimed?: boolean
+  /** 已改名次數（from save_data） */
+  nameChangeCount?: number
+  /** 當前鑽石（用於顯示是否足夠） */
+  diamond?: number
 }
 
 /* ────────────────────────────
    Component
    ──────────────────────────── */
 
-export function SettingsPanel({ onBack, onLogout, displayName, isBound: initialBound, onRefreshMail, pwaRewardClaimed: initialPwaClaimed }: SettingsPanelProps) {
+export function SettingsPanel({ onBack, onLogout, displayName, isBound: initialBound, onRefreshMail, pwaRewardClaimed: initialPwaClaimed, nameChangeCount: initialNameChangeCount, diamond: initialDiamond }: SettingsPanelProps) {
   /* ── 音量設定 ── */
   const [audioSettings, setAudioSettings] = useState(audioManager.getSettings())
   useEffect(() => {
@@ -61,6 +65,10 @@ export function SettingsPanel({ onBack, onLogout, displayName, isBound: initialB
   const [newName, setNewName] = useState(displayName)
   const [nameLoading, setNameLoading] = useState(false)
   const [nameMsg, setNameMsg] = useState<{ ok: boolean; text: string } | null>(null)
+  const [nameChangeCount, setNameChangeCount] = useState(initialNameChangeCount ?? 0)
+  const [currentDiamond, setCurrentDiamond] = useState(initialDiamond ?? 0)
+  const nameCost = nameChangeCount === 0 ? 0 : NAME_CHANGE_COST
+  const canAffordName = nameCost === 0 || currentDiamond >= nameCost
 
   /* ── 改密碼 ── */
   const [oldPw, setOldPw] = useState('')
@@ -108,21 +116,32 @@ export function SettingsPanel({ onBack, onLogout, displayName, isBound: initialB
       setNameMsg({ ok: false, text: '暱稱 1~16 個字元' })
       return
     }
+    if (!canAffordName) {
+      setNameMsg({ ok: false, text: `鑽石不足（需要 ${nameCost} 💎）` })
+      return
+    }
     setNameLoading(true)
     try {
       const res = await changeName(trimmed)
       if (res.success) {
-        updateProgress({ displayName: trimmed })
-        setNameMsg({ ok: true, text: '暱稱已更新！' })
+        updateProgress({ displayName: trimmed, diamond: res.diamond, nameChangeCount: res.nameChangeCount })
+        if (res.nameChangeCount !== undefined) setNameChangeCount(res.nameChangeCount)
+        if (res.diamond !== undefined) setCurrentDiamond(res.diamond)
+        const costText = (res.cost ?? 0) > 0 ? `（花費 ${res.cost} 💎）` : ''
+        setNameMsg({ ok: true, text: `暱稱已更新！${costText}` })
       } else {
-        setNameMsg({ ok: false, text: translateError(res.error, '暱稱更新失敗') })
+        if (res.error === 'insufficient_diamond') {
+          setNameMsg({ ok: false, text: `鑽石不足（需要 ${NAME_CHANGE_COST} 💎）` })
+        } else {
+          setNameMsg({ ok: false, text: translateError(res.error, '暱稱更新失敗') })
+        }
       }
     } catch (e) {
       setNameMsg({ ok: false, text: '網路連線失敗，請稍後再試' })
     } finally {
       setNameLoading(false)
     }
-  }, [newName])
+  }, [newName, canAffordName, nameCost])
 
   const handleChangePassword = useCallback(async () => {
     setPwMsg(null)
@@ -282,6 +301,11 @@ export function SettingsPanel({ onBack, onLogout, displayName, isBound: initialB
           {/* ── 修改暱稱 ── */}
           <section className="settings-section">
             <h3 className="settings-section-title">修改暱稱</h3>
+            <div className="settings-name-rule" style={{ fontSize: '0.82rem', color: 'rgba(255,255,255,0.55)', marginBottom: '8px', lineHeight: 1.5 }}>
+              {nameChangeCount === 0
+                ? '📝 首次改名免費'
+                : `💎 每次改名需花費 ${NAME_CHANGE_COST} 鑽石（已改 ${nameChangeCount} 次）`}
+            </div>
             <div className="settings-form-row">
               <input
                 className="settings-input"
@@ -293,10 +317,11 @@ export function SettingsPanel({ onBack, onLogout, displayName, isBound: initialB
               />
               <button
                 className="settings-btn settings-btn-secondary"
-                disabled={nameLoading || !newName.trim()}
+                disabled={nameLoading || !newName.trim() || !canAffordName}
                 onClick={handleChangeName}
+                title={!canAffordName ? `鑽石不足（需要 ${nameCost} 💎）` : undefined}
               >
-                {nameLoading ? '...' : '更新'}
+                {nameLoading ? '...' : nameCost > 0 ? `更新（${nameCost} 💎）` : '更新（免費）'}
               </button>
             </div>
             {nameMsg && (

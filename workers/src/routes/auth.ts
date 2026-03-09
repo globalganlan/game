@@ -193,7 +193,9 @@ auth.post('/bind-account', async (c) => {
   return c.json({ success: true, message: '帳號綁定成功' });
 });
 
-// ── 修改暱稱 ──────────────────────────────────
+// ── 修改暱稱（第一次免費，之後每次 200 鑽石） ──
+const NAME_CHANGE_COST = 200;
+
 auth.post('/change-name', async (c) => {
   const body = await c.req.json<{ guestToken?: string; newName?: string }>();
   const token = body.guestToken;
@@ -202,19 +204,46 @@ auth.post('/change-name', async (c) => {
   if (!newName || newName.length < 1 || newName.length > 20)
     return c.json({ success: false, error: 'name must be 1-20 chars' });
 
-  // 先查 playerId，再批次更新 players + save_data + arena_rankings
+  // 查 playerId
   const player = await c.env.DB.prepare(
     'SELECT playerId FROM players WHERE guestToken = ?'
   ).bind(token).first<{ playerId: string }>();
   if (!player) return c.json({ success: false, error: 'token_not_found' });
 
-  await c.env.DB.batch([
-    c.env.DB.prepare('UPDATE players SET displayName = ? WHERE playerId = ?').bind(newName, player.playerId),
-    c.env.DB.prepare('UPDATE save_data SET displayName = ? WHERE playerId = ?').bind(newName, player.playerId),
-    c.env.DB.prepare('UPDATE arena_rankings SET displayName = ? WHERE playerId = ?').bind(newName, player.playerId),
-  ]);
+  // 查改名次數 + 當前鑽石
+  const sd = await c.env.DB.prepare(
+    'SELECT nameChangeCount, diamond FROM save_data WHERE playerId = ?'
+  ).bind(player.playerId).first<{ nameChangeCount: number; diamond: number }>();
+  const changeCount = sd?.nameChangeCount ?? 0;
+  const diamond = sd?.diamond ?? 0;
+  const cost = changeCount === 0 ? 0 : NAME_CHANGE_COST;
 
-  return c.json({ success: true });
+  // 鑽石不足
+  if (cost > 0 && diamond < cost) {
+    return c.json({ success: false, error: 'insufficient_diamond', cost, diamond });
+  }
+
+  // 批次更新：扣鑽石 + 改名 + 遞增改名次數
+  const stmts: D1PreparedStatement[] = [
+    c.env.DB.prepare('UPDATE players SET displayName = ? WHERE playerId = ?').bind(newName, player.playerId),
+    c.env.DB.prepare(
+      'UPDATE save_data SET displayName = ?, nameChangeCount = nameChangeCount + 1, diamond = diamond - ? WHERE playerId = ?'
+    ).bind(newName, cost, player.playerId),
+    c.env.DB.prepare('UPDATE arena_rankings SET displayName = ? WHERE playerId = ?').bind(newName, player.playerId),
+  ];
+  await c.env.DB.batch(stmts);
+
+  // 回傳最新鑽石 + 改名次數
+  const updated = await c.env.DB.prepare(
+    'SELECT diamond, nameChangeCount FROM save_data WHERE playerId = ?'
+  ).bind(player.playerId).first<{ diamond: number; nameChangeCount: number }>();
+
+  return c.json({
+    success: true,
+    diamond: updated?.diamond ?? (diamond - cost),
+    nameChangeCount: updated?.nameChangeCount ?? (changeCount + 1),
+    cost,
+  });
 });
 
 // ── 修改密碼 ──────────────────────────────────
