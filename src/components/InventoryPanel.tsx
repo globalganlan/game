@@ -412,6 +412,7 @@ function EquipmentDetail({ equip, onClose, heroInstances, heroNameMap }: Equipme
 
   const handleUnequip = useCallback(async () => {
     try {
+      emitToast('⏳ 卸下裝備中...')
       await unequipItem(localEquip.equipId)
       setActionMsg('已卸下裝備')
       emitToast('✅ 已卸下裝備')
@@ -423,6 +424,7 @@ function EquipmentDetail({ equip, onClose, heroInstances, heroNameMap }: Equipme
 
   const handleEquipTo = useCallback(async (heroInstId: string, heroName: string) => {
     try {
+      emitToast(`⏳ 裝備給 ${heroName} 中...`)
       const heroEqs = getHeroEquipment(heroInstId)
       const conflict = heroEqs.find(e => e.slot === localEquip.slot && e.equipId !== localEquip.equipId)
       await equipItem(localEquip.equipId, heroInstId)
@@ -439,6 +441,7 @@ function EquipmentDetail({ equip, onClose, heroInstances, heroNameMap }: Equipme
     if (isProcessing) return
     setIsProcessing(true)
     const newLocked = !localEquip.locked
+    emitToast(newLocked ? '⏳ 鎖定中...' : '⏳ 解鎖中...')
     const ok = await lockEquipment(localEquip.equipId, newLocked)
     setIsProcessing(false)
     if (ok) {
@@ -457,6 +460,7 @@ function EquipmentDetail({ equip, onClose, heroInstances, heroNameMap }: Equipme
     if (localEquip.locked) { setActionMsg('請先解鎖裝備再分解'); return }
     if (!showDecomposeConfirm) { setShowDecomposeConfirm(true); return }
     setIsProcessing(true)
+    emitToast('⏳ 分解中...')
     const res = await decomposeEquipment([localEquip.equipId])
     setIsProcessing(false)
     if (res.success) {
@@ -490,6 +494,7 @@ function EquipmentDetail({ equip, onClose, heroInstances, heroNameMap }: Equipme
   const handleEnhance = useCallback(async () => {
     if (isProcessing || !canEnhance) return
     setIsProcessing(true)
+    emitToast('⏳ 強化中...')
     const res = await enhanceEquipment(localEquip.equipId)
     setIsProcessing(false)
     if (res.success) {
@@ -748,6 +753,7 @@ export function InventoryPanel({ onBack, heroesList, heroInstances }: InventoryP
     if (isBulkProcessing || bulkDecomposeTargets.length === 0) return
     setIsBulkProcessing(true)
     setBulkResult(null)
+    emitToast(`⏳ 批量分解 ${bulkDecomposeTargets.length} 件中...`)
     const ids = bulkDecomposeTargets.map(eq => eq.equipId)
     const res = await decomposeEquipment(ids)
     setIsBulkProcessing(false)
