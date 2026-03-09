@@ -4,6 +4,18 @@
 
 ---
 
+### [2026-03-08] 裝備鎖定恢復 + 批次分解 SQL 溢位修復
+- **觸發者**：使用者需求
+- **執行角色**：🔧 CODING + 🧪 QA
+- **變更內容**：
+  1. **InventoryPanel.tsx**：恢復裝備鎖定/解鎖 UI（EquipmentDetail 新增 🔓鎖定 / 🔒已鎖定 切換按鈕）；裝備格子顯示 🔒 鎖定徽章（`.inv-equip-lock-badge`）；鎖定裝備隱藏分解按鈕 + 一鍵分解自動排除
+  2. **workers inventory.ts**：`/decompose-equipment` 改為分段查詢（CHUNK_SIZE=80），修復 `D1_ERROR: too many SQL variables` 溢位；後端額外過濾 `locked` 裝備，回傳 `skippedLocked` 計數
+  3. **App.css**：新增 `.inv-equip-lock-badge` / `.inv-lock-btn` / `.inv-lock-btn-active` 樣式
+- **Spec 更新**：`inventory.md` v3.2→v3.3
+- **Commit**：`ee76997`
+
+---
+
 ### [2026-03-08] 改名費用系統：首次免費、之後每次 200💎
 - **觸發者**：使用者需求
 - **執行角色**：🔧 CODING + 🧪 QA

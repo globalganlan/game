@@ -1,7 +1,7 @@
 # 背包與道具系統 Spec
 
-> 版本：v3.2 ｜ 狀態：🟢 已實作
-> 最後更新：2026-03-07
+> 版本：v3.3 ｜ 狀態：🟢 已實作
+> 最後更新：2026-03-08
 > 負賬角色：🎯 GAME_DESIGN → 🔧 CODING
 
 ## 概述
@@ -245,7 +245,7 @@ InventoryPanel mount
 
 > **v2.0 移除的函式**：`equipItem`、`unequipItem`、`lockEquipment`、`expandInventory`、`getHeroEquipment`、`getUnequippedEquipment`（裝備操作移至 `progressionService`）
 >
-> **v2.7 棄用**：`lockEquipment` — `/lock-equipment` API 端點已棄用，裝備實例上的 `locked` 欄位不再使用，背包 UI 不再顯示鎖定按鈕。
+> **v3.3 恢復**：`lockEquipment` — `/lock-equipment` API 端點重新啟用，裝備實例 `locked` 欄位恢復使用。背包 EquipmentDetail 彈窗顯示鎖定/解鎖切換按鈕（🔓鎖定 / 🔒已鎖定）；鎖定裝備隱藏分解按鈕、一鍵分解自動排除。
 
 ### addItemsLocally 細節
 
@@ -279,7 +279,11 @@ function addItemsLocally(items: { itemId: string; quantity: number }[]): void
 >
 > **v2.7 新增端點**：`/decompose-equipment` — 分解裝備，回收金幣 + 裝備碎片（`equip_scrap`）。
 >
-> **v2.7 棄用端點**：`/lock-equipment`（鎖定功能移除）、`/expand-inventory`（容量限制移除）。
+> **v2.7 棄用端點**：`/expand-inventory`（容量限制移除）。
+>
+> **v3.3 恢復端點**：`/lock-equipment`（鎖定功能恢復）。
+>
+> **v3.3 修復**：`/decompose-equipment` 改為分段查詢（CHUNK_SIZE=80），防止 D1 SQL 變數溢位錯誤；後端額外過濾 `locked` 裝備，回傳 `skippedLocked` 計數。
 
 ### ✅ 已實作的商店端點
 
@@ -468,6 +472,7 @@ type SortMode = 'default' | 'rarity-desc' | 'quantity-desc' | 'name-asc'
 - [ ] **批量使用**：素材批量使用
 - [ ] **道具合成**：低級素材合成高級（如 3×小型經驗核心 → 1×中型經驗核心）
 - [x] **收藏圖鑑**：裝備圖鑑百科（✅ 已完成，v2.7 移除收集進度追蹤）
+- [x] **裝備鎖定功能**：EquipmentDetail 鎖定/解鎖切換，鎖定裝備自動排除一鍵分解（✅ v3.3 恢復）
 - [ ] **裝備分解功能**：批量分解（目前僅支援單件分解）
 
 ---
@@ -493,4 +498,5 @@ type SortMode = 'default' | 'rarity-desc' | 'quantity-desc' | 'name-asc'
 | v2.9 | 2026-03-05 | **Server-First 庫存操作**：`sellItems` / `useItem` 改為 API 先調、成功後才扣本地庫存；`sellItems` 失敗回傳 0（移除 estimatedGold fallback）；`ShopPanel.handlePurchase` 改為 API 先調、成功後才扣本地貨幣/加道具，失敗顯示「購買失敗」toast |
 | v3.1 | 2026-03-07 | **pvp_coin 即時同步**：ArenaPanel 掃蕩 + runBattleLoop 競技場勝利/敗北，pvp_coin 獲得後立即呼叫 `addItemsLocally` 寫入本地快取 |
 | v3.2 | 2026-03-07 | **寶箱開啟改善 + 素材 Tab 移除 + 商店批量購買**：①寶箱開啟後顯示詳細獎勵明細（💰/💚/💎 emoji + 名稱 ×數量，多種獎勵以「、」分隔）②寶箱數量歸零時自動關閉詳情面板（1.2~1.5s 延遲）③移除「🧪 素材」Tab（general_material 無實際道具用途）④商店購買按鈕改為彈出批量購買 Modal：數量控制（−/−10/輸入/+10/+/MAX）、滑桿、獎勵預覽、餘額不足紅字、每日剩餘、確認購買⑤後端 shop-buy 支援 `quantity` 參數（1~999），批量扣款+批量發放，每日限量檢查 |
+| v3.3 | 2026-03-08 | **裝備鎖定恢復 + 批次分解 SQL 修復**：①恢復裝備鎖定/解鎖 UI（EquipmentDetail 彈窗新增 🔓鎖定/🔒已鎖定 切換按鈕）②裝備格子顯示 🔒 鎖定徽章（`.inv-equip-lock-badge`）③鎖定裝備隱藏分解按鈕 + 一鍵分解自動排除（前端+後端雙重檢查）④`/decompose-equipment` 改為分段 SELECT/batch（CHUNK_SIZE=80），修復 `D1_ERROR: too many SQL variables` 溢位⑤後端額外過濾 `locked` 裝備，回傳 `skippedLocked` 計數⑥新增 `.inv-lock-btn` / `.inv-lock-btn-active` CSS 樣式 |
 | v3.0 | 2026-03-06 | **移除廢棄強化石 + 商店獎勵同步**：①背包新增 `DEPRECATED_ITEMS` 過濾器，隱藏已廢棄的 `eqm_enhance_s/m/l`（前端 InventoryPanel）②雜貨商店 `daily_enhance_s` → `daily_forge_ore`（forge_ore_common ×5）③星塵商店 `sd_enhance_l` → `sd_forge_rare`（forge_ore_rare ×3）④碎片兌換 `scrap_enhance_s/m/l` → `scrap_forge_common`（forge_ore_common ×5）+ `scrap_forge_rare`（forge_ore_rare ×2）⑤寶箱掉落 `generateChestRewards` 全面替換強化石為鍛造礦 ⑥物品資訊彈窗（`ItemInfoPopup`）z-index 提升至 99999，確保永遠在最上層 ⑦簽到彈窗描述新增 `white-space: pre-wrap` 支援換行 |
