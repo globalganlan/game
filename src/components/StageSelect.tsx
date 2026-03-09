@@ -415,7 +415,7 @@ function DailyPanel({
                   {unlocked && (
                     <span className="daily-tier-rewards">
                       <CurrencyIcon type="gold" /> {diff.rewards.gold}
-                      {' '}<CurrencyIcon type="exp" /> {diff.rewards.exp}
+                      {(diff.rewards.exp ?? 0) > 0 && <>{' '}<CurrencyIcon type="exp" /> {diff.rewards.exp}</>}
                       {diff.rewards.items?.filter(it => it.dropRate >= 1).slice(0, 2).map((it, i) => (
                         <span key={i}> <ClickableItemIcon itemId={it.itemId}>×{it.quantity}</ClickableItemIcon></span>
                       ))}
