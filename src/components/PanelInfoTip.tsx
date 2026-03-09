@@ -91,8 +91,9 @@ export function PanelInfoTip({ description, children }: PanelInfoTipProps) {
         onClick={(e) => { e.stopPropagation(); setOpen(!open) }}
         title="功能說明"
         type="button"
+        aria-label="說明"
       >
-        ℹ️
+        i
       </button>
       {popup}
     </>
