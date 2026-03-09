@@ -1,8 +1,14 @@
 # 開發狀態快照 — Dev Status
 
-> 最後更新：2026-03-08（第六十五次更新 — 陰影+iOS Canvas常駐+暴擊UI）
+> 最後更新：2026-03-08（第六十六次更新 — 被動技能字型預載修復）
 
 ## 截至 2026-03-08 的開發狀態
+
+### 被動技能旋轉方塊閃現修復（7a4e5ab）
+- [x] 根因：drei v10 `<Text>` 使用 `suspend-react` 的 `suspend()` 載入字型；戰鬥開始時 PassiveHint3D 首次渲染 → 字型未快取 → throw Promise → 觸發 Suspense fallback（旋轉方塊）
+- [x] SceneWidgets.tsx：新增 `preloadTroikaFont()` — 使用 `suspend-react` 的 `preload()` 預熱快取
+- [x] App.tsx：新增 `FontPreloader` 元件，Canvas 掛載時預載字型
+- [x] three-modules.d.ts：新增 troika-three-text / suspend-react 型別宣告
 
 ### iOS 3D 渲染修復歷程
 - [x] 第一次修復（e69a17f）：移除 `flat` prop + iOS Sky 替換為 scene.background + SceneReady setTimeout + 安全超時 5s — **不夠**，iOS 仍全黑

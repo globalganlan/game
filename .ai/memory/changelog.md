@@ -4,15 +4,16 @@
 
 ---
 
-### [2026-03-08] 進入戰鬥旋轉方塊載入佔位符消除
-- **觸發者**：使用者（Bug 報告：第一次載入進入戰鬥時英雄攻擊前有旋轉方塊）
+### [2026-03-08] 戰鬥開始被動技能旋轉方塊閃現修復（字型預載）
+- **觸發者**：使用者（Bug 報告：有被動技能的英雄在開始戰鬥時短暫出現旋轉方塊）
 - **執行角色**：🔧 CODING + 🧪 QA
-- **根因**：`SceneReady` 在外層 `<Suspense>` 解析（Arena 載入完成）後就觸發 `closeCurtain()`，但各英雄的獨立 `<Suspense>` 邊界可能仍在載入模型（preload 的 12s 超時先到），導致過場幕提前開啟、使用者看到 `HeroLoadingPlaceholder`（旋轉藍色方塊）
+- **根因**：drei v10 的 `<Text>` 內部使用 `suspend-react` 的 `suspend()` — 以 key `['troika-text', font, characters]` 快取字型。當 `PassiveHint3D`/`BuffApplyToast3D` 等 3D 文字元件在戰鬥開始時首次渲染、字型尚未在 `suspend-react` 快取中時，`suspend()` 會 throw Promise 觸發外層 `<Suspense>` fallback（HeroLoadingPlaceholder 旋轉方塊），即使模型早已載入完成。NotoSansSC-Regular.ttf 達 10.5 MB，首次載入需時間。
 - **修復方式**：
-  1. **App.tsx**：移除 `SceneReady` 元件及其 JSX 引用（不再由外層 Suspense 觸發收幕）
-  2. **useStageHandlers.ts**：`selectStage`/`enterArena`/`defenseSetup` — 立即掛載 3D 場景（過場幕遮蓋 Suspense 佔位符），`await preloadPromise` 完成後再 `closeCurtain()`（25s 安全網）
-  3. **useBattleFlow.ts**：`goNextStage` tower/story 預載超時從 12s 提升至 25s
-- **Commit**：`a9e97b7`
+  1. **SceneWidgets.tsx**：新增 `preloadTroikaFont()` — 使用 `suspend-react` 的 `preload()` 非拋出式 API 預熱快取
+  2. **App.tsx**：新增 `FontPreloader` 元件，在 Canvas 掛載時呼叫 `preloadTroikaFont()`，確保字型在任何 `<Text>` 渲染前已進入快取
+  3. **three-modules.d.ts**：新增 `troika-three-text` 及 `suspend-react` 型別宣告
+- **Commit**：`7a4e5ab`
+- **備註**：先前的修復嘗試 `a9e97b7`（改動 SceneReady/curtain/preload 時序）已被使用者 revert，因根因並非模型載入時序而是字型觸發 Suspense
 
 ### [2026-03-08] Toast z-index 提升（寶箱/物品詳情彈窗遮擋修復）
 - **觸發者**：使用者（Bug 報告：開啟寶箱的獲得物品動畫沒有在介面上方）
