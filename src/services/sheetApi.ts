@@ -34,10 +34,3 @@ export async function readSheet<T = Record<string, unknown>>(sheetName: string):
   return rows as T[]
 }
 
-/**
- * 列出所有 Sheet 名稱
- */
-export async function listSheets(): Promise<Array<{ name: string; rows: number; cols: number }>> {
-  const res = await callApi<{ sheets: Array<{ name: string; rows: number; cols: number }> }>('listSheets', {})
-  return res.sheets ?? []
-}

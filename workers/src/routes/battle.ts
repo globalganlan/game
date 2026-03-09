@@ -200,10 +200,10 @@ battle.post('/complete-battle', async (c) => {
     const ch = parseInt(parts[0]) || 1;
     const st = parseInt(parts[1]) || 1;
 
-    const stageStars = safeJsonParse<Record<string, number>>(saveData.stageStars, {});
-    const prevBest = stageStars[stageId] || 0;
-    if (prevBest === 0) isFirstClear = true;
-    if (!stageStars[stageId]) stageStars[stageId] = 1;
+    const currentProgress = safeJsonParse<{ chapter: number; stage: number }>(saveData.storyProgress, { chapter: 1, stage: 1 });
+    const newProg = (ch - 1) * 8 + st;
+    const curProg = (currentProgress.chapter - 1) * 8 + currentProgress.stage;
+    isFirstClear = newProg >= curProg;
 
     // 從 stage_configs 讀取獎勵（優先），fallback 到公式
     const cfgRow = await db.prepare('SELECT rewards FROM stage_configs WHERE stageId = ?')
@@ -219,9 +219,6 @@ battle.post('/complete-battle', async (c) => {
       rewards.diamond = st === 8 ? 20 : 0;
     }
 
-    const currentProgress = safeJsonParse<{ chapter: number; stage: number }>(saveData.storyProgress, { chapter: 1, stage: 1 });
-    const newProg = (ch - 1) * 8 + st;
-    const curProg = (currentProgress.chapter - 1) * 8 + currentProgress.stage;
     if (newProg >= curProg) {
       let nextSt = st + 1, nextCh = ch;
       if (nextSt > 8) { nextCh = ch + 1; nextSt = 1; }
@@ -230,14 +227,13 @@ battle.post('/complete-battle', async (c) => {
 
     await db.prepare(
       `UPDATE save_data SET
-        gold = gold + ?, diamond = diamond + ?, exp = exp + ?, stageStars = ?,
+        gold = gold + ?, diamond = diamond + ?, exp = exp + ?,
         storyProgress = COALESCE(?, storyProgress),
         resourceTimerStage = COALESCE(?, resourceTimerStage),
         lastSaved = ?
        WHERE playerId = ?`
     ).bind(
       rewards.gold, rewards.diamond, rewards.exp,
-      JSON.stringify(stageStars),
       newStoryProgress ? JSON.stringify(newStoryProgress) : null,
       newStoryProgress ? stageId : null,
       isoNow(), playerId
@@ -405,9 +401,10 @@ battle.post('/complete-stage', async (c) => {
   const ch = parseInt(parts[0]) || 1;
   const st = parseInt(parts[1]) || 1;
 
-  const stageStars = safeJsonParse<Record<string, number>>(saveData.stageStars, {});
-  const isFirstClear = !stageStars[stageId];
-  if (!stageStars[stageId]) stageStars[stageId] = 1;
+  const currentProgress = safeJsonParse<{ chapter: number; stage: number }>(saveData.storyProgress, { chapter: 1, stage: 1 });
+  const newProg = (ch - 1) * 8 + st;
+  const curProg = (currentProgress.chapter - 1) * 8 + currentProgress.stage;
+  const isFirstClear = newProg >= curProg;
 
   const rewards = { gold: 0, exp: 0, diamond: 0 };
 
@@ -425,10 +422,7 @@ battle.post('/complete-stage', async (c) => {
     rewards.diamond = st === 8 ? 20 : 0;
   }
 
-  const currentProgress = safeJsonParse<{ chapter: number; stage: number }>(saveData.storyProgress, { chapter: 1, stage: 1 });
   let newStoryProgress2: { chapter: number; stage: number } | undefined;
-  const newProg = (ch - 1) * 8 + st;
-  const curProg = (currentProgress.chapter - 1) * 8 + currentProgress.stage;
   if (newProg >= curProg) {
     let nextSt = st + 1, nextCh = ch;
     if (nextSt > 8) { nextCh++; nextSt = 1; }
@@ -436,11 +430,11 @@ battle.post('/complete-stage', async (c) => {
   }
 
   await db.prepare(
-    `UPDATE save_data SET gold = gold + ?, diamond = diamond + ?, exp = exp + ?, stageStars = ?,
+    `UPDATE save_data SET gold = gold + ?, diamond = diamond + ?, exp = exp + ?,
      storyProgress = COALESCE(?, storyProgress), resourceTimerStage = COALESCE(?, resourceTimerStage),
      lastSaved = ? WHERE playerId = ?`
   ).bind(
-    rewards.gold, rewards.diamond, rewards.exp ?? 0, JSON.stringify(stageStars),
+    rewards.gold, rewards.diamond, rewards.exp ?? 0,
     newStoryProgress2 ? JSON.stringify(newStoryProgress2) : null,
     newStoryProgress2 ? stageId : null, isoNow(), playerId
   ).run();

@@ -2819,6 +2819,31 @@
   color: #f4a261;
 }
 
+/* 裝備子分頁切換（列表 / 圖鑑） */
+.inv-equip-sub-tabs {
+  display: flex;
+  gap: 6px;
+  padding: 6px 12px 0;
+  flex-shrink: 0;
+}
+.inv-equip-sub-tab {
+  flex: 1;
+  padding: 5px 8px;
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 6px;
+  background: rgba(255,255,255,0.03);
+  color: #aaa;
+  cursor: pointer;
+  font-size: 0.7rem;
+  text-align: center;
+  transition: all 0.15s;
+}
+.inv-equip-sub-tab-active {
+  background: rgba(244,162,97,0.15);
+  border-color: #f4a261;
+  color: #f4a261;
+}
+
 .inv-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(64px, 1fr));

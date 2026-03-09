@@ -31,13 +31,11 @@ export interface ItemDefinition {
   icon: string
   stackLimit: number
   useAction: string
-  sellPrice: number
 }
 
 export interface InventoryState {
   items: InventoryItem[]
   equipment: EquipmentInstance[]
-  equipmentCapacity: number
   definitions: Map<string, ItemDefinition>
 }
 
@@ -85,14 +83,13 @@ export async function loadInventory(): Promise<InventoryState> {
   const res = await callApi<{
     items: InventoryItem[]
     equipment: EquipmentInstance[]
-    equipmentCapacity: number
   }>('load-inventory')
   if (!res.success) throw new Error(res.error || 'load-inventory failed')
 
   const equipment = (res.equipment || []).map(parseEquipment)
   const serverItems = res.items || []
 
-  inventoryState = { items: serverItems, equipment, equipmentCapacity: res.equipmentCapacity || 200, definitions }
+  inventoryState = { items: serverItems, equipment, definitions }
   notify()
   return inventoryState
 }
@@ -115,31 +112,6 @@ export async function removeItems(items: { itemId: string; quantity: number }[])
     notify()
   }
   return true
-}
-
-export async function sellItems(items: { itemId: string; quantity: number }[]): Promise<number> {
-  try {
-    const res = await callApi<{ goldGained: number; currencies?: { gold?: number; diamond?: number; exp?: number } }>('sell-items', { items })
-    if (res.success) {
-      // 伺服器確認成功後才更新本地庫存
-      if (inventoryState) {
-        for (const sold of items) {
-          const existing = inventoryState.items.find(i => i.itemId === sold.itemId)
-          if (existing) existing.quantity = Math.max(0, existing.quantity - sold.quantity)
-        }
-        notify()
-      }
-      if (res.currencies) {
-        const { applyCurrenciesFromServer } = await import('./saveService')
-        applyCurrenciesFromServer(res.currencies)
-      }
-      return res.goldGained ?? 0
-    }
-    return 0
-  } catch (e) {
-    console.warn('[inventory] sell-items error:', e)
-    return 0
-  }
 }
 
 export async function useItem(
@@ -212,14 +184,7 @@ export async function lockEquipment(equipId: string, locked: boolean): Promise<b
   return res.success
 }
 
-export async function expandInventory(): Promise<number> {
-  const res = await callApi<{ newCapacity: number }>('expand-inventory', {})
-  if (res.success && inventoryState) {
-    inventoryState.equipmentCapacity = res.newCapacity
-    notify()
-  }
-  return res.newCapacity || inventoryState?.equipmentCapacity || 200
-}
+
 
 export async function decomposeEquipment(equipIds: string[]): Promise<{
   success: boolean; decomposed?: number; goldGained?: number; scrapGained?: number; error?: string
@@ -341,7 +306,7 @@ export function clearInventoryCache(): void {
 
 export function addItemsLocally(items: { itemId: string; quantity: number }[]): void {
   if (!inventoryState) {
-    inventoryState = { items: [], equipment: [], equipmentCapacity: 200, definitions: cachedDefinitions ?? new Map() }
+    inventoryState = { items: [], equipment: [], definitions: cachedDefinitions ?? new Map() }
   }
   let changed = false
   for (const { itemId, quantity } of items) {
@@ -355,7 +320,7 @@ export function addItemsLocally(items: { itemId: string; quantity: number }[]): 
 
 export function removeItemsLocally(items: { itemId: string; quantity: number }[]): void {
   if (!inventoryState) {
-    inventoryState = { items: [], equipment: [], equipmentCapacity: 200, definitions: cachedDefinitions ?? new Map() }
+    inventoryState = { items: [], equipment: [], definitions: cachedDefinitions ?? new Map() }
   }
   let changed = false
   for (const { itemId, quantity } of items) {
@@ -368,7 +333,7 @@ export function removeItemsLocally(items: { itemId: string; quantity: number }[]
 
 export function addEquipmentLocally(equipment: EquipmentInstance[]): void {
   if (!inventoryState) {
-    inventoryState = { items: [], equipment: [], equipmentCapacity: 200, definitions: cachedDefinitions ?? new Map() }
+    inventoryState = { items: [], equipment: [], definitions: cachedDefinitions ?? new Map() }
   }
   if (equipment.length === 0) return
   // 透過 parseEquipment 正規化，避免 rarity/subStats 為 undefined 或字串導致崩潰

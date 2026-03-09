@@ -35,16 +35,9 @@ CREATE TABLE IF NOT EXISTS save_data (
   formation               TEXT NOT NULL DEFAULT '[null,null,null,null,null,null]',
   lastSaved               TEXT NOT NULL,
   -- Gacha 欄位
-  gachaPool               TEXT NOT NULL DEFAULT '[]',
   gachaPity               TEXT NOT NULL DEFAULT '{"pullsSinceLastSSR":0,"guaranteedFeatured":false}',
-  gachaPoolEndPity        INTEGER NOT NULL DEFAULT 0,
   lastHeroFreePull        TEXT NOT NULL DEFAULT '',
   lastEquipFreePull       TEXT NOT NULL DEFAULT '',
-  -- 裝備（JSON 陣列，裝備抽卡寫入）
-  equipment               TEXT NOT NULL DEFAULT '[]',
-  equipmentCapacity       INTEGER NOT NULL DEFAULT 200,
-  -- 關卡星級
-  stageStars              TEXT NOT NULL DEFAULT '{}',
   -- 每日簽到
   checkinDay              INTEGER NOT NULL DEFAULT 0,
   checkinLastDate         TEXT NOT NULL DEFAULT '',
@@ -123,10 +116,9 @@ CREATE TABLE IF NOT EXISTS item_definitions (
   description TEXT NOT NULL DEFAULT '',
   type        TEXT NOT NULL DEFAULT '',
   rarity      TEXT NOT NULL DEFAULT 'N',
-  stackable   INTEGER NOT NULL DEFAULT 1,
-  sellPrice   INTEGER NOT NULL DEFAULT 0,
+  stackable   INTEGER NOT NULL DEFAULT 999,
   icon        TEXT NOT NULL DEFAULT '',
-  extra       TEXT NOT NULL DEFAULT '{}'
+  useAction   TEXT NOT NULL DEFAULT ''
 );
 
 -- ═══════════════════════════════════════════════
@@ -145,8 +137,7 @@ CREATE TABLE IF NOT EXISTS heroes (
   modelId     TEXT NOT NULL DEFAULT '',
   critRate    REAL NOT NULL DEFAULT 5,
   critDmg     REAL NOT NULL DEFAULT 50,
-  description TEXT NOT NULL DEFAULT '',
-  extra       TEXT NOT NULL DEFAULT '{}'
+  description TEXT NOT NULL DEFAULT ''
 );
 
 -- ═══════════════════════════════════════════════
@@ -231,14 +222,6 @@ CREATE TABLE IF NOT EXISTS arena_rankings (
 
 CREATE INDEX IF NOT EXISTS idx_arena_playerId ON arena_rankings(playerId);
 
--- ═══════════════════════════════════════════════
--- 11. game_sheets — 靜態遊戲資料（前端 readSheet 用）
--- ═══════════════════════════════════════════════
-CREATE TABLE IF NOT EXISTS game_sheets (
-  sheetName  TEXT PRIMARY KEY,
-  data       TEXT NOT NULL DEFAULT '[]',
-  updatedAt  TEXT NOT NULL DEFAULT ''
-);
 
 -- ═══════════════════════════════════════════════
 -- 12. shop_purchases — 商店每日購買計數

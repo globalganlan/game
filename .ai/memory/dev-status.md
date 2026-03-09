@@ -1,10 +1,35 @@
 # 開發狀態快照 — Dev Status
 
-> 最後更新：2026-03-08（第六十六次更新 — 被動技能字型預載修復）
+> 最後更新：2026-03-09（第六十九次更新 — DB 清理第二波：heroes.extra / item_definitions 正規化 / stageStars / sellPrice 移除）
 
-## 截至 2026-03-08 的開發狀態
+## 截至 2026-03-09 的開發狀態
 
-### 被動技能旋轉方塊閃現修復（7a4e5ab）
+### 資料庫清理（第二波）— heroes.extra / item_definitions 正規化 / stageStars / sellPrice 移除
+- [x] D1 `ALTER TABLE heroes DROP COLUMN extra` — 移除 heroes.extra 欄位
+- [x] item_definitions 正規化：新增 useAction 欄位、extra JSON 中 category→type / useAction→新欄位 / stackable→實際數量（999/99999）、移除 extra 欄位、移除 sellPrice 欄位
+- [x] load-item-definitions 路由簡化：不再解析 JSON，直接讀取 type/useAction 欄位
+- [x] sellPrice 功能完整移除：後端 sell-items 路由、前端 sellItems 函式、ItemDefinition.sellPrice 型別
+- [x] D1 `ALTER TABLE save_data DROP COLUMN stageStars`
+- [x] stageStars 功能完整移除：battle.ts isFirstClear 改用 storyProgress 比較、complete-story-offline 同上、init-save 移除、saveService 移除解析+updateStageStars、SaveData 型別移除
+- [x] schema.sql 同步更新（heroes/item_definitions/save_data）
+- [x] 驗證：tsc ✅ / workers tsc ✅ / vite build ✅ / wrangler deploy ✅
+
+### 資料庫清理 — 移除廢棄表/欄位/道具
+- [x] D1 `DROP TABLE game_sheets`（13 筆全未使用，已被 DEDICATED_READERS / 專屬 D1 表 / 前端硬寫取代）
+- [x] D1 `DELETE FROM item_definitions` 7 個廢棄道具（ticket_gacha, ticket_gacha_10, eqm_enhance_s/m/l, forge_ore_common/rare）
+- [x] D1 `DELETE FROM inventory` 清除玩家庫存中的上述 7 個廢棄道具
+- [x] D1 `ALTER TABLE save_data DROP COLUMN` 4 個廢棄欄位（gachaPool, gachaPoolEndPity, equipment, equipmentCapacity）
+- [x] `workers/schema.sql` 移除 save_data 4 個廢棄欄位定義
+- [x] Workers 程式碼清理：data.ts（game_sheets fallback + listSheets）、types.ts（SaveDataRow 4 欄位）、save.ts（init-save INSERT）、inventory.ts（equipmentCapacity + expand-inventory）
+- [x] 前端程式碼清理：inventoryService.ts（equipmentCapacity + expandInventory + 3 個 local helper 殘留引用）、sheetApi.ts（listSheets）、index.ts（匯出）、InventoryPanel.tsx（DEPRECATED_ITEMS 過濾）
+- [x] 驗證：tsc ✅ / workers tsc ✅ / vite build ✅ / wrangler deploy ✅ / Playwright 全流程 ✅
+
+### 統一 ItemIcon + 粗體資源數字 + 商店貨幣列 overflow（38174b4）
+- [x] ChestLootPreview 統一使用 `<ItemIcon>` 取代 `<CurrencyIcon>` 和原始 emoji
+- [x] `.infotip-trigger` 新增 `font-weight: bold; font-variant-numeric: tabular-nums`
+- [x] `.shop-currency-bar` 新增 `flex-wrap: wrap` 防止 5 個貨幣溢出裁切
+
+### 被動技能字型預載修復（7a4e5ab）
 - [x] 根因：drei v10 `<Text>` 使用 `suspend-react` 的 `suspend()` 載入字型；戰鬥開始時 PassiveHint3D 首次渲染 → 字型未快取 → throw Promise → 觸發 Suspense fallback（旋轉方塊）
 - [x] SceneWidgets.tsx：新增 `preloadTroikaFont()` — 使用 `suspend-react` 的 `preload()` 預熱快取
 - [x] App.tsx：新增 `FontPreloader` 元件，Canvas 掛載時預載字型
@@ -72,7 +97,7 @@
 - [x] **Cloudflare Workers + D1 後端** — Hono 路由 + D1 SQLite，取代 GAS + Google Sheets
   - `workers/src/index.ts` — 主入口 + CORS + Cron Triggers
   - `workers/src/routes/` — 11 個路由模組（auth / save / battle / inventory / progression / gacha / mail / arena / sheet / checkin / **stage**）
-  - `workers/schema.sql` — **15 張** D1 資料表（含新增的 skill_templates / hero_skills / element_matrix）
+  - `workers/schema.sql` — **14 張** D1 資料表（game_sheets 已移除；含 skill_templates / hero_skills / element_matrix）
 - [x] **D1 原子批次寫入** — 所有多寫入路由使用 `db.batch()` 包成單一 SQLite 交易
   - 核心 helper：`upsertItemStmt` / `grantRewardsStmts` / `insertMailStmt`
   - 共 22 條路由完成批次化（save/auth/inventory/gacha/progression/mail/checkin/arena）

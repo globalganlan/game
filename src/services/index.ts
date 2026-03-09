@@ -3,7 +3,7 @@
  */
 
 // Sheet API
-export { readSheet, listSheets, clearCache } from './sheetApi'
+export { readSheet, clearCache } from './sheetApi'
 
 // 資料服務
 export {
@@ -63,7 +63,7 @@ export {
   equipItem,
   unequipItem,
   lockEquipment,
-  expandInventory,
+
   getItemQuantity,
   getHeroEquipment,
   getUnequippedEquipment,

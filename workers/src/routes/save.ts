@@ -153,8 +153,7 @@ save.post('/init-save', async (c) => {
       playerId, displayName, diamond, gold, stardust,
       resourceTimerStage, resourceTimerLastCollect,
       towerFloor, storyProgress, formation, lastSaved,
-      gachaPool, gachaPity, gachaPoolEndPity,
-      equipment, equipmentCapacity, stageStars,
+      gachaPity,
       checkinDay, checkinLastDate,
       arenaChallengesLeft, arenaHighestRank, arenaLastReset,
       pwaRewardClaimed
@@ -162,8 +161,7 @@ save.post('/init-save', async (c) => {
       ?, ?, 500, 10000, 0,
       '1-1', ?,
       0, '{"chapter":1,"stage":1}', ?, ?,
-      '[]', '{"pullsSinceLastSSR":0,"guaranteedFeatured":false}', 0,
-      '[]', 200, '{}',
+      '{"pullsSinceLastSSR":0,"guaranteedFeatured":false}',
       0, '',
       5, 500, '',
       0

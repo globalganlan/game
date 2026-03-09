@@ -1,11 +1,11 @@
 /**
- * Inventory Routes — 道具/裝備 CRUD、出售、商店、使用、裝卸
+ * Inventory Routes — 道具/裝備 CRUD、商店、使用、裝卸
  */
 import { Hono } from 'hono';
 import type { Env, HonoVars, SaveDataRow, InventoryRow, EquipmentInstanceRow, ItemDefinitionRow } from '../types.js';
 import { getBody } from '../middleware/auth.js';
 import { upsertItem, upsertItemStmt, getCurrencies } from './save.js';
-import { isoNow, safeJsonParse } from '../utils/helpers.js';
+import { isoNow } from '../utils/helpers.js';
 
 const inventory = new Hono<{ Bindings: Env; Variables: HonoVars }>();
 
@@ -49,21 +49,16 @@ const SHOP_CATALOG: Record<string, {
 // ── 載入道具定義 ──────────────────────────────
 inventory.post('/load-item-definitions', async (c) => {
   const items = await c.env.DB.prepare('SELECT * FROM item_definitions').all<ItemDefinitionRow>();
-  // 解析 extra JSON，合併 useAction / category 等欄位到回傳結果
-  const parsed = items.results.map(row => {
-    const extra = safeJsonParse<Record<string, unknown>>(row.extra, {});
-    return {
-      itemId: row.itemId,
-      name: (extra.name as string) || row.name,
-      category: (extra.category as string) || row.type || '',
-      rarity: (extra.rarity as string) || row.rarity,
-      description: (extra.description as string) || row.description,
-      icon: (extra.icon as string) || row.icon,
-      stackLimit: (extra.stackLimit as number) ?? (row.stackable ? 999 : 1),
-      useAction: (extra.useAction as string) || '',
-      sellPrice: (extra.sellPrice as number) ?? row.sellPrice,
-    };
-  });
+  const parsed = items.results.map(row => ({
+    itemId: row.itemId,
+    name: row.name,
+    category: row.type || '',
+    rarity: row.rarity,
+    description: row.description,
+    icon: row.icon,
+    stackLimit: row.stackable || 999,
+    useAction: row.useAction || '',
+  }));
   return c.json({ success: true, items: parsed });
 });
 
@@ -94,9 +89,7 @@ inventory.post('/load-inventory', async (c) => {
     'SELECT * FROM equipment_instances WHERE playerId = ?'
   ).bind(playerId).all<EquipmentInstanceRow>();
 
-  const saveData = await db.prepare(
-    'SELECT equipmentCapacity FROM save_data WHERE playerId = ?'
-  ).bind(playerId).first<Pick<SaveDataRow, 'equipmentCapacity'>>();
+
 
   // 自動修復 equippedBy 含 local_ 開頭的陳舊參照
   const heroRows = await db.prepare(
@@ -136,7 +129,6 @@ inventory.post('/load-inventory', async (c) => {
     success: true,
     items: items.results,
     equipment: fixedEquipment,
-    equipmentCapacity: saveData?.equipmentCapacity ?? 200,
   });
 });
 
@@ -181,43 +173,6 @@ inventory.post('/remove-items', async (c) => {
   ).bind(playerId).all<InventoryRow>();
 
   return c.json({ success: true, inventory: updated.results });
-});
-
-// ── 出售道具 ──────────────────────────────────
-inventory.post('/sell-items', async (c) => {
-  const playerId = c.get('playerId');
-  const db = c.env.DB;
-  const body = getBody(c);
-  const items = body.items as Array<{ itemId: string; quantity: number }>;
-  if (!items?.length) return c.json({ success: false, error: 'missing items' });
-
-  // 載入定義
-  const defs = await db.prepare('SELECT itemId, sellPrice FROM item_definitions').all<Pick<ItemDefinitionRow, 'itemId' | 'sellPrice'>>();
-  const defMap = new Map(defs.results.map((d) => [d.itemId, d.sellPrice]));
-
-  let totalGold = 0;
-  const stmts: D1PreparedStatement[] = [];
-  for (const item of items) {
-    const qty = Number(item.quantity) || 0;
-    const row = await db.prepare(
-      'SELECT quantity FROM inventory WHERE playerId = ? AND itemId = ?'
-    ).bind(playerId, item.itemId).first<{ quantity: number }>();
-    if ((row?.quantity ?? 0) < qty) return c.json({ success: false, error: `insufficient_${item.itemId}` });
-    const price = defMap.get(item.itemId) ?? 0;
-    totalGold += price * qty;
-    stmts.push(upsertItemStmt(db, playerId, item.itemId, -qty));
-  }
-
-  if (totalGold > 0) {
-    stmts.push(db.prepare(
-      'UPDATE save_data SET gold = gold + ? WHERE playerId = ?'
-    ).bind(totalGold, playerId));
-  }
-
-  if (stmts.length > 0) await db.batch(stmts);
-
-  const currencies = await getCurrencies(db, playerId);
-  return c.json({ success: true, goldGained: totalGold, currencies });
 });
 
 // ── 商店購買 ──────────────────────────────────
@@ -497,30 +452,6 @@ inventory.post('/lock-equipment', async (c) => {
   ).bind(locked, equipId, playerId).run();
 
   return c.json({ success: true });
-});
-
-// ── 擴展背包容量（格數 = 道具種類 + 裝備件數）──────────────────────────────
-inventory.post('/expand-inventory', async (c) => {
-  const playerId = c.get('playerId');
-  const db = c.env.DB;
-
-  const saveData = await db.prepare(
-    'SELECT diamond, equipmentCapacity FROM save_data WHERE playerId = ?'
-  ).bind(playerId).first<Pick<SaveDataRow, 'diamond' | 'equipmentCapacity'>>();
-  if (!saveData) return c.json({ success: false, error: 'save_not_found' });
-
-  const cost = 100;
-  if (saveData.diamond < cost) return c.json({ success: false, error: 'insufficient_diamond' });
-
-  const currentCap = saveData.equipmentCapacity || 200;
-  if (currentCap >= 500) return c.json({ success: false, error: 'max_capacity_reached' });
-
-  const newCap = Math.min(500, currentCap + 50);
-  await db.prepare(
-    'UPDATE save_data SET diamond = diamond - ?, equipmentCapacity = ? WHERE playerId = ?'
-  ).bind(cost, newCap, playerId).run();
-
-  return c.json({ success: true, newCapacity: newCap });
 });
 
 // ── 分解裝備 ──────────────────────────────

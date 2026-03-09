@@ -38,12 +38,7 @@ export interface SaveDataRow {
   storyProgress: string;   // JSON
   formation: string;       // JSON
   lastSaved: string;
-  gachaPool: string;       // JSON
   gachaPity: string;       // JSON
-  gachaPoolEndPity: string;  // JSON
-  equipment: string;       // JSON
-  equipmentCapacity: number;
-  stageStars: string;      // JSON
   checkinDay: number;
   checkinLastDate: string;
   arenaChallengesLeft: number;
@@ -97,9 +92,8 @@ export interface ItemDefinitionRow {
   type: string;
   rarity: string;
   stackable: number;
-  sellPrice: number;
   icon: string;
-  extra: string;          // JSON
+  useAction: string;
 }
 
 export interface HeroRow {

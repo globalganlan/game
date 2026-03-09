@@ -13,12 +13,10 @@ import type { RawHeroData } from '../types'
 import {
   loadInventory,
   getInventoryState,
-  filterItemsByCategory,
   onInventoryChange,
   useItem,
   decomposeEquipment,
   enhanceEquipment,
-  type ItemCategory,
   type ItemDefinition,
   type InventoryState,
 } from '../services/inventoryService'
@@ -76,21 +74,20 @@ function resolveFallbackName(
    ──────────────────────────── */
 
 interface CategoryTab {
-  key: ItemCategory | 'all' | 'codex'
+  key: 'items' | 'equipment'
   icon: React.ReactNode
   label: string
 }
 
 const TABS: CategoryTab[] = [
-  { key: 'all',                icon: '📦', label: '全部' },
-  { key: 'equipment',          icon: '⚔️', label: '裝備' },
-  { key: 'ascension_material', icon: '🔥', label: '突破' },
-  { key: 'chest',              icon: '🎁', label: '寶箱' },
-  { key: 'currency',           icon: <CurrencyIcon type="gold" />, label: '貨幣' },
-  { key: 'codex',              icon: '📖', label: '圖鑑' },
+  { key: 'items',     icon: '📦', label: '道具' },
+  { key: 'equipment', icon: '⚔️', label: '裝備' },
 ]
 
-type SortMode = 'default' | 'rarity-desc' | 'quantity-desc' | 'name-asc'
+type SortMode = 'default' | 'rarity-desc' | 'rarity-asc' | 'quantity-desc' | 'name-asc'
+
+/** 裝備子分頁 */
+type EquipSubTab = 'list' | 'codex'
 
 /* ────────────────────────────
    Rarity Colors（共用常數）
@@ -644,7 +641,8 @@ export function InventoryPanel({ onBack, heroesList, heroInstances }: InventoryP
     return m
   }, [heroesList])
   const [invState, setInvState] = useState<InventoryState | null>(getInventoryState)
-  const [activeTab, setActiveTab] = useState<ItemCategory | 'all' | 'codex'>('all')
+  const [activeTab, setActiveTab] = useState<'items' | 'equipment'>('items')
+  const [equipSubTab, setEquipSubTab] = useState<EquipSubTab>('list')
   /* ── 延遲格子渲染：面板外殼先顯示，grid 下一幀再繪製 ── */
   const [gridReady, setGridReady] = useState(false)
   const PAGE_SIZE = 50
@@ -685,19 +683,18 @@ export function InventoryPanel({ onBack, heroesList, heroInstances }: InventoryP
   const filteredItems = useMemo(() => {
     if (!invState) return []
     let items: InventoryItem[]
-    if (activeTab === 'all') {
-      items = invState.items.filter((i) => i.quantity > 0)
-    } else if (activeTab === 'equipment') {
-      // 裝備分頁由 equipment 清單處理，這裡回傳空
-      items = []
-    } else if (activeTab === 'codex') {
-      items = []
+    if (activeTab === 'items') {
+      // 道具分頁：顯示所有非裝備類別（突破材料、寶箱、貨幣、一般素材等）
+      items = invState.items.filter((i) => {
+        if (i.quantity <= 0) return false
+        const def = invState.definitions.get(i.itemId)
+        return !def || def.category !== 'equipment'
+      })
     } else {
-      items = filterItemsByCategory(activeTab)
+      // 裝備分頁由 equipment 清單處理
+      items = []
     }
-    // 過濾已移除的道具（強化石）
-    const DEPRECATED_ITEMS = new Set(['eqm_enhance_s', 'eqm_enhance_m', 'eqm_enhance_l', 'forge_ore_common', 'forge_ore_rare'])
-    items = items.filter(i => !DEPRECATED_ITEMS.has(i.itemId))
+
     // 排序
     if (sortMode === 'quantity-desc') {
       items = [...items].sort((a, b) => b.quantity - a.quantity)
@@ -707,6 +704,13 @@ export function InventoryPanel({ onBack, heroesList, heroInstances }: InventoryP
         const ra = rarityOrder[invState.definitions.get(a.itemId)?.rarity ?? 'N'] ?? 0
         const rb = rarityOrder[invState.definitions.get(b.itemId)?.rarity ?? 'N'] ?? 0
         return rb - ra
+      })
+    } else if (sortMode === 'rarity-asc') {
+      const rarityOrder: Record<string, number> = { SSR: 4, SR: 3, R: 2, N: 1 }
+      items = [...items].sort((a, b) => {
+        const ra = rarityOrder[invState.definitions.get(a.itemId)?.rarity ?? 'N'] ?? 0
+        const rb = rarityOrder[invState.definitions.get(b.itemId)?.rarity ?? 'N'] ?? 0
+        return ra - rb
       })
     } else if (sortMode === 'name-asc') {
       items = [...items].sort((a, b) => {
@@ -718,20 +722,24 @@ export function InventoryPanel({ onBack, heroesList, heroInstances }: InventoryP
     return items
   }, [invState, activeTab, sortMode])
 
-  /** 裝備清單（全部 / 裝備分頁都需要） */
+  /** 裝備清單（裝備分頁） */
   const equipmentList = useMemo(() => {
-    if (!invState || (activeTab !== 'equipment' && activeTab !== 'all')) return []
+    if (!invState || activeTab !== 'equipment') return []
+    const rarityOrder: Record<string, number> = { SSR: 4, SR: 3, R: 2, N: 1 }
     return [...invState.equipment].sort((a, b) => {
       const aEquipped = a.equippedBy ? 0 : 1
       const bEquipped = b.equippedBy ? 0 : 1
       if (aEquipped !== bEquipped) return aEquipped - bEquipped
-      // 同組內依稀有度排序
-      const rarityOrder: Record<string, number> = { SSR: 4, SR: 3, R: 2, N: 1 }
+      // 依排序模式
+      if (sortMode === 'rarity-asc') {
+        return (rarityOrder[a.rarity] ?? 0) - (rarityOrder[b.rarity] ?? 0)
+      }
+      // 預設 rarity-desc
       return (rarityOrder[b.rarity] ?? 0) - (rarityOrder[a.rarity] ?? 0)
     })
-  }, [invState, activeTab])
+  }, [invState, activeTab, sortMode])
 
-  const showEquipment = activeTab === 'all' || activeTab === 'equipment'
+  const showEquipment = activeTab === 'equipment'
 
   // ── 一鍵分解：篩選可分解裝備 ──
   const bulkDecomposeTargets = useMemo(() => {
@@ -811,7 +819,7 @@ export function InventoryPanel({ onBack, heroesList, heroInstances }: InventoryP
             <button
               key={tab.key}
               className={`inv-tab ${activeTab === tab.key ? 'inv-tab-active' : ''}`}
-              onClick={() => { startTransition(() => setActiveTab(tab.key)); setVisibleCount(PAGE_SIZE) }}
+              onClick={() => { startTransition(() => setActiveTab(tab.key)); setVisibleCount(PAGE_SIZE); if (tab.key === 'equipment') setEquipSubTab('list') }}
             >
               <span>{tab.icon}</span>
               <span>{tab.label}</span>
@@ -819,20 +827,45 @@ export function InventoryPanel({ onBack, heroesList, heroInstances }: InventoryP
           ))}
         </div>
 
-        {/* Sort bar （圖鑑 tab 不顯示） */}
-        {activeTab !== 'codex' && (<>
+        {/* 裝備子分頁切換（列表 / 圖鑑） */}
+        {activeTab === 'equipment' && (
+          <div className="inv-equip-sub-tabs">
+            <button
+              className={`inv-equip-sub-tab ${equipSubTab === 'list' ? 'inv-equip-sub-tab-active' : ''}`}
+              onClick={() => setEquipSubTab('list')}
+            >📋 裝備列表</button>
+            <button
+              className={`inv-equip-sub-tab ${equipSubTab === 'codex' ? 'inv-equip-sub-tab-active' : ''}`}
+              onClick={() => setEquipSubTab('codex')}
+            >📖 裝備圖鑑</button>
+          </div>
+        )}
+
+        {/* Sort bar */}
+        {!(activeTab === 'equipment' && equipSubTab === 'codex') && (<>
         <div className="inv-sort-bar">
-          <select
-            className="inv-sort-select"
-            value={sortMode}
-            onChange={e => setSortMode(e.target.value as SortMode)}
-          >
-            <option value="default">預設排序</option>
-            <option value="rarity-desc">稀有度↓</option>
-            <option value="quantity-desc">數量↓</option>
-            <option value="name-asc">名稱排序</option>
-          </select>
-          {showEquipment && (
+          {activeTab === 'items' ? (
+            <select
+              className="inv-sort-select"
+              value={sortMode}
+              onChange={e => setSortMode(e.target.value as SortMode)}
+            >
+              <option value="default">預設排序</option>
+              <option value="rarity-desc">稀有度↓</option>
+              <option value="quantity-desc">數量↓</option>
+              <option value="name-asc">名稱排序</option>
+            </select>
+          ) : (
+            <select
+              className="inv-sort-select"
+              value={sortMode === 'rarity-asc' ? 'rarity-asc' : 'rarity-desc'}
+              onChange={e => setSortMode(e.target.value as SortMode)}
+            >
+              <option value="rarity-desc">稀有度 高→低</option>
+              <option value="rarity-asc">稀有度 低→高</option>
+            </select>
+          )}
+          {showEquipment && equipSubTab === 'list' && (
             <button
               className="inv-action-btn inv-decompose-btn inv-bulk-decompose-trigger"
               onClick={() => { setShowBulkDecompose(true); setBulkResult(null) }}
@@ -845,10 +878,11 @@ export function InventoryPanel({ onBack, heroesList, heroInstances }: InventoryP
         {/* Items Grid — 延遲渲染 + 漸進式載入 */}
         <div className="inv-grid" ref={gridRef}>
           {(!gridReady || isLoading) && <div className="inv-loading">載入中...</div>}
-          {gridReady && !isLoading && activeTab !== 'equipment' && filteredItems.length === 0 && equipmentList.length === 0 && (
+          {/* 道具分頁 */}
+          {gridReady && !isLoading && activeTab === 'items' && filteredItems.length === 0 && (
             <div className="inv-empty">此分類無道具</div>
           )}
-          {gridReady && activeTab !== 'equipment' && filteredItems.slice(0, visibleCount).map((item) => (
+          {gridReady && activeTab === 'items' && filteredItems.slice(0, visibleCount).map((item) => (
             <ItemCell
               key={item.itemId}
               item={item}
@@ -857,11 +891,11 @@ export function InventoryPanel({ onBack, heroesList, heroInstances }: InventoryP
               onClick={() => setSelectedItem(item)}
             />
           ))}
-          {/* 裝備（全部 / 裝備分頁） */}
-          {gridReady && showEquipment && activeTab === 'equipment' && equipmentList.length === 0 && (
+          {/* 裝備分頁 — 列表 */}
+          {gridReady && showEquipment && equipSubTab === 'list' && equipmentList.length === 0 && (
             <div className="inv-empty">尚無裝備</div>
           )}
-          {gridReady && showEquipment && equipmentList.slice(0, Math.max(0, visibleCount - filteredItems.length)).map(eq => (
+          {gridReady && showEquipment && equipSubTab === 'list' && equipmentList.slice(0, visibleCount).map(eq => (
             <button
               key={eq.equipId}
               className={`inv-cell inv-equip-cell${eq.equippedBy ? ' inv-equip-in-use' : ''}`}
@@ -880,16 +914,21 @@ export function InventoryPanel({ onBack, heroesList, heroInstances }: InventoryP
             </button>
           ))}
           {/* 顯示更多按鈕 */}
-          {gridReady && !isLoading && visibleCount < (filteredItems.length + equipmentList.length) && (
+          {gridReady && !isLoading && activeTab === 'items' && visibleCount < filteredItems.length && (
             <button className="inv-show-more-btn" onClick={() => setVisibleCount(c => c + PAGE_SIZE)}>
-              顯示更多（剩餘 {filteredItems.length + equipmentList.length - visibleCount} 項）
+              顯示更多（剩餘 {filteredItems.length - visibleCount} 項）
+            </button>
+          )}
+          {gridReady && !isLoading && showEquipment && equipSubTab === 'list' && visibleCount < equipmentList.length && (
+            <button className="inv-show-more-btn" onClick={() => setVisibleCount(c => c + PAGE_SIZE)}>
+              顯示更多（剩餘 {equipmentList.length - visibleCount} 項）
             </button>
           )}
         </div>
       </>)}
 
-      {/* 圖鑑面板 */}
-      {activeTab === 'codex' && (
+      {/* 裝備分頁 — 圖鑑子介面 */}
+      {activeTab === 'equipment' && equipSubTab === 'codex' && (
         <CodexPanel />
       )}
       </div>

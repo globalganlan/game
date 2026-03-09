@@ -26,7 +26,6 @@ export interface SaveData {
   towerFloor: number
   storyProgress: { chapter: number; stage: number }
   formation: (string | null)[] // 6 slots, heroInstanceId or null
-  stageStars: Record<string, number> // stageId  best star (1-3)
   lastSaved: string
   gachaPity?: { pullsSinceLastSSR: number; guaranteedFeatured: boolean }
   lastHeroFreePull?: string
@@ -187,13 +186,6 @@ function sanitizeSaveData(sd: SaveData): SaveData {
   if (!Array.isArray(sd.formation)) {
     sd.formation = [null, null, null, null, null, null]
   }
-  // stageStars  防多層序列化
-  for (let i = 0; i < 3 && typeof sd.stageStars === 'string'; i++) {
-    try { sd.stageStars = JSON.parse(sd.stageStars as unknown as string) } catch { sd.stageStars = {}; break }
-  }
-  if (!sd.stageStars || typeof sd.stageStars !== 'object' || Array.isArray(sd.stageStars)) {
-    sd.stageStars = {}
-  }
   // towerFloor
   if (!sd.towerFloor || sd.towerFloor < 1) {
     sd.towerFloor = 1
@@ -321,26 +313,6 @@ export function updateStoryProgress(chapter: number, stage: number): void {
     // 必須覆蓋為正確的物件型態後再 notify，否則 React 端會拿到字串
     currentData.save.storyProgress = { chapter, stage }
     notify()
-  }
-}
-
-/**
- * 更新關卡星級（只保留最佳）
- */
-export function updateStageStars(stageId: string, stars: number): void {
-  if (currentData) {
-    if (typeof currentData.save.stageStars === 'string') {
-      try { currentData.save.stageStars = JSON.parse(currentData.save.stageStars as unknown as string) } catch { currentData.save.stageStars = {} }
-    }
-    if (!currentData.save.stageStars || typeof currentData.save.stageStars !== 'object') {
-      currentData.save.stageStars = {}
-    }
-    const prev = currentData.save.stageStars[stageId] || 0
-    if (stars > prev) {
-      currentData.save.stageStars[stageId] = stars
-      notify()
-      updateLocal({ stageStars: JSON.stringify(currentData.save.stageStars) })
-    }
   }
 }
 

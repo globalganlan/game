@@ -1,9 +1,9 @@
 /**
  * Data Routes — 靜態遊戲資料讀取
  *
- * 前端 sheetApi.ts 的 readSheet / listSheets 對應端點。
- * 正規化後，heroes / skill_templates / hero_skills / element_matrix
- * 改從專屬 D1 表讀取；其餘仍從 game_sheets KV blob 讀取。
+ * 前端 sheetApi.ts 的 readSheet 對應端點。
+ * heroes / skill_templates / hero_skills / element_matrix
+ * 從專屬 D1 表讀取。
  */
 import { Hono } from 'hono';
 import type { Env, HonoVars } from '../types.js';
@@ -73,51 +73,16 @@ data.post('/readSheet', async (c) => {
 
   const db = c.env.DB;
 
-  // 優先從專屬 Table 讀取
+  // 從專屬 Table 讀取
   const reader = DEDICATED_READERS[sheet];
   if (reader) {
     const rows = await reader(db);
     return c.json({ success: true, data: rows });
   }
 
-  // 其餘仍從 game_sheets 讀取
-  const row = await db.prepare(
-    'SELECT data FROM game_sheets WHERE sheetName = ?'
-  ).bind(sheet).first<{ data: string }>();
-
-  if (!row) {
-    return c.json({ success: true, data: [] });
-  }
-
-  try {
-    const parsed = JSON.parse(row.data);
-    return c.json({ success: true, data: parsed });
-  } catch {
-    return c.json({ success: true, data: [] });
-  }
+  // 未知的 sheetName 回傳空陣列
+  return c.json({ success: true, data: [] });
 });
 
-/**
- * POST /listSheets
- * Returns: { success: true, sheets: [{ name, rows, cols }] }
- */
-data.post('/listSheets', async (c) => {
-  const db = c.env.DB;
-  const rows = await db.prepare(
-    'SELECT sheetName, data FROM game_sheets'
-  ).all<{ sheetName: string; data: string }>();
-
-  const sheets = (rows.results ?? []).map((r) => {
-    try {
-      const arr = JSON.parse(r.data) as Record<string, unknown>[];
-      const cols = arr.length > 0 ? Object.keys(arr[0]).length : 0;
-      return { name: r.sheetName, rows: arr.length, cols };
-    } catch {
-      return { name: r.sheetName, rows: 0, cols: 0 };
-    }
-  });
-
-  return c.json({ success: true, sheets });
-});
 
 export default data;

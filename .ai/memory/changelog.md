@@ -4,6 +4,74 @@
 
 ---
 
+### [2026-03-09] 資料庫清理（第二波）— heroes.extra / item_definitions 正規化 / stageStars / sellPrice 移除
+- **觸發者**：使用者指令 — DB 清理第二波
+- **執行角色**：🔧 CODING
+- **D1 遠端操作**：
+  1. `ALTER TABLE heroes DROP COLUMN extra` — 移除 heroes.extra 欄位
+  2. `ALTER TABLE item_definitions ADD COLUMN useAction TEXT NOT NULL DEFAULT ''` — 新增 useAction 欄位
+  3. item_definitions extra JSON 遷移：category→type、useAction→新欄位（chest 類='open'）、stackable 改為實際數量（999/99999）
+  4. `ALTER TABLE item_definitions DROP COLUMN extra` — 移除 extra 欄位
+  5. `ALTER TABLE item_definitions DROP COLUMN sellPrice` — 移除 sellPrice 欄位
+  6. `ALTER TABLE save_data DROP COLUMN stageStars` — 移除 stageStars 欄位
+- **程式碼修改**：
+  - `workers/schema.sql` — 移除 heroes.extra、item_definitions.extra/sellPrice、save_data.stageStars；新增 item_definitions.useAction
+  - `workers/src/routes/inventory.ts` — 移除 sell-items 路由
+  - `workers/src/routes/data.ts`（load-item-definitions）— 簡化：不再解析 JSON extra，直接讀取 type/useAction 欄位
+  - `workers/src/routes/battle.ts` — isFirstClear 改用 storyProgress 比較取代 stageStars
+  - `workers/src/routes/battle.ts`（complete-story-offline）— 同上
+  - `workers/src/routes/save.ts` — init-save INSERT 移除 stageStars
+  - `workers/src/types.ts` — SaveDataRow 移除 stageStars
+  - `src/services/inventoryService.ts` — 移除 sellItems 函式
+  - `src/services/saveService.ts` — 移除 stageStars 解析邏輯、移除 updateStageStars 函式
+  - `src/types.ts` — ItemDefinition 移除 sellPrice；SaveData 移除 stageStars
+- **驗證**：tsc ✅ / workers tsc ✅ / vite build ✅ / wrangler deploy ✅
+
+---
+
+### [2026-03-09] 資料庫清理 — 移除廢棄表/欄位/道具
+- **觸發者**：使用者指令 — 清理資料庫
+- **執行角色**：🔧 CODING
+- **D1 遠端操作**：
+  1. `DROP TABLE game_sheets` — 移除整張 game_sheets KV 表（13 筆資料全部未使用，4 筆被 DEDICATED_READERS 取代、2 筆被專屬 D1 表取代、7 筆功能硬寫在前端或未實裝）
+  2. `DELETE FROM item_definitions` — 刪除 7 個廢棄道具定義：ticket_gacha, ticket_gacha_10, eqm_enhance_s, eqm_enhance_m, eqm_enhance_l, forge_ore_common, forge_ore_rare
+  3. `DELETE FROM inventory` — 清除所有玩家庫存中的上述 7 個廢棄道具
+  4. `ALTER TABLE save_data DROP COLUMN` — 移除 4 個廢棄欄位：gachaPool, gachaPoolEndPity, equipment, equipmentCapacity
+- **程式碼修改**：
+  - `workers/src/routes/data.ts` — 移除 game_sheets fallback 讀取邏輯和 listSheets 端點
+  - `workers/src/types.ts` — SaveDataRow 移除 4 個廢棄欄位
+  - `workers/src/routes/save.ts` — init-save INSERT 移除廢棄欄位
+  - `workers/src/routes/inventory.ts` — 移除 equipmentCapacity 讀取和 expand-inventory 路由
+  - `src/services/inventoryService.ts` — 移除 equipmentCapacity 和 expandInventory 函式，修復 3 個 local helper 中殘留的 equipmentCapacity 引用
+  - `src/services/sheetApi.ts` — 移除 listSheets 函式
+  - `src/services/index.ts` — 移除 listSheets 和 expandInventory 匯出
+  - `src/components/InventoryPanel.tsx` — 移除 DEPRECATED_ITEMS 過濾邏輯
+  - `workers/schema.sql` — 移除 save_data 的 4 個廢棄欄位定義
+- **驗證**：tsc ✅ / workers tsc ✅ / vite build ✅ / wrangler deploy ✅ / Playwright 全流程 ✅
+
+---
+
+### [2026-03-09] 大廳資源間距縮窄 + ℹ️ 按鈕圓角
+- **觸發者**：使用者需求
+- **執行角色**：🔧 CODING + 🧪 QA
+- **變更內容**：
+  1. **App.css `.menu-resources`**：gap 從 `8px` 改為 `4px`，與召喚介面間距更接近
+  2. **App.css `.panel-infotip-btn`**：新增 `border-radius: 50%` + 半透明背景圓形 + 固定 24×24px 尺寸，ℹ️ 按鈕變為圓形小按鈕
+- **Commit**：`0844263`
+
+---
+
+### [2026-03-09] 統一 ItemIcon + 粗體資源數字 + 商店貨幣列 overflow 修復
+- **觸發者**：使用者需求
+- **執行角色**：🔧 CODING + 🧪 QA
+- **變更內容**：
+  1. **ChestLootPreview.tsx**：移除所有 `<CurrencyIcon>` 和原始 emoji（📦），統一使用 `<ItemIcon itemId="..." />`，import 簡化為僅 `ItemIcon`
+  2. **App.css `.infotip-trigger`**：新增 `font-weight: bold; font-variant-numeric: tabular-nums;`，所有 InfoTip 資源數字統一粗體+等寬數位
+  3. **App.css `.shop-currency-bar`**：新增 `flex-wrap: wrap; gap: 4px 10px; min-width: 0; margin-left: auto`，防止貨幣列溢出導致後方項目被裁切
+- **Commit**：`38174b4`
+
+---
+
 ### [2026-03-09] 裝備寶箱 toast 合併同名同稀有度
 - **觸發者**：使用者需求
 - **執行角色**：🔧 CODING + 🧪 QA
