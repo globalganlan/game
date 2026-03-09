@@ -202,7 +202,7 @@ auth.post('/change-name', async (c) => {
   if (!newName || newName.length < 1 || newName.length > 20)
     return c.json({ success: false, error: 'name must be 1-20 chars' });
 
-  // 先查 playerId，再批次更新 players + arena_rankings
+  // 先查 playerId，再批次更新 players + save_data + arena_rankings
   const player = await c.env.DB.prepare(
     'SELECT playerId FROM players WHERE guestToken = ?'
   ).bind(token).first<{ playerId: string }>();
@@ -210,6 +210,7 @@ auth.post('/change-name', async (c) => {
 
   await c.env.DB.batch([
     c.env.DB.prepare('UPDATE players SET displayName = ? WHERE playerId = ?').bind(newName, player.playerId),
+    c.env.DB.prepare('UPDATE save_data SET displayName = ? WHERE playerId = ?').bind(newName, player.playerId),
     c.env.DB.prepare('UPDATE arena_rankings SET displayName = ? WHERE playerId = ?').bind(newName, player.playerId),
   ]);
 
