@@ -431,6 +431,21 @@
 ### ADR-020: 移除所有 iOS 渲染降級 — PNG→JPEG 修復後不再需要
 
 - **日期**：2026-03-08
+
+### ADR-021: 啟動 Vite Dev Server 前必須先關閉舊的
+
+- **狀態**：✅ 已定案
+- **日期**：2026-03-10
+- **決策**：每次啟動 `npx vite --host` 前，**必須先執行**：
+  ```powershell
+  Get-Process -Name node -ErrorAction SilentlyContinue | Where-Object { $_.CommandLine -match 'vite' } | Stop-Process -Force -ErrorAction SilentlyContinue; Start-Sleep -Seconds 1
+  ```
+- **根因**：不關閉舊 server 會導致 port 累加（5173→5174→…5217+），佔用大量端口且 Playwright 測試連線混亂
+- **規則**：
+  1. **每次新對話啟動 dev server 前**，一律先 kill 舊 vite 進程
+  2. **同一對話中重啟 dev server 前**，同樣先 kill
+  3. 不可假設前一個對話已關閉 dev server
+- **影響範圍**：所有 AI 對話中涉及 `npx vite` 的操作
 - **決策**：全面移除 iOS 專用的渲染品質降級，讓 iOS 與桌面使用相同品質設定
 - **根因**：GLB 內嵌 PNG 紋理才是 iOS 黑色模型的真正原因（ADR-019 的各種降級只是症狀緩解方案）。PNG→JPEG 根因修復後（commit `3b339df`），iOS Safari 能正常載入模型，所有降級措施成為多餘的品質犧牲
 - **移除項目**（5 檔案 12 處）：
