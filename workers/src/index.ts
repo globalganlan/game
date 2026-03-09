@@ -74,8 +74,6 @@ app.onError((err, c) => {
   return c.json({ success: false, error: 'internal_error', message: err.message }, 500);
 });
 
-export default app;
-
 // ── Scheduled (Cron) Handler ─────────────
 const ARENA_DAILY_REWARDS: { minRank: number; maxRank: number; diamond: number; gold: number; pvpCoin: number; exp: number }[] = [
   { minRank: 1,   maxRank: 1,   diamond: 100, gold: 30000, pvpCoin: 50, exp: 500 },
@@ -144,15 +142,23 @@ async function arenaWeeklyReset(db: D1Database) {
   console.log(`[Cron] arenaWeeklyReset: reset ${(humanRows.results || []).length} human ranks`);
 }
 
-export const scheduled: ExportedHandlerScheduledHandler<Env> = async (event, env, ctx) => {
-  const cron = event.cron;
-  console.log(`[Cron] triggered: ${cron}`);
+/**
+ * Default export — 必須把 fetch + scheduled 放在同一個物件上，
+ * Cloudflare Workers ES modules 只認 default export 的屬性。
+ * 之前 `export default app` + `export const scheduled` 導致 cron 從未觸發。
+ */
+export default {
+  fetch: app.fetch,
+  scheduled: async (event: ScheduledEvent, env: Env, ctx: ExecutionContext) => {
+    const cron = event.cron;
+    console.log(`[Cron] triggered: ${cron}`);
 
-  if (cron === '5 16 * * *') {
-    // 每日 UTC 16:05 = UTC+8 00:05 → 競技場每日獎勵
-    await arenaDailyReward(env.DB);
-  } else if (cron === '0 16 * * 1') {
-    // 每週一 UTC 16:00 = UTC+8 00:00 → 競技場每週重置
-    await arenaWeeklyReset(env.DB);
-  }
+    if (cron === '5 16 * * *') {
+      // 每日 UTC 16:05 = UTC+8 00:05 → 競技場每日獎勵
+      await arenaDailyReward(env.DB);
+    } else if (cron === '0 16 * * 1') {
+      // 每週一 UTC 16:00 = UTC+8 00:00 → 競技場每週重置
+      await arenaWeeklyReset(env.DB);
+    }
+  },
 };

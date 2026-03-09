@@ -699,15 +699,21 @@ arena.post('/arena-challenge-complete', async (c) => {
       );
     }
 
-    // 里程碑
+    // 里程碑 — 累計所有跨過的門檻（修復：舊版只取第一個就 break，跳多級時漏發獎勵）
     const prevHighest = saveData?.arenaHighestRank ?? ARENA_MAX_RANK;
     if (newRank < prevHighest) {
+      const acc = { diamond: 0, gold: 0, pvpCoin: 0, exp: 0 };
+      let hit = false;
       for (const m of MILESTONES) {
         if (newRank <= m.rank && prevHighest > m.rank) {
-          milestoneReward = { diamond: m.diamond, gold: m.gold, pvpCoin: m.pvpCoin, exp: m.exp };
-          break;
+          acc.diamond += m.diamond;
+          acc.gold += m.gold;
+          acc.pvpCoin += m.pvpCoin;
+          acc.exp += m.exp;
+          hit = true;
         }
       }
+      if (hit) milestoneReward = acc;
     }
   }
 
