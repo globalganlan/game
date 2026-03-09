@@ -149,7 +149,7 @@ export function MainMenu({
         <div className="menu-player-info">
           <span className="menu-player-name">{name}</span>
         </div>
-        <div className="menu-resources">
+        <div className="resource-bar resource-bar-center">
           <InfoTip icon={<CurrencyIcon type="gold" />} value={gold.toLocaleString()} label="金幣" description="升級、購買、強化所需的通用貨幣" className="menu-gold" />
           <InfoTip icon={<CurrencyIcon type="diamond" />} value={diamond.toLocaleString()} label="鑽石" description="召喚、加速、購買稀有道具" className="menu-diamond" />
           <InfoTip icon={<CurrencyIcon type="exp" />} value={exp.toLocaleString()} label="經驗" description="英雄升級所需的經驗值" className="menu-exp" />

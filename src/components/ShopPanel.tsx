@@ -385,7 +385,7 @@ export function ShopPanel({ onBack }: ShopPanelProps) {
           <button className="panel-back-btn" onClick={onBack}>← 返回</button>
           <h2 className="panel-title">🏪 商店</h2>
           <PanelInfoTip description={PANEL_DESCRIPTIONS.shop} />
-          <div className="shop-currency-bar">
+          <div className="resource-bar">
             <InfoTip icon={<CurrencyIcon type="gold" />} value={gold.toLocaleString()} label="金幣" description="購買道具、強化裝備所需" className="menu-gold" />
             <InfoTip icon={<CurrencyIcon type="diamond" />} value={diamond.toLocaleString()} label="鑽石" description="購買稀有商品、禮包" className="menu-diamond" />
             <InfoTip icon={<CurrencyIcon type="stardust" />} value={stardust.toLocaleString()} label="星塵" description="重複英雄轉化而來，可在商店兑換稀有道具" className="menu-stardust" />

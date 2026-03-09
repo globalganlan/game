@@ -788,7 +788,7 @@ export function InventoryPanel({ onBack, heroesList, heroInstances }: InventoryP
           <button className="panel-back-btn" onClick={onBack}>← 返回</button>
           <h2 className="panel-title">🎒 背包</h2>
           <PanelInfoTip description={PANEL_DESCRIPTIONS.inventory} />
-          <div className="inv-currency-bar">
+          <div className="resource-bar">
             <InfoTip icon={<CurrencyIcon type="gold" />} value={gold.toLocaleString()} label="金幣" description="升級、購買、強化所需的通用貨幣" className="menu-gold" />
             <InfoTip icon={<CurrencyIcon type="diamond" />} value={diamond.toLocaleString()} label="鑽石" description="召喚、加速、購買稀有道具" className="menu-diamond" />
           </div>

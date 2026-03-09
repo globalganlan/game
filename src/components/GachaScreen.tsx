@@ -617,7 +617,7 @@ export function GachaScreen({
           <button className="panel-back-btn" onClick={onBack}>← 返回</button>
           <h2 className="panel-title">🎰 召喚</h2>
           <PanelInfoTip description={PANEL_DESCRIPTIONS.gacha} />
-          <div className="gacha-currencies">
+          <div className="resource-bar">
             <InfoTip icon={<CurrencyIcon type="diamond" />} value={diamond.toLocaleString()} label="鑽石" description="召喚英雄、抽取裝備所需" className="menu-diamond" />
             <InfoTip icon={<CurrencyIcon type="gold" />} value={gold.toLocaleString()} label="金幣" description="金幣池裝備鍛造所需" className="menu-gold" />
           </div>

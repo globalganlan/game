@@ -1219,29 +1219,31 @@
   font-weight: bold;
 }
 
-.menu-resources {
+/* ── 統一資源列 ── */
+.resource-bar {
   display: flex;
-  justify-content: center;
   flex-wrap: wrap;
-  gap: 4px;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.82rem;
+  min-width: 0;
+  flex-shrink: 1;
+  margin-left: auto;
+}
+/* 大廳置中排版 */
+.resource-bar-center {
+  justify-content: center;
   margin: 6px 0;
+  margin-left: 0;
   max-width: 400px;
   width: 100%;
-}
-
-.menu-res-item {
-  display: inline-flex;
-  align-items: center;
-  gap: 2px;
-  font-size: 0.82rem;
-  white-space: nowrap;
-  min-width: 0;
 }
 
 .menu-gold { color: #ffd43b; }
 .menu-diamond { color: #4dabf7; }
 .menu-exp { color: #51cf66; }
 .menu-cp { color: #ffa94d; }
+.menu-stardust { color: #f5c542; }
 
 /* ── InfoTip 通用資源提示 ── */
 .infotip-wrap {
@@ -3051,17 +3053,8 @@
 
 /* ── 背包新增 UI ── */
 
-.inv-currency-bar {
-  display: flex;
-  gap: 10px;
-  font-size: 0.78rem;
-  flex-shrink: 0;
-  margin-left: auto;
-}
-.inv-currency {
-  color: #ddd;
-  white-space: nowrap;
-}
+/* .inv-currency-bar → 已統一為 .resource-bar */
+/* .inv-currency → 已廢棄 */
 
 .inv-sort-bar {
   display: flex;
@@ -3703,17 +3696,8 @@
    Phase 3 — Shop Panel
    ══════════════════════════════════════════════════ */
 
-.shop-currency-bar {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px 10px;
-  font-size: 0.78rem;
-  min-width: 0;
-  margin-left: auto;
-}
-.shop-currency { color: #ddd; white-space: nowrap; }
-.shop-currency.gold { color: #ffd43b; }
-.shop-currency.diamond { color: #4dabf7; }
+/* .shop-currency-bar → 已統一為 .resource-bar */
+/* .shop-currency.* → 已廢棄 */
 
 .shop-tabs {
   display: flex;
@@ -4638,22 +4622,8 @@
 }
 
 /* ── Gacha Currencies display ── */
-.gacha-currencies {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-  flex-shrink: 1;
-  min-width: 0;
-  margin-left: auto;
-}
-.gacha-gold-display {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  color: #ffd43b;
-  font-size: 0.85rem;
-  font-weight: bold;
-}
+/* .gacha-currencies → 已統一為 .resource-bar */
+/* .gacha-gold-display → 已廢棄 */
 
 /* ── Equipment Pool Selector ── */
 .gacha-pool-selector {
