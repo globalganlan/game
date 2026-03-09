@@ -2838,6 +2838,22 @@
   padding: 40px 0;
 }
 
+.inv-show-more-btn {
+  grid-column: 1 / -1;
+  padding: 10px 16px;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.18);
+  border-radius: 8px;
+  color: #ccc;
+  font-size: 0.82rem;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.inv-show-more-btn:hover {
+  background: rgba(255,255,255,0.12);
+  color: #fff;
+}
+
 .inv-cell {
   display: flex;
   flex-direction: column;

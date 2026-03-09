@@ -5,7 +5,7 @@
  * 支援分類篩選、排序、道具詳情、使用操作。
  */
 
-import React, { useState, useEffect, useMemo, useCallback } from 'react'
+import React, { useState, useEffect, useMemo, useCallback, useRef, startTransition } from 'react'
 import { createPortal } from 'react-dom'
 import type { InventoryItem } from '../services/saveService'
 import { getSaveState } from '../services/saveService'
@@ -110,7 +110,7 @@ interface ItemCellProps {
   onClick: () => void
 }
 
-function ItemCell({ item, definition, onClick, heroMap }: ItemCellProps & { heroMap?: Map<number, string> }) {
+const ItemCell = React.memo(function ItemCell({ item, definition, onClick, heroMap }: ItemCellProps & { heroMap?: Map<number, string> }) {
   const fallback = resolveFallbackName(item.itemId, heroMap)
   // 英雄碎片：一律用 fallback（帶英雄名稱），不用 DB 原始 name
   const isFragment = item.itemId.startsWith('asc_fragment_')
@@ -144,7 +144,7 @@ function ItemCell({ item, definition, onClick, heroMap }: ItemCellProps & { hero
       <span className="inv-cell-qty">×{qty}</span>
     </button>
   )
-}
+})
 
 /* ────────────────────────────
    Item Detail Modal
@@ -645,6 +645,11 @@ export function InventoryPanel({ onBack, heroesList, heroInstances }: InventoryP
   }, [heroesList])
   const [invState, setInvState] = useState<InventoryState | null>(getInventoryState)
   const [activeTab, setActiveTab] = useState<ItemCategory | 'all' | 'codex'>('all')
+  /* ── 延遲格子渲染：面板外殼先顯示，grid 下一幀再繪製 ── */
+  const [gridReady, setGridReady] = useState(false)
+  const PAGE_SIZE = 50
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE)
+  const gridRef = useRef<HTMLDivElement>(null)
   const [selectedItem, setSelectedItem] = useState<InventoryItem | null>(null)
   const [selectedEquip, setSelectedEquip] = useState<EquipmentInstance | null>(null)
   const [isLoading, setIsLoading] = useState(false)
@@ -670,6 +675,12 @@ export function InventoryPanel({ onBack, heroesList, heroInstances }: InventoryP
     const unsub = onInventoryChange(setInvState)
     return unsub
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  /* ── 面板掛載後下一幀再開始渲染 grid，避免卡頓 ── */
+  useEffect(() => {
+    const id = requestAnimationFrame(() => setGridReady(true))
+    return () => cancelAnimationFrame(id)
+  }, [])
 
   const filteredItems = useMemo(() => {
     if (!invState) return []
@@ -800,7 +811,7 @@ export function InventoryPanel({ onBack, heroesList, heroInstances }: InventoryP
             <button
               key={tab.key}
               className={`inv-tab ${activeTab === tab.key ? 'inv-tab-active' : ''}`}
-              onClick={() => setActiveTab(tab.key)}
+              onClick={() => { startTransition(() => setActiveTab(tab.key)); setVisibleCount(PAGE_SIZE) }}
             >
               <span>{tab.icon}</span>
               <span>{tab.label}</span>
@@ -831,13 +842,13 @@ export function InventoryPanel({ onBack, heroesList, heroInstances }: InventoryP
           )}
         </div>
 
-        {/* Items Grid */}
-        <div className="inv-grid">
-          {isLoading && <div className="inv-loading">載入中...</div>}
-          {!isLoading && activeTab !== 'equipment' && filteredItems.length === 0 && equipmentList.length === 0 && (
+        {/* Items Grid — 延遲渲染 + 漸進式載入 */}
+        <div className="inv-grid" ref={gridRef}>
+          {(!gridReady || isLoading) && <div className="inv-loading">載入中...</div>}
+          {gridReady && !isLoading && activeTab !== 'equipment' && filteredItems.length === 0 && equipmentList.length === 0 && (
             <div className="inv-empty">此分類無道具</div>
           )}
-          {activeTab !== 'equipment' && filteredItems.map((item) => (
+          {gridReady && activeTab !== 'equipment' && filteredItems.slice(0, visibleCount).map((item) => (
             <ItemCell
               key={item.itemId}
               item={item}
@@ -847,10 +858,10 @@ export function InventoryPanel({ onBack, heroesList, heroInstances }: InventoryP
             />
           ))}
           {/* 裝備（全部 / 裝備分頁） */}
-          {showEquipment && activeTab === 'equipment' && equipmentList.length === 0 && (
+          {gridReady && showEquipment && activeTab === 'equipment' && equipmentList.length === 0 && (
             <div className="inv-empty">尚無裝備</div>
           )}
-          {showEquipment && equipmentList.map(eq => (
+          {gridReady && showEquipment && equipmentList.slice(0, Math.max(0, visibleCount - filteredItems.length)).map(eq => (
             <button
               key={eq.equipId}
               className={`inv-cell inv-equip-cell${eq.equippedBy ? ' inv-equip-in-use' : ''}`}
@@ -868,6 +879,12 @@ export function InventoryPanel({ onBack, heroesList, heroInstances }: InventoryP
               {eq.equippedBy && <span className="inv-equip-badge">使用中</span>}
             </button>
           ))}
+          {/* 顯示更多按鈕 */}
+          {gridReady && !isLoading && visibleCount < (filteredItems.length + equipmentList.length) && (
+            <button className="inv-show-more-btn" onClick={() => setVisibleCount(c => c + PAGE_SIZE)}>
+              顯示更多（剩餘 {filteredItems.length + equipmentList.length - visibleCount} 項）
+            </button>
+          )}
         </div>
       </>)}
 
