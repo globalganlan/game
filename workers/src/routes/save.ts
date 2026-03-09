@@ -280,6 +280,8 @@ save.post('/collect-resources', async (c) => {
     newGoldTotal: newGold,
     newExpTotal: newExp,
     hoursElapsed: Math.round(hours * 10) / 10,
+    currencies: { gold: newGold, diamond: saveData.diamond ?? 0, exp: newExp },
+    resourceTimerLastCollect: now,
   });
 });
 

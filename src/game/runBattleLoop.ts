@@ -1144,7 +1144,11 @@ export async function executeBattleLoop(ctx: BattleLoopContext, replayActions?: 
       // 推進劇情進度（伺服器已寫入 DB，此處同步本地內存）
       if (stageMode === 'story' && first && serverResult?.newStoryProgress) {
         doUpdateStory(serverResult.newStoryProgress.chapter, serverResult.newStoryProgress.stage)
-        doUpdateProgress({ resourceTimerStage: stageId })
+        // 伺服器已自動結算舊產速的離線資源並重置 lastCollect，同步本地
+        doUpdateProgress({
+          resourceTimerStage: stageId,
+          resourceTimerLastCollect: new Date().toISOString(),
+        })
       }
 
       // 推進爬塔樓層

@@ -225,18 +225,38 @@ battle.post('/complete-battle', async (c) => {
       newStoryProgress = { chapter: nextCh, stage: nextSt };
     }
 
+    // ── 自動結算離線產出（防止 resourceTimerStage 升級後回溯套利）──
+    let offlineGoldSettle = 0;
+    let offlineExpSettle = 0;
+    const now = isoNow();
+    if (newStoryProgress && saveData.resourceTimerLastCollect) {
+      const oldStageId = saveData.resourceTimerStage || '1-1';
+      const oldParts = oldStageId.split('-');
+      const oldCh = parseInt(oldParts[0]) || 1;
+      const oldSt = parseInt(oldParts[1]) || 1;
+      const oldProgress = (oldCh - 1) * 8 + oldSt;
+      const oldGoldPerH = 100 + oldProgress * 50;
+      const oldExpPerH = Math.max(100, oldProgress * 50);
+      const elapsed = (Date.now() - new Date(saveData.resourceTimerLastCollect).getTime()) / (3600 * 1000);
+      const hours = Math.min(24, Math.max(0, elapsed));
+      offlineGoldSettle = Math.floor(oldGoldPerH * hours);
+      offlineExpSettle = Math.floor(oldExpPerH * hours);
+    }
+
     await db.prepare(
       `UPDATE save_data SET
         gold = gold + ?, diamond = diamond + ?, exp = exp + ?,
         storyProgress = COALESCE(?, storyProgress),
         resourceTimerStage = COALESCE(?, resourceTimerStage),
+        resourceTimerLastCollect = COALESCE(?, resourceTimerLastCollect),
         lastSaved = ?
        WHERE playerId = ?`
     ).bind(
-      rewards.gold, rewards.diamond, rewards.exp,
+      rewards.gold + offlineGoldSettle, rewards.diamond, rewards.exp + offlineExpSettle,
       newStoryProgress ? JSON.stringify(newStoryProgress) : null,
       newStoryProgress ? stageId : null,
-      isoNow(), playerId
+      newStoryProgress ? now : null,
+      now, playerId
     ).run();
 
   } else if (stageMode === 'tower') {
@@ -430,14 +450,35 @@ battle.post('/complete-stage', async (c) => {
     newStoryProgress2 = { chapter: nextCh, stage: nextSt };
   }
 
+  // ── 自動結算離線產出（防止 resourceTimerStage 升級後回溯套利）──
+  let offlineGoldSettle2 = 0;
+  let offlineExpSettle2 = 0;
+  const now2 = isoNow();
+  if (newStoryProgress2 && saveData.resourceTimerLastCollect) {
+    const oldStageId = saveData.resourceTimerStage || '1-1';
+    const oldParts = oldStageId.split('-');
+    const oldCh2 = parseInt(oldParts[0]) || 1;
+    const oldSt2 = parseInt(oldParts[1]) || 1;
+    const oldProgress = (oldCh2 - 1) * 8 + oldSt2;
+    const oldGoldPerH = 100 + oldProgress * 50;
+    const oldExpPerH = Math.max(100, oldProgress * 50);
+    const elapsed = (Date.now() - new Date(saveData.resourceTimerLastCollect).getTime()) / (3600 * 1000);
+    const hours = Math.min(24, Math.max(0, elapsed));
+    offlineGoldSettle2 = Math.floor(oldGoldPerH * hours);
+    offlineExpSettle2 = Math.floor(oldExpPerH * hours);
+  }
+
   await db.prepare(
     `UPDATE save_data SET gold = gold + ?, diamond = diamond + ?, exp = exp + ?,
      storyProgress = COALESCE(?, storyProgress), resourceTimerStage = COALESCE(?, resourceTimerStage),
+     resourceTimerLastCollect = COALESCE(?, resourceTimerLastCollect),
      lastSaved = ? WHERE playerId = ?`
   ).bind(
-    rewards.gold, rewards.diamond, rewards.exp ?? 0,
+    rewards.gold + offlineGoldSettle2, rewards.diamond, (rewards.exp ?? 0) + offlineExpSettle2,
     newStoryProgress2 ? JSON.stringify(newStoryProgress2) : null,
-    newStoryProgress2 ? stageId : null, isoNow(), playerId
+    newStoryProgress2 ? stageId : null,
+    newStoryProgress2 ? now2 : null,
+    now2, playerId
   ).run();
 
   return c.json({ success: true, rewards, isFirstClear, newStoryProgress: newStoryProgress2 });

@@ -293,7 +293,7 @@ function stripPlayerId(h: HeroInstance & { playerId?: string }): HeroInstance {
  */
 export function updateProgress(changes: Partial<Pick<SaveData,
   'gold' | 'diamond' | 'exp' | 'displayName' |
-  'towerFloor' | 'resourceTimerStage' | 'nameChangeCount'
+  'towerFloor' | 'resourceTimerStage' | 'resourceTimerLastCollect' | 'nameChangeCount'
 >>): void {
   const serialized: Record<string, unknown> = {}
   for (const [key, val] of Object.entries(changes)) {
@@ -457,7 +457,10 @@ export async function collectResources(): Promise<AccumulatedResources | null> {
   )
   if (resources.gold <= 0 && resources.exp <= 0) return null
 
-  // 更新收集時間（避免重複領取）
+  // 先保存舊值，API 失敗時回滾
+  const oldLastCollect = currentData.save.resourceTimerLastCollect
+
+  // 樂觀更新：先阻止重複點擊（UI 立即歸零）
   currentData.save.resourceTimerLastCollect = new Date().toISOString()
 
   // 呼叫 API → 以伺服器權威值覆蓋
@@ -469,6 +472,7 @@ export async function collectResources(): Promise<AccumulatedResources | null> {
       newExpTotal: number
       hoursElapsed: number
       currencies?: { gold?: number; diamond?: number; exp?: number }
+      resourceTimerLastCollect?: string
     }>('collect-resources', {})
     if (result.success && currentData) {
       if (result.currencies) {
@@ -479,10 +483,17 @@ export async function collectResources(): Promise<AccumulatedResources | null> {
         if (result.newExpTotal !== undefined) currentData.save.exp = result.newExpTotal
         notify()
       }
+      // 同步伺服器的 lastCollect 時間戳（確保與 DB 一致）
+      if (result.resourceTimerLastCollect && currentData) {
+        currentData.save.resourceTimerLastCollect = result.resourceTimerLastCollect
+      }
     }
   } catch (e) {
     console.warn('[save] collect-resources error:', e)
-    // 伺服器失敗時不更新本地資料，僅回傳預估值供顯示
+    // API 失敗 → 回滾 lastCollect，下次重新計算
+    if (currentData) {
+      currentData.save.resourceTimerLastCollect = oldLastCollect
+    }
   }
 
   return resources
