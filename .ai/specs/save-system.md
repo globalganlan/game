@@ -1,7 +1,7 @@
 # 存檔系統 Spec
 
-> 版本：v2.4 ｜ 狀態：🟢 已實作
-> 最後更新：2026-03-05
+> 版本：v2.5 ｜ 狀態：🟢 已實作
+> 最後更新：2026-03-10
 > 負責角色：🎯 GAME_DESIGN → 🔧 CODING
 
 ## 概述
@@ -335,11 +335,30 @@ function getAccumulatedResources(stageId, lastCollect, maxHours = 24) {
   1. storyProgress.chapter===1 && stage===1 → 未解鎖，return null
   2. 本地計算 getAccumulatedResources()
   3. gold<=0 && expItems<=0 → return null
-  4. 呼叫 API collect-resources
-  5. 伺服器成功 → applyCurrenciesFromServer(currencies) 覆蓋本地
-  6. 伺服器失敗 → 不更新本地資料（僅 console.warn）
-  7. 回傳本地計算結果（供 UI 顯示）
+  4. 保存 oldLastCollect（用於失敗回滾）
+  5. 樂觀更新 lastCollect = now（阻止重複點擊）
+  6. 呼叫 API collect-resources
+  7. 伺服器成功 → applyCurrenciesFromServer(currencies) + 同步 lastCollect
+  8. 伺服器失敗 → 回滾 lastCollect = oldLastCollect
+  9. 回傳本地計算結果（供 UI 顯示）
 ```
+
+### 關卡推進自動結算（防利率回溯套利）
+
+```
+後端 battle-complete / complete-stage（story 模式）:
+  若 newStoryProgress 存在（推進了 resourceTimerStage）：
+  1. 以舊 resourceTimerStage 計算產速
+  2. 計算 elapsed = now - lastCollect（上限 24h）
+  3. 自動結算: gold += oldRate × hours, exp += oldRate × hours
+  4. 重置 resourceTimerLastCollect = now
+  5. 更新 resourceTimerStage = newStageId
+前端 runBattleLoop:
+  通關 story 推進時，同步 resourceTimerLastCollect = now
+```
+
+> **為什麼需要**：若不自動結算，玩家可在 1-1 掛網 24h，打到 4-8 後領取，
+> 系統會以 4-8 的高產速回算整個 24h → 獎勵暴增。
 
 Workers handleCollectResources_:（包在 executeWithIdempotency_ 中）
   1. 驗證 token → playerId
@@ -389,3 +408,4 @@ Workers handleCollectResources_:（包在 executeWithIdempotency_ 中）
 | v2.2 | 2026-03-04 | **saveService 狀態刷新修復**：`notify()` 深複製 heroes + save 物件修復 useMemo 偵測；`updateLocal()` 移除 `if (key in currentData.save)` guard 允許寫入 optional fields（lastHeroFreePull/lastEquipFreePull/gachaPity）；`sanitizeSaveData()` 初始化 optional 日期欄位；新增 `updateFreePullLocally()` / `updateGachaPityLocally()` 匯出函式 |
 | v2.4 | 2026-03-07 | **簽到獎勵同步修復**：① `CHECKIN_REWARDS` 補齊缺失的 gacha_ticket_hero（Day 3/6）、gacha_ticket_equip（Day 5/7）與後端一致 ② `doDailyCheckin` 返回值改用 `serverRes.reward`（權威）而非本地 CHECKIN_REWARDS，避免動畫缺失與背包漏同步 |
 | v2.3 | 2026-03-05 | **Server-First 資料一致性**：`collectResources` catch 不再加本地金幣/經驗；`doDailyCheckin` catch 不再發本地獎勵，回傳 `success:false`；移除離線樂觀更新策略 |
+| v2.5 | 2026-03-10 | **離線產出利率回溯套利修復**：① battle.ts 推進 resourceTimerStage 時自動以舊產速結算累積資源 + 重置 lastCollect ② save.ts collect-resources 回傳 currencies + resourceTimerLastCollect ③ saveService.ts collectResources API 失敗時回滾 lastCollect ④ runBattleLoop.ts 通關後同步重置本地 lastCollect ⑤ updateProgress 接受 resourceTimerLastCollect |
