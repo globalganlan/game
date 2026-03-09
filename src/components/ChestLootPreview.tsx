@@ -6,7 +6,7 @@
  */
 
 import { getChestRates } from '../domain/equipmentGacha'
-import { CurrencyIcon, ItemIcon } from './CurrencyIcon'
+import { ItemIcon } from './CurrencyIcon'
 
 /* ────────────────────────────
    獎勵表資料定義
@@ -25,22 +25,22 @@ interface LootEntry {
 /** 四種寶箱的掉落表（與後端 generateChestRewards 同步） */
 const CHEST_LOOT_TABLES: Record<string, LootEntry[]> = {
   chest_bronze: [
-    { icon: <CurrencyIcon type="gold" />,     name: '金幣',     amount: '1,000~2,999', chance: 1 },
-    { icon: <CurrencyIcon type="exp" />,      name: '經驗',     amount: '200',         chance: 0.5 },
-    { icon: <CurrencyIcon type="diamond" />,  name: '鑽石',     amount: '3~7',         chance: 0.15 },
+    { icon: <ItemIcon itemId="gold" />,               name: '金幣',     amount: '1,000~2,999', chance: 1 },
+    { icon: <ItemIcon itemId="exp" />,                name: '經驗',     amount: '200',         chance: 0.5 },
+    { icon: <ItemIcon itemId="diamond" />,            name: '鑽石',     amount: '3~7',         chance: 0.15 },
   ],
   chest_silver: [
-    { icon: <CurrencyIcon type="gold" />,     name: '金幣',     amount: '3,000~6,999', chance: 1 },
-    { icon: <CurrencyIcon type="diamond" />,  name: '鑽石',     amount: '10~29',       chance: 1 },
-    { icon: <CurrencyIcon type="exp" />,      name: '經驗',     amount: '1,000',       chance: 0.8 },
-    { icon: '📦',                             name: '裝備寶箱',  amount: '×1',         chance: 0.25, rarity: 'SR' },
+    { icon: <ItemIcon itemId="gold" />,               name: '金幣',     amount: '3,000~6,999', chance: 1 },
+    { icon: <ItemIcon itemId="diamond" />,            name: '鑽石',     amount: '10~29',       chance: 1 },
+    { icon: <ItemIcon itemId="exp" />,                name: '經驗',     amount: '1,000',       chance: 0.8 },
+    { icon: <ItemIcon itemId="chest_equipment" />,    name: '裝備寶箱',  amount: '×1',         chance: 0.25, rarity: 'SR' },
   ],
   chest_gold: [
-    { icon: <CurrencyIcon type="gold" />,     name: '金幣',     amount: '8,000~14,999', chance: 1 },
-    { icon: <CurrencyIcon type="diamond" />,  name: '鑽石',     amount: '30~79',        chance: 1 },
-    { icon: <CurrencyIcon type="exp" />,      name: '經驗',     amount: '4,000',        chance: 1 },
-    { icon: '📦',                             name: '裝備寶箱',  amount: '×1',          chance: 0.4, rarity: 'SR' },
-    { icon: <ItemIcon itemId="gacha_ticket_hero" />, name: '英雄召喚券', amount: '×1',          chance: 0.2, rarity: 'SR' },
+    { icon: <ItemIcon itemId="gold" />,               name: '金幣',     amount: '8,000~14,999', chance: 1 },
+    { icon: <ItemIcon itemId="diamond" />,            name: '鑽石',     amount: '30~79',        chance: 1 },
+    { icon: <ItemIcon itemId="exp" />,                name: '經驗',     amount: '4,000',        chance: 1 },
+    { icon: <ItemIcon itemId="chest_equipment" />,    name: '裝備寶箱',  amount: '×1',          chance: 0.4, rarity: 'SR' },
+    { icon: <ItemIcon itemId="gacha_ticket_hero" />,  name: '英雄召喚券', amount: '×1',          chance: 0.2, rarity: 'SR' },
   ],
   chest_equipment: [], // 由下方動態建立
 }
