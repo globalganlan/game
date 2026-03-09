@@ -911,7 +911,7 @@ export default function App() {
                       <span className="bp-stage-id">{modeLabel}</span>
                     </div>
                     {modeDescription && (
-                      <div className="bp-mode-desc" style={{ fontSize: '0.75em', opacity: 0.8, marginBottom: 4 }}>{modeDescription}</div>
+                      <div className="bp-mode-desc" style={{ fontSize: '0.65em', opacity: 0.75, marginBottom: 1, lineHeight: 1.2 }}>{modeDescription}</div>
                     )}
                     {/* 競技場：顯示勝/敗兩組獎勵 */}
                     {arenaWinLoss && (

@@ -6218,23 +6218,25 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 4px;
-  padding: max(8px, env(safe-area-inset-top, 0px)) 12px 6px;
+  gap: 2px;
+  padding: max(4px, env(safe-area-inset-top, 0px)) 10px 4px;
   background: linear-gradient(180deg, rgba(0,0,0,0.65) 0%, rgba(0,0,0,0.25) 80%, transparent 100%);
   z-index: 12;
   pointer-events: auto;
+  max-height: 28vh;
+  overflow: hidden;
 }
 .bp-stage-section {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 2px;
+  gap: 1px;
 }
 .bp-stage-header {
   display: flex;
   align-items: center;
-  gap: 6px;
-  font-size: 0.8rem;
+  gap: 4px;
+  font-size: 0.72rem;
 }
 .bp-stage-id {
   background: rgba(250,204,21,0.85);
@@ -6251,8 +6253,8 @@
 .bp-reward-row {
   display: flex;
   align-items: center;
-  gap: 8px;
-  font-size: 0.7rem;
+  gap: 5px;
+  font-size: 0.62rem;
   color: #ccc;
   flex-wrap: wrap;
   justify-content: center;
@@ -6311,8 +6313,8 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 4px;
-  padding: 6px 12px;
+  gap: 2px;
+  padding: 3px 10px;
   background: rgba(0,0,0,0.1);
   border-radius: 8px;
   backdrop-filter: blur(4px);
