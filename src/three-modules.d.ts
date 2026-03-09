@@ -58,3 +58,17 @@ declare module 'three/examples/jsm/utils/SkeletonUtils' {
   import { Object3D } from 'three'
   export function clone(source: Object3D): Object3D
 }
+
+declare module 'troika-three-text' {
+  export function preloadFont(
+    options: { font?: string; characters?: string },
+    callback: () => void,
+  ): void
+}
+
+declare module 'suspend-react' {
+  export function suspend<T>(fn: () => Promise<T>, keys: unknown[], config?: unknown): T
+  export function preload<T>(fn: () => Promise<T>, keys: unknown[], config?: unknown): void
+  export function clear(keys?: unknown[]): void
+  export function peek<T>(keys: unknown[]): T | undefined
+}

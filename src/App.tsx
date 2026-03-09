@@ -22,7 +22,7 @@ import { useResponsive } from './hooks/useResponsive'
 
 import { Arena } from './components/Arena'
 import { Hero } from './components/Hero'
-import { ResponsiveCamera, SlotMarker } from './components/SceneWidgets'
+import { ResponsiveCamera, SlotMarker, preloadTroikaFont } from './components/SceneWidgets'
 import { TransitionOverlay, ThumbnailList } from './components/UIOverlay'
 import { LoginScreen } from './components/LoginScreen'
 import { useAuth } from './hooks/useAuth'
@@ -93,6 +93,26 @@ import { useBgm } from './hooks/useBgm'
    ══════════════════════════════ */
 
 /** Suspense 內的哨兵元件 — 所有兄弟的 GLB 載入完成後才會掛載，掛載即觸發收幕 */
+function SceneReady({ onReady }: { onReady: (delay?: number) => void }) {
+  const called = useRef(false)
+  useEffect(() => {
+    if (called.current) return
+    called.current = true
+    // ★ 用 setTimeout 而非 rAF — iOS WKWebView 對被 overlay 遮蓋的 canvas 會節流 rAF
+    setTimeout(() => onReady(0), 50)
+  }, [onReady])
+  return null
+}
+
+/**
+ * FontPreloader — 掛載時立即預載 troika 中文字型到 suspend-react 快取。
+ * 避免首次渲染 <Text>（PassiveHint3D / DamagePopup）時觸發 Suspense → 旋轉方塊閃現。
+ */
+function FontPreloader() {
+  preloadTroikaFont()
+  return null
+}
+
 /** 英雄模型載入中佔位符 — 半透明旋轉方塊 */
 function HeroLoadingPlaceholder({ position }: { position: [number, number, number] }) {
   const ref = useRef<THREE.Mesh>(null)
@@ -573,6 +593,7 @@ export default function App() {
           >
             {showBattleScene && (
             <Suspense fallback={null}>
+              <FontPreloader />
               <Arena sceneMode={sceneTheme} stageId={stageId} />
 
               {/* 格子標記 */}
@@ -661,6 +682,7 @@ export default function App() {
               )}
 
               <ResponsiveCamera fov={responsive.fov} position={responsive.camPos} target={responsive.camTarget} />
+              <SceneReady onReady={closeCurtain} />
             </Suspense>
             )}
           </Canvas>

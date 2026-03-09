@@ -11,8 +11,24 @@ import * as THREE from 'three'
 import type { Vector3Tuple } from 'three'
 import type { StatusEffect, StatusType } from '../domain/types'
 
+import { preloadFont } from 'troika-three-text'
+import { preload as suspendPreload } from 'suspend-react'
+
 /** 本機中文字型（避免等待 CDN 下載） */
 export const LOCAL_FONT = `${import.meta.env.BASE_URL}fonts/NotoSansSC-Regular.ttf`
+
+/**
+ * 預載 troika 字型到 suspend-react 快取。
+ * 在 Canvas 掛載時呼叫一次，避免首次渲染 <Text> 時觸發 Suspense。
+ * drei v10 的 Text 內部使用 suspend(['troika-text', font, characters], ...) —
+ * 若字型未預載，throw Promise 會觸發外層 Suspense 邊界。
+ */
+export function preloadTroikaFont(): void {
+  suspendPreload(
+    () => new Promise<void>(res => preloadFont({ font: LOCAL_FONT }, res)),
+    ['troika-text', LOCAL_FONT, undefined],
+  )
+}
 
 /* ────────────────────────────
    工具：圓角矩形 Shape
