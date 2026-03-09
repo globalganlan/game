@@ -612,7 +612,7 @@ describe('控制效果', () => {
     ])
     const p1 = hero(mkHero({ SPD: 200 }), 'player', 0, null, [silencePassive], 6, 'p1')
     const e1 = hero(mkHero({ HP: 99999, SPD: 150 }), 'enemy', 0, eSkill, [], 6, 'e1')
-    e1.energy = 1000 // Ready to cast
+    e1.energy = 800 // 未滿，被 p1 沉默後才達 1000（受擊+150 → 回合開始+50）
 
     const { actions } = await runBattleCollect([p1], [e1], { maxTurns: 1 })
 

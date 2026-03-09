@@ -656,6 +656,8 @@ export function InventoryPanel({ onBack, heroesList, heroInstances }: InventoryP
   const [bulkRarities, setBulkRarities] = useState<Set<string>>(new Set(['N', 'R']))
   const [isBulkProcessing, setIsBulkProcessing] = useState(false)
   const [bulkResult, setBulkResult] = useState<string | null>(null)
+  /** 副屬性篩選（多選：選中的 stat 名稱） */
+  const [subStatFilters, setSubStatFilters] = useState<Set<string>>(new Set())
 
   const saveState = getSaveState()
   const gold = saveState?.save.gold ?? 0
@@ -726,7 +728,16 @@ export function InventoryPanel({ onBack, heroesList, heroInstances }: InventoryP
   const equipmentList = useMemo(() => {
     if (!invState || activeTab !== 'equipment') return []
     const rarityOrder: Record<string, number> = { SSR: 4, SR: 3, R: 2, N: 1 }
-    return [...invState.equipment].sort((a, b) => {
+    let list = [...invState.equipment]
+
+    // 副屬性篩選
+    if (subStatFilters.size > 0) {
+      list = list.filter(eq =>
+        [...subStatFilters].every(stat =>
+          (eq.subStats ?? []).some(sub => sub.stat === stat)))
+    }
+
+    return list.sort((a, b) => {
       const aEquipped = a.equippedBy ? 0 : 1
       const bEquipped = b.equippedBy ? 0 : 1
       if (aEquipped !== bEquipped) return aEquipped - bEquipped
@@ -737,7 +748,7 @@ export function InventoryPanel({ onBack, heroesList, heroInstances }: InventoryP
       // 預設 rarity-desc
       return (rarityOrder[b.rarity] ?? 0) - (rarityOrder[a.rarity] ?? 0)
     })
-  }, [invState, activeTab, sortMode])
+  }, [invState, activeTab, sortMode, subStatFilters])
 
   const showEquipment = activeTab === 'equipment'
 
@@ -837,7 +848,7 @@ export function InventoryPanel({ onBack, heroesList, heroInstances }: InventoryP
             <button
               className={`inv-equip-sub-tab ${equipSubTab === 'codex' ? 'inv-equip-sub-tab-active' : ''}`}
               onClick={() => setEquipSubTab('codex')}
-            >📖 裝備圖鑑</button>
+            >📖 圖鑑</button>
           </div>
         )}
 
@@ -874,6 +885,45 @@ export function InventoryPanel({ onBack, heroesList, heroInstances }: InventoryP
             </button>
           )}
         </div>
+
+        {/* 副屬性篩選列（僅裝備列表） */}
+        {showEquipment && equipSubTab === 'list' && (
+          <div className="inv-substat-filter">
+            <span className="inv-substat-label">副屬性：</span>
+            {[
+              { stat: 'ATK', label: '攻擊' },
+              { stat: 'HP', label: 'HP' },
+              { stat: 'DEF', label: '防禦' },
+              { stat: 'SPD', label: '速度' },
+              { stat: 'CritRate', label: '暴擊率' },
+              { stat: 'CritDmg', label: '暴擊傷害' },
+            ].map(({ stat, label }) => {
+              const active = subStatFilters.has(stat)
+              return (
+                <button
+                  key={stat}
+                  className={`inv-substat-btn ${active ? 'inv-substat-active' : ''}`}
+                  onClick={() => setSubStatFilters(prev => {
+                    const next = new Set(prev)
+                    if (next.has(stat)) next.delete(stat); else next.add(stat)
+                    return next
+                  })}
+                >{label}</button>
+              )
+            })}
+            {subStatFilters.size > 0 && (
+              <button
+                className="inv-substat-btn inv-substat-clear"
+                onClick={() => setSubStatFilters(new Set())}
+              >✕ 清除</button>
+            )}
+            {subStatFilters.size > 0 && (
+              <span className="inv-substat-count">
+                {equipmentList.length} 件
+              </span>
+            )}
+          </div>
+        )}
 
         {/* Items Grid — 延遲渲染 + 漸進式載入 */}
         <div className="inv-grid" ref={gridRef}>

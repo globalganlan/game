@@ -91,7 +91,7 @@ export type PassiveTrigger =
 
 /** 技能效果模組（一個技能可包含多個效果） */
 export interface SkillEffect {
-  type: 'damage' | 'heal' | 'buff' | 'debuff' | 'energy' | 'revive' | 'dispel_debuff' | 'extra_turn' | 'reflect' | 'damage_mult' | 'damage_mult_random'
+  type: 'damage' | 'heal' | 'buff' | 'debuff' | 'energy' | 'revive' | 'dispel_debuff' | 'extra_turn' | 'reflect' | 'damage_mult' | 'damage_mult_random' | 'random_debuff'
   scalingStat?: keyof FinalStats  // 基於哪個數值（ATK / HP / DEF）
   multiplier?: number             // 倍率（1.8 = 180%）
   flatValue?: number              // 固定值加成
@@ -103,6 +103,8 @@ export interface SkillEffect {
   statusValue?: number            // 效果數值
   statusDuration?: number         // 持續回合
   statusMaxStacks?: number        // 最大疊加數
+  targetHpThreshold?: number      // damage_mult 條件：目標 HP% 低於閾值才生效（0~1）
+  perAlly?: boolean               // buff 效果按存活隊友人數倍增
 }
 
 /** 技能模板（對應 Google Sheet: skill_templates） */

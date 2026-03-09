@@ -19,6 +19,7 @@ import type {
   SkillEffect,
   DamageResult,
   HealResult,
+  StatusType,
 } from './types'
 import { calculateDamage, calculateHeal } from './damageFormula'
 import { getFinalStats, type HeroInstanceData, type BaseStats } from './progressionSystem'
@@ -769,10 +770,16 @@ function executePassiveEffect(
       if (!effect.status) return
       // 根據被動 target 欄位決定施加對象
       const targets = resolvePassiveTargets(hero, effect.type, passiveTargetType, context)
+      // perAlly: 效果數值按存活隊友人數倍增
+      let effectValue = effect.statusValue ?? 0
+      if (effect.perAlly) {
+        const aliveAllies = context.allAllies.filter(h => h.side === hero.side && h.currentHP > 0).length
+        effectValue *= aliveAllies
+      }
       for (const t of targets) {
         applyStatus(t, {
           type: effect.status,
-          value: effect.statusValue ?? 0,
+          value: effectValue,
           duration: effect.statusDuration ?? 0, // 0 = permanent for passive
           maxStacks: effect.statusMaxStacks ?? 1,
           sourceHeroId: hero.uid,
@@ -808,6 +815,11 @@ function executePassiveEffect(
     }
     case 'damage_mult': {
       // on_attack 被動：乘算傷害倍率（多個被動可疊加）
+      // 支援 targetHpThreshold：只在目標 HP% 低於閾值時才生效
+      if (effect.targetHpThreshold != null && context.target) {
+        const targetHpPct = context.target.currentHP / context.target.maxHP
+        if (targetHpPct >= effect.targetHpThreshold) break // 條件不滿足，跳過
+      }
       context.damageMult = (context.damageMult ?? 1.0) * (effect.multiplier ?? 1.0)
       break
     }
@@ -858,6 +870,22 @@ function executePassiveEffect(
       // 將英雄加入額外行動佇列
       if (cfg._extraTurnQueue) cfg._extraTurnQueue.push(hero.uid)
       break
+    case 'random_debuff': {
+      // 隨機施加一個減益效果（如 PAS_11_2 中場休息）
+      const debuffPool: StatusType[] = ['atk_down', 'def_down', 'spd_down', 'silence']
+      const randomDebuff = debuffPool[Math.floor(Math.random() * debuffPool.length)]
+      const debuffTargets = resolvePassiveTargets(hero, 'debuff', passiveTargetType, context)
+      for (const t of debuffTargets) {
+        applyStatus(t, {
+          type: randomDebuff,
+          value: effect.statusValue ?? 0.15,
+          duration: effect.statusDuration ?? 1,
+          maxStacks: 1,
+          sourceHeroId: hero.uid,
+        })
+      }
+      break
+    }
     default:
       break
   }

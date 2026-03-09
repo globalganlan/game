@@ -289,11 +289,12 @@ describe('buffSystem', () => {
     it('getStatusValue 加總同類型', () => {
       const hero = makeHero()
       hero.statusEffects.push(
-        { type: 'atk_up', value: 0.1, duration: 2, stacks: 2, maxStacks: 5, sourceHeroId: 'a' },
-        { type: 'atk_up', value: 0.2, duration: 3, stacks: 1, maxStacks: 5, sourceHeroId: 'b' },
+        { type: 'atk_up', value: 0.2, duration: 2, stacks: 2, maxStacks: 5, sourceHeroId: 'a' },
+        { type: 'atk_up', value: 0.1, duration: 3, stacks: 1, maxStacks: 5, sourceHeroId: 'b' },
       )
-      // (0.1 * 2) + (0.2 * 1) = 0.4
-      expect(getStatusValue(hero, 'atk_up')).toBeCloseTo(0.4)
+      // value 已在 applyStatus 中按疊加累加，getStatusValue 直接加總 value
+      // 0.2 + 0.1 = 0.3
+      expect(getStatusValue(hero, 'atk_up')).toBeCloseTo(0.3)
     })
 
     it('hasStatus / isControlled / isSilenced / isFeared / hasTaunt', () => {

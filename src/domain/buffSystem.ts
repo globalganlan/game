@@ -193,11 +193,12 @@ export function tickShieldDurations(hero: BattleHero): void {
 
 /**
  * 查詢角色身上指定效果的總數值（加算所有同類型）
+ * 注意：value 已在 applyStatus 中按疊加層數累加，不需再乘以 stacks
  */
 export function getStatusValue(hero: BattleHero, type: StatusType): number {
   return hero.statusEffects
     .filter(s => s.type === type)
-    .reduce((sum, s) => sum + s.value * s.stacks, 0)
+    .reduce((sum, s) => sum + s.value, 0)
 }
 
 /**

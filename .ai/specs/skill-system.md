@@ -1,7 +1,7 @@
 # 技能系統 Spec
 
-> 版本：v1.4 ｜ 狀態：🟢 已實作
-> 最後更新：2026-03-01
+> 版本：v1.5 ｜ 狀態：🟢 已實作
+> 最後更新：2026-03-09
 > 負責角色：🎯 GAME_DESIGN → 🔧 CODING
 > 原始碼：`src/domain/types.ts`（型別）、`src/domain/battleEngine.ts`（執行）、`src/services/dataService.ts`（資料載入）
 
@@ -46,7 +46,7 @@ interface SkillTemplate {
 interface SkillEffect {
   type: 'damage' | 'heal' | 'buff' | 'debuff' | 'energy'
       | 'revive' | 'dispel_debuff' | 'extra_turn' | 'reflect'
-      | 'damage_mult' | 'damage_mult_random'
+      | 'damage_mult' | 'damage_mult_random' | 'random_debuff'
   scalingStat?: keyof FinalStats  // 基於哪個數值（ATK / HP / DEF）
   multiplier?: number             // 倍率（1.8 = 180%）
   flatValue?: number              // 固定值加成
@@ -58,6 +58,8 @@ interface SkillEffect {
   statusValue?: number            // 效果數值
   statusDuration?: number         // 持續回合（預設 2）
   statusMaxStacks?: number        // 最大疊加數（預設 1）
+  targetHpThreshold?: number      // damage_mult HP% 門檻（目標 HP% < 此值才觸發）
+  perAlly?: boolean               // buff/debuff 數值按存活隊友數倍增
 }
 ```
 
@@ -109,6 +111,7 @@ type TargetType =
 | `damage_mult` | ✅ 已實作 | 下次攻擊倍率加成（施加 `damage_mult` buff） |
 | `damage_mult_random` | ✅ 已實作 | 隨機倍率加成（min~max 範圍） |
 | `extra_turn` | ✅ 已實作 | 額外行動機制（推入 `_extraTurnQueue`，每回合每位英雄最多 1 次） |
+| `random_debuff` | ✅ 已實作 | 隨機施加 debuff（atk_down/def_down/spd_down/silence） |
 
 ### Buff/Debuff 施加流程
 
@@ -372,3 +375,4 @@ getHeroSkillSet(heroId, skillsMap, heroSkillsMap)
 | v1.2 | 2026-03-01 | **被動系統 6 項 Bug 修復**：`always`/`every_n_turns` 觸發修復；新增 `resolvePassiveTargets()` 多目標被動；`on_dodge` 反擊目標修正；被動效果新增 `dispel_debuff`/`reflect` 處理；JSON 修正 5 筆（`damage_reduce`→`dmg_reduce`、`crit_up`→`crit_rate_up`）；~15+ 個被動技能從無效變為正確運作 |
 | v1.3 | 2026-03-01 | **extra_turn 機制實作**：新增 `_extraTurnQueue` + `processExtraTurns()`（每回合每位英雄最多 1 次，安全上限 MAX_EXTRA=10）；新增 `on_ally_death` / `on_ally_skill` 觸發點；`PassiveTrigger` 型別更新；`BattleAction` 新增 `EXTRA_TURN` 類型；App.tsx 表現層處理；5 項新增測試（47→594 全通過） |
 | v1.4 | 2026-03-01 | Spec 同步：SkillEffect.type 新增 `damage_mult` / `damage_mult_random`、新增 `min`/`max` 欄位、`hitCount` 標記為已使用、效果實作狀態表更新 |
+| v1.5 | 2026-03-09 | **12 項技能 Bug 修復 + 3 項引擎新功能**：新增 `random_debuff`/`targetHpThreshold`/`perAlly` 效果欄位；修正 SPD buff 絕對值→百分比（PAS_4_1/10_1/10_4/14_4）；PAS_4_4 斬殺加 HP 門檻；PAS_5_1/5_4 治療改 ATK 基準；PAS_14_1 閃避改 always 觸發；PAS_11_2 改 random_debuff；PAS_9_4 加機率；PAS_6_3 加 perAlly；`getStatusValue` 修正 value×stacks 雙重計算 bug |
