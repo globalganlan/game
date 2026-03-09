@@ -145,6 +145,7 @@ export interface CompleteBattleResult {
   newFloor?: number
   bossRank?: string
   currencies?: ServerCurrencies
+  resourceTimerLastCollect?: string
   dailyCounts?: { daily: number; pvp: number; boss: number; date: string }
 }
 

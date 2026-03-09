@@ -444,8 +444,11 @@ export function applyCurrenciesFromServer(
  *
  * 呼叫 API，以伺服器回傳的 currencies 絕對值覆蓋本地
  */
+let isCollectingResources = false
+
 export async function collectResources(): Promise<AccumulatedResources | null> {
   if (!currentData) return null
+  if (isCollectingResources) return null // 防重複點擊
 
   // 尚未通關 1-1  離線獎勵未解鎖
   const sp = currentData.save.storyProgress
@@ -457,13 +460,9 @@ export async function collectResources(): Promise<AccumulatedResources | null> {
   )
   if (resources.gold <= 0 && resources.exp <= 0) return null
 
-  // 先保存舊值，API 失敗時回滾
-  const oldLastCollect = currentData.save.resourceTimerLastCollect
+  isCollectingResources = true
 
-  // 樂觀更新：先阻止重複點擊（UI 立即歸零）
-  currentData.save.resourceTimerLastCollect = new Date().toISOString()
-
-  // 呼叫 API → 以伺服器權威值覆蓋
+  // 呼叫 API → lastCollect 一律由伺服器回傳覆蓋，前端不自行生成
   try {
     const result = await callApi<{
       gold: number
@@ -486,14 +485,14 @@ export async function collectResources(): Promise<AccumulatedResources | null> {
       // 同步伺服器的 lastCollect 時間戳（確保與 DB 一致）
       if (result.resourceTimerLastCollect && currentData) {
         currentData.save.resourceTimerLastCollect = result.resourceTimerLastCollect
+        notify()
       }
     }
   } catch (e) {
     console.warn('[save] collect-resources error:', e)
-    // API 失敗 → 回滾 lastCollect，下次重新計算
-    if (currentData) {
-      currentData.save.resourceTimerLastCollect = oldLastCollect
-    }
+    // API 失敗 → lastCollect 不動，下次重新計算
+  } finally {
+    isCollectingResources = false
   }
 
   return resources

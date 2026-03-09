@@ -194,6 +194,7 @@ battle.post('/complete-battle', async (c) => {
   let newStoryProgress: { chapter: number; stage: number } | undefined;
   let newFloor: number | undefined;
   let bossRank: string | undefined;
+  let storySettleLastCollect: string | undefined;
 
   if (stageMode === 'story') {
     const parts = stageId.split('-');
@@ -242,6 +243,7 @@ battle.post('/complete-battle', async (c) => {
       offlineGoldSettle = Math.floor(oldGoldPerH * hours);
       offlineExpSettle = Math.floor(oldExpPerH * hours);
     }
+    if (newStoryProgress) storySettleLastCollect = now;
 
     await db.prepare(
       `UPDATE save_data SET
@@ -403,6 +405,8 @@ battle.post('/complete-battle', async (c) => {
     actions: battleResult.actions,
     currencies,
     dailyCounts,
+    // story 推關時伺服器已重置 lastCollect，回傳給前端同步
+    ...(newStoryProgress ? { resourceTimerLastCollect: storySettleLastCollect } : {}),
   });
 });
 
@@ -481,7 +485,11 @@ battle.post('/complete-stage', async (c) => {
     now2, playerId
   ).run();
 
-  return c.json({ success: true, rewards, isFirstClear, newStoryProgress: newStoryProgress2 });
+  return c.json({
+    success: true, rewards, isFirstClear, newStoryProgress: newStoryProgress2,
+    // story 推關時伺服器已重置 lastCollect，回傳給前端同步
+    ...(newStoryProgress2 ? { resourceTimerLastCollect: now2 } : {}),
+  });
 });
 
 // ── 爬塔通關（舊版相容） ──────────────────

@@ -87,7 +87,7 @@ export function MainMenu({
   arenaChallengesLeft = 0,
   heroesHasStarUp = false,
 }: MainMenuProps) {
-  // 每 30 秒刷新離線獎勵預覽
+  // 每 1 秒刷新離線獎勵預覽（純本地計算，讓玩家看到數字在增長）
   const [resourcePreview, setResourcePreview] = useState(
     () => getResourcePreview?.() ?? null,
   )
@@ -96,7 +96,7 @@ export function MainMenu({
   }, [getResourcePreview])
   useEffect(() => {
     refreshPreview()
-    const id = setInterval(refreshPreview, 30_000)
+    const id = setInterval(refreshPreview, 1_000)
     return () => clearInterval(id)
   }, [refreshPreview])
   const name = saveData?.displayName || '倖存者'

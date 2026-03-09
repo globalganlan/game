@@ -1,6 +1,6 @@
 # 存檔系統 Spec
 
-> 版本：v2.5 ｜ 狀態：🟢 已實作
+> 版本：v2.6 ｜ 狀態：🟢 已實作
 > 最後更新：2026-03-10
 > 負責角色：🎯 GAME_DESIGN → 🔧 CODING
 
@@ -335,11 +335,11 @@ function getAccumulatedResources(stageId, lastCollect, maxHours = 24) {
   1. storyProgress.chapter===1 && stage===1 → 未解鎖，return null
   2. 本地計算 getAccumulatedResources()
   3. gold<=0 && expItems<=0 → return null
-  4. 保存 oldLastCollect（用於失敗回滾）
-  5. 樂觀更新 lastCollect = now（阻止重複點擊）
-  6. 呼叫 API collect-resources
-  7. 伺服器成功 → applyCurrenciesFromServer(currencies) + 同步 lastCollect
-  8. 伺服器失敗 → 回滾 lastCollect = oldLastCollect
+  4. isCollecting 旗標防重複點擊（不再樂觀寫入 lastCollect）
+  5. 呼叫 API collect-resources
+  6. 伺服器成功 → applyCurrenciesFromServer(currencies) + 同步 server lastCollect
+  7. 伺服器失敗 → lastCollect 不動，下次重新計算
+  8. finally: isCollecting = false
   9. 回傳本地計算結果（供 UI 顯示）
 ```
 
@@ -354,7 +354,7 @@ function getAccumulatedResources(stageId, lastCollect, maxHours = 24) {
   4. 重置 resourceTimerLastCollect = now
   5. 更新 resourceTimerStage = newStageId
 前端 runBattleLoop:
-  通關 story 推進時，同步 resourceTimerLastCollect = now
+  通關 story 推進時，使用伺服器回傳的 resourceTimerLastCollect 同步（不自行生成）
 ```
 
 > **為什麼需要**：若不自動結算，玩家可在 1-1 掛網 24h，打到 4-8 後領取，
@@ -375,6 +375,7 @@ Workers handleCollectResources_:（包在 executeWithIdempotency_ 中）
 |------|-----|
 | 最大累積時間 | 24 小時 |
 | 產出週期 | 持續（離線也計算） |
+| 離線預覽刷新 | 每 1 秒（純本地計算，無 API 請求） |
 | 領取方式 | 主畫面「領取」按鈕，一次全收 |
 | 起始條件 | 通關 1-1 後啟動 |
 | 產出隨進度提升 | 通關越後面的關卡，金幣/經驗產量越高 |
@@ -409,3 +410,4 @@ Workers handleCollectResources_:（包在 executeWithIdempotency_ 中）
 | v2.4 | 2026-03-07 | **簽到獎勵同步修復**：① `CHECKIN_REWARDS` 補齊缺失的 gacha_ticket_hero（Day 3/6）、gacha_ticket_equip（Day 5/7）與後端一致 ② `doDailyCheckin` 返回值改用 `serverRes.reward`（權威）而非本地 CHECKIN_REWARDS，避免動畫缺失與背包漏同步 |
 | v2.3 | 2026-03-05 | **Server-First 資料一致性**：`collectResources` catch 不再加本地金幣/經驗；`doDailyCheckin` catch 不再發本地獎勵，回傳 `success:false`；移除離線樂觀更新策略 |
 | v2.5 | 2026-03-10 | **離線產出利率回溯套利修復**：① battle.ts 推進 resourceTimerStage 時自動以舊產速結算累積資源 + 重置 lastCollect ② save.ts collect-resources 回傳 currencies + resourceTimerLastCollect ③ saveService.ts collectResources API 失敗時回滾 lastCollect ④ runBattleLoop.ts 通關後同步重置本地 lastCollect ⑤ updateProgress 接受 resourceTimerLastCollect |
+| v2.6 | 2026-03-10 | **lastCollect Server-Only + 即時預覽**：① collectResources 移除樂觀寫入 lastCollect，改用 isCollecting 旗標防重複點擊 ② lastCollect 一律從後端（load-save / collect-resources / complete-battle）取得，前端不再 new Date().toISOString() ③ 離線收益預覽從 30 秒改為 1 秒刷新（純本地計算，讓玩家看到數字即時增長） ④ complete-battle / complete-stage 回傳 resourceTimerLastCollect ⑤ CompleteBattleResult 新增 resourceTimerLastCollect 欄位 |

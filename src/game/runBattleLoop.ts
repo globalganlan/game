@@ -1147,7 +1147,10 @@ export async function executeBattleLoop(ctx: BattleLoopContext, replayActions?: 
         // 伺服器已自動結算舊產速的離線資源並重置 lastCollect，同步本地
         doUpdateProgress({
           resourceTimerStage: stageId,
-          resourceTimerLastCollect: new Date().toISOString(),
+          // lastCollect 一律使用伺服器回傳的時間戳（不自行生成）
+          ...(serverResult.resourceTimerLastCollect
+            ? { resourceTimerLastCollect: serverResult.resourceTimerLastCollect }
+            : {}),
         })
       }
 
