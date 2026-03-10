@@ -1,8 +1,22 @@
 # 開發狀態快照 — Dev Status
 
-> 最後更新：2026-03-09（第六十九次更新 — DB 清理第二波：heroes.extra / item_definitions 正規化 / stageStars / sellPrice 移除）
+> 最後更新：2026-03-11（第七十次更新 — 屬性系統完整移除）
 
-## 截至 2026-03-09 的開發狀態
+## 截至 2026-03-11 的開發狀態
+
+### 屬性系統完整移除（Element System Removal）
+- [x] 刪除 `src/domain/elementSystem.ts`、`src/domain/__tests__/elementSystem.test.ts`
+- [x] 移除 `Element` type、`ElementEntry` interface、`BattleHero.element`、`SkillTemplate.element`、`DamageResult.elementMult`
+- [x] 移除 `DamageDisplayType` 中的 `'weakness'`
+- [x] 移除傷害公式步驟 4（屬性倍率）
+- [x] 移除戰鬥 HUD 屬性提示（`ElementHint3D`、`elementHints` state）
+- [x] 移除 CodexPanel 的 Element 圖鑑分頁
+- [x] 移除英雄列表/抽卡畫面的屬性顯示
+- [x] 移除 Workers 後端 battleEngine 中的屬性邏輯
+- [x] 所有測試檔案的屬性引用已清除
+- [x] DB 欄位（heroes.Element、element_matrix 表）保留但不再讀取/使用
+- [x] Spec 全面更新（element-system 標記廢棄、8 份相關 spec 同步修改）
+- [x] ADR-022 記錄
 
 ### 資料庫清理（第二波）— heroes.extra / item_definitions 正規化 / stageStars / sellPrice 移除
 - [x] D1 `ALTER TABLE heroes DROP COLUMN extra` — 移除 heroes.extra 欄位
@@ -97,11 +111,11 @@
 - [x] **Cloudflare Workers + D1 後端** — Hono 路由 + D1 SQLite，取代 GAS + Google Sheets
   - `workers/src/index.ts` — 主入口 + CORS + Cron Triggers
   - `workers/src/routes/` — 11 個路由模組（auth / save / battle / inventory / progression / gacha / mail / arena / sheet / checkin / **stage**）
-  - `workers/schema.sql` — **14 張** D1 資料表（game_sheets 已移除；含 skill_templates / hero_skills / element_matrix）
+  - `workers/schema.sql` — **14 張** D1 資料表（game_sheets 已移除；含 skill_templates / hero_skills；element_matrix 保留但不再使用）
 - [x] **D1 原子批次寫入** — 所有多寫入路由使用 `db.batch()` 包成單一 SQLite 交易
   - 核心 helper：`upsertItemStmt` / `grantRewardsStmts` / `insertMailStmt`
   - 共 22 條路由完成批次化（save/auth/inventory/gacha/progression/mail/checkin/arena）
-- [x] **D1 遊戲資料正規化** — heroes/skill_templates/hero_skills/element_matrix 從 game_sheets KV blob 拉出為專屬 D1 表
+- [x] **D1 遊戲資料正規化** — heroes/skill_templates/hero_skills 從 game_sheets KV blob 拉出為專屬 D1 表（element_matrix 保留但不再使用）
   - `readSheet` 端點自動從專屬表讀取，前端零改動
   - heroes 表新增 modelId/critRate/critDmg/description 獨立欄位
 - [x] **CurrencyIcon 統一 emoji** — 💰💎💚✨⚔️，移除 CSS badge 樣式
@@ -110,23 +124,19 @@
 - [x] **升級英雄 UI v2** — 雙按鈕（升1級/升N級）+ 費用預覽，取代 slider
 - [x] **經驗資源即時更新** — 信箱/簽到/寶箱/道具使用的 exp 正確回寫 save.exp
 - [x] **戰力動畫改進** — 穿脫裝備即時觸發 + 顯示最終戰力值 + 綠增紅減顏色
-- [x] **heroes.tsv + D1 heroes 表已同步** — 新增 DEF / CritRate / CritDmg / Element 欄位
+- [x] **heroes.tsv + D1 heroes 表已同步** — 新增 DEF / CritRate / CritDmg 欄位（Element 欄位保留但不再使用）
 - [x] **主線關卡 API 驅動** — D1 stage_configs 存 24 筆關卡配置，Workers `/list-stages` API 提供，前端 StageSelect 動態載入
   - 3 章主題（廢墟之城/暗夜森林/死寂荒原），每章 8 關
   - 章節主題色卡片 UI + 難度骷髏 + 推薦等級 + BOSS 金框
   - `getStoryStageConfig()` 前端死碼已移除
 - [x] **Domain 層戰鬥引擎** — 純 TypeScript 函式，零 React 依賴
   - `src/domain/types.ts` — 完整型別定義（BattleHero, BattleAction, SkillTemplate 等）
-  - `src/domain/elementSystem.ts` — 7 屬性剋制矩陣
-  - `src/domain/buffSystem.ts` — Buff/Debuff 全生命週期管理（DOT/護盾/控制/淨化）
-  - `src/domain/damageFormula.ts` — 10 步完整傷害公式（DEF 減傷/暴擊/屬性/閃避/護盾/反彈）
-  - `src/domain/energySystem.ts` — 能量管理（每回合/攻擊/被攻擊/擊殺/大招門檻 1000）
-  - `src/domain/targetStrategy.ts` — 8+ 種目標選擇策略（嘲諷/前排/後排/隨機/全體/AOE）
+
   - `src/domain/battleEngine.ts` — 核心引擎 `runBattle()`、普攻/技能執行、被動觸發、BattleHero 工廠
   - `src/domain/index.ts` — 統一匯出
 - [x] **資料服務層** — 透過 Workers API 載入遊戲配置
   - `src/services/apiClient.ts` — Workers callApi + callAuthApi
-  - `src/services/dataService.ts` — 解析 heroes/skill_templates/hero_skills/element_matrix → domain 型別
+  - `src/services/dataService.ts` — 解析 heroes/skill_templates/hero_skills → domain 型別
   - `src/services/index.ts` — 統一匯出
 - [x] **App.tsx 整合** — 戰鬥迴圈已切換至 Domain Engine 驅動
   - `runBattleLoop()` 改用 `runBattle()` + `onAction` callback
@@ -185,8 +195,8 @@
 | Spec | 版本 | 狀態 |
 |------|------|------|
 | core-combat.md | v3.3 | 🟢 Phase B 死亡角色守衛 + 致死跳過 HURT |
-| hero-schema.md | v2.1 | 🟢 4 層型別 + 14 角色完整數值表 |
-| damage-formula.md | v1.0 | 🟢 10 步完整傷害公式 |
+| hero-schema.md | v2.5 | 🟢 4 層型別 + 14 角色完整數值表（Element 已移除） |
+| damage-formula.md | v1.2 | 🟢 9 步傷害公式（屬性倍率步驟已移除） |
 | skill-system.md | v1.3 | 🟢 SkillTemplate + 15 PassiveTrigger + extra_turn 機制 + on_ally_death/on_ally_skill |
 | progression.md | v2.3 | 🟢 EXP 資源重構（頂層資源 + 滑桿升級 UI） |
 | tech-architecture.md | v2.1 | 🟢 ClickableItemIcon 統一 + PanelInfoTip + CurrencyIcon |
@@ -194,7 +204,7 @@
 | save-system.md | v2.2 | 🟢 saveService 狀態刷新修復 + updateFreePullLocally/updateGachaPityLocally |
 | stage-system.md | v2.2 | 🟢 EXP 資源獎勵（取代 exp_core 掉落） |
 | gacha.md | v2.4 | 🟢 前端狀態即時刷新修復（removeItemsLocally + optional fields） |
-| element-system.md | v1.0 | 🟢 7 屬性 + 倍率矩陣 |
+| element-system.md | v1.1 | 🔴 已廢棄（2026-03-11 完整移除） |
 | inventory.md | v2.5 | 🟢 移除 exp_core / reroll + 星塵兌換商店 + 「全部」分頁含裝備 + 碎片中文名 |
 | optimistic-queue.md | v1.0 | 🟢 3 種套用模式 |
 | local-storage-migration.md | v2.0 | 🟢 舊版 key 清除器（後端權威模式） |
@@ -213,7 +223,7 @@
 - [x] 過場幕（TransitionOverlay）
 
 ### 尚未實作（已有 spec 設計）
-- [x] ~~傷害公式（DEF 減傷 / 暴擊 / 屬性剋制 / DOT）~~ ✅ `src/domain/damageFormula.ts`
+- [x] ~~傷害公式（DEF 減傷 / 暴擊 / ~~屬性剋制~~（已移除） / DOT）~~ ✅ `src/domain/damageFormula.ts`
 - [x] ~~能量系統 + 大招（1000 門檻）~~ ✅ `src/domain/energySystem.ts`
 - [x] ~~4 被動技能 / 星級解鎖~~ ✅ `src/domain/battleEngine.ts`（被動觸發 + 星級限制）
 - [x] ~~Buff/Debuff 系統~~ ✅ `src/domain/buffSystem.ts`
@@ -226,7 +236,7 @@
 - [x] ~~Workers 55+ API 端點~~ ✅ 已部署（inventory/progression/stage/gacha/auth/save/battle/mail/arena/checkin/sheet）
 - [x] ~~Buff/Debuff 3D 圖標~~ ✅ Phase 7 完成（BattleHUD 2D overlay — buff/debuff icons + energy bar + skill toasts + element hints）
 - [x] ~~Phase 3: 主選單 UI~~ ✅ 完成（MainMenu + HeroListPanel + InventoryPanel + GachaScreen + StageSelect）
-- [x] ~~Phase 7: 戰鬥 UI 強化~~ ✅ 完成（BattleHUD — Buff 圖標/能量條/技能彈幕/屬性相剋指示）
+- [x] ~~Phase 7: 戰鬥 UI 強化~~ ✅ 完成（BattleHUD — Buff 圖標/能量條/技能彈幕）
 
 ### 2026-02-28 新增功能（8 項 UI/UX 改善）
 - [x] 陣型自動存讀 — 登入後從 save.formation 還原 playerSlots，變更時自動回存（不阻塞 loading）
@@ -336,6 +346,6 @@
 ### 技術債
 - ~~敵方陣型隨機生成較簡陋（隨機 1~6 隻）— 需串接 stage_configs D1 表~~ ✅ 已修復（v2.0）
 - ~~localStorage 遊戲資料快取殘留（GAS→Workers 遷移未清理）~~ ✅ 已修復（2026-03-04）
-- heroes 表 Element 用中文（闇/毒/火/冰/雷/光），domain 用英文 — `toElement()` 橋接
+- heroes 表 Element 用中文（闇/毒/火/冰/雷/光）— 屬性系統已移除（DB 欄位保留但不再使用）
 - Narrative 劇情系統（.ai/specs/narrative.md v0.1）— 已擱置
 - ESLint 殘餘 42 問題（28 errors + 14 warnings），多為 unused-vars / prefer-const / Math.random purity

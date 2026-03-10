@@ -14,7 +14,6 @@ function makeRawInput(overrides: Partial<RawHeroInput> = {}): RawHeroInput {
     heroId: 1,
     modelId: 'zombie_1',
     name: '測試角色',
-    element: 'fire',
     HP: 1000,
     ATK: 150,
     DEF: 50,

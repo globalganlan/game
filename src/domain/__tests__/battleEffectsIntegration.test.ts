@@ -21,7 +21,6 @@ import skillDataJson from '../../../.ai/scripts/skill_data_zh.json'
 
 const BASE_STATS: RawHeroInput = {
   heroId: 1, modelId: 'z1', name: 'TestHero',
-  element: 'fire',
   HP: 5000, ATK: 500, DEF: 200, SPD: 100,
   CritRate: 10, CritDmg: 50,
 }
@@ -35,7 +34,6 @@ function mkPassive(id: string, trigger: string, target: string, effects: any[]):
     skillId: id,
     name: id,
     type: 'passive',
-    element: '',
     target: target as any,
     description: '',
     effects,
@@ -49,7 +47,6 @@ function mkActiveSkill(id: string, target: string, effects: any[]): SkillTemplat
     skillId: id,
     name: id,
     type: 'active',
-    element: 'fire',
     target: target as any,
     description: '',
     effects,
@@ -624,22 +621,10 @@ describe('控制效果', () => {
 })
 
 /* ═══════════════════════════════════
-   F. 屬性剋制 + 閃避 + 暴擊 + 反彈
+   F. 閃避 + 暴擊 + 反彈
    ═══════════════════════════════════ */
 
 describe('傷害公式特殊效果', () => {
-  it('屬性剋制 fire→wind 應造成 1.3x 傷害', async () => {
-    vi.spyOn(Math, 'random').mockReturnValue(0.99) // no crit, no dodge, no variance impact
-    const p1 = hero(mkHero({ SPD: 200, ATK: 500, element: 'fire' }), 'player', 0, null, [], 6, 'p1')
-    const e1 = hero(mkHero({ HP: 99999, SPD: 1, element: 'wind' as any }), 'enemy', 0, null, [], 6, 'e1')
-
-    const { actions } = await runBattleCollect([p1], [e1], { maxTurns: 1 })
-    const attacks = filterActions(actions, 'NORMAL_ATTACK')
-    expect(attacks.length).toBeGreaterThan(0)
-    expect(attacks[0].result.elementMult).toBe(1.3)
-    vi.restoreAllMocks()
-  })
-
   it('閃避（dodge_up）— MISS 不造成傷害', async () => {
     vi.spyOn(Math, 'random').mockReturnValue(0.01) // < dodge rate → dodge succeeds
     const dodgePassive = mkPassive('PAS_DODGE', 'always', 'self', [

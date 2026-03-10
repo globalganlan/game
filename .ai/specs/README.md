@@ -16,10 +16,10 @@
 | 檔案 | 系統 | 版本 | 狀態 |
 |------|------|------|------|
 | `.ai/specs/core-combat.md` | 回合制戰鬥系統（Domain Engine + Command Pattern） | v3.3 | 🟢 已實作 |
-| `.ai/specs/hero-schema.md` | 英雄資料結構（三層型別：RawHeroData → RawHeroInput → BattleHero + HeroInstance.stars） | v2.4 | 🟢 已實作 |
-| `.ai/specs/damage-formula.md` | 傷害公式（10 步流程：閃避→DEF→暴擊→屬性→護盾→反彈） | v1.1 | 🟢 已實作 |
+| `.ai/specs/hero-schema.md` | 英雄資料結構（三層型別：RawHeroData → RawHeroInput → BattleHero + HeroInstance.stars） | v2.5 | 🟢 已實作 |
+| `.ai/specs/damage-formula.md` | 傷害公式（9 步流程：閃避→DEF→暴擊→~~屬性~~→護盾→反彈） | v1.2 | 🟢 已實作 |
 | `.ai/specs/skill-system.md` | 技能系統（SkillTemplate + SkillEffect + Sheets 資料管線） | v1.4 | 🟢 已實作 |
-| `.ai/specs/element-system.md` | 屬性剋制系統（7 屬性矩陣 + 動態載入 + 中英對照） | v1.1 | 🟢 已實作 |
+| ~~`.ai/specs/element-system.md`~~ | ~~屬性剋制系統（7 屬性矩陣 + 動態載入 + 中英對照）~~ — 2026-03-11 完整移除 | v1.1 | 🔴 已廢棄 |
 | `.ai/specs/tech-architecture.md` | 技術架構（含 Domain + Services 分層 + Audio Engine + CurrencyIcon） | v1.8 | 🟢 定稿 |
 | `.ai/specs/progression.md` | 養成系統（等級/突破/星級/裝備模板制 v2/套裝 + UI 全面實作） | v2.0 | 🟢 已實作 |
 | `.ai/specs/auth-system.md` | 帳號系統（訪客 + 綁定帳密 + 登出保留 token） | v1.4 | 🟢 已實作 |
@@ -50,7 +50,7 @@
 | `src/domain/buffSystem.ts` | core-combat §5 | Buff/Debuff 施加/結算/查詢 |
 | `src/domain/energySystem.ts` | core-combat §4 | 能量獲取/消耗/大招判定 |
 | `src/domain/targetStrategy.ts` | core-combat §7 | 目標選擇策略 |
-| `src/domain/elementSystem.ts` | element-system | 屬性剋制矩陣 |
+| ~~`src/domain/elementSystem.ts`~~ | ~~element-system~~ | ~~屬性剋制矩陣~~（2026-03-11 已刪除） |
 | `src/domain/types.ts` | hero-schema, skill-system | 核心型別定義 |
 | `src/services/dataService.ts` | skill-system §6-7 | Sheets → domain 轉換 |
 | `src/services/sheetApi.ts` | tech-architecture | API 封裝 + 快取 |

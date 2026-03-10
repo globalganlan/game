@@ -224,12 +224,12 @@ describe('Integration: Full battle with fixed passives', () => {
     })
     const sklBackSnipe: SkillTemplate = makeSkill({
       skillId: 'SKL_BACK_SNIPE', name: '後排狙擊', type: 'active',
-      target: 'back_row_enemies', element: '',
+      target: 'back_row_enemies',
       effects: [{ type: 'damage', scalingStat: 'ATK', multiplier: 2.2 }],
     })
 
     const attacker = makeHero({
-      side: 'player', slot: 0, name: '屠宰者', element: 'fire',
+      side: 'player', slot: 0, name: '屠宰者',
       activeSkill: sklBackSnipe,
       passives: [pas41, pas42, pas43, pas44],
       activePassives: [pas41, pas42, pas43, pas44],
@@ -262,7 +262,7 @@ describe('Integration: Full battle with fixed passives', () => {
     })
     const sklIcePrison: SkillTemplate = makeSkill({
       skillId: 'SKL_ICE_PRISON', name: '冰獄', type: 'active',
-      target: 'single_enemy', element: 'water',
+      target: 'single_enemy',
       effects: [
         { type: 'damage', scalingStat: 'ATK', multiplier: 3.5 },
         { type: 'debuff', status: 'freeze', statusChance: 0.4, statusDuration: 1 },
@@ -270,7 +270,7 @@ describe('Integration: Full battle with fixed passives', () => {
     })
 
     const dodger = makeHero({
-      side: 'player', slot: 1, name: '脫逃者', element: 'water',
+      side: 'player', slot: 1, name: '脫逃者',
       activeSkill: sklIcePrison,
       passives: [pas141, pas142, pas143, pas144],
       activePassives: [pas141, pas142, pas143, pas144],
@@ -301,12 +301,12 @@ describe('Integration: Full battle with fixed passives', () => {
     })
     const sklFocusHeal: SkillTemplate = makeSkill({
       skillId: 'SKL_FOCUS_HEAL', name: '集中治療', type: 'active',
-      target: 'single_ally', element: '',
+      target: 'single_ally',
       effects: [{ type: 'heal', scalingStat: 'ATK', multiplier: 3.5 }],
     })
 
     const healer = makeHero({
-      side: 'player', slot: 2, name: '倖存者', element: 'light',
+      side: 'player', slot: 2, name: '倖存者',
       activeSkill: sklFocusHeal,
       passives: [pas91, pas92, pas93, pas94],
       activePassives: [pas91, pas92, pas93, pas94],
@@ -315,9 +315,9 @@ describe('Integration: Full battle with fixed passives', () => {
 
     // 敵方
     const enemies = [
-      makeHero({ side: 'enemy', slot: 0, name: '敵1', element: 'fire', finalStats: { HP: 800, ATK: 80, DEF: 40, SPD: 70, CritRate: 5, CritDmg: 50 } }),
-      makeHero({ side: 'enemy', slot: 1, name: '敵2', element: 'earth', finalStats: { HP: 800, ATK: 80, DEF: 40, SPD: 65, CritRate: 5, CritDmg: 50 } }),
-      makeHero({ side: 'enemy', slot: 2, name: '敵3', element: 'dark', finalStats: { HP: 800, ATK: 80, DEF: 40, SPD: 60, CritRate: 5, CritDmg: 50 } }),
+      makeHero({ side: 'enemy', slot: 0, name: '敵1', finalStats: { HP: 800, ATK: 80, DEF: 40, SPD: 70, CritRate: 5, CritDmg: 50 } }),
+      makeHero({ side: 'enemy', slot: 1, name: '敵2', finalStats: { HP: 800, ATK: 80, DEF: 40, SPD: 65, CritRate: 5, CritDmg: 50 } }),
+      makeHero({ side: 'enemy', slot: 2, name: '敵3', finalStats: { HP: 800, ATK: 80, DEF: 40, SPD: 60, CritRate: 5, CritDmg: 50 } }),
     ]
 
     const result = await runBattleCollect([attacker, dodger, healer], enemies, { maxTurns: 50, seed: 123 })
@@ -353,7 +353,7 @@ describe('Integration: Full battle with fixed passives', () => {
     })
     const sklFlameBurst: SkillTemplate = makeSkill({
       skillId: 'SKL_FLAME_BURST', name: '烈焰爆發', type: 'active',
-      target: 'all_enemies', element: 'fire',
+      target: 'all_enemies',
       effects: [
         { type: 'damage', scalingStat: 'ATK', multiplier: 1.2 },
         { type: 'debuff', status: 'dot_burn', statusChance: 0.3, statusDuration: 2 },
@@ -361,7 +361,7 @@ describe('Integration: Full battle with fixed passives', () => {
     })
 
     const hero = makeHero({
-      side: 'player', slot: 0, name: '白面鬼', element: 'fire',
+      side: 'player', slot: 0, name: '白面鬼',
       activeSkill: sklFlameBurst,
       passives: [pas111, pas112],
       activePassives: [pas111, pas112],
@@ -369,7 +369,7 @@ describe('Integration: Full battle with fixed passives', () => {
     })
 
     const enemies = [
-      makeHero({ side: 'enemy', slot: 0, name: '敵', element: 'water', finalStats: { HP: 2000, ATK: 60, DEF: 30, SPD: 50, CritRate: 5, CritDmg: 50 } }),
+      makeHero({ side: 'enemy', slot: 0, name: '敵', finalStats: { HP: 2000, ATK: 60, DEF: 30, SPD: 50, CritRate: 5, CritDmg: 50 } }),
     ]
 
     const result = await runBattleCollect([hero], enemies, { maxTurns: 10, seed: 456 })
@@ -391,7 +391,7 @@ describe('Full roster: 14 heroes all functional', () => {
     }
 
     // ── Hero 1: 女喪屍 ──
-    const h1Skill = makeSkill({ skillId: 'SKL_SHADOW_STRIKE', name: '暗影突襲', type: 'active', target: 'random_enemies_3', element: 'dark', effects: [{ type: 'damage', scalingStat: 'ATK', multiplier: 1.4 }] })
+    const h1Skill = makeSkill({ skillId: 'SKL_SHADOW_STRIKE', name: '暗影突襲', type: 'active', target: 'random_enemies_3', effects: [{ type: 'damage', scalingStat: 'ATK', multiplier: 1.4 }] })
     const h1Passives = [
       pas('PAS_1_1', '殘存意志', 'on_lethal', 'self', [{ type: 'revive', multiplier: 0.01 }]),
       pas('PAS_1_2', '靈巧身軀', 'always', 'all_allies', [{ type: 'buff', status: 'spd_up', statusValue: 0.05 }]),
@@ -399,13 +399,13 @@ describe('Full roster: 14 heroes all functional', () => {
       pas('PAS_1_4', '不死執念', 'on_lethal', 'self', [{ type: 'heal', scalingStat: 'HP', multiplier: 0.2 }]),
     ]
     heroes.push(makeHero({
-      heroId: 1, side: 'player', slot: 0, name: '女喪屍', element: 'dark',
+      heroId: 1, side: 'player', slot: 0, name: '女喪屍',
       activeSkill: h1Skill, passives: h1Passives, activePassives: h1Passives,
       finalStats: { HP: 1000, ATK: 120, DEF: 60, SPD: 80, CritRate: 5, CritDmg: 50 },
     }))
 
     // ── Hero 2: 異變者 ──
-    const h2Skill = makeSkill({ skillId: 'SKL_FLAME_BURST', name: '烈焰爆發', type: 'active', target: 'all_enemies', element: 'fire', effects: [{ type: 'damage', scalingStat: 'ATK', multiplier: 1.2 }, { type: 'debuff', status: 'dot_burn', statusChance: 0.3, statusDuration: 2 }] })
+    const h2Skill = makeSkill({ skillId: 'SKL_FLAME_BURST', name: '烈焰爆發', type: 'active', target: 'all_enemies', effects: [{ type: 'damage', scalingStat: 'ATK', multiplier: 1.2 }, { type: 'debuff', status: 'dot_burn', statusChance: 0.3, statusDuration: 2 }] })
     const h2Passives = [
       pas('PAS_2_1', '狂暴基因', 'hp_below_pct', 'self', [{ type: 'buff', status: 'atk_up', statusValue: 0.2 }]),
       pas('PAS_2_2', '血腥本能', 'on_kill', 'self', [{ type: 'heal', scalingStat: 'HP', multiplier: 0.15 }]),
@@ -413,13 +413,13 @@ describe('Full roster: 14 heroes all functional', () => {
       pas('PAS_2_4', '狂化覺醒', 'hp_below_pct', 'self', [{ type: 'buff', status: 'atk_up', statusValue: 0.5 }, { type: 'buff', status: 'spd_up', statusValue: 0.3 }]),
     ]
     heroes.push(makeHero({
-      heroId: 2, side: 'player', slot: 1, name: '異變者', element: 'wind',
+      heroId: 2, side: 'player', slot: 1, name: '異變者',
       activeSkill: h2Skill, passives: h2Passives, activePassives: h2Passives,
       finalStats: { HP: 1200, ATK: 180, DEF: 70, SPD: 100, CritRate: 5, CritDmg: 50 },
     }))
 
     // ── Hero 9: 倖存者 ──
-    const h9Skill = makeSkill({ skillId: 'SKL_FOCUS_HEAL', name: '集中治療', type: 'active', target: 'single_ally', element: '', effects: [{ type: 'heal', scalingStat: 'ATK', multiplier: 3.5 }] })
+    const h9Skill = makeSkill({ skillId: 'SKL_FOCUS_HEAL', name: '集中治療', type: 'active', target: 'single_ally', effects: [{ type: 'heal', scalingStat: 'ATK', multiplier: 3.5 }] })
     const h9Passives = [
       pas('PAS_9_1', '求生知識', 'battle_start', 'all_allies', [{ type: 'buff', status: 'def_up', statusValue: 0.08, statusDuration: 3 }]),
       pas('PAS_9_2', '堅韌', 'always', 'self', [{ type: 'buff', status: 'def_up', statusValue: 0.1 }]),
@@ -427,7 +427,7 @@ describe('Full roster: 14 heroes all functional', () => {
       pas('PAS_9_4', '逆轉', 'hp_below_pct', 'self', [{ type: 'heal', scalingStat: 'HP', multiplier: 0.3, statusChance: 0.5 }]),
     ]
     heroes.push(makeHero({
-      heroId: 9, side: 'player', slot: 2, name: '倖存者', element: 'light',
+      heroId: 9, side: 'player', slot: 2, name: '倖存者',
       activeSkill: h9Skill, passives: h9Passives, activePassives: h9Passives,
       finalStats: { HP: 1200, ATK: 100, DEF: 80, SPD: 90, CritRate: 5, CritDmg: 50 },
     }))
@@ -438,9 +438,9 @@ describe('Full roster: 14 heroes all functional', () => {
   it('3-hero team should battle without crashes', async () => {
     const players = buildAllHeroes()
     const enemies = [
-      makeHero({ side: 'enemy', slot: 0, element: 'fire', finalStats: { HP: 1500, ATK: 100, DEF: 50, SPD: 70, CritRate: 5, CritDmg: 50 } }),
-      makeHero({ side: 'enemy', slot: 1, element: 'earth', finalStats: { HP: 1500, ATK: 100, DEF: 50, SPD: 65, CritRate: 5, CritDmg: 50 } }),
-      makeHero({ side: 'enemy', slot: 2, element: 'water', finalStats: { HP: 1500, ATK: 100, DEF: 50, SPD: 60, CritRate: 5, CritDmg: 50 } }),
+      makeHero({ side: 'enemy', slot: 0, finalStats: { HP: 1500, ATK: 100, DEF: 50, SPD: 70, CritRate: 5, CritDmg: 50 } }),
+      makeHero({ side: 'enemy', slot: 1, finalStats: { HP: 1500, ATK: 100, DEF: 50, SPD: 65, CritRate: 5, CritDmg: 50 } }),
+      makeHero({ side: 'enemy', slot: 2, finalStats: { HP: 1500, ATK: 100, DEF: 50, SPD: 60, CritRate: 5, CritDmg: 50 } }),
     ]
 
     const result = await runBattleCollect(players, enemies, { maxTurns: 50, seed: 789 })

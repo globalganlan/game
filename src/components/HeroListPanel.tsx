@@ -79,18 +79,6 @@ function resolveModelId(h: RawHeroData, idx = 0): string {
   return `zombie_${idx + 1}`
 }
 
-/* ────────────────────────────
-   Element / Type Config
-   ──────────────────────────── */
-
-const ELEMENT_ICON: Record<string, string> = {
-  闇: '🌑', 毒: '☠️', 火: '🔥', 冰: '❄️', 光: '✨', 雷: '⚡',
-}
-
-const ELEMENT_COLOR: Record<string, string> = {
-  闇: '#9775fa', 毒: '#51cf66', 火: '#ff6b6b', 冰: '#74c0fc', 光: '#ffd43b', 雷: '#ffa94d',
-}
-
 /** 被動技能解鎖所需星級（索引 0=被動1, 1=被動2, ...） */
 function getPassiveUnlockStars(passiveIndex: number): number {
   // 根據 STAR_PASSIVE_SLOTS: 1★→1, 2★→2, 4★→3, 6★→4
@@ -276,7 +264,6 @@ function HeroDetail({ hero, instance, onClose, skills, heroSkills }: HeroDetailP
   const rarity = toRarity(heroAny.Rarity)
   const rcfg = RARITY_CONFIG[rarity]
   const passiveSlots = getStarPassiveSlots(stars)
-  const element = String(heroAny.Element ?? '')
   const heroType = String(heroAny.Type ?? '?')
   const description = String(heroAny.Description ?? '')
   const modelId = resolveModelId(hero)
@@ -561,11 +548,6 @@ function HeroDetail({ hero, instance, onClose, skills, heroSkills }: HeroDetailP
             </div>
             <StarDisplay count={stars} />
             <div className="hd2-tags">
-              {element && (
-                <span className="hd2-tag" style={{ color: ELEMENT_COLOR[element] ?? '#aaa' }}>
-                  {ELEMENT_ICON[element] ?? '❓'} {element}
-                </span>
-              )}
               <span className="hd2-tag">{heroType}</span>
             </div>
             <div className="hd2-level-row">

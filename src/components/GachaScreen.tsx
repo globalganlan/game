@@ -153,11 +153,6 @@ function rarityToNum(r: string): number {
   return map[r] || 1
 }
 
-const ELEMENT_LABEL: Record<string, string> = {
-  fire: '🔥 火', water: '💧 水', wind: '🌀 風', earth: '🪨 地',
-  light: '✨ 光', dark: '🌑 暗', Fire: '🔥 火', Water: '💧 水',
-  Wind: '🌀 風', Earth: '🪨 地', Light: '✨ 光', Dark: '🌑 暗',
-}
 const TYPE_LABEL: Record<string, string> = {
   tank: '🛡️ 坦克', attacker: '⚔️ 攻擊', support: '💚 輔助', healer: '💗 治療',
   Tank: '🛡️ 坦克', Attacker: '⚔️ 攻擊', Support: '💚 輔助', Healer: '💗 治療',
@@ -188,7 +183,6 @@ function HeroInfoPopup({ hero, rarity, onClose }: { hero: RawHeroData; rarity: s
             <span className="gacha-info-name">{hero.Name || '???'}</span>
             <span className="gacha-info-rarity" style={{ color: cfg.color }}>{cfg.label}</span>
             <div className="gacha-info-tags">
-              {heroAny.Element ? <span className="gacha-info-tag">{ELEMENT_LABEL[String(heroAny.Element)] ?? String(heroAny.Element)}</span> : null}
               {heroAny.Type ? <span className="gacha-info-tag">{TYPE_LABEL[String(heroAny.Type)] ?? String(heroAny.Type)}</span> : null}
             </div>
             {heroAny.Description ? <span className="gacha-info-desc">{String(heroAny.Description)}</span> : null}

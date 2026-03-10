@@ -31,7 +31,7 @@ interface SkillTemplate {
   skillId: string         // 唯一 ID，如 'ACT_1', 'PAS_2_1'
   name: string            // 技能名稱
   type: 'active' | 'passive'
-  element: Element | ''   // 技能屬性（空 = 無屬性）
+  // element — 已移除（2026-03-11）
   target: TargetType | string  // 目標類型
   description: string     // 技能描述文字
   effects: SkillEffect[]  // 效果列表（一個技能可有多個效果）
@@ -247,7 +247,7 @@ activePassives = passives.slice(0, passiveSlots)
 | skillId | string | 唯一 ID |
 | name | string | 技能名稱 |
 | type | string | `active` 或 `passive` |
-| element | string | 屬性（中/英文皆可） |
+| ~~element~~ | ~~string~~ | ~~屬性~~（已移除 2026-03-11） |
 | target | string | TargetType |
 | description | string | 描述 |
 | effects | string | **JSON 字串**（`SkillEffect[]`） |

@@ -19,12 +19,10 @@ describe('damageFormula', () => {
     vi.restoreAllMocks()
 
     attacker = makeHero({
-      element: 'fire',
       finalStats: { HP: 1000, ATK: 200, DEF: 50, SPD: 100, CritRate: 0, CritDmg: 50 },
     })
 
     defender = makeHero({
-      element: 'wind', // fire → wind = 1.3 克制
       finalStats: { HP: 2000, ATK: 100, DEF: 100, SPD: 80, CritRate: 0, CritDmg: 50 },
       maxHP: 2000,
       currentHP: 2000,
@@ -34,7 +32,7 @@ describe('damageFormula', () => {
   /* ═══════ calculateDamage ═══════ */
 
   describe('calculateDamage', () => {
-    it('基本公式：ATK × DEF 減傷 × 元素 × 浮動', () => {
+    it('基本公式：ATK × DEF 減傷 × 浮動', () => {
       // 固定隨機數：不暴擊、不閃避、浮動 0.95 + 0.05 = 1.0
       vi.spyOn(Math, 'random').mockReturnValue(0.5)
       // random() calls: dodge check (0.5 > 0 dodge → no dodge), crit (0.5 > 0% → no crit), variance (0.5 → 0.95 + 0.05 = 1.0)
@@ -45,14 +43,12 @@ describe('damageFormula', () => {
 
       // 基礎: 200 * 1.0 = 200
       // DEF: 100/(100+100) = 0.5
-      // 元素: fire→wind = 1.3
       // 浮動: 0.95 + 0.5*0.1 = 1.0
       // 攻擊方 modifier: 1.0 (no buff)
       // 防守方 modifier: 1.0 (no buff)
-      // = 200 * 0.5 * 1.3 * 1.0 * 1.0 * 1.0 = 130
-      expect(result.damage).toBe(130)
-      expect(result.elementMult).toBe(1.3)
-      expect(result.damageType).toBe('weakness')
+      // = 200 * 0.5 * 1.0 * 1.0 * 1.0 = 100
+      expect(result.damage).toBe(100)
+      expect(result.damageType).toBe('normal')
     })
 
     it('閃避 → damage=0, isDodge=true', () => {
@@ -77,12 +73,11 @@ describe('damageFormula', () => {
 
       const result = calculateDamage(attacker, defender)
       expect(result.isCrit).toBe(true)
-      // damageType 優先序: crit → weakness（覆寫），所以 fire→wind 克制時顯示 weakness
-      expect(result.damageType).toBe('weakness')
+      expect(result.damageType).toBe('crit')
 
-      // base = 200; DEF = 100/(100+100)=0.5; crit = 1.5; element = 1.3; rand = 1.0
-      // = 200 * 0.5 * 1.5 * 1.3 * 1.0 = 195
-      expect(result.damage).toBe(195)
+      // base = 200; DEF = 100/(100+100)=0.5; crit = 1.5; rand = 1.0
+      // = 200 * 0.5 * 1.5 * 1.0 = 150
+      expect(result.damage).toBe(150)
     })
 
     it('護盾吸收傷害', () => {
@@ -91,8 +86,8 @@ describe('damageFormula', () => {
       vi.spyOn(Math, 'random').mockReturnValue(0.5)
 
       const result = calculateDamage(attacker, defender)
-      // 基礎傷害 130，護盾吸收 130，實際 0
-      expect(result.shieldAbsorbed).toBe(130)
+      // 基礎傷害 100，護盾吸收 100，實際 0
+      expect(result.shieldAbsorbed).toBe(100)
       expect(result.damage).toBe(0)
       expect(result.damageType).toBe('shield')
     })
@@ -102,17 +97,17 @@ describe('damageFormula', () => {
       vi.spyOn(Math, 'random').mockReturnValue(0.5)
 
       const result = calculateDamage(attacker, defender)
-      // 傷害 130, reflect 30% = 39
-      expect(result.reflectDamage).toBe(Math.floor(130 * 0.3))
+      // 傷害 100, reflect 30% = 30
+      expect(result.reflectDamage).toBe(Math.floor(100 * 0.3))
     })
 
     it('技能倍率影響傷害', () => {
       vi.spyOn(Math, 'random').mockReturnValue(0.5)
       const skillEffect = makeDamageEffect({ multiplier: 2.0 })
       const result = calculateDamage(attacker, defender, skillEffect)
-      // base = 200 * 2.0 = 400; DEF = 0.5; elem = 1.3; rand = 1.0
-      // = 400 * 0.5 * 1.3 * 1.0 = 260
-      expect(result.damage).toBe(260)
+      // base = 200 * 2.0 = 400; DEF = 0.5; rand = 1.0
+      // = 400 * 0.5 * 1.0 = 200
+      expect(result.damage).toBe(200)
     })
 
     it('攻擊方 buff 增傷', () => {
@@ -122,10 +117,10 @@ describe('damageFormula', () => {
       const result = calculateDamage(attacker, defender)
       // Bug #002 修復後：ATK buff 只在 getBuffedStats 套用一次
       // ATK with buff: 200 * 1.3 = 260
-      // base = 260; DEF = 100/(100+100)=0.5; elem = 1.3; rand = 1.0
+      // base = 260; DEF = 100/(100+100)=0.5; rand = 1.0
       // getAttackerDamageModifier 不再重複讀 atk_up → 1.0
-      // = 260 * 0.5 * 1.3 * 1.0 = 169
-      expect(result.damage).toBe(169)
+      // = 260 * 0.5 * 1.0 = 130
+      expect(result.damage).toBe(130)
     })
 
     it('防守方 fear → 受傷增加 1.2x', () => {
@@ -134,9 +129,9 @@ describe('damageFormula', () => {
 
       const result = calculateDamage(attacker, defender)
       // getTargetDamageModifier: 1.0 * 1.2 (fear) = 1.2
-      // base = 200; DEF = 0.5; elem = 1.3; rand = 1.0; target_mod = 1.2
-      // = 200 * 0.5 * 1.3 * 1.0 * 1.0 * 1.2 = 156
-      expect(result.damage).toBe(156)
+      // base = 200; DEF = 0.5; rand = 1.0; target_mod = 1.2
+      // = 200 * 0.5 * 1.0 * 1.0 * 1.2 = 120
+      expect(result.damage).toBe(120)
     })
 
     it('最低傷害 1', () => {
@@ -244,20 +239,19 @@ describe('damageFormula', () => {
 
       // 無 buff 基線
       const baseResult = calculateDamage(
-        makeHero({ element: 'fire', finalStats: { HP: 1000, ATK: 200, DEF: 50, SPD: 100, CritRate: 0, CritDmg: 50 } }),
-        makeHero({ element: '', finalStats: { HP: 1000, ATK: 100, DEF: 0, SPD: 100, CritRate: 0, CritDmg: 50 } }),
+        makeHero({ finalStats: { HP: 1000, ATK: 200, DEF: 50, SPD: 100, CritRate: 0, CritDmg: 50 } }),
+        makeHero({ finalStats: { HP: 1000, ATK: 100, DEF: 0, SPD: 100, CritRate: 0, CritDmg: 50 } }),
       )
 
       // 有 30% ATK buff
       const buffedAttacker = makeHero({
-        element: 'fire',
         finalStats: { HP: 1000, ATK: 200, DEF: 50, SPD: 100, CritRate: 0, CritDmg: 50 },
       })
       applyStatus(buffedAttacker, { type: 'atk_up', value: 0.3, duration: 2, maxStacks: 3, sourceHeroId: 'src' })
 
       const buffResult = calculateDamage(
         buffedAttacker,
-        makeHero({ element: '', finalStats: { HP: 1000, ATK: 100, DEF: 0, SPD: 100, CritRate: 0, CritDmg: 50 } }),
+        makeHero({ finalStats: { HP: 1000, ATK: 100, DEF: 0, SPD: 100, CritRate: 0, CritDmg: 50 } }),
       )
 
       const ratio = buffResult.damage / baseResult.damage

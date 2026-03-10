@@ -16,7 +16,7 @@ function makeTestPlayers(): BattleHero[] {
   return [
     makeHero({
       uid: 'p1', heroId: 1, modelId: 'zombie_1', name: 'P1',
-      side: 'player', slot: 0, element: 'fire',
+      side: 'player', slot: 0,
     }),
   ]
 }
@@ -25,7 +25,7 @@ function makeTestEnemies(): BattleHero[] {
   return [
     makeHero({
       uid: 'e1', heroId: 2, modelId: 'zombie_2', name: 'E1',
-      side: 'enemy', slot: 0, element: 'water',
+      side: 'enemy', slot: 0,
     }),
   ]
 }
@@ -112,7 +112,6 @@ describe('battleService', () => {
       expect(serializedPlayer).toHaveProperty('name')
       expect(serializedPlayer).toHaveProperty('side')
       expect(serializedPlayer).toHaveProperty('slot')
-      expect(serializedPlayer).toHaveProperty('element')
       expect(serializedPlayer).toHaveProperty('baseStats')
       expect(serializedPlayer).toHaveProperty('finalStats')
       expect(serializedPlayer).toHaveProperty('currentHP')

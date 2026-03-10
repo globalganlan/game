@@ -9,7 +9,7 @@
  */
 
 import { useState, useEffect, useRef, useMemo } from 'react'
-import type { StatusEffect, StatusType, Element } from '../domain/types'
+import type { StatusEffect, StatusType } from '../domain/types'
 import { statusZh } from '../constants/statNames'
 import { getBossConfig, getBossRewardByBossAndRank } from '../domain/stageSystem'
 import { CurrencyIcon } from './CurrencyIcon'
@@ -30,14 +30,6 @@ export interface SkillToast {
   id: number
   heroName: string
   skillName: string
-  timestamp: number
-  attackerUid: string
-}
-
-export interface ElementHint {
-  id: number
-  text: string
-  color: string
   timestamp: number
   attackerUid: string
 }
@@ -89,20 +81,6 @@ const STATUS_ICONS: Partial<Record<StatusType, { icon: string; color: string; is
 }
 
 /* ════════════════════════════════════
-   屬性相剋
-   ════════════════════════════════════ */
-
-const ELEMENT_COLORS: Record<Element, string> = {
-  fire:    '#e63946',
-  water:   '#4dabf7',
-  wind:    '#2a9d8f',
-  thunder: '#ffd43b',
-  earth:   '#a0522d',
-  light:   '#fff',
-  dark:    '#6c5ce7',
-}
-
-/* ════════════════════════════════════
    Props
    ════════════════════════════════════ */
 
@@ -121,7 +99,6 @@ interface BattleHUDProps {
     name: string
     currentHP: number
     maxHP: number
-    element?: Element | ''
   }>
   /** 敵方英雄資訊 */
   enemyHeroes: Array<{
@@ -129,7 +106,6 @@ interface BattleHUDProps {
     name: string
     currentHP: number
     maxHP: number
-    element?: Element | ''
   }>
   /** 各英雄身上的 Buff/Debuff */
   buffMap: BattleBuffMap
@@ -137,8 +113,6 @@ interface BattleHUDProps {
   energyMap: BattleEnergyMap
   /** 技能發動通知佇列 */
   skillToasts: SkillToast[]
-  /** 屬性相剋提示 */
-  elementHints: ElementHint[]
 }
 
 /* ════════════════════════════════════
@@ -203,12 +177,6 @@ function HeroPanel({
       {/* Portrait */}
       <div className="bhud-portrait">
         <span className="bhud-portrait-char">{hero.name.charAt(0)}</span>
-        {hero.element && (
-          <span
-            className="bhud-element-dot"
-            style={{ background: ELEMENT_COLORS[hero.element] || '#888' }}
-          />
-        )}
       </div>
 
       {/* Info */}
@@ -266,38 +234,6 @@ function SkillToastBar({ toasts }: { toasts: SkillToast[] }) {
 }
 
 /* ════════════════════════════════════
-   ElementHintBar
-   ════════════════════════════════════ */
-
-function ElementHintBar({ hints }: { hints: ElementHint[] }) {
-  const [visible, setVisible] = useState<ElementHint[]>([])
-
-  useEffect(() => {
-    if (hints.length === 0) return
-    const latest = hints[hints.length - 1]
-    setVisible((prev) => [...prev.slice(-1), latest])
-
-    const t = setTimeout(() => {
-      setVisible((prev) => prev.filter((h) => h.id !== latest.id))
-    }, 1500)
-
-    return () => clearTimeout(t)
-  }, [hints])
-
-  if (visible.length === 0) return null
-
-  return (
-    <div className="bhud-element-hints">
-      {visible.map((h) => (
-        <span key={h.id} className="bhud-element-hint" style={{ color: h.color }}>
-          {h.text}
-        </span>
-      ))}
-    </div>
-  )
-}
-
-/* ════════════════════════════════════
    Compact Energy Indicator
    ════════════════════════════════════ */
 
@@ -306,7 +242,7 @@ function CompactEnergyItem({
   energy,
   side,
 }: {
-  hero: { uid: string; name: string; element?: Element | '' }
+  hero: { uid: string; name: string }
   energy: { current: number; max: number } | undefined
   side: 'player' | 'enemy'
 }) {
@@ -430,7 +366,6 @@ export function BattleHUD({
   buffMap: _buffMap,
   energyMap: _energyMap,
   skillToasts: _skillToasts,
-  elementHints: _elementHints,
 }: BattleHUDProps) {
   if (!visible) return null
 

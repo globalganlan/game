@@ -3760,123 +3760,6 @@
   pointer-events: none;
 }
 
-/* ── Element Codex ── */
-.codex-element {
-  padding: 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-.codex-elem-desc {
-  font-size: 0.82rem;
-  color: #bbb;
-  line-height: 1.6;
-}
-.codex-elem-desc p { margin: 0 0 4px; }
-.codex-elem-ring {
-  background: rgba(255,255,255,0.04);
-  border-radius: 10px;
-  padding: 12px;
-}
-.codex-elem-ring-title {
-  font-size: 0.85rem;
-  font-weight: 700;
-  color: #e9c46a;
-  margin-bottom: 8px;
-}
-.codex-elem-cycle {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 2px;
-  font-size: 0.9rem;
-  font-weight: 600;
-  margin-bottom: 8px;
-}
-.codex-elem-arrow { color: #888; font-weight: 400; }
-.codex-elem-ld {
-  font-size: 0.88rem;
-  font-weight: 600;
-}
-.codex-elem-table-wrap {
-  background: rgba(255,255,255,0.04);
-  border-radius: 10px;
-  padding: 12px;
-}
-.codex-elem-table-scroll {
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
-}
-.codex-elem-table {
-  border-collapse: collapse;
-  font-size: 0.75rem;
-  width: 100%;
-  min-width: 360px;
-  text-align: center;
-}
-.codex-elem-table th,
-.codex-elem-table td {
-  padding: 5px 4px;
-  border: 1px solid rgba(255,255,255,0.1);
-  white-space: nowrap;
-}
-.codex-elem-th-corner {
-  font-size: 0.68rem;
-  color: #999;
-  background: rgba(0,0,0,0.3);
-}
-.codex-elem-table thead th {
-  background: rgba(0,0,0,0.3);
-  font-weight: 700;
-}
-.codex-elem-row-label {
-  font-weight: 700;
-  text-align: left;
-  background: rgba(0,0,0,0.2);
-  white-space: nowrap;
-}
-.codex-elem-adv {
-  color: #e63946;
-  font-weight: 700;
-  background: rgba(230, 57, 70, 0.12);
-}
-.codex-elem-dis {
-  color: #4dabf7;
-  font-weight: 700;
-  background: rgba(77, 171, 247, 0.12);
-}
-.codex-elem-same {
-  color: #888;
-  background: rgba(255,255,255,0.03);
-}
-.codex-elem-quick {
-  background: rgba(255,255,255,0.04);
-  border-radius: 10px;
-  padding: 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-.codex-elem-quick-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 0.82rem;
-}
-.codex-elem-quick-icon {
-  min-width: 56px;
-  font-weight: 700;
-}
-.codex-elem-quick-info {
-  display: flex;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-.codex-elem-quick-adv { color: #e63946; }
-.codex-elem-quick-adv span { margin-right: 2px; }
-.codex-elem-quick-dis { color: #4dabf7; }
-.codex-elem-quick-dis span { margin-right: 2px; }
-
 /* ── Codex RWD ── */
 @media (max-width: 480px) {
   .codex-equip-grid {
@@ -5668,19 +5551,6 @@
   letter-spacing: 1px;
 }
 
-/* Element Hints */
-.bhud-element-hints {
-  align-self: center;
-  margin-top: 8px;
-}
-
-.bhud-element-hint {
-  font-size: 0.8rem;
-  font-weight: bold;
-  text-shadow: 0 0 10px currentColor;
-  animation: skillToastIn 0.2s;
-}
-
 /* Hero Panels Bar — REMOVED (replaced by compact energy strips) */
 
 /* Compact Energy Strips */
@@ -5772,16 +5642,6 @@
 .bhud-portrait-char {
   font-size: 0.9rem;
   color: #e9c46a;
-}
-
-.bhud-element-dot {
-  position: absolute;
-  bottom: -2px;
-  right: -2px;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  border: 1px solid rgba(0,0,0,0.5);
 }
 
 .bhud-info {

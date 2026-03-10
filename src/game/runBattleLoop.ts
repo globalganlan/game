@@ -19,11 +19,11 @@ import type {
 
 /* ── Domain Engine ── */
 import type { BattleHero, BattleAction, SkillTemplate, DamageResult } from '../domain'
-import type { Element as DomainElement, HeroSkillConfig } from '../domain/types'
+import type { HeroSkillConfig } from '../domain/types'
 import type { RawHeroInput, HeroInstanceData } from '../domain'
 import { BattleFlowValidator } from '../domain/battleFlowValidator'
 import { createBattleHero } from '../domain'
-import { getHeroSkillSet, toElement } from '../services'
+import { getHeroSkillSet } from '../services'
 import { completeBattle, type CompleteBattleResult } from '../services/progressionService'
 import {
   rollDrops, mergeDrops,
@@ -44,7 +44,7 @@ import {
 } from './constants'
 
 /* ── Component types ── */
-import type { BattleBuffMap, BattleEnergyMap, SkillToast, ElementHint, PassiveHint, BuffApplyHint } from '../components/BattleHUD'
+import type { BattleBuffMap, BattleEnergyMap, SkillToast, PassiveHint, BuffApplyHint } from '../components/BattleHUD'
 import type { VictoryRewards } from '../components/VictoryPanel'
 import type { BattleStatEntry } from '../components/BattleStatsPanel'
 import type { AcquireItem } from '../hooks/useAcquireToast'
@@ -73,7 +73,6 @@ export interface BattleLoopContext {
 
   /* ── BattleHUD id refs ── */
   skillToastIdRef: MutableRefObject<number>
-  elementHintIdRef: MutableRefObject<number>
   passiveHintIdRef: MutableRefObject<number>
   buffApplyHintIdRef: MutableRefObject<number>
 
@@ -93,7 +92,6 @@ export interface BattleLoopContext {
   setBattleBuffs: Dispatch<SetStateAction<BattleBuffMap>>
   setBattleEnergy: Dispatch<SetStateAction<BattleEnergyMap>>
   setSkillToasts: Dispatch<SetStateAction<SkillToast[]>>
-  setElementHints: Dispatch<SetStateAction<ElementHint[]>>
   setPassiveHints: Dispatch<SetStateAction<PassiveHint[]>>
   setBuffApplyHints: Dispatch<SetStateAction<BuffApplyHint[]>>
   setBossDamageProgress: Dispatch<SetStateAction<number>>
@@ -135,12 +133,12 @@ export async function executeBattleLoop(ctx: BattleLoopContext, replayActions?: 
     flowValidatorRef, skillsRef, heroSkillsRef, heroInputsRef,
     battleHeroesRef, actorStatesRef, moveTargetsRef,
     arenaTargetRankRef,
-    skillToastIdRef, elementHintIdRef, passiveHintIdRef, buffApplyHintIdRef,
+    skillToastIdRef, passiveHintIdRef, buffApplyHintIdRef,
     setGameState, setTurn, setShowBattleStats, setBattleCalculating,
     setBattleResult, setVictoryRewards, setBattleStats,
     updatePlayerSlots, updateEnemySlots, setActorState,
     setBattleBuffs, setBattleEnergy, setSkillToasts,
-    setElementHints, setPassiveHints, setBuffApplyHints,
+    setPassiveHints, setBuffApplyHints,
     setBossDamageProgress,
     addDamage, waitForAction, waitForMove, clearAllPromises,
     actionResolveRefs, moveResolveRefs,
@@ -199,7 +197,6 @@ export async function executeBattleLoop(ctx: BattleLoopContext, replayActions?: 
       heroId,
       modelId: s._modelId,
       name: String(s.Name ?? ''),
-      element: toElement(String((s as Record<string, unknown>).Element ?? '')),
       HP: Number(s.HP ?? 100),
       ATK: Number(s.ATK ?? 20),
       DEF: Number((s as Record<string, unknown>).DEF ?? 10),
@@ -269,7 +266,6 @@ export async function executeBattleLoop(ctx: BattleLoopContext, replayActions?: 
     )
   )
   setSkillToasts([])
-  setElementHints([])
   setPassiveHints([])
   setBuffApplyHints([])
 
@@ -369,7 +365,7 @@ export async function executeBattleLoop(ctx: BattleLoopContext, replayActions?: 
           case 'TURN_END': return `── 回合 ${a.turn} 結束 ──`
           case 'NORMAL_ATTACK': {
             const r = a.result
-            const dmgStr = r.isDodge ? 'MISS' : `${r.damage}${r.isCrit ? ' 暴擊' : ''}${r.elementMult && r.elementMult !== 1 ? ` ×${r.elementMult}屬性` : ''}`
+            const dmgStr = r.isDodge ? 'MISS' : `${r.damage}${r.isCrit ? ' 暴擊' : ''}`
             return `${name(a.attackerUid)} → ${name(a.targetUid)}  普攻 ${dmgStr}${a.killed ? ' 💀擊殺' : ''}${r.reflectDamage > 0 ? ` (反彈${r.reflectDamage})` : ''}`
           }
           case 'SKILL_CAST': {
@@ -423,20 +419,10 @@ export async function executeBattleLoop(ctx: BattleLoopContext, replayActions?: 
         // ★ 目標已死 → 只顯傷害數字
         if (actorStatesRef.current[action.targetUid] === 'DEAD') {
           if (!action.result.isDodge) {
-            const deadDmgType: import('../types').DamageDisplayType = action.result.isCrit ? 'crit'
-              : (action.result.elementMult && action.result.elementMult > 1.0) ? 'weakness' : 'normal'
+            const deadDmgType: import('../types').DamageDisplayType = action.result.isCrit ? 'crit' : 'normal'
             addDamage(action.targetUid, action.result.damage, deadDmgType)
           }
           break
-        }
-
-        // Phase 7: 屬性相剋指示
-        if (action.result.elementMult && action.result.elementMult !== 1.0) {
-          const ehId = ++elementHintIdRef.current
-          const txt = action.result.elementMult > 1.0 ? '屬性剋制！' : '屬性抵抗'
-          const clr = action.result.elementMult > 1.0 ? '#e63946' : '#4dabf7'
-          setElementHints((prev) => [...prev, { id: ehId, text: txt, color: clr, timestamp: Date.now(), attackerUid: action.attackerUid }])
-          setTimeout(() => setElementHints((prev) => prev.filter((h) => h.id !== ehId)), 2000)
         }
 
         // 1) 前進
@@ -467,8 +453,7 @@ export async function executeBattleLoop(ctx: BattleLoopContext, replayActions?: 
         if (action.result.isCrit && !skipBattleRef.current) audioManager.playSfx('hit_critical')
 
         // 3+4) 受傷/死亡 與 攻擊者後退 同時並行
-        const hitDmgType: import('../types').DamageDisplayType = action.result.isCrit ? 'crit'
-          : (action.result.elementMult && action.result.elementMult > 1.0) ? 'weakness' : 'normal'
+        const hitDmgType: import('../types').DamageDisplayType = action.result.isCrit ? 'crit' : 'normal'
         const hitPromise = playHitOrDeath(action.targetUid, action.result.damage, action.killed, action.result.isDodge, hitDmgType)
 
         const retreatPromise = (async () => {
@@ -525,19 +510,6 @@ export async function executeBattleLoop(ctx: BattleLoopContext, replayActions?: 
           timestamp: Date.now(),
           attackerUid: action.attackerUid,
         }])
-
-        // Phase 7: 屬性相剋指示（技能版）
-        {
-          const firstDmg = action.targets.find(t => 'damage' in t.result && !(t.result as DamageResult).isDodge)
-          const em = firstDmg ? (firstDmg.result as DamageResult).elementMult : undefined
-          if (em && em !== 1.0) {
-            const ehId = ++elementHintIdRef.current
-            const txt = em > 1.0 ? '屬性剋制！' : '屬性抵抗'
-            const clr = em > 1.0 ? '#e63946' : '#4dabf7'
-            setElementHints((prev) => [...prev, { id: ehId, text: txt, color: clr, timestamp: Date.now(), attackerUid: action.attackerUid }])
-            setTimeout(() => setElementHints((prev) => prev.filter((h) => h.id !== ehId)), 2000)
-          }
-        }
 
         // 判斷是否有傷害目標
         const hasDamageTargets = action.targets.some(t => 'damage' in t.result)
@@ -604,8 +576,7 @@ export async function executeBattleLoop(ctx: BattleLoopContext, replayActions?: 
             // 技能多目標：從 action.targets 取該 uid 的暴擊/屬性資訊
             const tgtResult = action.targets.find((t: { uid: string; result: DamageResult | { heal: number } }) => t.uid === uid && 'damage' in t.result)
             const dr = tgtResult?.result as DamageResult | undefined
-            const skillDmgType: import('../types').DamageDisplayType = dr?.isCrit ? 'crit'
-              : (dr?.elementMult && dr.elementMult > 1.0) ? 'weakness' : 'normal'
+            const skillDmgType: import('../types').DamageDisplayType = dr?.isCrit ? 'crit' : 'normal'
             const p = playHitOrDeath(uid, m.damage, m.killed, m.isDodge, skillDmgType)
             if (m.killed) deathPromises.push(p)
             else hurtPromises.push(p)

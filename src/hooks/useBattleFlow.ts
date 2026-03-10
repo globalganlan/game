@@ -17,7 +17,7 @@ import type { VictoryRewards } from '../components/VictoryPanel'
 import type { AcquireItem } from '../hooks/useAcquireToast'
 import type { ActionResolveEntry, DamagePopupData } from '../types'
 import type {
-  BattleBuffMap, BattleEnergyMap, SkillToast, ElementHint,
+  BattleBuffMap, BattleEnergyMap, SkillToast,
   PassiveHint, BuffApplyHint,
 } from '../components/BattleHUD'
 import { BattleFlowValidator } from '../domain/battleFlowValidator'
@@ -48,7 +48,6 @@ export interface BattleFlowDeps {
   arenaTargetRankRef: React.MutableRefObject<number>
   preBattleMenuScreenRef: React.MutableRefObject<MenuScreen>
   skillToastIdRef: React.MutableRefObject<number>
-  elementHintIdRef: React.MutableRefObject<number>
   passiveHintIdRef: React.MutableRefObject<number>
   buffApplyHintIdRef: React.MutableRefObject<number>
   actionResolveRefs: React.MutableRefObject<Record<string, ActionResolveEntry>>
@@ -73,7 +72,6 @@ export interface BattleFlowDeps {
   setBattleBuffs: React.Dispatch<React.SetStateAction<BattleBuffMap>>
   setBattleEnergy: React.Dispatch<React.SetStateAction<BattleEnergyMap>>
   setSkillToasts: React.Dispatch<React.SetStateAction<SkillToast[]>>
-  setElementHints: React.Dispatch<React.SetStateAction<ElementHint[]>>
   setPassiveHints: React.Dispatch<React.SetStateAction<PassiveHint[]>>
   setBuffApplyHints: React.Dispatch<React.SetStateAction<BuffApplyHint[]>>
   setBossDamageProgress: React.Dispatch<React.SetStateAction<number>>
@@ -164,7 +162,6 @@ export function useBattleFlow(deps: BattleFlowDeps) {
     moveTargetsRef: deps.moveTargetsRef,
     arenaTargetRankRef: deps.arenaTargetRankRef,
     skillToastIdRef: deps.skillToastIdRef,
-    elementHintIdRef: deps.elementHintIdRef,
     passiveHintIdRef: deps.passiveHintIdRef,
     buffApplyHintIdRef: deps.buffApplyHintIdRef,
     setGameState: deps.setGameState,
@@ -180,7 +177,6 @@ export function useBattleFlow(deps: BattleFlowDeps) {
     setBattleBuffs: deps.setBattleBuffs,
     setBattleEnergy: deps.setBattleEnergy,
     setSkillToasts: deps.setSkillToasts,
-    setElementHints: deps.setElementHints,
     setPassiveHints: deps.setPassiveHints,
     setBuffApplyHints: deps.setBuffApplyHints,
     setBossDamageProgress: deps.setBossDamageProgress,
@@ -208,7 +204,7 @@ export function useBattleFlow(deps: BattleFlowDeps) {
     deps.doSaveFormation, deps.doUpdateProgress, deps.doUpdateStory,
     deps.acquireShow, deps.showToast,
     deps.setBattleBuffs, deps.setBattleEnergy, deps.setSkillToasts,
-    deps.setElementHints, deps.setPassiveHints, deps.setBuffApplyHints,
+    deps.setPassiveHints, deps.setBuffApplyHints,
     deps.heroInstances, deps.saveData,
   ])
 

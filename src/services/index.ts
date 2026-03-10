@@ -11,11 +11,9 @@ export {
   loadHeroes,
   loadSkillTemplates,
   loadHeroSkills,
-  loadElements,
   loadAllGameData,
   getHeroSkillSet,
   clearGameDataCache,
-  toElement,
 } from './dataService'
 
 // 認證服務

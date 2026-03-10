@@ -458,3 +458,33 @@
   7. shadowMap 512 → 恢復 2048
 - **保留項目**：pwaService.ts 的 iOS 平台偵測（PWA 安裝邏輯）、main.tsx 的 iOS SW 禁用（ADR-009）
 - **commit**：`0bff921`
+
+---
+
+### ADR-022: 屬性系統完整移除（Element System Removal）
+
+- **狀態**：✅ 已定案
+- **日期**：2026-03-11
+- **背景**：遊戲原有 7 屬性剋制系統（火/水/風/雷/地/光/闇），攻擊時依屬性剋制矩陣乘算傷害倍率（1.3 剋制 / 0.9 同屬 / 0.7 抵抗）。經過數月遊玩與測試，發現屬性系統對策略深度的貢獻有限，但增加了大量複雜度。
+- **決定**：完整移除屬性系統，包含前端 Domain 層、型別定義、傷害公式步驟、UI 元件、後端戰鬥引擎、所有測試中的屬性引用。DB 欄位保留但不再讀取/使用。
+- **移除範圍**：
+  1. **Domain 層**：刪除 `src/domain/elementSystem.ts`、`src/domain/__tests__/elementSystem.test.ts`
+  2. **型別**：移除 `Element` type、`ElementEntry` interface、`BattleHero.element`、`SkillTemplate.element`、`DamageResult.elementMult`
+  3. **傷害公式**：移除步驟 4（屬性倍率）、移除 `DamageDisplayType` 中的 `'weakness'`
+  4. **戰鬥 HUD**：移除 `ElementHint3D` 元件、`elementHints` state
+  5. **圖鑑**：移除 CodexPanel 的 Element 分頁
+  6. **英雄列表/抽卡**：移除屬性顯示
+  7. **Workers 後端**：移除 workers/battleEngine 的屬性邏輯
+  8. **測試**：所有測試檔案的屬性引用已清除
+- **DB 處理**：`heroes.Element` 欄位、`element_matrix` 表保留但不再讀取（避免破壞性 schema 變更）
+- **理由**：
+  1. 屬性系統對策略深度貢獻有限 — 玩家很少根據屬性選擇陣容
+  2. 增加新手理解門檻 — 7 屬性 × 49 倍率矩陣過於複雜
+  3. 維護成本高 — 新增角色需額外設定屬性、平衡屬性分佈
+  4. 移除後傷害計算更透明 — 玩家更容易理解傷害構成
+- **影響 Spec**：
+  - `element-system.md` → 🔴 已廢棄
+  - `damage-formula.md` v1.1 → v1.2
+  - `hero-schema.md` v2.4 → v2.5
+  - `core-combat.md`、`skill-system.md`、`tech-architecture.md`、`ui-flow.md`、`gacha.md` — 移除屬性引用
+  - `specs/README.md` — 標記為已廢棄

@@ -43,7 +43,6 @@ import type {
 } from './types'
 
 /* ── Domain Engine & Data Service ── */
-import type { Element as DomainElement } from './domain/types'
 import { CurrencyIcon } from './components/CurrencyIcon'
 /* ── Phase 10: Combat Power + Acquire Toast + Arena ── */
 import { CombatPowerComparison } from './components/CombatPowerHUD'
@@ -202,10 +201,10 @@ export default function App() {
   const battleHUD = useBattleHUD()
   const {
     battleBuffs, setBattleBuffs, battleEnergy, setBattleEnergy,
-    skillToasts, setSkillToasts, elementHints, setElementHints,
+    skillToasts, setSkillToasts,
     passiveHints, setPassiveHints, buffApplyHints, setBuffApplyHints,
     bossDamageProgress, setBossDamageProgress,
-    skillToastIdRef, elementHintIdRef, passiveHintIdRef, buffApplyHintIdRef,
+    skillToastIdRef, passiveHintIdRef, buffApplyHintIdRef,
   } = battleHUD
 
   /* ── 動畫 Promise 系統（hook） ── */
@@ -443,14 +442,14 @@ export default function App() {
     flowValidatorRef, skillsRef, heroSkillsRef, heroInputsRef,
     battleHeroesRef, actorStatesRef, moveTargetsRef,
     arenaTargetRankRef, preBattleMenuScreenRef,
-    skillToastIdRef, elementHintIdRef, passiveHintIdRef, buffApplyHintIdRef,
+    skillToastIdRef, passiveHintIdRef, buffApplyHintIdRef,
     actionResolveRefs, moveResolveRefs,
     setGameState, setStageId, setTurn, setShowBattleStats, setBattleCalculating,
     setBattleResult, setVictoryRewards, setBattleStats, setMenuScreen,
     updatePlayerSlots, updateEnemySlots, setActorState, setActorStates,
     setDamagePopups, setHitFlashSignals,
     setBattleBuffs, setBattleEnergy, setSkillToasts,
-    setElementHints, setPassiveHints, setBuffApplyHints,
+    setPassiveHints, setBuffApplyHints,
     setBossDamageProgress,
     setCurtainVisible, setCurtainFading, setCurtainText, curtainClosePromiseRef, closeCurtain,
     addDamage, waitForAction, waitForMove, clearAllPromises,
@@ -635,7 +634,6 @@ export default function App() {
                     canAdjustFormation={canAdjustFormation}
                     energyRatio={gameState === 'BATTLE' && battleEnergy[p._uid] ? battleEnergy[p._uid].current / battleEnergy[p._uid].max : undefined}
                     skillToasts={skillToasts.filter((t) => t.attackerUid === p._uid)}
-                    elementHints={elementHints.filter((h) => h.attackerUid === p._uid)}
                     passiveHints={passiveHints.filter((ph) => ph.heroUid === p._uid)}
                     battleBuffs={battleBuffs[p._uid] || []}
                     buffApplyHints={buffApplyHints.filter((bh) => bh.heroUid === p._uid)}
@@ -672,7 +670,6 @@ export default function App() {
                     moveTargetsRef={moveTargetsRef}
                     energyRatio={gameState === 'BATTLE' && battleEnergy[e._uid] ? battleEnergy[e._uid].current / battleEnergy[e._uid].max : undefined}
                     skillToasts={skillToasts.filter((t) => t.attackerUid === e._uid)}
-                    elementHints={elementHints.filter((h) => h.attackerUid === e._uid)}
                     passiveHints={passiveHints.filter((ph) => ph.heroUid === e._uid)}
                     battleBuffs={battleBuffs[e._uid] || []}
                     buffApplyHints={buffApplyHints.filter((bh) => bh.heroUid === e._uid)}
@@ -772,7 +769,6 @@ export default function App() {
                   name: String(s.Name ?? ''),
                   currentHP: s.currentHP,
                   maxHP: battleHeroesRef.current?.get(s._uid)?.maxHP ?? Number(s.HP ?? s.currentHP ?? 1),
-                  element: ((s.element as string) || '') as DomainElement | '',
                 }))}
               enemyHeroes={enemySlots
                 .filter((s): s is SlotHero => s !== null)
@@ -781,12 +777,10 @@ export default function App() {
                   name: String(s.Name ?? ''),
                   currentHP: s.currentHP,
                   maxHP: battleHeroesRef.current?.get(s._uid)?.maxHP ?? Number(s.HP ?? s.currentHP ?? 1),
-                  element: ((s.element as string) || '') as DomainElement | '',
                 }))}
               buffMap={battleBuffs}
               energyMap={battleEnergy}
               skillToasts={skillToasts}
-              elementHints={elementHints}
             />
           )}
 

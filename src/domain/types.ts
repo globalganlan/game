@@ -6,12 +6,6 @@
  */
 
 /* ════════════════════════════════════
-   屬性系統
-   ════════════════════════════════════ */
-
-export type Element = 'fire' | 'water' | 'wind' | 'thunder' | 'earth' | 'light' | 'dark'
-
-/* ════════════════════════════════════
    角色基礎數值
    ════════════════════════════════════ */
 
@@ -112,7 +106,6 @@ export interface SkillTemplate {
   skillId: string
   name: string
   type: 'active' | 'passive'
-  element: Element | ''
   target: TargetType | string
   description: string
   effects: SkillEffect[]
@@ -131,16 +124,6 @@ export interface HeroSkillConfig {
 }
 
 /* ════════════════════════════════════
-   屬性剋制
-   ════════════════════════════════════ */
-
-export interface ElementEntry {
-  attacker: Element
-  defender: Element
-  multiplier: number
-}
-
-/* ════════════════════════════════════
    戰鬥角色
    ════════════════════════════════════ */
 
@@ -152,7 +135,6 @@ export interface BattleHero {
   name: string
   side: 'player' | 'enemy'
   slot: number
-  element: Element | ''
 
   // 數值
   baseStats: FinalStats        // 基礎數值（不含 Buff）
@@ -208,8 +190,7 @@ export interface DamageResult {
   damage: number
   isCrit: boolean
   isDodge: boolean
-  elementMult: number
-  damageType: 'normal' | 'crit' | 'dot' | 'miss' | 'shield' | 'weakness'
+  damageType: 'normal' | 'crit' | 'dot' | 'miss' | 'shield'
   shieldAbsorbed: number
   reflectDamage: number
 }

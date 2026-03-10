@@ -17,8 +17,8 @@ describe('damageFormula - 進階測試', () => {
   describe('技能 Scaling', () => {
     it('ATK scaling + multiplier', () => {
       vi.spyOn(Math, 'random').mockReturnValue(0.5) // no dodge, no crit, 中間浮動
-      const attacker = makeHero({ element: 'fire', finalStats: { HP: 1000, ATK: 200, DEF: 50, SPD: 100, CritRate: 0, CritDmg: 50 } })
-      const target = makeHero({ element: 'fire', finalStats: { HP: 1000, ATK: 100, DEF: 100, SPD: 100, CritRate: 0, CritDmg: 50 } })
+      const attacker = makeHero({ finalStats: { HP: 1000, ATK: 200, DEF: 50, SPD: 100, CritRate: 0, CritDmg: 50 } })
+      const target = makeHero({ finalStats: { HP: 1000, ATK: 100, DEF: 100, SPD: 100, CritRate: 0, CritDmg: 50 } })
 
       const result = calculateDamage(attacker, target, makeDamageEffect({ scalingStat: 'ATK', multiplier: 2.0 }))
 
@@ -30,11 +30,9 @@ describe('damageFormula - 進階測試', () => {
     it('HP scaling 使用 HP 基礎值', () => {
       vi.spyOn(Math, 'random').mockReturnValue(0.5)
       const attacker = makeHero({
-        element: 'fire',
         finalStats: { HP: 5000, ATK: 100, DEF: 50, SPD: 100, CritRate: 0, CritDmg: 50 },
       })
       const target = makeHero({
-        element: 'fire',
         finalStats: { HP: 1000, ATK: 100, DEF: 0, SPD: 100, CritRate: 0, CritDmg: 50 },
       })
 
@@ -47,11 +45,9 @@ describe('damageFormula - 進階測試', () => {
     it('flatValue 加算在基礎傷害上', () => {
       vi.spyOn(Math, 'random').mockReturnValue(0.5)
       const attacker = makeHero({
-        element: 'fire',
         finalStats: { HP: 1000, ATK: 100, DEF: 50, SPD: 100, CritRate: 0, CritDmg: 50 },
       })
       const target = makeHero({
-        element: 'fire',
         finalStats: { HP: 1000, ATK: 100, DEF: 0, SPD: 100, CritRate: 0, CritDmg: 50 },
       })
 
@@ -77,11 +73,9 @@ describe('damageFormula - 進階測試', () => {
       })
 
       const attacker = makeHero({
-        element: 'fire',
         finalStats: { HP: 1000, ATK: 200, DEF: 50, SPD: 100, CritRate: 50, CritDmg: 100 },
       })
       const target = makeHero({
-        element: 'fire',
         finalStats: { HP: 1000, ATK: 100, DEF: 0, SPD: 100, CritRate: 0, CritDmg: 50 },
       })
 
@@ -99,8 +93,8 @@ describe('damageFormula - 進階測試', () => {
     it('dodge_up 75% 上限', () => {
       vi.spyOn(Math, 'random').mockReturnValue(0.74) // 剛好低於 75%
 
-      const attacker = makeHero({ element: 'fire' })
-      const target = makeHero({ element: 'fire' })
+      const attacker = makeHero({ })
+      const target = makeHero({ })
       applyStatus(target, { type: 'dodge_up', value: 0.9, duration: 3, maxStacks: 1, sourceHeroId: 'src' })
 
       const result = calculateDamage(attacker, target)
@@ -111,8 +105,8 @@ describe('damageFormula - 進階測試', () => {
     it('dodge_up 為 0 → 不閃避', () => {
       vi.spyOn(Math, 'random').mockReturnValue(0.5)
 
-      const attacker = makeHero({ element: 'fire' })
-      const target = makeHero({ element: 'fire' })
+      const attacker = makeHero({ })
+      const target = makeHero({ })
       // 沒有 dodge_up
 
       const result = calculateDamage(attacker, target)
@@ -189,15 +183,12 @@ describe('damageFormula - 進階測試', () => {
       vi.spyOn(Math, 'random').mockReturnValue(0.5) // 控制隨機
 
       const attacker = makeHero({
-        element: 'fire',
         finalStats: { HP: 1000, ATK: 200, DEF: 50, SPD: 100, CritRate: 0, CritDmg: 50 },
       })
       const normalTarget = makeHero({
-        element: 'fire',
         finalStats: { HP: 1000, ATK: 100, DEF: 50, SPD: 100, CritRate: 0, CritDmg: 50 },
       })
       const fearedTarget = makeHero({
-        element: 'fire',
         finalStats: { HP: 1000, ATK: 100, DEF: 50, SPD: 100, CritRate: 0, CritDmg: 50 },
       })
       applyStatus(fearedTarget, { type: 'fear', value: 0, duration: 2, maxStacks: 1, sourceHeroId: 'e' })
@@ -217,15 +208,12 @@ describe('damageFormula - 進階測試', () => {
       vi.spyOn(Math, 'random').mockReturnValue(0.5)
 
       const attacker = makeHero({
-        element: 'fire',
         finalStats: { HP: 1000, ATK: 200, DEF: 50, SPD: 100, CritRate: 0, CritDmg: 50 },
       })
       const normalTarget = makeHero({
-        element: 'fire',
         finalStats: { HP: 1000, ATK: 100, DEF: 50, SPD: 100, CritRate: 0, CritDmg: 50 },
       })
       const reducedTarget = makeHero({
-        element: 'fire',
         finalStats: { HP: 1000, ATK: 100, DEF: 50, SPD: 100, CritRate: 0, CritDmg: 50 },
       })
       applyStatus(reducedTarget, { type: 'dmg_reduce', value: 0.3, duration: 3, maxStacks: 1, sourceHeroId: 'src' })
@@ -281,11 +269,9 @@ describe('damageFormula - 進階測試', () => {
       vi.spyOn(Math, 'random').mockReturnValue(0.5)
 
       const attacker = makeHero({
-        element: 'fire',
         finalStats: { HP: 1000, ATK: 10, DEF: 50, SPD: 100, CritRate: 0, CritDmg: 50 },
       })
       const target = makeHero({
-        element: 'fire',
         finalStats: { HP: 1000, ATK: 100, DEF: 50, SPD: 100, CritRate: 0, CritDmg: 50 },
       })
       target.shields = [{ value: 9999, duration: 5, sourceHeroId: 'src' }]

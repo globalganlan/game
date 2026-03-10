@@ -4,7 +4,6 @@
 
 // 核心型別
 export type {
-  Element,
   FinalStats,
   StatusType,
   StatusEffect,
@@ -14,7 +13,6 @@ export type {
   SkillEffect,
   SkillTemplate,
   HeroSkillConfig,
-  ElementEntry,
   BattleHero,
   BattleContext,
   DamageResult,
@@ -24,9 +22,6 @@ export type {
 } from './types'
 
 export { DEFAULT_ENERGY_CONFIG } from './types'
-
-// 屬性系統
-export { getElementMultiplier, isWeakness, isResist, loadElementMatrix } from './elementSystem'
 
 // Buff 系統
 export {

@@ -1,12 +1,34 @@
-# 屬性系統 Spec
+# ~~屬性系統 Spec~~ — 🔴 已廢棄
 
-> 版本：v1.1 ｜ 狀態：🟢 已實作
-> 最後更新：2026-03-01
-> 最後更新：2025-02-26
+> 版本：v1.1 → **已廢棄** ｜ 狀態：🔴 已廢棄（2026-03-11 移除）
+> 最後更新：2026-03-11
 > 負責角色：🎯 GAME_DESIGN → 🔧 CODING
-> 原始碼：`src/domain/elementSystem.ts`（核心）、`src/services/dataService.ts`（中英對照 + 載入）
+> ~~原始碼：`src/domain/elementSystem.ts`~~（已刪除）
 
-## 概述
+## ⚠️ 廢棄聲明
+
+**本系統已於 2026-03-11 完整移除。** 此 spec 僅供歷史參考。
+
+### 移除範圍
+- 刪除：`src/domain/elementSystem.ts`、`src/domain/__tests__/elementSystem.test.ts`
+- 移除：`Element` type、`ElementEntry` interface、`BattleHero.element`、`SkillTemplate.element`、`DamageResult.elementMult`
+- 移除：`DamageDisplayType` 中的 `'weakness'`
+- 移除：傷害公式中的屬性倍率步驟（原步驟 4）
+- 移除：戰鬥 HUD 屬性提示（`ElementHint3D`）、3D 場景屬性相剋指示
+- 移除：圖鑑面板屬性分頁（CodexPanel Element tab）
+- 移除：英雄列表 / 抽卡畫面的屬性顯示
+- 移除：Workers 後端 `battleEngine` 中的屬性邏輯
+- 所有測試檔案中的屬性引用已清除
+- DB 欄位（heroes.Element、element_matrix 表）保留但不再讀取/使用
+
+### 移除原因
+屬性系統在當前遊戲設計中增加了不必要的複雜度，對策略深度貢獻有限。移除後可簡化傷害計算、減少新手理解門檻、降低維護成本。
+
+---
+
+## 以下為歷史記錄（僅供參考）
+
+## 概述（已廢棄）
 
 7 屬性剋制系統。每位英雄和技能可擁有一種屬性，
 攻擊時依屬性剋制矩陣乘算傷害倍率。
@@ -186,3 +208,4 @@ isResist(attacker: Element | '', defender: Element | ''): boolean
 | v0.1 | 2025-02-26 | 草案：基礎 7 屬性設計 |
 | v1.0 | 2025-02-26 | **已實作**：完整矩陣 + Sheets 動態載入 + 中英對照 + 3 個查詢 API |
 | v1.1 | 2026-03-01 | Spec 同步：`getElementMultiplier` 參數型別新增 `undefined` 支援 |
+| v1.1→🔴 | 2026-03-11 | **已廢棄**：整個屬性系統從遊戲中移除（ADR-022）。程式碼、型別、UI、測試全部清除。DB 欄位保留但不再使用。 |

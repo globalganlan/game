@@ -97,7 +97,6 @@ export function DamagePopup({ value, position, textScale = 1, damageType }: Dama
   const [opacity, setOpacity] = useState(1)
 
   const isCrit = damageType === 'crit'
-  const isWeakness = damageType === 'weakness'
   const fadeSpeed = isCrit ? 0.6 : 0.8  // 暴擊飄字停留更久
 
   useFrame((_state, delta) => {
@@ -125,10 +124,6 @@ export function DamagePopup({ value, position, textScale = 1, damageType }: Dama
     displayText = `💥${displayValue}`
     textColor = '#ffaa00'
     fontSize = 1.35  // 暴擊放大 35%
-  } else if (isWeakness) {
-    displayText = `-${displayValue}`
-    textColor = '#e63946'  // 屬性剋制：深紅
-    fontSize = 1.15
   } else {
     displayText = `-${displayValue}`
     textColor = '#ff0000'
@@ -415,50 +410,6 @@ export function SkillToast3D({ heroName, skillName, position, textScale = 1 }: S
         renderOrder={31}
       >
         {skillName}
-        <meshBasicMaterial transparent depthTest={false} />
-      </Text>
-    </Billboard>
-  )
-}
-
-/* ────────────────────────────
-   ElementHint3D — 屬性提示浮動標示
-   ──────────────────────────── */
-
-interface ElementHint3DProps {
-  text: string
-  color: string
-  position: Vector3Tuple
-  textScale?: number
-}
-
-/** 攻擊者頭頂顯示屬性克制/抵抗（自動上浮淡出） */
-export function ElementHint3D({ text, color, position, textScale = 1 }: ElementHint3DProps) {
-  const ref = useRef<THREE.Group>(null)
-  const [opacity, setOpacity] = useState(1)
-
-  useFrame((_state, delta) => {
-    if (ref.current) {
-      ref.current.position.y += delta * 0.15
-      setOpacity((prev) => Math.max(0, prev - delta * 0.55))
-    }
-  })
-
-  if (opacity <= 0) return null
-
-  return (
-    <Billboard position={position} ref={ref} renderOrder={28}>
-      <Text
-        font={LOCAL_FONT}
-        fontSize={0.45 * textScale}
-        color={color}
-        outlineColor="#000"
-        outlineWidth={0.04}
-        fillOpacity={opacity}
-        outlineOpacity={opacity}
-        renderOrder={28}
-      >
-        {text}
         <meshBasicMaterial transparent depthTest={false} />
       </Text>
     </Billboard>

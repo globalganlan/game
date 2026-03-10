@@ -11,9 +11,9 @@ import { Html } from '@react-three/drei'
 import * as THREE from 'three'
 
 import { ZombieModel } from './ZombieModel'
-import { DamagePopup, HealthBar3D, EnergyBar3D, SkillToast3D, ElementHint3D, PassiveHint3D, BuffIcons3D, BuffApplyToast3D } from './SceneWidgets'
+import { DamagePopup, HealthBar3D, EnergyBar3D, SkillToast3D, PassiveHint3D, BuffIcons3D, BuffApplyToast3D } from './SceneWidgets'
 import type { SlotHero, ActorState, AnimationState, DamagePopupData } from '../types'
-import type { SkillToast, ElementHint, PassiveHint, BuffApplyHint } from './BattleHUD'
+import type { SkillToast, PassiveHint, BuffApplyHint } from './BattleHUD'
 import type { StatusEffect } from '../domain/types'
 
 import type { Vector3Tuple } from 'three'
@@ -50,8 +50,6 @@ interface HeroProps {
   energyRatio?: number
   /** 技能彈幕（顯示在此英雄頭頂） */
   skillToasts?: SkillToast[]
-  /** 屬性提示（顯示在此英雄頭頂） */
-  elementHints?: ElementHint[]
   /** 被動觸發提示（顯示在此英雄頭頂） */
   passiveHints?: PassiveHint[]
   /** 當前身上的 Buff/Debuff 列表（顯示 3D Icon） */
@@ -88,7 +86,6 @@ export function Hero({
   canAdjustFormation = false,
   energyRatio,
   skillToasts = [],
-  elementHints = [],
   passiveHints = [],
   battleBuffs = [],
   buffApplyHints = [],
@@ -244,11 +241,6 @@ export function Hero({
         {/* 技能名稱浮動標示（身體位置） */}
         {skillToasts.map((t) => (
           <SkillToast3D key={t.id} heroName={t.heroName} skillName={t.skillName} position={[0, 1.5, 0]} textScale={textScale} />
-        ))}
-
-        {/* 屬性克制/抵抗浮動標示（身體位置） */}
-        {elementHints.map((h) => (
-          <ElementHint3D key={h.id} text={h.text} color={h.color} position={[0, 1.2, 0]} textScale={textScale} />
         ))}
 
         {/* 被動觸發浮動標示（身體位置） */}

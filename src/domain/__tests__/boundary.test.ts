@@ -8,14 +8,13 @@ import { calculateDamage, calculateHeal } from '../damageFormula'
 import { applyStatus, cleanse, processDotEffects, getBuffedStats } from '../buffSystem'
 import { addEnergy, canCastUltimate, consumeEnergy } from '../energySystem'
 import { selectTargets, selectNormalAttackTarget } from '../targetStrategy'
-import { getElementMultiplier } from '../elementSystem'
 import { createBattleHero, runBattle } from '../battleEngine'
 import type { BattleEngineConfig, RawHeroInput } from '../battleEngine'
 import { makeHero, makeSkill, makeHealEffect, resetUidCounter } from './testHelper'
 
 function makeRawInput(overrides: Partial<RawHeroInput> = {}): RawHeroInput {
   return {
-    heroId: 1, modelId: 'z1', name: 'Test', element: 'fire',
+    heroId: 1, modelId: 'z1', name: 'Test',
     HP: 1000, ATK: 100, DEF: 50, SPD: 100, CritRate: 15, CritDmg: 50,
     ...overrides,
   }
@@ -175,15 +174,6 @@ describe('邊界條件 & 安全性', () => {
       }
       const stats = getBuffedStats(hero)
       expect(stats.ATK).toBeGreaterThanOrEqual(1) // 下限保護
-    })
-  })
-
-  /* ═══════ 屬性系統邊界 ═══════ */
-
-  describe('屬性系統邊界', () => {
-    it('不存在的屬性 → 1.0', () => {
-      expect(getElementMultiplier('fire', '' as any)).toBe(1.0)
-      expect(getElementMultiplier(undefined, undefined)).toBe(1.0)
     })
   })
 

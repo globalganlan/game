@@ -1,7 +1,7 @@
 # 傷害公式 Spec
 
-> 版本：v1.1 ｜ 狀態：🟢 已實作
-> 最後更新：2026-03-01
+> 版本：v1.2 ｜ 狀態：🟢 已實作
+> 最後更新：2026-03-11
 > 負責角色：🎯 GAME_DESIGN → 🔧 CODING
 > 原始碼：`src/domain/damageFormula.ts`
 
@@ -13,7 +13,7 @@
 ## 依賴
 
 - `src/domain/types.ts` → `BattleHero`, `DamageResult`, `HealResult`, `SkillEffect`, `FinalStats`
-- `src/domain/elementSystem.ts` → `getElementMultiplier()`, `isWeakness()`
+- ~~`src/domain/elementSystem.ts`~~ — 已移除（2026-03-11）
 - `src/domain/buffSystem.ts` → `getStatusValue()`, `hasStatus()`, `absorbDamageByShields()`, `getBuffedStats()`
 
 ---
@@ -31,7 +31,7 @@ calculateDamage(attacker: BattleHero, target: BattleHero, skill?: SkillEffect): 
 步驟 1. 基礎傷害
 步驟 2. DEF 減傷
 步驟 3. 暴擊判定
-步驟 4. 屬性倍率
+步驟 4. ~~屬性倍率~~（已移除，固定 1.0）
 步驟 5. 隨機浮動
 步驟 6. 攻擊方修正
 步驟 7. 防守方修正
@@ -97,17 +97,9 @@ if (isCrit) dmg *= (1 + atkStats.CritDmg / 100)
 - 暴擊倍率 = `1 + CritDmg/100`（CritDmg=50 → 1.5×）
 - CritRate 上限：100%
 
-### 步驟 4：屬性倍率
+### ~~步驟 4：屬性倍率~~（已移除）
 
-```typescript
-const elementMult = getElementMultiplier(attacker.element, target.element)
-dmg *= elementMult
-```
-
-- 無屬性 → 1.0
-- 剋制 → 1.3（配置來自 `element_matrix` Google Sheet）
-- 抵抗 → 0.7
-- 同屬 → 0.9
+> **2026-03-11 移除**：屬性系統已從遊戲中完整移除。此步驟不再存在，傷害計算從暴擊判定直接進入隨機浮動。
 
 ### 步驟 5：隨機浮動
 
@@ -170,8 +162,7 @@ interface DamageResult {
   damage: number           // 實際受到的傷害（扣除護盾後）
   isCrit: boolean
   isDodge: boolean
-  elementMult: number      // 屬性倍率
-  damageType: 'normal' | 'crit' | 'dot' | 'miss' | 'shield' | 'weakness'
+  damageType: 'normal' | 'crit' | 'dot' | 'miss' | 'shield'
   shieldAbsorbed: number   // 護盾吸收量
   reflectDamage: number    // 反彈傷害
 }
@@ -183,7 +174,7 @@ interface DamageResult {
 |------|-----------|---------|------|
 | 閃避成功 | `miss` | 最高（步驟 0） | 傷害為 0 |
 | 護盾完全吸收（actualDmg=0） | `shield` | 高 | 後覆蓋前 |
-| 屬性剋制 | `weakness` | 中 | 後覆蓋 crit |
+| ~~屬性剋制~~ | ~~`weakness`~~ | ~~中~~ | ~~已移除（2026-03-11）~~ |
 | 暴擊 | `crit` | 中低 | 先設定 |
 | DOT 持續傷害 | `dot` | — | 獨立判定 |
 | 以上皆非 | `normal` | 低 | 預設 |
@@ -283,7 +274,7 @@ calculateReflect(target: BattleHero, damageReceived: number): number
 
 - [ ] DEF 穿透（`defPen` 參數）
 - [ ] 真實傷害（無視 DEF 的傷害類型）
-- [ ] 屬性加傷 buff（如「火屬性傷害 +20%」）
+- ~~[ ] 屬性加傷 buff~~（屬性系統已移除）
 - [ ] 多段攻擊（`hitCount > 1` 每段獨立暴擊）
 - [ ] 最終傷害乘算層（如「對 Boss +30%」）
 
@@ -294,3 +285,4 @@ calculateReflect(target: BattleHero, damageReceived: number): number
 | v0.1 | 2025-02-26 | 草案：設計公式流程 |
 | v1.0 | 2025-02-26 | **已實作**：完整 10 步公式 + 護盾 + 反彈 + 治療 + DOT |
 | v1.1 | 2026-03-01 | Spec 同步：步驟 6 攻擊方修正改為 return 1.0（atk_up/down 已移至 getBuffedStats）、步驟 7 移除 def_down（同理）、damageType 優先順序修正、DOT 公式使用 finalStats.ATK、Buff 摘要表更新處理位置 |
+| v1.2 | 2026-03-11 | **移除屬性倍率步驟**：步驟 4（屬性倍率）完整移除；`DamageResult.elementMult` 欄位刪除；`damageType` 移除 `'weakness'`；傷害計算從 9 步改為 9 步（原步驟 4 跳過） |

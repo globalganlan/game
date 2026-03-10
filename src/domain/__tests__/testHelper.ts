@@ -1,7 +1,7 @@
 /**
  * 測試工具 — 建立 mock BattleHero 等工廠函式
  */
-import type { BattleHero, FinalStats, SkillEffect, SkillTemplate, StatusEffect, Shield, Element } from '../types'
+import type { BattleHero, FinalStats, SkillEffect, SkillTemplate, StatusEffect, Shield } from '../types'
 
 let uidCounter = 0
 
@@ -35,7 +35,6 @@ export function makeHero(overrides: Partial<BattleHero> = {}): BattleHero {
     name: `測試英雄 ${uidCounter}`,
     side: 'player',
     slot: 0,
-    element: 'fire',
 
     baseStats,
     finalStats,
@@ -65,14 +64,14 @@ export function makeHero(overrides: Partial<BattleHero> = {}): BattleHero {
  */
 export function makeTeams(): { players: BattleHero[]; enemies: BattleHero[] } {
   const players = [
-    makeHero({ side: 'player', slot: 0, element: 'fire', name: 'P1' }),
-    makeHero({ side: 'player', slot: 1, element: 'water', name: 'P2' }),
-    makeHero({ side: 'player', slot: 2, element: 'wind', name: 'P3' }),
+    makeHero({ side: 'player', slot: 0, name: 'P1' }),
+    makeHero({ side: 'player', slot: 1, name: 'P2' }),
+    makeHero({ side: 'player', slot: 2, name: 'P3' }),
   ]
   const enemies = [
-    makeHero({ side: 'enemy', slot: 0, element: 'earth', name: 'E1' }),
-    makeHero({ side: 'enemy', slot: 1, element: 'thunder', name: 'E2' }),
-    makeHero({ side: 'enemy', slot: 2, element: 'dark', name: 'E3' }),
+    makeHero({ side: 'enemy', slot: 0, name: 'E1' }),
+    makeHero({ side: 'enemy', slot: 1, name: 'E2' }),
+    makeHero({ side: 'enemy', slot: 2, name: 'E3' }),
   ]
   return { players, enemies }
 }
@@ -106,7 +105,6 @@ export function makeSkill(overrides: Partial<SkillTemplate> = {}): SkillTemplate
     skillId: 'TEST_SKILL_1',
     name: '測試技能',
     type: 'active',
-    element: 'fire',
     target: 'single_enemy',
     description: '測試用技能',
     effects: [makeDamageEffect()],

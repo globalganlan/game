@@ -19,7 +19,7 @@ import type { BattleAction, DamageResult, StatusType } from '../types'
 
 /** 快捷建立 DamageResult（補齊必填欄位） */
 const dmgResult = (overrides: Partial<DamageResult> = {}): DamageResult => ({
-  damage: 100, isCrit: false, isDodge: false, elementMult: 1, reflectDamage: 0,
+  damage: 100, isCrit: false, isDodge: false, reflectDamage: 0,
   damageType: 'normal', shieldAbsorbed: 0,
   ...overrides,
 })
@@ -220,7 +220,7 @@ describe('validateBattleActions (靜態流程分析)', () => {
       {
         type: 'NORMAL_ATTACK',
         attackerUid: 'p1', targetUid: 'e1',
-        result: dmgResult({ damage: 9999, isCrit: true, elementMult: 1.25 }),
+        result: dmgResult({ damage: 9999, isCrit: true }),
         killed: true,
       },
       { type: 'BATTLE_END', winner: 'player' },
@@ -397,7 +397,6 @@ describe('引擎整合：runBattleCollect → validateBattleActions', () => {
       skillId: 'AOE_FIRE',
       name: '烈焰風暴',
       type: 'active',
-      element: 'fire',
       target: 'all_enemies',
       effects: [makeDamageEffect({ multiplier: 2.0 })],
     })
@@ -424,7 +423,6 @@ describe('引擎整合：runBattleCollect → validateBattleActions', () => {
       skillId: 'HEAL_ALL',
       name: '群體治療',
       type: 'active',
-      element: 'water',
       target: 'all_allies',
       effects: [makeHealEffect({ multiplier: 1.5 })],
     })

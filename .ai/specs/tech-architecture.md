@@ -50,7 +50,7 @@ src/
     buffSystem.ts           Buff/Debuff 施加 / 結算 / 查詢
     energySystem.ts         能量獲取 / 消耗 / 大招判定
     targetStrategy.ts       目標選擇策略
-    elementSystem.ts        屬性剋制矩陣    gachaSystem.ts          抽卡系統（機率/保底/費用計算）
+    ~~elementSystem.ts~~       ~~屬性剋制矩陣~~（已移除 2026-03-11）    gachaSystem.ts          抽卡系統（機率/保底/費用計算）
     progressionSystem.ts    英雄養成系統（升級/突破/升星）
     seededRng.ts            確定性隨機數產生器
     stageSystem.ts          關卡/爬塔/副本設定與解鎖判定
@@ -74,7 +74,7 @@ src/
     Arena.tsx               場景（地面/碎片/雨/天空/霧，13 種 SceneMode 主題）
     Hero.tsx                英雄容器（移動/動畫狀態機）
     ZombieModel.tsx         GLB 模型 + 受擊閃光
-    SceneWidgets.tsx        血條/飄字/鏡頭/控制/SkillToast3D/ElementHint3D
+    SceneWidgets.tsx        血條/飄字/鏡頭/控制/SkillToast3D
     UIOverlay.tsx           HUD 元件（TransitionOverlay、ThumbnailList、useToast）
     LoginScreen.tsx         登入畫面
     MainMenu.tsx            主選單導航中心（7 功能卡片）
@@ -275,7 +275,6 @@ main.tsx
                   <EnergyBar3D />   3D 能量條
                   <DamagePopup />   飄字傷害
                   <SkillToast3D />  技能名稱 3D 飄字
-                  <ElementHint3D /> 屬性提示 3D 飄字
                   <Html /> (名稱 HTML Overlay，固定像素大小)
                <DragPlane />
             <ResponsiveCamera />
@@ -301,7 +300,7 @@ main.tsx
 ```
 Phase 0（掛載即刻、登入前）：
   - 預取英雄列表（heroes API）
-  - 預取 gameData（skill_templates / hero_skills / element_matrix）
+  - 預取 gameData（skill_templates / hero_skills）
   - 預載 GLB 模型 + 縮圖（fire-and-forget，不阻塞）
 
 Phase 1（登入後）：
@@ -344,7 +343,7 @@ fireOptimistic / fireOptimisticAsync
 ```
 
               Cloudflare D1 (正規化表)
-  heroes | skill_templates | hero_skills | element_matrix    
+  heroes | skill_templates | hero_skills | item_definitions    
 
            Workers API  POST /readSheet
            (從專屬 D1 表查詢，回傳 JSON 陣列)
@@ -357,8 +356,8 @@ fireOptimistic / fireOptimisticAsync
                  
 
             src/services/dataService.ts                      
-  loadAllGameData() → 並行載入 4 表                          
-  toElement() 中英對照                                       
+  loadAllGameData() → 並行載入 3 表                          
+  ~~toElement() 中英對照~~（已移除）                                       
   toSkillTemplate() 解析 effects JSON                        
   getHeroSkillSet() 查詢英雄技能                              
 
@@ -564,7 +563,7 @@ export default defineConfig({
 
 | 級別 | 對象 | Cache Key | TTL | 說明 |
 |------|------|-----------|-----|------|
-| **A. 全域配表** | heroes, skill_templates, hero_skills, element_matrix, item_definitions | `sheet:{name}` | 6h | 所有玩家共用、極少變動 |
+| **A. 全域配表** | heroes, skill_templates, hero_skills, item_definitions | `sheet:{name}` | 6h | 所有玩家共用、極少變動 |
 | **B. 衍生結果** | loadHeroPool_() | `heroPool` | 6h | 從 heroes 表衍生的抽卡池模板 |
 | **C. 用戶映射** | resolvePlayerId_() | `pid:{guestToken}` | 6h | token→playerId 建立後不變 |
 | **D. 道具配表** | handleLoadItemDefinitions_() | `itemDefs` | 6h | 道具定義表，極少變動 |
@@ -606,7 +605,7 @@ POST { "action": "invalidate-cache" }
 |------|------|---------|
 | v1.0 | 2025-02-26 | 從現有程式碼逆向整理完整技術架構 |
 | v1.1 | 2025-02-26 | 新增 `src/domain/` + `src/services/` 分層架構、更新資料流圖 |
-| v1.2 | 2026-02-28 | 三階段載入架構（prefetch）、全面 Optimistic Queue、SkillToast3D / ElementHint3D 3D 元件、ZombieModel visibilitychange 補時、heroesListRef、資源 HUD 僅主選單顯示 |
+| v1.2 | 2026-02-28 | 三階段載入架構（prefetch）、全面 Optimistic Queue、SkillToast3D 3D 元件、ZombieModel visibilitychange 補時、heroesListRef、資源 HUD 僅主選單顯示 |
 | v1.3 | 2026-02-28 | 新增 GAS CacheService 快取層：全域配表快取（6h TTL）、resolvePlayerId_ 快取、loadHeroPool_ 快取、分片機制、自動/手動失效、invalidate-cache API |
 | v1.4 | 2026-02-28 | 新增 audioService.ts（Web Audio API 合成 BGM 6 曲目 + SFX 9 種）、ShopPanel.tsx、SettingsPanel.tsx 音效控制 UI、標記音效引擎為已實作 |
 | v1.5 | 2026-02-28 | 新增 `constants/rarity.ts` 共用常數層 + `CurrencyIcon.tsx` 統一貨幣 icon 元件，替代各元件散落的 CSS inline icon 和 emoji |

@@ -6,7 +6,6 @@
  */
 
 import type { BattleHero, DamageResult, HealResult, SkillEffect, FinalStats } from './types'
-import { getElementMultiplier, isWeakness } from './elementSystem'
 import { getStatusValue, hasStatus, absorbDamageByShields, getBuffedStats } from './buffSystem'
 
 /* ════════════════════════════════════
@@ -34,7 +33,6 @@ export function calculateDamage(
       damage: 0,
       isCrit: false,
       isDodge: true,
-      elementMult: 1.0,
       damageType: 'miss',
       shieldAbsorbed: 0,
       reflectDamage: 0,
@@ -60,9 +58,7 @@ export function calculateDamage(
     dmg *= (1 + atkStats.CritDmg / 100) // CritDmg=50 → ×1.5
   }
 
-  // 4. 屬性倍率
-  const elementMult = getElementMultiplier(attacker.element, target.element)
-  dmg *= elementMult
+  // 4. (屬性系統已移除)
 
   // 5. 隨機浮動 ±5%
   dmg *= 0.95 + Math.random() * 0.10
@@ -85,14 +81,12 @@ export function calculateDamage(
   // 決定飄字顯示類型
   let damageType: DamageResult['damageType'] = 'normal'
   if (isCrit) damageType = 'crit'
-  if (isWeakness(attacker.element, target.element)) damageType = 'weakness'
   if (shieldAbsorbed > 0 && actualDmg === 0) damageType = 'shield'
 
   return {
     damage: actualDmg,
     isCrit,
     isDodge: false,
-    elementMult,
     damageType,
     shieldAbsorbed,
     reflectDamage,

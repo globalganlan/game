@@ -4,6 +4,34 @@
 
 ---
 
+### [2026-03-11] 屬性系統完整移除（Element System Removal）
+- **觸發者**：使用者指令 — 移除屬性系統
+- **執行角色**：🔧 CODING
+- **移除範圍**：
+  1. **Domain 層**：刪除 `src/domain/elementSystem.ts`、`src/domain/__tests__/elementSystem.test.ts`
+  2. **型別**：移除 `Element` type、`ElementEntry` interface；移除 `BattleHero.element`、`SkillTemplate.element`、`DamageResult.elementMult`
+  3. **傷害公式**：移除步驟 4（屬性倍率）、移除 `DamageDisplayType` 中的 `'weakness'`
+  4. **戰鬥 HUD**：移除屬性相剋提示（`ElementHint3D`、`elementHints` state）
+  5. **3D 場景**：移除 SceneWidgets 中的 `ElementHint3D` 元件
+  6. **圖鑑**：移除 CodexPanel 的 Element 分頁
+  7. **英雄列表 / 抽卡**：移除英雄屬性顯示
+  8. **Workers 後端**：移除 workers/battleEngine 中的屬性邏輯
+  9. **測試**：所有測試檔案的屬性引用已清除
+  10. **DB**：heroes.Element 欄位、element_matrix 表保留但不再讀取/使用
+- **Spec 更新**：
+  - `element-system.md` → 🔴 已廢棄
+  - `damage-formula.md` v1.1 → v1.2（移除步驟 4、elementMult、weakness）
+  - `hero-schema.md` v2.4 → v2.5（移除 Element 欄位、toElement、屬性分佈）
+  - `core-combat.md`（移除 ElementHint3D、element_matrix 載入、weakness 飄字）
+  - `skill-system.md`（移除 SkillTemplate.element、skill_templates.element 欄位）
+  - `tech-architecture.md`（移除 elementSystem.ts、ElementHint3D、element_matrix 快取）
+  - `ui-flow.md`（移除 ElementHint 參考）
+  - `gacha.md`（移除 'element' pool type）
+  - `specs/README.md`（element-system 標記為已廢棄）
+- **ADR**：ADR-022（屬性系統移除決策）
+
+---
+
 ### [2026-03-09] 資料庫清理（第二波）— heroes.extra / item_definitions 正規化 / stageStars / sellPrice 移除
 - **觸發者**：使用者指令 — DB 清理第二波
 - **執行角色**：🔧 CODING

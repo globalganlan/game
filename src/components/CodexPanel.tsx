@@ -46,11 +46,10 @@ const RARITIES: Rarity[] = ['N', 'R', 'SR', 'SSR']
    圖鑑分類
    ════════════════════════════════════ */
 
-type CodexCategory = 'equipment' | 'element'
+type CodexCategory = 'equipment'
 
 const CODEX_TABS: { key: CodexCategory; icon: string; label: string }[] = [
   { key: 'equipment', icon: '⚔️', label: '裝備' },
-  { key: 'element', icon: '🔥', label: '屬性' },
 ]
 
 /* ════════════════════════════════════
@@ -170,139 +169,6 @@ function EquipmentCodex() {
 }
 
 /* ════════════════════════════════════
-   屬性相剋圖鑑
-   ════════════════════════════════════ */
-
-const ELEMENTS = ['fire', 'water', 'wind', 'thunder', 'earth', 'light', 'dark'] as const
-type ElemKey = typeof ELEMENTS[number]
-
-const ELEM_ZH: Record<ElemKey, string> = {
-  fire: '火', water: '水', wind: '風', thunder: '雷', earth: '地', light: '光', dark: '闇',
-}
-const ELEM_EMOJI: Record<ElemKey, string> = {
-  fire: '🔥', water: '💧', wind: '🌿', thunder: '⚡', earth: '🪨', light: '✨', dark: '🌑',
-}
-const ELEM_COLOR: Record<ElemKey, string> = {
-  fire: '#e63946', water: '#4dabf7', wind: '#2a9d8f', thunder: '#ffd43b',
-  earth: '#a0522d', light: '#fff', dark: '#6c5ce7',
-}
-
-/** 克制環 + 光暗互剋。attacker → defender = 1.3 */
-const ADVANTAGE: [ElemKey, ElemKey][] = [
-  ['fire', 'wind'], ['wind', 'earth'], ['earth', 'thunder'], ['thunder', 'water'], ['water', 'fire'],
-  ['light', 'dark'], ['dark', 'light'],
-]
-
-function ElementCodex() {
-  return (
-    <div className="codex-element">
-      {/* 說明文字 */}
-      <div className="codex-elem-desc">
-        <p>屬性相剋影響攻擊傷害倍率：</p>
-        <p><span style={{ color: '#e63946' }}>●</span> 克制（×1.3）　
-           <span style={{ color: '#4dabf7' }}>●</span> 抵抗（×0.7）　
-           <span style={{ color: '#888' }}>●</span> 同屬（×0.9）</p>
-      </div>
-
-      {/* 五行環 */}
-      <div className="codex-elem-ring">
-        <div className="codex-elem-ring-title">五行相剋環</div>
-        <div className="codex-elem-cycle">
-          {(['fire', 'wind', 'earth', 'thunder', 'water'] as ElemKey[]).map((el, i, arr) => {
-            const next = arr[(i + 1) % arr.length]
-            return (
-              <span key={el} className="codex-elem-cycle-item">
-                <span style={{ color: ELEM_COLOR[el] }}>{ELEM_EMOJI[el]} {ELEM_ZH[el]}</span>
-                {i < arr.length - 1 && <span className="codex-elem-arrow"> → </span>}
-              </span>
-            )
-          })}
-          <span className="codex-elem-arrow"> → </span>
-          <span style={{ color: ELEM_COLOR.fire }}>{ELEM_EMOJI.fire} {ELEM_ZH.fire}</span>
-        </div>
-        <div className="codex-elem-ld">
-          <span style={{ color: ELEM_COLOR.light }}>{ELEM_EMOJI.light} {ELEM_ZH.light}</span>
-          <span className="codex-elem-arrow"> ⇄ </span>
-          <span style={{ color: ELEM_COLOR.dark }}>{ELEM_EMOJI.dark} {ELEM_ZH.dark}</span>
-          <span style={{ color: '#999', marginLeft: 8 }}>（互相克制）</span>
-        </div>
-      </div>
-
-      {/* 完整倍率表 */}
-      <div className="codex-elem-table-wrap">
-        <div className="codex-elem-ring-title">完整倍率表</div>
-        <div className="codex-elem-table-scroll">
-          <table className="codex-elem-table">
-            <thead>
-              <tr>
-                <th className="codex-elem-th-corner">攻↓ 守→</th>
-                {ELEMENTS.map(e => (
-                  <th key={e} style={{ color: ELEM_COLOR[e] }}>
-                    {ELEM_EMOJI[e]}<br />{ELEM_ZH[e]}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {ELEMENTS.map(atk => (
-                <tr key={atk}>
-                  <td className="codex-elem-row-label" style={{ color: ELEM_COLOR[atk] }}>
-                    {ELEM_EMOJI[atk]} {ELEM_ZH[atk]}
-                  </td>
-                  {ELEMENTS.map(def => {
-                    const isAdvantage = ADVANTAGE.some(([a, d]) => a === atk && d === def)
-                    const isDisadvantage = ADVANTAGE.some(([a, d]) => a === def && d === atk)
-                    const isSame = atk === def
-                    const mult = isAdvantage ? 1.3 : isDisadvantage ? 0.7 : isSame ? 0.9 : 1.0
-                    const cls = isAdvantage ? 'codex-elem-adv'
-                      : isDisadvantage ? 'codex-elem-dis'
-                      : isSame ? 'codex-elem-same'
-                      : ''
-                    return (
-                      <td key={def} className={cls}>
-                        ×{mult.toFixed(1)}
-                      </td>
-                    )
-                  })}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {/* 各屬性克制速查 */}
-      <div className="codex-elem-quick">
-        <div className="codex-elem-ring-title">各屬性速查</div>
-        {ELEMENTS.map(el => {
-          const beats = ADVANTAGE.filter(([a]) => a === el).map(([, d]) => d)
-          const losesTo = ADVANTAGE.filter(([, d]) => d === el).map(([a]) => a)
-          return (
-            <div key={el} className="codex-elem-quick-row">
-              <span className="codex-elem-quick-icon" style={{ color: ELEM_COLOR[el] }}>
-                {ELEM_EMOJI[el]} {ELEM_ZH[el]}
-              </span>
-              <span className="codex-elem-quick-info">
-                {beats.length > 0 && (
-                  <span className="codex-elem-quick-adv">
-                    剋 {beats.map(b => <span key={b} style={{ color: ELEM_COLOR[b] }}>{ELEM_EMOJI[b]}{ELEM_ZH[b]}</span>)}
-                  </span>
-                )}
-                {losesTo.length > 0 && (
-                  <span className="codex-elem-quick-dis">
-                    被剋 {losesTo.map(b => <span key={b} style={{ color: ELEM_COLOR[b] }}>{ELEM_EMOJI[b]}{ELEM_ZH[b]}</span>)}
-                  </span>
-                )}
-              </span>
-            </div>
-          )
-        })}
-      </div>
-    </div>
-  )
-}
-
-/* ════════════════════════════════════
    主圖鑑面板
    ════════════════════════════════════ */
 
@@ -333,9 +199,6 @@ export function CodexPanel({}: CodexPanelProps) {
       {/* 內容 */}
       {category === 'equipment' && (
         <EquipmentCodex />
-      )}
-      {category === 'element' && (
-        <ElementCodex />
       )}
     </div>
   )

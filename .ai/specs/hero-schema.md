@@ -1,7 +1,7 @@
 # 英雄資料結構 Spec
 
-> 版本：v2.4 ｜ 狀態：🟢 已實作
-> 最後更新：2026-03-01
+> 版本：v2.5 ｜ 狀態：🟢 已實作
+> 最後更新：2026-03-11
 > 負賬角色：🎯 GAME_DESIGN → 🔧 CODING
 > 原始碼：`src/types.ts`（表現層）、`src/domain/types.ts`（domain 層）、`src/services/dataService.ts`（資料轉換）、`src/services/saveService.ts`（HeroInstance）
 
@@ -10,7 +10,7 @@
 英雄資料由 Google Sheets 提供，前端透過 API 拉取後即時使用。
 資料流：**Sheet → sheetApi → dataService → domain types → battleEngine**。
 
-**v2.0**：新增 DEF / CritRate / CritDmg / Element、星級系統、模組化技能表。
+**v2.0**：新增 DEF / CritRate / CritDmg / ~~Element~~（已移除）、星級系統、模組化技能表。
 **v2.1**：Domain 層新增 `RawHeroInput`、`BattleHero`、`FinalStats` 三層型別。
 **v2.2**：HeroInstance 新增 `stars` 欄位，舊存檔自動遷移預設 stars=1。
 **v2.3**：所有英雄從 ★0 開始培養（不再依稀有度給初始星級），舊存檔遷移預設改為 stars=0。
@@ -19,7 +19,7 @@
 
 - `.ai/specs/skill-system.md` → 技能模板 + 英雄技能對照表
 - `.ai/specs/progression.md` → 等級 / 突破 / 裝備提供的數值加成（✅ 已實作）
-- `.ai/specs/element-system.md` → 屬性定義 + 中英對照
+- ~~`.ai/specs/element-system.md`~~ — 已移除（2026-03-11）
 - `.ai/specs/damage-formula.md` → 戰鬥數值計算
 - Google Sheets `heroes` 表 → 資料來源
 
@@ -48,7 +48,7 @@
 | `Speed` | number | 行動速度 |★ 5 |★ 5~15 |
 | `CritRate` | number | 暴擊率（%） |★ 5 | 0~100 |
 | `CritDmg` | number | 暴擊傷害加成（%） |★ 50 | 0~300 |
-| `Element` | string | 屬性（中文） |  | 火/冰/雷/毒/闇/光 |
+| ~~`Element`~~ | ~~string~~ | ~~屬性（中文）~~ | | ~~已移除（2026-03-11）~~ |
 
 ### 已廢棄欄位
 
@@ -72,7 +72,7 @@ interface RawHeroData {
   Type?: string
   Rarity?: string | number  // D1 存 TEXT，用 toRarity() / toRarityNum() 轉換
   Description?: string
-  Element?: string
+  // Element?: string  // 已移除（2026-03-11）
   HP?: number; ATK?: number; DEF?: number
   Speed?: number; SPD?: number; SPEED?: number; AGI?: number
   CritRate?: number; CritDmg?: number
@@ -103,7 +103,7 @@ interface RawHeroInput {
   heroId: number
   modelId: string
   name: string
-  element: string         // 已轉為英文（fire/water/...）
+  // element — 已移除（2026-03-11）
   HP: number
   ATK: number
   DEF: number
@@ -125,7 +125,7 @@ interface BattleHero {
   name: string
   side: 'player' | 'enemy'
   slot: number            // 0-5
-  element: Element | ''   // 英文屬性
+  // element — 已移除（2026-03-11）
 
   // 數值
   baseStats: FinalStats   // 基礎數值（= RawHeroInput 的值）
@@ -188,7 +188,7 @@ function toRawHeroInput(row: RawHeroRow): RawHeroInput {
     heroId: Number(row.HeroID),
     modelId: String(row.ModelID || `zombie_${row.HeroID}`),
     name: String(row.Name || ''),
-    element: toElement(row.Element) || '',   // 中文→英文
+    // element — 已移除（2026-03-11）
     HP: Number(row.HP) || 100,
     ATK: Number(row.ATK) || 20,
     DEF: Number(row.DEF) || 10,
@@ -207,17 +207,9 @@ function slotToInput(slot: SlotHero, heroId: number): RawHeroInput
 // 從 SlotHero 萃取 domain 需要的欄位
 ```
 
-### 屬性中英對照（toElement）
+### ~~屬性中英對照（toElement）~~（已移除 2026-03-11）
 
-| 中文 | 英文 | 備註 |
-|------|------|------|
-| 火 | fire |  |
-| 冰 / 水 | water | 冰 = water |
-| 毒 / 風 | wind | 毒 = wind |
-| 雷 | thunder |  |
-| 地 / 土 | earth |  |
-| 光 | light |  |
-| 闇 / 暗 | dark |  |
+> 屬性系統已完整移除，`toElement()` 函式不再存在。
 
 ---
 
@@ -241,22 +233,22 @@ function getHeroSpeed(h: RawHeroData): number {
 
 ## 五、角色一覽（14 隻）
 
-| ID | 名稱 | 類型 | 稀有度 | HP | ATK | DEF | Speed | CritRate | CritDmg | 屬性 |
-|----|------|------|--------|-----|-----|-----|-------|----------|---------|------|
-| 1 | 女喪屍 | 敏捷 | ★★★★ | 100 | 25 | 15 | 8 | 5% | 50% | 闇 |
-| 2 | 異變者 | 力量 | ★★★ | 125 | 50 | 20 | 10 | 5% | 50% | 毒 |
-| 3 | 詭獸 | 坦克 | ★★★★ | 175 | 30 | 45 | 7 | 5% | 50% | 闇 |
-| 4 | 屠宰者 | 刺客 | ★★★★ | 100 | 60 | 12 | 11 | 15% | 80% | 火 |
-| 5 | 口器者 | 特殊 | ★★★ | 110 | 40 | 18 | 10 | 5% | 50% | 毒 |
-| 6 | 無名活屍 | 均衡 | ★★ | 100 | 30 | 20 | 8 | 5% | 50% | 闇 |
-| 7 | 腐學者 | 輔助 | ★★★ | 105 | 35 | 22 | 9 | 5% | 50% | 毒 |
-| 8 | 夜鬼 | 力量 | ★★★★ | 130 | 45 | 25 | 9 | 5% | 50% | 闇 |
-| 9 | 倖存者 | 均衡 | ★★★ | 115 | 35 | 20 | 9 | 5% | 50% | 光 |
-| 10 | 童魘 | 敏捷 | ★★★★ | 95 | 45 | 14 | 12 | 10% | 60% | 冰 |
-| 11 | 白面鬼 | 特殊 | ★★ | 100 | 40 | 16 | 10 | 5% | 50% | 火 |
-| 12 | 戰厄 | 坦克 | ★★★ | 160 | 35 | 40 | 7 | 5% | 50% | 雷 |
-| 13 | 南瓜魔 | 力量 | ★★★★ | 150 | 55 | 30 | 6 | 10% | 70% | 火 |
-| 14 | 脫逃者 | 敏捷 | ★ | 90 | 30 | 10 | 13 | 8% | 50% | 冰 |
+| ID | 名稱 | 類型 | 稀有度 | HP | ATK | DEF | Speed | CritRate | CritDmg |
+|----|------|------|--------|-----|-----|-----|-------|----------|---------|
+| 1 | 女喪屍 | 敏捷 | ★★★★ | 100 | 25 | 15 | 8 | 5% | 50% |
+| 2 | 異變者 | 力量 | ★★★ | 125 | 50 | 20 | 10 | 5% | 50% |
+| 3 | 诡獸 | 坦克 | ★★★★ | 175 | 30 | 45 | 7 | 5% | 50% |
+| 4 | 屠宰者 | 刺客 | ★★★★ | 100 | 60 | 12 | 11 | 15% | 80% |
+| 5 | 口器者 | 特殊 | ★★★ | 110 | 40 | 18 | 10 | 5% | 50% |
+| 6 | 無名活屍 | 均衡 | ★★ | 100 | 30 | 20 | 8 | 5% | 50% |
+| 7 | 腐學者 | 輔助 | ★★★ | 105 | 35 | 22 | 9 | 5% | 50% |
+| 8 | 夜鬼 | 力量 | ★★★★ | 130 | 45 | 25 | 9 | 5% | 50% |
+| 9 | 倖存者 | 均衡 | ★★★ | 115 | 35 | 20 | 9 | 5% | 50% |
+| 10 | 童魘 | 敏捷 | ★★★★ | 95 | 45 | 14 | 12 | 10% | 60% |
+| 11 | 白面鬼 | 特殊 | ★★ | 100 | 40 | 16 | 10 | 5% | 50% |
+| 12 | 戰厄 | 坦克 | ★★★ | 160 | 35 | 40 | 7 | 5% | 50% |
+| 13 | 南瓜魔 | 力量 | ★★★★ | 150 | 55 | 30 | 6 | 10% | 70% |
+| 14 | 脫逃者 | 敏捷 | ★ | 90 | 30 | 10 | 13 | 8% | 50% |
 
 ### 職業分佈
 - 力量 3、敏捷 3、坦克 2、特殊 2、均衡 2、刺客 1、輔助 1
@@ -264,8 +256,7 @@ function getHeroSpeed(h: RawHeroData): number {
 ### 稀有度分佈
 - ★ 1、★★ 3、★★★ 5、★★★★ 5
 
-### 屬性分佈
-- 闇 4、火 3、毒 3、冰 2、雷 1、光 1
+### ~~屬性分佈~~（已移除 2026-03-11）
 
 ---
 
@@ -344,9 +335,10 @@ public/models/zombie_N/
 | 版本 | 日期 | 變更內容 |
 |------|------|---------|
 | v1.0 | 2025-02-26 | 從程式碼逆向整理 |
-| v2.0 | 2025-02-26 | 新增 DEF/CritRate/CritDmg/Element、星級系統、14 隻角色數值 |
+| v2.0 | 2025-02-26 | 新增 DEF/CritRate/CritDmg/~~Element~~（已移除）、星級系統、14 隻角色數值 |
 | v2.1 | 2025-02-26 | **已實作**：Domain 三層型別（RawHeroInput → BattleHero）、dataService 轉換流程 |
 | v2.2 | 2026-02-28 | HeroInstance 新增 `stars: number` 欄位，舊存檔自動遷移 |
 | v2.3 | 2026-03-01 | 所有英雄從 ★0 開始培養：初始星級統一 0、加乘數 0.90、GAS appendRow 寫入 stars=0（注意：code 中 ★0 仍有 1 個被動欄位） |
 | v2.4 | 2026-03-01 | Spec 同步：BattleHero 欄位數修正 23→21、createBattleHero 加入 heroInstance/rarity 參數、★0 被動欄修正為 1（非 0）、養成依賴標記為已實作 |
 | v2.5 | 2026-03-06 | 修正 Rarity 欄位型別：D1 存 TEXT 非 number。新增共用 `toRarity(v)` / `toRarityNum(v)` 工具函式於 `constants/rarity.ts`，取代各元件 inline `numToRarity()` |
+| v2.5 | 2026-03-11 | **移除 Element 欄位**：Element 型別、BattleHero.element、RawHeroInput.element、toElement() 全部移除。DB 欄位保留但不再讀取。英雄一覽表移除屬性欄。 |

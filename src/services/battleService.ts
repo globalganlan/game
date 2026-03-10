@@ -51,7 +51,6 @@ function serializeHeroes(heroes: BattleHero[]): unknown[] {
     name: h.name,
     side: h.side,
     slot: h.slot,
-    element: h.element,
     baseStats: h.baseStats,
     finalStats: h.finalStats,
     currentHP: h.currentHP,

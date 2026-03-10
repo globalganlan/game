@@ -26,7 +26,7 @@ v2.2 十連折扣移除、免費單抽合併至單抽按鈕、裝備鍛造免費
 interface GachaBanner {
   id: string;
   name: string;                      // "常駐招募"
-  type: 'standard' | 'limited' | 'element';
+  type: 'standard' | 'limited';
   featuredHeroes: string[];          // hero_id[]（UP 角色）
   startDate: string;                 // ISO date
   endDate?: string;                  // 常駐池無結束

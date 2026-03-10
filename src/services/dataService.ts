@@ -13,45 +13,14 @@
  */
 
 import { readSheet } from './sheetApi'
-import { loadElementMatrix } from '../domain/elementSystem'
 import type {
-  Element,
   SkillTemplate,
   SkillEffect,
   HeroSkillConfig,
-  ElementEntry,
   PassiveTrigger,
   TargetType,
 } from '../domain/types'
 import type { RawHeroInput } from '../domain/battleEngine'
-
-/* ════════════════════════════════════
-   中文 ↔ 英文 屬性對照
-   ════════════════════════════════════ */
-
-const ELEMENT_ZH_TO_EN: Record<string, Element> = {
-  '火': 'fire',
-  '冰': 'water',   // 冰元素 → water
-  '水': 'water',
-  '雷': 'thunder',
-  '闇': 'dark',
-  '暗': 'dark',
-  '光': 'light',
-  '毒': 'wind',    // 毒元素 → wind（遊戲設定）
-  '風': 'wind',
-  '地': 'earth',
-  '土': 'earth',
-}
-
-export function toElement(raw: string | undefined | null): Element | '' {
-  if (!raw) return ''
-  const trimmed = raw.trim().toLowerCase()
-  // 已經是英文
-  const validEn: Element[] = ['fire', 'water', 'wind', 'thunder', 'earth', 'light', 'dark']
-  if (validEn.includes(trimmed as Element)) return trimmed as Element
-  // 中文轉換
-  return ELEMENT_ZH_TO_EN[raw.trim()] ?? ''
-}
 
 /* ════════════════════════════════════
    原始 Sheet Row 型別
@@ -97,13 +66,6 @@ interface RawHeroSkillRow {
   [key: string]: unknown
 }
 
-interface RawElementRow {
-  attacker: string
-  defender: string
-  multiplier: number | string
-  [key: string]: unknown
-}
-
 /* ════════════════════════════════════
    解析函式
    ════════════════════════════════════ */
@@ -127,7 +89,6 @@ function toSkillTemplate(row: RawSkillRow): SkillTemplate {
     skillId: row.skillId,
     name: row.name,
     type: row.type as 'active' | 'passive',
-    element: toElement(row.element),
     target: (row.target || 'single_enemy') as TargetType,
     description: row.description || '',
     effects: parseEffects(row.effects),
@@ -142,7 +103,6 @@ function toRawHeroInput(row: RawHeroRow): RawHeroInput {
     heroId: Number(row.HeroID),
     modelId: String(row.ModelID || `zombie_${row.HeroID}`),
     name: String(row.Name || ''),
-    element: toElement(row.Element) || '',
     HP: Number(row.HP) || 100,
     ATK: Number(row.ATK) || 20,
     DEF: Number(row.DEF) || 10,
@@ -171,7 +131,6 @@ function toHeroSkillConfig(row: RawHeroSkillRow): HeroSkillConfig {
 let heroesCache: RawHeroInput[] | null = null
 let skillsCache: Map<string, SkillTemplate> | null = null
 let heroSkillsCache: Map<number, HeroSkillConfig> | null = null
-let elementLoaded = false
 let allDataLoaded = false
 
 /* ════════════════════════════════════
@@ -215,19 +174,6 @@ export async function loadHeroSkills(): Promise<Map<number, HeroSkillConfig>> {
   return heroSkillsCache
 }
 
-/** 載入屬性剋制矩陣到 domain 層 */
-export async function loadElements(): Promise<void> {
-  if (elementLoaded) return
-  const rows = await readSheet<RawElementRow>('element_matrix')
-  const entries: ElementEntry[] = rows.map(r => ({
-    attacker: r.attacker as Element,
-    defender: r.defender as Element,
-    multiplier: Number(r.multiplier),
-  }))
-  loadElementMatrix(entries)
-  elementLoaded = true
-}
-
 /**
  * 一次載入所有遊戲資料
  * 在遊戲初始化時呼叫此函式（配合進度條）。
@@ -248,7 +194,7 @@ export async function loadAllGameData(
 
   // 並行載入所有表（用計數器確保進度只遞增）
   let completed = 0
-  const total = 4 // heroes + skills + heroSkills + elements
+  const total = 3 // heroes + skills + heroSkills
   const tick = () => { completed++; onProgress?.(completed / total * 0.9) }
 
   const [heroes, skills, heroSkills] = await Promise.all([
@@ -257,9 +203,6 @@ export async function loadAllGameData(
     loadHeroSkills().then(r => { tick(); return r }),
   ])
 
-  // 載入屬性矩陣
-  await loadElements()
-  tick()
   onProgress?.(0.95)
 
   allDataLoaded = true
@@ -307,6 +250,5 @@ export function clearGameDataCache(): void {
   heroesCache = null
   skillsCache = null
   heroSkillsCache = null
-  elementLoaded = false
   allDataLoaded = false
 }

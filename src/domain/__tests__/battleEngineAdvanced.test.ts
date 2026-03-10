@@ -19,7 +19,6 @@ function makeRawInput(overrides: Partial<RawHeroInput> = {}): RawHeroInput {
     heroId: 1,
     modelId: 'zombie_1',
     name: '測試角色',
-    element: 'fire',
     HP: 1000,
     ATK: 150,
     DEF: 50,
@@ -179,14 +178,14 @@ describe('battleEngine - 進階測試', () => {
 
     it('3v3 戰鬥正常運作', async () => {
       const players = [
-        createBattleHero(makeRawInput({ name: 'P1', SPD: 120, element: 'fire' }), 'player', 0, null, [], 1),
-        createBattleHero(makeRawInput({ heroId: 2, name: 'P2', SPD: 110, element: 'water' }), 'player', 1, null, [], 1),
-        createBattleHero(makeRawInput({ heroId: 3, name: 'P3', SPD: 100, element: 'wind' }), 'player', 2, null, [], 1),
+        createBattleHero(makeRawInput({ name: 'P1', SPD: 120 }), 'player', 0, null, [], 1),
+        createBattleHero(makeRawInput({ heroId: 2, name: 'P2', SPD: 110 }), 'player', 1, null, [], 1),
+        createBattleHero(makeRawInput({ heroId: 3, name: 'P3', SPD: 100 }), 'player', 2, null, [], 1),
       ]
       const enemies = [
-        createBattleHero(makeRawInput({ heroId: 4, name: 'E1', SPD: 115, element: 'earth' }), 'enemy', 0, null, [], 1),
-        createBattleHero(makeRawInput({ heroId: 5, name: 'E2', SPD: 105, element: 'thunder' }), 'enemy', 1, null, [], 1),
-        createBattleHero(makeRawInput({ heroId: 6, name: 'E3', SPD: 95, element: 'dark' }), 'enemy', 2, null, [], 1),
+        createBattleHero(makeRawInput({ heroId: 4, name: 'E1', SPD: 115 }), 'enemy', 0, null, [], 1),
+        createBattleHero(makeRawInput({ heroId: 5, name: 'E2', SPD: 105 }), 'enemy', 1, null, [], 1),
+        createBattleHero(makeRawInput({ heroId: 6, name: 'E3', SPD: 95 }), 'enemy', 2, null, [], 1),
       ]
 
       const result = await runBattleCollect(players, enemies)

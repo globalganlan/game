@@ -19,7 +19,7 @@
 - `.ai/specs/hero-schema.md` → 角色資料結構（HP / ATK / DEF / Speed / CritRate / CritDmg）
 - `.ai/specs/skill-system.md` → 主動技能 + 被動技能 + Buff/Debuff 定義
 - `.ai/specs/damage-formula.md` → 傷害 / 治療 / 暴擊 / 閃避 / DOT 數值計算
-- `.ai/specs/element-system.md` → 屬性剋制倍率
+- ~~`.ai/specs/element-system.md`~~ — 已移除（2026-03-11）
 - `.ai/specs/progression.md` → finalStats 結算（等級 / 突破 / 裝備）
 - Google Sheets API → 英雄資料來源
 
@@ -44,7 +44,7 @@
 | 戰鬥回放 | 12 | `src/App.tsx` `battleActionsRef` + `replayBattle()` | ✅ |
 | 戰鬥統計 | 13 | `src/App.tsx` `battleStats` + stats panel UI | ✅ |
 | 戰鬥速度持久化 | 11 | `localStorage.battleSpeed` | ✅ |
-| 技能/屬性 3D 飄字 | 10.3 | `src/components/SceneWidgets.tsx` `SkillToast3D` / `ElementHint3D` | ✅ |
+| 技能 3D 飄字 | 10.3 | `src/components/SceneWidgets.tsx` `SkillToast3D` | ✅ |
 | waitForAction 防碰撞 | 10.4 | `src/App.tsx` | ✅ |
 | 分頁隱藏補時 | 10.5 | `src/components/ZombieModel.tsx` `visibilitychange` | ✅ |
 | Buff 3D 圖標 | 5.3 | — | ⬜ 待做 |
@@ -79,7 +79,6 @@ fetchData() 觸發：
         - heroes → heroInputsRef（domain 格式 RawHeroInput[]）
         - skill_templates → skillsRef（Map<skillId, SkillTemplate>）
         - hero_skills → heroSkillsRef（Map<heroId, HeroSkillConfig>）
-        - element_matrix → loadElementMatrix()（domain 全域矩陣）
   2. 隨機生成敵方陣型
   3. 預載所有 GLB 模型 + 縮圖
   4. 設置 IDLE 狀態
@@ -590,7 +589,7 @@ const result = calculateHeal(attacker, target, effect)
 | `normal` | 白色 | 普通傷害 |
 | `crit` | 橙色 + 加大 | 暴擊 |
 | `miss` | 灰色 | 閃避 |
-| `weakness` | 紅色 | 屬性剋制 |
+| ~~`weakness`~~ | ~~紅色~~ | ~~屬性剋制~~（已移除） |
 | `dot` | 紫色 | DOT 持續傷害（burn/poison/bleed） |
 | `shield` | 藍色 | 完全被護盾吸收 |
 
@@ -660,12 +659,11 @@ IDLE → ADVANCING → ATTACKING → RETREATING → IDLE
 - 前進速率：`Math.min(0.12 × speed, 1)`
 - 到達判定：距離 < 0.25
 
-### 10.3 技能/屬性 3D 飄字
+### 10.3 技能 3D 飄字
 
 - `SkillToast3D`：技能名稱顯示在攻擊者頭頂（Billboard Text，2.5s 淡出上浮）
-- `ElementHint3D`：屬性剋制/抵抗提示顯示在攻擊者頭頂（Billboard Text）
+- ~~`ElementHint3D`~~：已移除（2026-03-11）
 - 元件位於 `src/components/SceneWidgets.tsx`
-- toast/hint 資料帶 `attackerUid`，由 `Hero` 元件根據 uid 過濾顯示
 
 ### 10.4 waitForAction / waitForMove 防碰撞機制
 
@@ -746,7 +744,7 @@ IDLE → ADVANCING → ATTACKING → RETREATING → IDLE
 ```typescript
 interface BattleHero {
   uid: string; heroId: number; modelId: string; name: string
-  side: 'player' | 'enemy'; slot: number; element: Element | ''
+  side: 'player' | 'enemy'; slot: number
   baseStats: FinalStats; finalStats: FinalStats
   currentHP: number; maxHP: number; energy: number
   activeSkill: SkillTemplate | null
@@ -761,7 +759,7 @@ interface BattleHero {
 
 ```typescript
 interface RawHeroInput {
-  heroId: number; modelId: string; name: string; element: string
+  heroId: number; modelId: string; name: string
   HP: number; ATK: number; DEF: number; SPD: number
   CritRate: number; CritDmg: number
 }
@@ -803,7 +801,6 @@ App.tsx
        EnergyBar3D  3D 能量條
        DamagePopup  傷害飄字（待擴展多顏色）
        SkillToast3D  技能名稱 3D 飄字
-       ElementHint3D  屬性剋制/抵抗 3D 提示
        Billboard Text  角色名稱
     DragPlane
     ResponsiveCamera

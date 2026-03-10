@@ -1,84 +1,9 @@
 /**
- * dataService 進階測試 — toElement / getHeroSkillSet
+ * dataService 進階測試 — getHeroSkillSet
  */
 import { describe, it, expect } from 'vitest'
-import { toElement, getHeroSkillSet } from '../dataService'
+import { getHeroSkillSet } from '../dataService'
 import type { SkillTemplate, HeroSkillConfig } from '../../domain/types'
-
-/* ═══════ toElement ═══════ */
-
-describe('dataService — toElement', () => {
-  it('英文 fire → fire', () => {
-    expect(toElement('fire')).toBe('fire')
-  })
-
-  it('英文大小寫不敏感 WATER → water', () => {
-    expect(toElement('WATER')).toBe('water')
-  })
-
-  it('英文 Thunder → thunder', () => {
-    expect(toElement('Thunder')).toBe('thunder')
-  })
-
-  it('中文 火 → fire', () => {
-    expect(toElement('火')).toBe('fire')
-  })
-
-  it('中文 冰 → water', () => {
-    expect(toElement('冰')).toBe('water')
-  })
-
-  it('中文 雷 → thunder', () => {
-    expect(toElement('雷')).toBe('thunder')
-  })
-
-  it('中文 闇 → dark', () => {
-    expect(toElement('闇')).toBe('dark')
-  })
-
-  it('中文 光 → light', () => {
-    expect(toElement('光')).toBe('light')
-  })
-
-  it('中文 毒 → wind', () => {
-    expect(toElement('毒')).toBe('wind')
-  })
-
-  it('中文 地 → earth', () => {
-    expect(toElement('地')).toBe('earth')
-  })
-
-  it('中文 土 → earth', () => {
-    expect(toElement('土')).toBe('earth')
-  })
-
-  it('空字串 → ""', () => {
-    expect(toElement('')).toBe('')
-  })
-
-  it('null → ""', () => {
-    expect(toElement(null)).toBe('')
-  })
-
-  it('undefined → ""', () => {
-    expect(toElement(undefined)).toBe('')
-  })
-
-  it('不認識的字串 → ""', () => {
-    expect(toElement('banana')).toBe('')
-  })
-
-  it('帶空白的中文 " 火 " → fire', () => {
-    expect(toElement(' 火 ')).toBe('fire')
-  })
-
-  it('所有 7 種英文元素皆可辨識', () => {
-    const elements = ['fire', 'water', 'wind', 'thunder', 'earth', 'light', 'dark'] as const
-    for (const el of elements) {
-      expect(toElement(el)).toBe(el)
-    }
-  })
-})
 
 /* ═══════ getHeroSkillSet ═══════ */
 
@@ -87,7 +12,6 @@ describe('dataService — getHeroSkillSet', () => {
     skillId: 'active_1',
     name: '火球術',
     type: 'active',
-    element: 'fire',
     target: 'single_enemy',
     description: '',
     effects: [],
@@ -99,7 +23,6 @@ describe('dataService — getHeroSkillSet', () => {
     skillId: 'passive_1',
     name: '被動1',
     type: 'passive',
-    element: '',
     target: 'self',
     description: '',
     effects: [],
@@ -111,7 +34,6 @@ describe('dataService — getHeroSkillSet', () => {
     skillId: 'passive_2',
     name: '被動2',
     type: 'passive',
-    element: '',
     target: 'self',
     description: '',
     effects: [],

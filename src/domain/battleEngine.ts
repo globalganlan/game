@@ -957,7 +957,6 @@ export interface RawHeroInput {
   heroId: number
   modelId: string
   name: string
-  element: string
   HP: number
   ATK: number
   DEF: number
@@ -1005,7 +1004,6 @@ export function createBattleHero(
     name: input.name,
     side,
     slot,
-    element: (input.element as BattleHero['element']) || '',
 
     baseStats,
     finalStats: { ...baseStats },  // progression already applied

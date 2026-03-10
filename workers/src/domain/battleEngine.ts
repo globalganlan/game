@@ -18,7 +18,6 @@ export interface BattleHero {
   heroId: number;
   side: 'player' | 'enemy';
   slot: number;
-  element: string;
   currentHP: number;
   maxHP: number;
   energy: number;
@@ -87,7 +86,6 @@ interface DamageResult {
   damage: number;
   isCrit: boolean;
   isDodge: boolean;
-  elementMult: number;
   damageType: string;
   shieldAbsorbed: number;
   reflectDamage: number;
@@ -109,30 +107,6 @@ interface BattleContext {
 
 type EmitFn = (action: Record<string, unknown>) => void;
 type RngFn = () => number;
-
-// ═══════════════════════════════════════════════════════
-// Element System
-// ═══════════════════════════════════════════════════════
-
-const ELEMENT_MATRIX: Record<string, Record<string, number>> = {
-  fire:    { fire: 0.9, water: 0.7, wind: 1.3, thunder: 1.0, earth: 1.0, light: 1.0, dark: 1.0 },
-  water:   { fire: 1.3, water: 0.9, wind: 1.0, thunder: 0.7, earth: 1.0, light: 1.0, dark: 1.0 },
-  wind:    { fire: 0.7, water: 1.0, wind: 0.9, thunder: 1.0, earth: 1.3, light: 1.0, dark: 1.0 },
-  thunder: { fire: 1.0, water: 1.3, wind: 1.0, thunder: 0.9, earth: 0.7, light: 1.0, dark: 1.0 },
-  earth:   { fire: 1.0, water: 1.0, wind: 0.7, thunder: 1.3, earth: 0.9, light: 1.0, dark: 1.0 },
-  light:   { fire: 1.0, water: 1.0, wind: 1.0, thunder: 1.0, earth: 1.0, light: 0.9, dark: 1.3 },
-  dark:    { fire: 1.0, water: 1.0, wind: 1.0, thunder: 1.0, earth: 1.0, light: 1.3, dark: 0.9 },
-};
-
-function getElementMultiplier(atk: string, def: string): number {
-  if (!atk || !def) return 1.0;
-  return ELEMENT_MATRIX[atk]?.[def] ?? 1.0;
-}
-
-function isWeakness(atk: string, def: string): boolean {
-  if (!atk || !def) return false;
-  return getElementMultiplier(atk, def) > 1.0;
-}
 
 // ═══════════════════════════════════════════════════════
 // Energy System
@@ -293,7 +267,7 @@ function calculateDamage(rng: RngFn, attacker: BattleHero, target: BattleHero, s
   // 0. 閃避
   const dodgeRate = Math.min(getStatusValue(target, 'dodge_up'), 0.75);
   if (rng() < dodgeRate) {
-    return { damage: 0, isCrit: false, isDodge: true, elementMult: 1.0, damageType: 'miss', shieldAbsorbed: 0, reflectDamage: 0 };
+    return { damage: 0, isCrit: false, isDodge: true, damageType: 'miss', shieldAbsorbed: 0, reflectDamage: 0 };
   }
 
   // 1. 基礎傷害
@@ -312,9 +286,7 @@ function calculateDamage(rng: RngFn, attacker: BattleHero, target: BattleHero, s
   const isCrit = rng() < critRate;
   if (isCrit) dmg *= (1 + atkStats.CritDmg / 100);
 
-  // 4. 屬性倍率
-  const elementMult = getElementMultiplier(attacker.element, target.element);
-  dmg *= elementMult;
+  // 4. (element system removed)
 
   // 5. 隨機浮動 ±5%
   dmg *= 0.95 + rng() * 0.10;
@@ -338,10 +310,9 @@ function calculateDamage(rng: RngFn, attacker: BattleHero, target: BattleHero, s
 
   let damageType = 'normal';
   if (isCrit) damageType = 'crit';
-  if (isWeakness(attacker.element, target.element)) damageType = 'weakness';
   if (shieldAbsorbed > 0 && actualDmg === 0) damageType = 'shield';
 
-  return { damage: actualDmg, isCrit, isDodge: false, elementMult, damageType, shieldAbsorbed, reflectDamage };
+  return { damage: actualDmg, isCrit, isDodge: false, damageType, shieldAbsorbed, reflectDamage };
 }
 
 function calculateHeal(rng: RngFn, healer: BattleHero, target: BattleHero, skill: SkillEffect) {
