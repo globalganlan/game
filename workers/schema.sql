@@ -128,7 +128,6 @@ CREATE TABLE IF NOT EXISTS heroes (
   heroId      INTEGER PRIMARY KEY,
   name        TEXT NOT NULL DEFAULT '',
   type        TEXT NOT NULL DEFAULT '',
-  element     TEXT NOT NULL DEFAULT '',
   rarity      TEXT NOT NULL DEFAULT 'N',
   baseHP      INTEGER NOT NULL DEFAULT 0,
   baseATK     INTEGER NOT NULL DEFAULT 0,
@@ -147,7 +146,6 @@ CREATE TABLE IF NOT EXISTS skill_templates (
   skillId         TEXT PRIMARY KEY,
   name            TEXT NOT NULL DEFAULT '',
   type            TEXT NOT NULL DEFAULT '',
-  element         TEXT NOT NULL DEFAULT '',
   target          TEXT NOT NULL DEFAULT '',
   description     TEXT NOT NULL DEFAULT '',
   effects         TEXT NOT NULL DEFAULT '[]',
@@ -165,16 +163,6 @@ CREATE TABLE IF NOT EXISTS hero_skills (
   passive2_skillId TEXT NOT NULL DEFAULT '',
   passive3_skillId TEXT NOT NULL DEFAULT '',
   passive4_skillId TEXT NOT NULL DEFAULT ''
-);
-
--- ═══════════════════════════════════════════════
--- 7d. element_matrix — 屬性剋制矩陣（靜態）
--- ═══════════════════════════════════════════════
-CREATE TABLE IF NOT EXISTS element_matrix (
-  id         INTEGER PRIMARY KEY AUTOINCREMENT,
-  attacker   TEXT NOT NULL DEFAULT '',
-  defender   TEXT NOT NULL DEFAULT '',
-  multiplier REAL NOT NULL DEFAULT 1.0
 );
 
 -- ═══════════════════════════════════════════════

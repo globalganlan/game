@@ -9,7 +9,6 @@
  * - heroes         → 英雄基礎數值
  * - skill_templates → 技能模板（effects 欄為 JSON 字串）
  * - hero_skills     → 英雄←→技能對照
- * - element_matrix  → 屬性剋制矩陣
  */
 
 import { readSheet } from './sheetApi'
@@ -38,7 +37,6 @@ interface RawHeroRow {
   Speed: number | string
   CritRate: number | string
   CritDmg: number | string
-  Element: string
   Description?: string
   [key: string]: unknown
 }
@@ -47,7 +45,6 @@ interface RawSkillRow {
   skillId: string
   name: string
   type: string
-  element: string
   target: string
   description: string
   effects: string     // JSON string

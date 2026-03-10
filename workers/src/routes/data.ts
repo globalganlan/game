@@ -2,7 +2,7 @@
  * Data Routes — 靜態遊戲資料讀取
  *
  * 前端 sheetApi.ts 的 readSheet 對應端點。
- * heroes / skill_templates / hero_skills / element_matrix
+ * heroes / skill_templates / hero_skills
  * 從專屬 D1 表讀取。
  */
 import { Hono } from 'hono';
@@ -20,7 +20,7 @@ async function readHeroes(db: D1Database) {
     SELECT heroId AS HeroID, modelId AS ModelID, name AS Name, type AS Type,
            rarity AS Rarity, baseHP AS HP, baseATK AS ATK, baseDEF AS DEF,
            baseSPD AS Speed, critRate AS CritRate, critDmg AS CritDmg,
-           element AS Element, description AS Description
+           description AS Description
     FROM heroes ORDER BY heroId
   `).all();
   return rows.results ?? [];
@@ -28,7 +28,7 @@ async function readHeroes(db: D1Database) {
 
 async function readSkillTemplates(db: D1Database) {
   const rows = await db.prepare(`
-    SELECT skillId, name, type, element, target, description,
+    SELECT skillId, name, type, target, description,
            effects, passive_trigger, icon
     FROM skill_templates ORDER BY skillId
   `).all();
@@ -44,20 +44,11 @@ async function readHeroSkills(db: D1Database) {
   return rows.results ?? [];
 }
 
-async function readElementMatrix(db: D1Database) {
-  const rows = await db.prepare(`
-    SELECT attacker, defender, multiplier
-    FROM element_matrix ORDER BY id
-  `).all();
-  return rows.results ?? [];
-}
-
 /** 正規化表對照 */
 const DEDICATED_READERS: Record<string, (db: D1Database) => Promise<unknown[]>> = {
   heroes: readHeroes,
   skill_templates: readSkillTemplates,
   hero_skills: readHeroSkills,
-  element_matrix: readElementMatrix,
 };
 
 /**
