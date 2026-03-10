@@ -95,6 +95,65 @@ function resolveSkillIcon(icon: string, type: 'active' | 'passive'): string {
 }
 
 /* ────────────────────────────
+   Skill Tag Labels
+   ──────────────────────────── */
+
+const TARGET_LABEL: Record<string, string> = {
+  single_enemy: '單體敵人',
+  all_enemies: '全體敵人',
+  random_enemies_3: '隨機3敵',
+  front_row_enemies: '前排敵人',
+  back_row_enemies: '後排敵人',
+  single_ally: '單體隊友',
+  all_allies: '全體隊友',
+  self: '自身',
+}
+const TRIGGER_LABEL: Record<string, string> = {
+  battle_start: '戰鬥開始',
+  turn_start: '回合開始',
+  turn_end: '回合結束',
+  on_attack: '攻擊時',
+  on_kill: '擊殺時',
+  on_be_attacked: '被攻擊時',
+  on_take_damage: '受傷時',
+  on_lethal: '致命時',
+  on_dodge: '閃避時',
+  on_crit: '暴擊時',
+  on_ally_death: '隊友陣亡',
+  on_ally_skill: '隊友施技',
+  hp_below_pct: 'HP低於閾值',
+  every_n_turns: '每N回合',
+  always: '常駐',
+}
+
+/** 依技能的 target / passiveTrigger 產生標籤 JSX */
+function SkillDescWithTags({ skill }: { skill: SkillTemplate }) {
+  const tags: { label: string; cls: string }[] = []
+  // trigger tag（被動技才有）
+  if (skill.passiveTrigger) {
+    const tl = TRIGGER_LABEL[skill.passiveTrigger] || skill.passiveTrigger
+    tags.push({ label: tl, cls: 'trigger' })
+  }
+  // target tag
+  if (skill.target && skill.target !== 'self') {
+    const tl = TARGET_LABEL[skill.target] || skill.target
+    tags.push({ label: tl, cls: 'target' })
+  }
+  return (
+    <div className="hd2-skill-desc">
+      {tags.length > 0 && (
+        <span className="hd2-skill-tags">
+          {tags.map((t, i) => (
+            <span key={i} className={`hd2-skill-tag ${t.cls}`}>{t.label}</span>
+          ))}
+        </span>
+      )}
+      {skill.description || '—'}
+    </div>
+  )
+}
+
+/* ────────────────────────────
    3D Model Preview (R3F)
    ──────────────────────────── */
 
@@ -619,7 +678,7 @@ function HeroDetail({ hero, instance, onClose, skills, heroSkills }: HeroDetailP
               <div className="hd2-skill-icon">{resolveSkillIcon(skillSet.activeSkill.icon, 'active')}</div>
               <div className="hd2-skill-body">
                 <div className="hd2-skill-name"><span className="hd2-skill-badge active">主動</span> {skillSet.activeSkill.name}</div>
-                <div className="hd2-skill-desc">{skillSet.activeSkill.description || '—'}</div>
+                <SkillDescWithTags skill={skillSet.activeSkill} />
               </div>
             </div>
           ) : (
@@ -647,7 +706,7 @@ function HeroDetail({ hero, instance, onClose, skills, heroSkills }: HeroDetailP
                         </span>
                         {passive.name}
                       </div>
-                      <div className="hd2-skill-desc">{passive.description || '—'}</div>
+                      <SkillDescWithTags skill={passive} />
                     </>
                   ) : (
                     <div className="hd2-skill-name hd2-skill-na">🔒 ★{reqStars} 解鎖</div>
@@ -953,7 +1012,9 @@ function HeroDetail({ hero, instance, onClose, skills, heroSkills }: HeroDetailP
                         <span className="hd2-star-skill-name">{unlockPassive.name}</span>
                       </div>
                       {unlockPassive.description && (
-                        <div className="hd2-star-skill-desc">{unlockPassive.description}</div>
+                        <div className="hd2-star-skill-desc">
+                          <SkillDescWithTags skill={unlockPassive} />
+                        </div>
                       )}
                     </>
                   ) : (
