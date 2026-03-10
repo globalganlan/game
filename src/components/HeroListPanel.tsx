@@ -304,6 +304,7 @@ function HeroDetail({ hero, instance, onClose, skills, heroSkills }: HeroDetailP
   // 裝備篩選
   const [equipFilterRarity, setEquipFilterRarity] = useState<Rarity | 'all'>('all')
   const [equipFilterSet, setEquipFilterSet] = useState<string>('all')
+  const [equipFilterSubStats, setEquipFilterSubStats] = useState<Set<string>>(new Set())
   // 背包訂閱（用於讀取素材數量 + 裝備變更即時刷新）
   const [invTick, setInvTick] = useState(0)
   useEffect(() => {
@@ -477,6 +478,11 @@ function HeroDetail({ hero, instance, onClose, skills, heroSkills }: HeroDetailP
   const availableForSlot = availableForSlotRaw.filter(eq => {
     if (equipFilterRarity !== 'all' && eq.rarity !== equipFilterRarity) return false
     if (equipFilterSet !== 'all' && eq.setId !== equipFilterSet) return false
+    if (equipFilterSubStats.size > 0) {
+      const hasSubs = [...equipFilterSubStats].every(stat =>
+        (eq.subStats ?? []).some(sub => sub.stat === stat))
+      if (!hasSubs) return false
+    }
     return true
   })
   // 收集可用的套裝列表（用於篩選下拉）
@@ -492,6 +498,7 @@ function HeroDetail({ hero, instance, onClose, skills, heroSkills }: HeroDetailP
     setEquipSelectSlot(slotKey)
     setEquipFilterRarity('all')
     setEquipFilterSet('all')
+    setEquipFilterSubStats(new Set())
     setResultMsg('')
     setModalMode('equip')
   }, [isOwned])
@@ -1066,6 +1073,45 @@ function HeroDetail({ hero, instance, onClose, skills, heroSkills }: HeroDetailP
                         ))}
                       </div>
                     </div>
+                  )}
+                </div>
+              )}
+
+              {/* ── 副屬性篩選 ── */}
+              {availableForSlotRaw.length > 0 && (
+                <div className="inv-substat-filter" style={{ padding: '0 0 6px' }}>
+                  <span className="inv-substat-label">副屬性：</span>
+                  {[
+                    { stat: 'ATK', label: '攻擊' },
+                    { stat: 'HP', label: 'HP' },
+                    { stat: 'DEF', label: '防禦' },
+                    { stat: 'SPD', label: '速度' },
+                    { stat: 'CritRate', label: '暴擊率' },
+                    { stat: 'CritDmg', label: '暴擊傷害' },
+                  ].map(({ stat, label }) => {
+                    const active = equipFilterSubStats.has(stat)
+                    return (
+                      <button
+                        key={stat}
+                        className={`inv-substat-btn ${active ? 'inv-substat-active' : ''}`}
+                        onClick={() => setEquipFilterSubStats(prev => {
+                          const next = new Set(prev)
+                          if (next.has(stat)) next.delete(stat); else next.add(stat)
+                          return next
+                        })}
+                      >{label}</button>
+                    )
+                  })}
+                  {equipFilterSubStats.size > 0 && (
+                    <button
+                      className="inv-substat-btn inv-substat-clear"
+                      onClick={() => setEquipFilterSubStats(new Set())}
+                    >✕ 清除</button>
+                  )}
+                  {equipFilterSubStats.size > 0 && (
+                    <span className="inv-substat-count">
+                      {availableForSlot.length} 件
+                    </span>
                   )}
                 </div>
               )}
