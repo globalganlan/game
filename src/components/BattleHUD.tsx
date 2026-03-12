@@ -93,6 +93,8 @@ interface BattleHUDProps {
   stageId?: string
   /** Boss 模式即時累計傷害 */
   bossDamageProgress?: number
+  /** 當前回合數 */
+  currentTurn?: number
   /** 玩家英雄資訊 */
   playerHeroes: Array<{
     uid: string
@@ -270,7 +272,7 @@ function CompactEnergyItem({
 
 const RANK_COLORS: Record<string, string> = { S: '#ff4444', A: '#ff9900', B: '#44aaff', C: '#88cc44' }
 
-function BossDamageBar({ stageId, totalDamage }: { stageId: string; totalDamage: number }) {
+function BossDamageBar({ stageId, totalDamage, currentTurn }: { stageId: string; totalDamage: number; currentTurn: number }) {
   const boss = useMemo(() => getBossConfig(stageId), [stageId])
   if (!boss) return null
 
@@ -302,6 +304,7 @@ function BossDamageBar({ stageId, totalDamage }: { stageId: string; totalDamage:
     <div className="boss-dmg-bar-wrap">
       <div className="boss-dmg-header">
         <span className="boss-dmg-title">⚔️ {boss.name} — 累計傷害</span>
+        <span className="boss-dmg-round">回合 {currentTurn}/{boss.turnLimit}</span>
         <span className="boss-dmg-value">{totalDamage.toLocaleString()}</span>
       </div>
 
@@ -361,6 +364,7 @@ export function BattleHUD({
   stageMode,
   stageId,
   bossDamageProgress,
+  currentTurn,
   playerHeroes: _playerHeroes,
   enemyHeroes: _enemyHeroes,
   buffMap: _buffMap,
@@ -373,7 +377,7 @@ export function BattleHUD({
     <div className="bhud-container">
       {/* Boss 傷害進度條 */}
       {stageMode === 'boss' && stageId && (
-        <BossDamageBar stageId={stageId} totalDamage={bossDamageProgress ?? 0} />
+        <BossDamageBar stageId={stageId} totalDamage={bossDamageProgress ?? 0} currentTurn={currentTurn ?? 0} />
       )}
     </div>
   )

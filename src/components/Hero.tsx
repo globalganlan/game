@@ -243,9 +243,9 @@ export function Hero({
           <SkillToast3D key={t.id} heroName={t.heroName} skillName={t.skillName} position={[0, 1.5, 0]} textScale={textScale} />
         ))}
 
-        {/* 被動觸發浮動標示（身體位置） */}
-        {passiveHints.map((ph) => (
-          <PassiveHint3D key={ph.id} skillName={ph.skillName} position={[0, 1.0, 0]} textScale={textScale} />
+        {/* 被動觸發浮動標示（依序往上錯開避免重疊） */}
+        {passiveHints.map((ph, idx) => (
+          <PassiveHint3D key={ph.id} skillName={ph.skillName} position={[0, 1.0 + idx * 0.55, 0]} textScale={textScale} />
         ))}
 
         {/* Buff/Debuff 施加漂浮文字 */}

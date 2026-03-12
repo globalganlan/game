@@ -1,7 +1,7 @@
 # 關卡系統 Spec
 
-> 版本：v3.0 ｜ 狀態：🟢 已實作
-> 最後更新：2026-03-06
+> 版本：v3.1 ｜ 狀態：🟢 已實作
+> 最後更新：2026-03-12
 > 負責角色：🎯 GAME_DESIGN → 🔧 CODING
 
 ## 概述
@@ -376,7 +376,7 @@ PvP 使用專屬「冷藍電光」競技場主題（Arena `SceneMode = 'pvp'`、
 
 ### 機制
 
-3 位固定 Boss，單體高數值、30 回合限制、傷害段位獎勵。
+3 位固定 Boss，單體高數值、20 回合限制、傷害段位獎勵。
 
 | 項目 | 值 |
 |------|-----|
@@ -384,16 +384,16 @@ PvP 使用專屬「冷藍電光」競技場主題（Arena `SceneMode = 'pvp'`、
 | 體力消耗 | **0** |
 | 解鎖條件 | 通關 2-8 |
 | Boss 數量 | 3 位 |
-| 回合限制 | 30 回合 |
+| 回合限制 | **20 回合**（v3.1 從 30 下修） |
 | stageId 格式 | `"boss_{bossId}"` |
 
 ### BOSS_CONFIGS 常數
 
 ```typescript
 const BOSS_CONFIGS: BossConfig[] = [
-  { bossId: 'boss_1', name: '腐化巨獸', heroId: 5,  hp: 5000,  atk: 120, speed: 80,  turnLimit: 30, damageThresholds: { S: 15000, A: 10000, B: 5000, C: 2000 } },
-  { bossId: 'boss_2', name: '暗夜領主', heroId: 9,  hp: 8000,  atk: 180, speed: 100, turnLimit: 30, damageThresholds: { S: 25000, A: 18000, B: 10000, C: 4000 } },
-  { bossId: 'boss_3', name: '末日審判者', heroId: 14, hp: 12000, atk: 250, speed: 120, turnLimit: 30, damageThresholds: { S: 40000, A: 28000, B: 15000, C: 6000 } },
+  { bossId: 'boss_1', name: '腐化巨獸', heroId: 5,  hp: 5000,  atk: 120, speed: 80,  turnLimit: 20, damageThresholds: { S: 15000, A: 10000, B: 5000, C: 2000 } },
+  { bossId: 'boss_2', name: '暗夜領主', heroId: 9,  hp: 8000,  atk: 180, speed: 100, turnLimit: 20, damageThresholds: { S: 25000, A: 18000, B: 10000, C: 4000 } },
+  { bossId: 'boss_3', name: '末日審判者', heroId: 14, hp: 12000, atk: 250, speed: 120, turnLimit: 20, damageThresholds: { S: 40000, A: 28000, B: 15000, C: 6000 } },
 ]
 ```
 
@@ -419,6 +419,7 @@ interface BossConfig {
 | `getBossConfig(bossId)` | 回傳 BossConfig 或 null |
 | `getBossEnemies(bossId)` | 回傳 StageEnemy[]（單一 Boss，倍率由 hp/atk/speed 除以基礎值算出） |
 | `getBossReward(bossId, totalDamage)` | 依累計傷害判定段位（S/A/B/C），回傳分級獎勵 |
+| `getBossCombatPower(boss)` | 計算 Boss 戰力值（基於 hp/atk/speed），用於選關卡片顯示 |
 
 ### Boss 獎勵分級（getBossReward）
 
@@ -637,3 +638,4 @@ mergeDrops(items: InventoryItem[]): InventoryItem[]   // 合併同 itemId
 | v2.8 | 2026-06-19 | **星級簡化 + 爬塔獎勵顯示移除**：移除 `calculateStarRating` 函式，關卡評價從三星制（1/2/3）改為二元通關制（通關=1 / 未通關）；`stageStars` 值固定為 `1`（已通關）；勝利面板不再顯示星級評價或首通星級獎勵；爬塔 UI 關卡列表不再顯示金幣/經驗/鑽石獎勵行（後端仍正常發放獎勵） |
 | v2.9 | 2026-03-05 | **每日限制 + 獎勵預覽 + battle.ts 重寫**：①`battle.ts` 完全重寫 — 新增 `DAILY_LIMITS`（daily:3/pvp:5/boss:3）、`DailyCounts` 介面 + `parseDailyCounts()` + `checkDailyLimit()`、後端強制每日限制（超過拒絕，敗北也消耗）、per-mode 獎勵計算（daily=依 tier 發 gold/exp/items、pvp=gold/exp/diamond/pvp_coin、boss=S/A/B/C rank-based gold/diamond）②新 `/daily-counts` API 端點 ③D1 `save_data` 新增 `dailyCounts TEXT` 欄位 ④前端 `stageSystem.ts` 新增 `DAILY_LIMITS` + `getDailyLimit()` ⑤`StageSelect.tsx` 大幅改版 — TowerPanel 獎勵預覽、DailyPanel 獎勵+剩餘次數+耗盡訊息、PvPPanel 獎勵+pvp_coin+剩餘次數、BossPanel2 段位獎勵提示+剩餘次數、全 Tab 紅點 badge ⑥`CurrencyIcon` 新增 `pvp_coin` 類型（🏅）⑦`MainMenu` 新增 `stagesHasDaily` prop + 關卡按鈕紅點 ⑧`App.tsx` 在 MAIN_MENU 時 fetch daily-counts ⑨`App.css` 新增 tower-rewards/sc-reward-tag/daily-attempts/daily-exhausted/daily-tier-rewards/pvp-meta-row/pvp-reward-preview/boss-card-reward-hint 樣式 |
 | v3.0 | 2026-03-06 | **UX 修正+獎勵清理**：①Boss B/C 段位移除重複 EXP items（前端 `getBossRewardByBossAndRank` + 後端 `battle.ts`）②關卡選擇鑽石為 0 時不顯示圖示（修正 React JSX `{0 && ...}` 渲染 "0" 的 gotcha，改用 `(diamond ?? 0) > 0`）③PvP 對手獎勵 + Boss 段位獎勵鑽石顯示同步修正 ④MainMenu 紅點增加 `isModeUnlocked` 檢查（未解鎖的 daily/pvp/boss 不計入紅點）⑤`backToLobby` 移除過場動畫（直接返回 StageSelect/MainMenu）⑥戰鬥準備戰力改為即時計算（`battlePrepPower` useMemo 基於 `playerSlots` 而非 saved `formation`）|
+| v3.1 | 2026-03-12 | **Boss 回合限制下修 + 戰力顯示**：①BOSS_CONFIGS 三位 Boss 的 `turnLimit` 從 30 下修為 20；`runBattleLoop.ts` 改為從 boss config 動態讀取 turnLimit（取代 hardcoded 值）；StageSelect 文字更新「限時 20 回合」②新增 `getBossCombatPower(boss)` 函式，計算 Boss 戰力值；StageSelect Boss 選關卡片新增戰力顯示（`.boss-card-cp` CSS）③BossDamageBar 新增回合顯示「回合 N/20」（App.tsx 傳 `currentTurn={turn}` 至 BattleHUD）④App.css 新增 `.boss-dmg-round` + `.boss-card-cp` 樣式 |

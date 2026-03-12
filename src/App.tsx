@@ -762,6 +762,7 @@ export default function App() {
               stageMode={stageMode}
               stageId={stageId}
               bossDamageProgress={bossDamageProgress}
+              currentTurn={turn}
               playerHeroes={playerSlots
                 .filter((s): s is SlotHero => s !== null)
                 .map(s => ({

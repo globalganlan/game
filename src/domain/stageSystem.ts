@@ -535,7 +535,7 @@ export const BOSS_CONFIGS: BossConfig[] = [
     hp: 99999999,
     atk: 120,
     speed: 80,
-    turnLimit: 30,
+    turnLimit: 20,
     damageThresholds: { S: 15000, A: 10000, B: 5000, C: 2000 },
   },
   {
@@ -545,7 +545,7 @@ export const BOSS_CONFIGS: BossConfig[] = [
     hp: 99999999,
     atk: 180,
     speed: 100,
-    turnLimit: 30,
+    turnLimit: 20,
     damageThresholds: { S: 25000, A: 18000, B: 10000, C: 4000 },
   },
   {
@@ -555,13 +555,25 @@ export const BOSS_CONFIGS: BossConfig[] = [
     hp: 99999999,
     atk: 250,
     speed: 120,
-    turnLimit: 30,
+    turnLimit: 20,
     damageThresholds: { S: 40000, A: 28000, B: 15000, C: 6000 },
   },
 ]
 
 export function getBossConfig(bossId: string): BossConfig | null {
   return BOSS_CONFIGS.find(b => b.bossId === bossId) ?? null
+}
+
+/** 估算 Boss 戰力（不含 HP，因為 Boss 血量無限） */
+export function getBossCombatPower(boss: BossConfig): number {
+  const DEF = 10, CRIT_RATE = 5, CRIT_DMG = 50
+  return Math.floor(
+    boss.atk * 3.0 +
+    DEF * 2.5 +
+    boss.speed * 8.0 +
+    CRIT_RATE * 5.0 +
+    CRIT_DMG * 2.0
+  )
 }
 
 /** 根據 bossId 產生 StageEnemy 陣列（單一 Boss） */

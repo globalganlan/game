@@ -26,7 +26,7 @@ import { createBattleHero } from '../domain'
 import { getHeroSkillSet } from '../services'
 import { completeBattle, type CompleteBattleResult } from '../services/progressionService'
 import {
-  rollDrops, mergeDrops,
+  rollDrops, mergeDrops, getBossConfig,
 } from '../domain/stageSystem'
 import type { StageReward } from '../domain/stageSystem'
 import { getTimerYield } from '../services/saveService'
@@ -761,7 +761,7 @@ export async function executeBattleLoop(ctx: BattleLoopContext, replayActions?: 
     // ── 快照當前英雄資料送後端 ──
     const snapshotPlayers = JSON.parse(JSON.stringify(playerBH)) as BattleHero[]
     const snapshotEnemies = JSON.parse(JSON.stringify(enemyBH)) as BattleHero[]
-    const bossMaxTurns = stageMode === 'boss' ? 30 : 50
+    const bossMaxTurns = stageMode === 'boss' ? (getBossConfig(stageId)?.turnLimit ?? 20) : 50
     const dungeonTier = stageMode === 'daily' ? (stageId.split('_').pop() || 'normal') : undefined
 
     // ── 等待後端戰鬥模擬 + 獎勵計算 ──

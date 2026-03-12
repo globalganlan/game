@@ -1,8 +1,14 @@
 # 開發狀態快照 — Dev Status
 
-> 最後更新：2026-03-11（第七十次更新 — 屬性系統完整移除）
+> 最後更新：2026-03-12（第七十一次更新 — Boss 回合限制下修 + 戰力顯示 + 被動飄字防疊 + 回合計數器）
 
-## 截至 2026-03-11 的開發狀態
+## 截至 2026-03-12 的開發狀態
+
+### Boss 平衡調整 + UI 改善（4 項）
+- [x] **被動技能飄字防疊** — Hero.tsx `PassiveHint3D` 多個同時觸發時依 `idx * 0.55` 垂直偏移，避免文字重疊
+- [x] **Boss 回合計數器** — BattleHUD.tsx `BossDamageBar` 新增回合顯示「回合 N/M」；App.tsx 傳 `currentTurn={turn}` 至 BattleHUD
+- [x] **Boss 回合限制下修 30→20** — BOSS_CONFIGS 三位 Boss turnLimit 30→20；`runBattleLoop.ts` 改從 boss config 動態讀取 turnLimit；StageSelect 文字更新「限時 20 回合」
+- [x] **Boss 戰力顯示** — 新增 `getBossCombatPower(boss)` 函式；Boss 選關卡片顯示戰力值；App.css 新增 `.boss-dmg-round` + `.boss-card-cp` 樣式
 
 ### 屬性系統完整移除（Element System Removal）
 - [x] 刪除 `src/domain/elementSystem.ts`、`src/domain/__tests__/elementSystem.test.ts`
@@ -194,7 +200,7 @@
 
 | Spec | 版本 | 狀態 |
 |------|------|------|
-| core-combat.md | v3.3 | 🟢 Phase B 死亡角色守衛 + 致死跳過 HURT |
+| core-combat.md | v3.9 | 🟢 Phase B 死亡角色守衞 + 致死跳過 HURT + PassiveHint3D 防疊痌 + Boss 回合計數 |
 | hero-schema.md | v2.5 | 🟢 4 層型別 + 14 角色完整數值表（Element 已移除） |
 | damage-formula.md | v1.2 | 🟢 9 步傷害公式（屬性倍率步驟已移除） |
 | skill-system.md | v1.3 | 🟢 SkillTemplate + 15 PassiveTrigger + extra_turn 機制 + on_ally_death/on_ally_skill |
@@ -202,7 +208,7 @@
 | tech-architecture.md | v2.1 | 🟢 ClickableItemIcon 統一 + PanelInfoTip + CurrencyIcon |
 | auth-system.md | v0.1 | 🟡 草案 |
 | save-system.md | v2.2 | 🟢 saveService 狀態刷新修復 + updateFreePullLocally/updateGachaPityLocally |
-| stage-system.md | v2.2 | 🟢 EXP 資源獎勵（取代 exp_core 掉落） |
+| stage-system.md | v3.1 | 🟢 Boss turnLimit 30→20 + getBossCombatPower + 回合計數器 |
 | gacha.md | v2.4 | 🟢 前端狀態即時刷新修復（removeItemsLocally + optional fields） |
 | element-system.md | v1.1 | 🔴 已廢棄（2026-03-11 完整移除） |
 | inventory.md | v2.5 | 🟢 移除 exp_core / reroll + 星塵兌換商店 + 「全部」分頁含裝備 + 碎片中文名 |
@@ -211,7 +217,7 @@
 | buff-debuff-icons.md | v1.0 | 🟢 3D 狀態圖示（綠底/紅底 + 疊層數） |
 | buff-apply-toast.md | v1.0 | 🟢 施加浮動文字（DOT 中文名稱） |
 | arena-pvp.md | v0.7 | 🟢 敵方模型修復 + 防守載入 + 戰力對齊 + 紅點 |
-| ui-flow.md | v2.5 | 🟢 紅點系統擴展 + ClickableItemIcon 統一 |
+| ui-flow.md | v2.9 | 🟢 BattleHUD Boss 回合計數 + 被動飄字防疊痌 + Boss 卡片戰力 |
 
 ### 現有戰鬥系統已實作功能
 - [x] GameState 5 態狀態機（PRE_BATTLE→FETCHING→IDLE→BATTLE→GAMEOVER）

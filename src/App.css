@@ -5254,6 +5254,13 @@
   gap: 16px;
   font-size: 0.78rem;
   color: #cba;
+  flex-wrap: wrap;
+}
+
+.boss-card-cp {
+  color: #ffd700;
+  font-weight: 700;
+  text-shadow: 0 0 4px rgba(255, 215, 0, 0.4);
 }
 
 .boss-card-thresholds {
@@ -7336,6 +7343,15 @@
   font-weight: 800;
   font-variant-numeric: tabular-nums;
   text-shadow: 0 0 8px rgba(255, 200, 50, 0.6);
+}
+
+.boss-dmg-round {
+  font-size: clamp(0.6rem, 1.4vw, 0.8rem);
+  color: #ffd700;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-shadow: 0 0 6px rgba(255, 215, 0, 0.5);
+  white-space: nowrap;
 }
 
 .boss-dmg-track {

@@ -1,7 +1,7 @@
 # 戰鬥系統 Spec
 
-> 版本：v3.8 ｜ 狀態：🟢 已實作
-> 最後更新：2026-03-05
+> 版本：v3.9 ｜ 狀態：🟢 已實作
+> 最後更新：2026-03-12
 > 負責角色：🎯 GAME_DESIGN → 🔧 CODING
 > 原始碼：`src/domain/battleEngine.ts`（前端邏輯）、`gas/battleEngine.js`（後端引擎）、`src/App.tsx`（3D 演出整合）、`gas/程式碼.js`（`handleCompleteBattle_` 伺服器端結算）
 
@@ -663,7 +663,8 @@ IDLE → ADVANCING → ATTACKING → RETREATING → IDLE
 
 - `SkillToast3D`：技能名稱顯示在攻擊者頭頂（Billboard Text，2.5s 淡出上浮）
 - ~~`ElementHint3D`~~：已移除（2026-03-11）
-- 元件位於 `src/components/SceneWidgets.tsx`
+- `PassiveHint3D`：被動觸發浮動文字，多個同時觸發時依 `idx * 0.55` 垂直對開避免疑疊（v3.9）
+- 元件位於 `src/components/Hero.tsx`（PassiveHint3D）、`src/components/SceneWidgets.tsx`（SkillToast3D）
 
 ### 10.4 waitForAction / waitForMove 防碰撞機制
 
@@ -848,3 +849,4 @@ App.tsx
 | v3.4 | 2026-03-02 | **屬性提示修復 + DOT/被動致死動畫修復**：(1) NORMAL_ATTACK 的 elementHint 加入 `setTimeout(2000)` 自動清理（先前無 cleanup 導致累積）；(2) SKILL_CAST handler 新增屬性相剋指示（取第一個非閃避目標的 `elementMult`）；(3) DOT_TICK / PASSIVE_DAMAGE handler 新增致死判定 — 若 `hero.currentHP <= 0` 直接播放死亡動畫（含音效 + `waitForAction('DEAD')` + `removeSlot`），後續 DEATH action 因 `actorState===DEAD` 自動跳過 |
 | v3.5 | 2026-03-02 | **Dead-Actor Guard 修正 — 移除 `currentHP <= 0` 判斷**：`applyHpFromAction()` 在 `onAction()` 前執行，會將**當前 action** 的傷害預扣為 0，導致擊殺 action 誤觸 early-exit → 跳過死亡動畫（角色站著不動、HP 條不更新）。修正：三處 guard（NORMAL_ATTACK×2 + SKILL_CAST×1）只保留 `actorStatesRef === 'DEAD'`，移除 `|| currentHP <= 0` 判斷 || v3.6 | 2026-03-02 | **pendingRetreats 等待擴展 + Validator DEATH 降級**：(1) `pendingRetreats` 的 await 從只限 NORMAL_ATTACK/SKILL_CAST 擴展到所有非 TURN_START/TURN_END/BATTLE_END 的 action——修復被動文字/DOT 傷害在前一位英雄還在退回動畫時就提前顯示的問題，同時修復 DOT 傷害數字被前一位英雄動畫過渡後看不到的問題；(2) Validator `beforeAction` 對 DEATH action 的重複檢查從 error 降級為 warn（DOT/被動致死後引擎仍會發 DEATH action，表現層因 actorState===DEAD 正確跳過，非真正錯誤） |
 | v3.8 | 2026-03-05 | **後端權威戰鬥模式**：完全移除前端本地戰鬥模擬（`runBattleCollect()`、`generateBattleSeed()`），Phase A 改為阻塞式 `await completeBattle()` 等待後端回傳 `actions[]` + `winner`；移除 `completeBattleRef`（不再需要背景 Promise）；前端僅負責 Phase B 3D 動畫回放 + Phase C 狀態同步；後端 `complete-battle` 為戰鬥唯一計算源，消除前後端資料不一致風險 |
+| v3.9 | 2026-03-12 | **被動技能飄字防疊痌 + Boss 回合計數器**：(1) `PassiveHint3D`（Hero.tsx）多個同時觸發時依 `idx * 0.55` 垂直偏移，避免文字重疊；(2) `BossDamageBar`（BattleHUD.tsx）新增回合顯示「回合 N/20」，App.tsx 傳 `currentTurn={turn}` 至 BattleHUD |

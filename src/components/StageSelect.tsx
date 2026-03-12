@@ -21,6 +21,7 @@ import {
   BOSS_CONFIGS,
   DAILY_LIMITS,
   getBossRewardByBossAndRank,
+  getBossCombatPower,
   type DailyDungeon,
   type PvPOpponent,
   type BossConfig,
@@ -545,7 +546,7 @@ function BossPanel2({
     <div className="stage-boss">
       <div className="boss-header">
         <span className="boss-title">👹 Boss 挑戰</span>
-        <span className="boss-subtitle">限時 30 回合，以傷害量評價 S/A/B/C 級</span>
+        <span className="boss-subtitle">限時 20 回合，以傷害量評價 S/A/B/C 級</span>
       </div>
       <div className="pvp-meta-row">
         <span className="daily-attempts">剩餘次數：{remaining}/{limit}</span>
@@ -569,6 +570,7 @@ function BossPanel2({
                 <span>血量 ∞</span>
                 <span>攻擊 {boss.atk}</span>
                 <span>速度 {boss.speed}</span>
+                <span className="boss-card-cp">⚔️ 戰力 {getBossCombatPower(boss).toLocaleString()}</span>
               </div>
               <div className="boss-card-thresholds">
                 <span className="rank-s">S ≥{boss.damageThresholds.S.toLocaleString()}</span>

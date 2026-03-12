@@ -4,6 +4,22 @@
 
 ---
 
+### [2026-03-12] Boss 回合限制下修 + 戰力顯示 + 被動飄字防疊 + 回合計數器
+- **觸發者**：使用者指令 — Boss 平衡調整 + UI 改善
+- **執行角色**：🔧 CODING
+- **變更內容**：
+  1. **被動技能飄字防疊**（Hero.tsx）：`PassiveHint3D` 多個同時觸發時依 `idx * 0.55` 垂直偏移，避免文字重疊
+  2. **Boss 回合計數器**（BattleHUD.tsx + App.tsx）：`BossDamageBar` 新增回合顯示「回合 N/M」；App.tsx 傳 `currentTurn={turn}` 至 BattleHUD
+  3. **Boss 回合限制下修 30→20**（stageSystem.ts + runBattleLoop.ts + StageSelect.tsx）：三位 Boss 的 `turnLimit` 從 30 改為 20；`runBattleLoop.ts` 改從 boss config 動態讀取 turnLimit（取代 hardcoded 值）；StageSelect 文字更新「限時 20 回合」
+  4. **Boss 戰力顯示**（stageSystem.ts + StageSelect.tsx + App.css）：新增 `getBossCombatPower(boss)` 函式；Boss 選關卡片顯示戰力值；新增 `.boss-dmg-round` + `.boss-card-cp` CSS 樣式
+- **Spec 更新**：
+  - `stage-system.md` v3.0 → v3.1（turnLimit 30→20、getBossCombatPower、Boss 卡片戰力、回合計數器）
+  - `core-combat.md` v3.8 → v3.9（PassiveHint3D 垂直偏移防疊、BossDamageBar 回合計數）
+  - `ui-flow.md` v2.8 → v2.9（BattleHUD Boss 回合計數、被動飄字防疊、Boss 卡片戰力 CSS）
+  - `specs/README.md` 版本號同步更新
+
+---
+
 ### [2026-03-11] 屬性系統完整移除（Element System Removal）
 - **觸發者**：使用者指令 — 移除屬性系統
 - **執行角色**：🔧 CODING
