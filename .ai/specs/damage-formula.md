@@ -1,7 +1,7 @@
 # 傷害公式 Spec
 
-> 版本：v1.2 ｜ 狀態：🟢 已實作
-> 最後更新：2026-03-11
+> 版本：v1.3 ｜ 狀態：🟢 已實作
+> 最後更新：2026-03-15
 > 負責角色：🎯 GAME_DESIGN → 🔧 CODING
 > 原始碼：`src/domain/damageFormula.ts`
 
@@ -18,13 +18,13 @@
 
 ---
 
-## 一、主要傷害公式 
+## 一、主要傷害公式（11 步 0-10）
 
 ```typescript
 calculateDamage(attacker: BattleHero, target: BattleHero, skill?: SkillEffect): DamageResult
 ```
 
-### 計算流程（10 步）
+### 計算流程（11 步 0-10）
 
 ```
 步驟 0. 閃避判定
@@ -286,3 +286,4 @@ calculateReflect(target: BattleHero, damageReceived: number): number
 | v1.0 | 2025-02-26 | **已實作**：完整 10 步公式 + 護盾 + 反彈 + 治療 + DOT |
 | v1.1 | 2026-03-01 | Spec 同步：步驟 6 攻擊方修正改為 return 1.0（atk_up/down 已移至 getBuffedStats）、步驟 7 移除 def_down（同理）、damageType 優先順序修正、DOT 公式使用 finalStats.ATK、Buff 摘要表更新處理位置 |
 | v1.2 | 2026-03-11 | **移除屬性倍率步驟**：步驟 4（屬性倍率）完整移除；`DamageResult.elementMult` 欄位刪除；`damageType` 移除 `'weakness'`；傷害計算從 9 步改為 9 步（原步驟 4 跳過） |
+| v1.3 | 2026-03-15 | **Spec 校正**：(1) 正式標註為 11 步（步驟 0~10，含已移除的步驟 4）；(2) 確認 DOT bleed 公式套用 50% DEF（`ATK × 0.25 × (100/(100+DEF×0.5))`）；(3) 新增反彈傷害公式說明 |

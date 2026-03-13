@@ -1,7 +1,7 @@
 # 英雄資料結構 Spec
 
-> 版本：v2.5 ｜ 狀態：🟢 已實作
-> 最後更新：2026-03-11
+> 版本：v2.6 ｜ 狀態：🟢 已實作
+> 最後更新：2026-03-15
 > 負賬角色：🎯 GAME_DESIGN → 🔧 CODING
 > 原始碼：`src/types.ts`（表現層）、`src/domain/types.ts`（domain 層）、`src/services/dataService.ts`（資料轉換）、`src/services/saveService.ts`（HeroInstance）
 
@@ -342,3 +342,4 @@ public/models/zombie_N/
 | v2.4 | 2026-03-01 | Spec 同步：BattleHero 欄位數修正 23→21、createBattleHero 加入 heroInstance/rarity 參數、★0 被動欄修正為 1（非 0）、養成依賴標記為已實作 |
 | v2.5 | 2026-03-06 | 修正 Rarity 欄位型別：D1 存 TEXT 非 number。新增共用 `toRarity(v)` / `toRarityNum(v)` 工具函式於 `constants/rarity.ts`，取代各元件 inline `numToRarity()` |
 | v2.5 | 2026-03-11 | **移除 Element 欄位**：Element 型別、BattleHero.element、RawHeroInput.element、toElement() 全部移除。DB 欄位保留但不再讀取。英雄一覽表移除屬性欄。 |
+| v2.6 | 2026-03-15 | **Spec 校正**：確認 RawHeroInput 位置為 `src/domain/battleEngine.ts`（非 types.ts）；確認 createBattleHero 預設 starLevel=1；版本號更新 |

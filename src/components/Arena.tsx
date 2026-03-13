@@ -1,5 +1,5 @@
 /**
- * Arena — 場景環境（地面 + 碎片 + 粒子 + 燈光 + 天空）
+ * Arena — 場景環境（地面 + 碎片 + 粒子 + 燈光 + 天空 + 建築剪影）
  *
  * 三種場景模式：
  * - story: 廢土雨夜（棕色地面 + 雨 + 紅色火花 + 暖霧）
@@ -7,6 +7,7 @@
  * - daily: 熔岩地獄（深紅地面 + 飛灰 + 橙色火花 + 暗紅霧）
  *
  * 五者連動：Ground / Debris / Particles / Sparkles / Fog
+ * 建築剪影：3 層深度天際線，根據場景自動調色
  */
 
 import { useRef, useMemo } from 'react'
@@ -678,6 +679,318 @@ function generateDebris(theme: SceneTheme): DebrisItem[] {
    地面幾何產生
    ──────────────────────────── */
 
+/* ────────────────────────────
+   建築剪影系統（Skyline Silhouette）
+   ──────────────────────────── */
+
+/** 剪影風格：決定天際線的形狀特徵 */
+type SilhouetteStyle = 'urban' | 'trees' | 'industrial' | 'mesa' | 'ice' | 'tunnel'
+
+/** 每種場景的剪影風格 */
+const SILHOUETTE_STYLE: Record<SceneMode, SilhouetteStyle> = {
+  story: 'urban', city: 'urban', residential: 'urban', hospital: 'urban',
+  pvp: 'industrial', boss: 'urban', core: 'industrial',
+  tower: 'ice', daily: 'mesa', wasteland: 'mesa',
+  forest: 'trees', factory: 'industrial', underground: 'tunnel',
+}
+
+/** 簡易 seeded hash（與 Arena 中的 hash 一致） */
+function silhouetteHash(seed: number): number {
+  const h = Math.sin(seed * 127.1 + 311.7) * 43758.5453
+  return h - Math.floor(h)
+}
+
+/** 從 fogColor 衍生出 3 層剪影顏色（遠→近，遠層幾乎等於 fogColor，近層稍亮） */
+function deriveSilhouetteColors(fogColor: string): [THREE.Color, THREE.Color, THREE.Color] {
+  const fog = new THREE.Color(fogColor)
+  // 剪影本體色比 fog 稍亮，模擬剪影在霧中的深度感
+  const silBase = new THREE.Color(fogColor).multiplyScalar(1.8)
+  // 遠層 → 90% fog + 10% silBase
+  const far = fog.clone().lerp(silBase.clone(), 0.10)
+  // 中層 → 70% fog + 30% silBase
+  const mid = fog.clone().lerp(silBase.clone(), 0.30)
+  // 近層 → 45% fog + 55% silBase
+  const near = fog.clone().lerp(silBase.clone(), 0.55)
+  return [far, mid, near]
+}
+
+/** 生成天際線 Shape 的頂點 */
+function generateSkylineVertices(
+  width: number, minH: number, maxH: number,
+  segments: number, seed: number, style: SilhouetteStyle,
+): Array<[number, number]> {
+  const pts: Array<[number, number]> = []
+  const segW = width / segments
+
+  // 起始左下
+  pts.push([-width / 2, 0])
+
+  for (let i = 0; i <= segments; i++) {
+    const x = -width / 2 + i * segW
+    const h0 = silhouetteHash(seed + i * 7.3)
+    const h1 = silhouetteHash(seed + i * 13.1 + 50)
+
+    let h: number
+    switch (style) {
+      case 'urban': {
+        // 城市：方正高矮交錯
+        const isTall = h0 > 0.6
+        h = isTall
+          ? minH + (maxH - minH) * (0.6 + h1 * 0.4)
+          : minH + (maxH - minH) * h1 * 0.5
+        // 方塊頂部
+        if (i < segments) {
+          pts.push([x, h])
+          pts.push([x + segW * 0.85, h])
+          // 小縮進模擬屋頂
+          if (isTall && h1 > 0.3) {
+            pts.push([x + segW * 0.85, h + (maxH - minH) * 0.08])
+            pts.push([x + segW * 0.92, h + (maxH - minH) * 0.08])
+          }
+          pts.push([x + segW * 0.92, h * 0.3])
+        }
+        break
+      }
+      case 'trees': {
+        // 枯樹：尖窄三角
+        h = minH + (maxH - minH) * h0
+        const halfW = segW * (0.15 + h1 * 0.2)
+        const cx = x + segW * 0.5
+        pts.push([cx - halfW, 0])
+        pts.push([cx - halfW * 0.3, h * 0.6])
+        pts.push([cx, h])
+        pts.push([cx + halfW * 0.3, h * 0.6])
+        pts.push([cx + halfW, 0])
+        break
+      }
+      case 'industrial': {
+        // 工廠：寬矮方塊 + 偶爾的高煙囪
+        const isChimney = h0 > 0.75
+        if (isChimney) {
+          const cw = segW * 0.15
+          const cx2 = x + segW * h1
+          h = minH + (maxH - minH) * 0.9
+          pts.push([cx2 - cw, 0])
+          pts.push([cx2 - cw, h])
+          pts.push([cx2 + cw, h])
+          pts.push([cx2 + cw, 0])
+        } else {
+          h = minH + (maxH - minH) * h1 * 0.4
+          pts.push([x, h])
+          pts.push([x + segW * 0.9, h])
+          pts.push([x + segW * 0.9, 0])
+        }
+        break
+      }
+      case 'mesa': {
+        // 荒漠岩柱：寬扁頂 + 偶爾尖峰
+        h = minH + (maxH - minH) * (h0 * 0.6 + 0.15)
+        const isPeak = h1 > 0.7
+        if (isPeak) {
+          const peakX = x + segW * 0.5
+          pts.push([peakX - segW * 0.3, h * 0.4])
+          pts.push([peakX, h])
+          pts.push([peakX + segW * 0.3, h * 0.4])
+        } else {
+          pts.push([x + segW * 0.1, h])
+          pts.push([x + segW * 0.9, h * (0.7 + h1 * 0.3)])
+        }
+        break
+      }
+      case 'ice': {
+        // 冰晶：尖銳三角群
+        h = minH + (maxH - minH) * h0
+        const cx3 = x + segW * (0.3 + h1 * 0.4)
+        pts.push([cx3 - segW * 0.25, 0])
+        pts.push([cx3 - segW * 0.08, h * 0.7])
+        pts.push([cx3, h])
+        pts.push([cx3 + segW * 0.08, h * 0.65])
+        pts.push([cx3 + segW * 0.2, h * 0.3])
+        break
+      }
+      case 'tunnel': {
+        // 地下隧道：弧頂
+        h = minH + (maxH - minH) * (0.5 + h0 * 0.5)
+        const steps = 4
+        for (let s = 0; s <= steps; s++) {
+          const t = s / steps
+          const ax = x + segW * t
+          const ay = h * Math.sin(t * Math.PI)
+          pts.push([ax, ay])
+        }
+        break
+      }
+    }
+  }
+
+  // 結束右下
+  pts.push([width / 2, 0])
+  return pts
+}
+
+/** 建立剪影 Shape 幾何體 */
+function createSilhouetteGeometry(
+  width: number, minH: number, maxH: number,
+  segments: number, seed: number, style: SilhouetteStyle,
+): THREE.ShapeGeometry {
+  const vertices = generateSkylineVertices(width, minH, maxH, segments, seed, style)
+  const shape = new THREE.Shape()
+  shape.moveTo(vertices[0][0], vertices[0][1])
+  for (let i = 1; i < vertices.length; i++) {
+    shape.lineTo(vertices[i][0], vertices[i][1])
+  }
+  shape.closePath()
+  return new THREE.ShapeGeometry(shape)
+}
+
+/** 單層剪影 Mesh（fog: false — 顏色已手動混合霧色，不受場景霧影響） */
+function SilhouetteLayer({ z, width, minH, maxH, segments, seed, style, color }: {
+  z: number; width: number; minH: number; maxH: number;
+  segments: number; seed: number; style: SilhouetteStyle; color: THREE.Color
+}) {
+  const geo = useMemo(
+    () => createSilhouetteGeometry(width, minH, maxH, segments, seed, style),
+    [width, minH, maxH, segments, seed, style],
+  )
+  const mat = useMemo(() => new THREE.MeshBasicMaterial({
+    color, side: THREE.DoubleSide, fog: false,
+  }), [color])
+
+  return <mesh geometry={geo} material={mat} position={[0, 0, z]} />
+}
+
+/** 建築剪影系統（3 層深度，放在戰場後方） */
+function SkylineSilhouettes({ theme, sceneMode }: { theme: SceneTheme; sceneMode: SceneMode }) {
+  const style = SILHOUETTE_STYLE[sceneMode]
+  const [farColor, midColor, nearColor] = useMemo(
+    () => deriveSilhouetteColors(theme.fogColor),
+    [theme.fogColor],
+  )
+
+  return (
+    <>
+      {/* 後方天際線（-Z 方向，敵人後方） */}
+      <SilhouetteLayer
+        z={-18} width={70} minH={8} maxH={20}
+        segments={18} seed={1.0} style={style} color={farColor}
+      />
+      <SilhouetteLayer
+        z={-14} width={65} minH={5} maxH={14}
+        segments={14} seed={2.0} style={style} color={midColor}
+      />
+      <SilhouetteLayer
+        z={-10} width={55} minH={3} maxH={9}
+        segments={12} seed={3.0} style={style} color={nearColor}
+      />
+
+      {/* 左側天際線（旋轉 90°） */}
+      <group position={[-18, 0, 5]} rotation={[0, Math.PI / 2, 0]}>
+        <SilhouetteLayer
+          z={0} width={50} minH={4} maxH={12}
+          segments={12} seed={4.0} style={style} color={midColor}
+        />
+      </group>
+
+      {/* 右側天際線（旋轉 -90°） */}
+      <group position={[18, 0, 5]} rotation={[0, -Math.PI / 2, 0]}>
+        <SilhouetteLayer
+          z={0} width={50} minH={4} maxH={12}
+          segments={12} seed={5.0} style={style} color={midColor}
+        />
+      </group>
+    </>
+  )
+}
+
+/* ────────────────────────────
+   地面法線貼圖（程序化生成）
+   ──────────────────────────── */
+
+const GROUND_NORMAL_SCALE = new THREE.Vector2(1.4, 1.4)
+
+/**
+ * 程序化 1024×1024 法線貼圖
+ * 7 層噪波：大地形 + 裂縫 + 碎石 + 砂粒，多 seed 避免重複感
+ */
+function generateGroundNormalMap(): THREE.DataTexture {
+  const size = 1024
+  const data = new Uint8Array(size * size * 4)
+
+  // 多 seed hash 避免單調
+  const h = (x: number, y: number, sx: number, sy: number) => {
+    const v = Math.sin(x * sx + y * sy) * 43758.5453
+    return v - Math.floor(v)
+  }
+
+  // 高度場（7 層：地形→裂縫→碎石→砂粒）
+  const heights = new Float32Array(size * size)
+  for (let j = 0; j < size; j++) {
+    for (let i = 0; i < size; i++) {
+      const wx = (i / size) * 60 - 30
+      const wy = (j / size) * 60 - 30
+
+      // 大起伏
+      const o1 = h(wx * 0.3, wy * 0.3, 127.1, 311.7) * 0.28
+      // 中地形
+      const o2 = h(wx * 0.8 + 37, wy * 0.8 + 91, 269.5, 183.3) * 0.22
+      // 碎塊
+      const o3 = h(wx * 2.5 + 113, wy * 2.5 + 67, 157.3, 243.1) * 0.18
+      // 裂縫（用 abs 製造銳利邊緣）
+      const crack = Math.abs(h(wx * 4.0 + 200, wy * 4.0 + 150, 317.1, 191.7) - 0.5) * 0.3
+      // 小石子
+      const o5 = h(wx * 8.0 + 300, wy * 8.0 + 250, 419.7, 371.3) * 0.12
+      // 粗砂
+      const o6 = h(wx * 18 + 500, wy * 18 + 430, 523.1, 617.9) * 0.07
+      // 細砂
+      const o7 = h(wx * 40 + 700, wy * 40 + 680, 739.3, 821.7) * 0.04
+
+      heights[j * size + i] = o1 + o2 + o3 + crack + o5 + o6 + o7
+    }
+  }
+
+  // 中央差分法推導法線（強度提高）
+  const str = 6.0
+  for (let j = 0; j < size; j++) {
+    for (let i = 0; i < size; i++) {
+      const idx = j * size + i
+      const l = heights[j * size + Math.max(0, i - 1)]
+      const r = heights[j * size + Math.min(size - 1, i + 1)]
+      const t = heights[Math.max(0, j - 1) * size + i]
+      const b = heights[Math.min(size - 1, j + 1) * size + i]
+
+      let nx = (l - r) * str
+      let ny = (t - b) * str
+      let nz = 1.0
+      const len = Math.sqrt(nx * nx + ny * ny + nz * nz)
+      nx /= len; ny /= len; nz /= len
+
+      const pi = idx * 4
+      data[pi]     = ((nx * 0.5 + 0.5) * 255) | 0
+      data[pi + 1] = ((ny * 0.5 + 0.5) * 255) | 0
+      data[pi + 2] = ((nz * 0.5 + 0.5) * 255) | 0
+      data[pi + 3] = 255
+    }
+  }
+
+  const tex = new THREE.DataTexture(data, size, size, THREE.RGBAFormat)
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping
+  tex.generateMipmaps = true
+  tex.magFilter = THREE.LinearFilter
+  tex.minFilter = THREE.LinearMipmapLinearFilter
+  tex.needsUpdate = true
+  return tex
+}
+
+let _cachedGroundNormalMap: THREE.DataTexture | null = null
+function getGroundNormalMap(): THREE.DataTexture {
+  if (!_cachedGroundNormalMap) _cachedGroundNormalMap = generateGroundNormalMap()
+  return _cachedGroundNormalMap
+}
+
+/* ────────────────────────────
+   地面幾何體
+   ──────────────────────────── */
+
 function createGroundGeometry(theme: SceneTheme): THREE.PlaneGeometry {
   const geo = new THREE.PlaneGeometry(60, 60, 64, 64)
   const pos = geo.attributes.position as THREE.BufferAttribute
@@ -731,6 +1044,8 @@ export function Arena({ sceneMode = 'story', stageId = '1-1' }: ArenaProps) {
   const debris = useMemo(() => generateDebris(theme), [sceneMode])
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const groundGeo = useMemo(() => createGroundGeometry(theme), [sceneMode])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const groundNormalMap = useMemo(getGroundNormalMap, [])
 
   return (
     <>
@@ -759,10 +1074,17 @@ export function Arena({ sceneMode = 'story', stageId = '1-1' }: ArenaProps) {
 
       {/* 地面 */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} geometry={groundGeo} receiveShadow>
-        <meshLambertMaterial
+        <meshStandardMaterial
           vertexColors
+          normalMap={groundNormalMap}
+          normalScale={GROUND_NORMAL_SCALE}
+          roughness={theme.groundRoughness}
+          metalness={theme.groundMetalness}
         />
       </mesh>
+
+      {/* 建築剪影 */}
+      <SkylineSilhouettes theme={theme} sceneMode={sceneMode} />
 
       {debris.map((d, i) => (
         <Debris key={i} {...d} />

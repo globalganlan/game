@@ -1,7 +1,7 @@
 # 戰鬥系統 Spec
 
-> 版本：v3.9 ｜ 狀態：🟢 已實作
-> 最後更新：2026-03-12
+> 版本：v4.0 ｜ 狀態：🟢 已實作
+> 最後更新：2026-03-15
 > 負責角色：🎯 GAME_DESIGN → 🔧 CODING
 > 原始碼：`src/domain/battleEngine.ts`（前端邏輯）、`gas/battleEngine.js`（後端引擎）、`src/App.tsx`（3D 演出整合）、`gas/程式碼.js`（`handleCompleteBattle_` 伺服器端結算）
 
@@ -195,8 +195,8 @@ type BattleAction =
   | { type: 'TURN_START'; turn: number }
   | { type: 'TURN_END'; turn: number }
   | { type: 'PASSIVE_DAMAGE'; attackerUid: string; targetUid: string;
-      result: DamageResult; killed: boolean; skillId: string }
-  | { type: 'EXTRA_TURN'; heroUid: string }
+      damage: number; killed: boolean }
+  | { type: 'EXTRA_TURN'; heroUid: string; reason: string }
   | { type: 'BATTLE_END'; winner: 'player' | 'enemy' | 'draw' }
 ```
 
@@ -371,7 +371,7 @@ export function applyStatus(target: BattleHero, effect: Omit<StatusEffect, 'stac
 |------|----------|
 | `immunity` 存在時施加 debuff | 失敗，回傳 `false` |
 | 控制效果（stun/freeze/silence/fear）重複 | 不疊加 stacks，刷新 duration 取較長 |
-| 其他同類型重複施加 | `stacks++`（ maxStacks），value 加算，duration 取較長 |
+| 其他同類型重複施加 | `stacks++`（≤ maxStacks），value 加算，duration 取較長 |
 | 全新效果 | push 新 StatusEffect（stacks = 1） |
 
 ### DOT 傷害公式
@@ -380,7 +380,7 @@ export function applyStatus(target: BattleHero, effect: Omit<StatusEffect, 'stac
 |---------|---------|------------|
 | `dot_burn` | 施加者 `ATK × 0.3 × stacks` | 無視 DEF |
 | `dot_poison` | 目標 `maxHP × 0.03 × stacks` | 無視 DEF |
-| `dot_bleed` | 施加者 `ATK × 0.25 × stacks` | 無視 DEF（簡化實作） |
+| `dot_bleed` | 施加者 `ATK × 0.25 × (100/(100+DEF×0.5)) × stacks` | 套用 50% DEF |
 
 > 注意：spec v2.0 設計 dot_bleed 套用 50% DEF，實作中已簡化為直接計算。
 
@@ -495,6 +495,35 @@ function triggerPassives(
 | `dispel_debuff` | 清除目標身上指定數量的 debuff |
 | `reflect` | 對自身施加反彈狀態（value = multiplier） |
 | `extra_turn` | 額外行動：將英雄 uid 加入 extraTurnQueue，本回合結束後插隊行動 |
+| `random_debuff` | 隨機施加 debuff（從 atk_down/def_down/spd_down/silence 中隨機一個） |
+
+### resolvePassiveTargets() 目標解析
+
+被動效果的目標由 `resolvePassiveTargets()` 決定：
+
+| passiveTarget + effectType | 解析結果 |
+|---------------------------|---------|
+| `self` + `buff` | 自身（hero） |
+| `self` + `debuff` | context.target（被動觸發的上下文目標，如被攻擊者的攻擊者） |
+| `all_allies` | 同陣營所有存活角色 |
+| `all_enemies` | 敵方陣營所有存活角色 |
+| 其他 | context.target（預設） |
+
+> 注意：`on_be_attacked` 觸發時，`context = makeContext(turn, attacker, allHeroes, target)`，其中 `target` 是被攻擊的英雄本身。因此 `self` + `debuff` 施加到 `context.target` = 被攻擊者本身。
+> `perAlly` 欄位：若 `effect.perAlly === true`，buff/debuff 的 `statusValue` 會乘以存活隊友數量。
+
+### duration=0 永久效果
+
+`duration: 0` 表示永久效果（持續至戰鬥結束），`tickStatusDurations()` 跳過 `duration === 0` 的狀態不倒數。
+
+### Buff 疊加規則
+
+同類型 StatusEffect 施加時：
+- `stacks++`（不超過 `maxStacks`）
+- `value` 直接加算（非 value × stacks）
+- `duration` 取較長值
+
+`getStatusValue(hero, type)` 回傳該類型的 `value` 總和（已包含疊加），不再乘以 stacks。
 
 ### on_lethal 特殊處理
 
@@ -850,3 +879,4 @@ App.tsx
 | v3.5 | 2026-03-02 | **Dead-Actor Guard 修正 — 移除 `currentHP <= 0` 判斷**：`applyHpFromAction()` 在 `onAction()` 前執行，會將**當前 action** 的傷害預扣為 0，導致擊殺 action 誤觸 early-exit → 跳過死亡動畫（角色站著不動、HP 條不更新）。修正：三處 guard（NORMAL_ATTACK×2 + SKILL_CAST×1）只保留 `actorStatesRef === 'DEAD'`，移除 `|| currentHP <= 0` 判斷 || v3.6 | 2026-03-02 | **pendingRetreats 等待擴展 + Validator DEATH 降級**：(1) `pendingRetreats` 的 await 從只限 NORMAL_ATTACK/SKILL_CAST 擴展到所有非 TURN_START/TURN_END/BATTLE_END 的 action——修復被動文字/DOT 傷害在前一位英雄還在退回動畫時就提前顯示的問題，同時修復 DOT 傷害數字被前一位英雄動畫過渡後看不到的問題；(2) Validator `beforeAction` 對 DEATH action 的重複檢查從 error 降級為 warn（DOT/被動致死後引擎仍會發 DEATH action，表現層因 actorState===DEAD 正確跳過，非真正錯誤） |
 | v3.8 | 2026-03-05 | **後端權威戰鬥模式**：完全移除前端本地戰鬥模擬（`runBattleCollect()`、`generateBattleSeed()`），Phase A 改為阻塞式 `await completeBattle()` 等待後端回傳 `actions[]` + `winner`；移除 `completeBattleRef`（不再需要背景 Promise）；前端僅負責 Phase B 3D 動畫回放 + Phase C 狀態同步；後端 `complete-battle` 為戰鬥唯一計算源，消除前後端資料不一致風險 |
 | v3.9 | 2026-03-12 | **被動技能飄字防疊痌 + Boss 回合計數器**：(1) `PassiveHint3D`（Hero.tsx）多個同時觸發時依 `idx * 0.55` 垂直偏移，避免文字重疊；(2) `BossDamageBar`（BattleHUD.tsx）新增回合顯示「回合 N/20」，App.tsx 傳 `currentTurn={turn}` 至 BattleHUD |
+| v4.0 | 2026-03-15 | **Spec 全面校正**：(1) PASSIVE_DAMAGE 型別修正為 `damage: number`（非 `result: DamageResult`），移除不存在的 `skillId` 欄位；(2) EXTRA_TURN 補上 `reason: string` 欄位；(3) 新增 `random_debuff` 到 executePassiveEffect 效果表；(4) 新增 `resolvePassiveTargets()` 目標解析規則文檔（含 on_be_attacked 上下文說明）；(5) 新增 `perAlly` 欄位說明；(6) 新增 `duration=0` 永久效果說明；(7) 修正 Buff 疊加規則（value 直接加算、getStatusValue 不再乘 stacks） |

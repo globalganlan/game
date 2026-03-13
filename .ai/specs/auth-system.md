@@ -1,6 +1,7 @@
 # 帳號系統 Spec
 
-> 版本：v1.5 ｜ 狀態：🟢 已實作
+> 版本：v1.6 ｜ 狀態：🟢 已實作
+> 最後更新：2026-03-15
 > 最後更新：2026-03-01
 > 負責角色：🎯 GAME_DESIGN → 🔧 CODING
 
@@ -26,14 +27,15 @@
 
 ### v1.2 新增：新用戶歡迎禮包
 
-`handleRegisterGuest_` 在建立新玩家後（`alreadyExists: false`），自動呼叫 `handleSendMail_` 寄送歡迎信件：
+`register-guest` 在建立新玩家後（`alreadyExists: false`），自動寄送歡迎信件：
 
 | 獎勵 | 數量 |
 |------|------|
 | 💎 鑽石 | 300 |
 | 🪙 金幣 | 10,000 |
-| 📘 中經驗石 | 5 |
-| 📙 大經驗石 | 2 |
+| 🟢 經驗 (EXP) | 6,500 |
+| 🎟️ 英雄召喚券 | 10 |
+| 🔧 裝備召喚券 | 10 |
 
 - 信件標題：`🎉 歡迎來到全球感染！`
 - 永不過期，玩家開信箱即可領取
@@ -274,3 +276,4 @@ LoginScreen（mount 時自動執行 doAutoLogin）
 | v1.3 | 2026-03-01 | 帳號綁定獎勵：`handleBindAccount_` 首次綁定成功寄送獎勵信件（鑽石 200 / 金幣 5,000） |
 | v1.4 | 2026-03-01 | Spec 修正：自動登入流程修正為 no-token/login-fail 回傳 `isLoggedIn:false`（不自動註冊）；「訪客模式進入」改呼叫 `registerGuest()`；`logout()` 保留 guestToken 改設 `globalganlan_logged_out` flag；新增 `registerGuest()` / `onAuthChange()` 至導出函式；新增 `globalganlan_logged_out` localStorage key 文件 |
 | v1.5 | 2026-03-02 | 改名費用系統：`save_data.nameChangeCount` 欄位；`/change-name` API 首次免費、之後每次 200💎（`NAME_CHANGE_COST`）；後端驗證鑽石餘額、batch 更新 players + save_data + arena_rankings；前端 SettingsPanel 顯示費用規則與已改次數；`authService.ts` 新增 `NAME_CHANGE_COST` 常數 |
+| v1.6 | 2026-03-15 | **Spec 校正**：歡迎禮包更新為 Workers 實際內容（鑽石 300 / 金幣 10,000 / EXP 6,500 / 英雄召喚券 10 / 裝備召喚券 10）；移除已廢棄的經驗石道具；函式名更新為 Workers API |

@@ -1,7 +1,7 @@
 # 技術架構 Spec
 
-> 版本：v2.6 ｜ 狀態：🟢 定稿（含 Domain Engine + Services 層 + Optimistic Queue + Audio Engine + CurrencyIcon 統一 icon + PWA + App 模組化拆分 + D1 原子批次寫入 + InfoTip/RedDot/ClickableItemIcon 新元件 + 獎勵一致性修復 + 大廳/戰鬥場景分離架構 + 英雄名稱 HTML Overlay + iOS WebGL 深度紋理修復）
-> 最後更新：2026-03-06
+> 版本：v2.9 ｜ 狀態：🟢 定稿（含 Domain Engine + Services 層 + Optimistic Queue + Audio Engine + CurrencyIcon 統一 icon + PWA + App 模組化拆分 + D1 原子批次寫入 + InfoTip/RedDot/ClickableItemIcon 新元件 + 獎勵一致性修復 + 大廳/戰鬥場景分離架構 + 英雄名稱 HTML Overlay + iOS WebGL 深度紋理修復 + 戰力系統 + 競技場 + 字型預載）
+> 最後更新：2026-03-15
 > 負責角色：🔧 CODING → 🏗️ ARCHITECT
 
 ## 概述
@@ -50,16 +50,21 @@ src/
     buffSystem.ts           Buff/Debuff 施加 / 結算 / 查詢
     energySystem.ts         能量獲取 / 消耗 / 大招判定
     targetStrategy.ts       目標選擇策略
-    ~~elementSystem.ts~~       ~~屬性剋制矩陣~~（已移除 2026-03-11）    gachaSystem.ts          抽卡系統（機率/保底/費用計算）
-    progressionSystem.ts    英雄養成系統（升級/突破/升星）
+    ~~elementSystem.ts~~    ~~屬性剋制矩陣~~（已移除 2026-03-11）
+    gachaSystem.ts          抽卡系統（機率/保底/費用計算）
+    equipmentGacha.ts       裝備抽卡 Domain 邏輯
+    progressionSystem.ts    英雄養成系統（升級/突破/升星/裝備）
     seededRng.ts            確定性隨機數產生器
     stageSystem.ts          關卡/爬塔/副本設定與解鎖判定
     battleFlowValidator.ts  戰鬥流程驗證器
+    combatPower.ts          戰力計算公式（六維加權）
+    arenaSystem.ts          競技場排名系統
  services/                    資料服務層（無 React 依賴）
     index.ts                統一匯出
     sheetApi.ts             Google Sheets API 封裝 + 快取
     dataService.ts          Sheet  domain 型別轉換 + 中英對照
-    audioService.ts         音效與背景音樂管理器（Web Audio API 合成）    authService.ts          認證服務（訪客/帳號登入、綁定、改密碼）
+    audioService.ts         音效與背景音樂管理器（Web Audio API 合成）
+    authService.ts          認證服務（訪客/帳號登入、綁定、改密碼）
     battleService.ts        戰鬥流程服務（開戰/結算/通關處理）
     gachaLocalPool.ts       本地抽卡池管理（初始化/抽取/同步）
     gachaPreloadService.ts  抽卡池預載服務
@@ -97,6 +102,15 @@ src/
     RedDot.tsx              通知紅點 badge 元件
     ClickableItemIcon.tsx   道具可點擊 icon（自帶 ItemInfoPopup 彈窗）
     PanelInfoTip.tsx        面板標題 ℹ️ 說明浮窗（Portal popup）
+    ArenaPanel.tsx          競技場面板（排名/防守陣型/挑戰/獎勵）
+    CombatPowerHUD.tsx      戰力 HUD（敵我戰力對比 + 變化動畫）
+    CheckinPanel.tsx        每日簽到面板（7 日循環獎勵）
+    TutorialOverlay.tsx     新手引導覆蓋層（5 步教學）
+    CodexPanel.tsx          圖鑑面板
+    ChestLootPreview.tsx    寶箱開啟預覽
+    AcquireToast.tsx        獲得物品動畫提示
+    ItemInfoPopup.tsx       道具資訊彈窗
+    SceneProps.tsx          場景道具元件
 
  hooks/
     useResponsive.ts        RWD 偵測 hook
@@ -114,6 +128,8 @@ src/
     useMail.ts              信箱 hook
     useBattleState.ts       戰鬥中介狀態 hook
     useBgm.ts               BGM 自動切換 hook
+    useCombatPower.ts       戰力計算 hook（敵我戰力對比）
+    useAcquireToast.ts      獲得物品動畫提示 hook
 
  loaders/
      glbLoader.ts            GLB 載入器（全域快取 + Suspense）
@@ -621,3 +637,4 @@ POST { "action": "invalidate-cache" }
 | v2.6 | 2026-03-06 | **iOS WebGL 深度紋理修復**：(1) ZombieModel/HeroListPanel `cloneMat` 新增所有紋理貼圖 `needsUpdate=true`（map/normalMap/roughnessMap/metalnessMap/aoMap），diffuse map 強制 `SRGBColorSpace`；(2) Canvas iOS 強制 WebGL1 渲染器（WKWebView WebGL2 紋理分配 bug）、`shadows=false`、`flat` 模式、`NoToneMapping`（避免 ACES 壓暗）；(3) ZombieModel useEffect cleanup — unmount 時 dispose cloned materials 防止 VRAM 洩漏；(4) glbLoader 新增 `disposeDracoDecoder()` 釋放 WASM 記憶體；(5) Context restored handler 加入紋理 colorSpace 修正 |
 | v2.7 | 2026-03-08 | **Canvas 常駐 + 過場幕等模型就緒**：(1) Canvas 改為常駐掛載（CSS visibility + frameloop 切換），避免 iOS Safari 反覆建立/銷毀 WebGL context；(2) 移除 `SceneReady` 元件 — 不再由外層 Suspense 觸發收幕，改由 `selectStage`/`enterArena`/`defenseSetup` 等 await `preloadPromise` 完成後才呼叫 `closeCurtain()`（25s 安全網），確保過場幕遮蓋所有 Suspense 載入佔位符；(3) `goNextStage` 預載超時從 12s 提升至 25s |
 | v2.8 | 2026-03-08 | **Troika 字型預載修復**：(1) 根因：drei v10 `<Text>` 內部使用 `suspend-react.suspend()` 載入字型，key `['troika-text', font, characters]` — 戰鬥開始時 PassiveHint3D 首次渲染 `<Text>` → 字型未快取 → throw Promise → 觸發 per-hero `<Suspense>` fallback（旋轉方塊），即使模型已全部載入；(2) SceneWidgets.tsx 新增 `preloadTroikaFont()` 使用 `suspend-react.preload()` 非拋出 API 預熱快取；(3) App.tsx 新增 `FontPreloader` 元件在 Canvas 掛載時呼叫；(4) 先前嘗試 a9e97b7（改 curtain/preload 時序）已 revert |
+| v2.9 | 2026-03-15 | **Spec 校正 — 文件清單對齊實際程式碼**：① domain/ 新增 combatPower.ts、arenaSystem.ts、equipmentGacha.ts ② components/ 新增 ArenaPanel.tsx、CombatPowerHUD.tsx、CheckinPanel.tsx、TutorialOverlay.tsx、CodexPanel.tsx、ChestLootPreview.tsx、AcquireToast.tsx、ItemInfoPopup.tsx、SceneProps.tsx ③ hooks/ 新增 useCombatPower.ts、useAcquireToast.ts ④ 修正 audioService/authService 兩條目合併問題 ⑤ 版本號從 v2.6 同步至 v2.9 |
