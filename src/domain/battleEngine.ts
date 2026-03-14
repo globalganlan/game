@@ -257,10 +257,13 @@ export async function runBattle(
         if (passive.passiveTrigger !== 'every_n_turns') continue
         const n = passive.description.includes('每 2') || passive.description.includes('每2') ? 2 : 3
         if (turn % n === 0) {
+          let anyApplied = false
           for (const eff of passive.effects) {
-            executePassiveEffect(actor, eff, makeContext(turn, actor, allHeroes), cfg)
+            if (executePassiveEffect(actor, eff, makeContext(turn, actor, allHeroes), cfg)) anyApplied = true
           }
-          cfg.onAction({ type: 'PASSIVE_TRIGGER', heroUid: actor.uid, skillId: passive.skillId, skillName: passive.name })
+          if (anyApplied) {
+            cfg.onAction({ type: 'PASSIVE_TRIGGER', heroUid: actor.uid, skillId: passive.skillId, skillName: passive.name })
+          }
         }
       }
 
@@ -740,9 +743,12 @@ function checkHpBelowPassives(
       const usageKey = `${passive.skillId}_hp_below`
       if (hero.passiveUsage[usageKey]) continue // 只觸發一次
 
+      let anyApplied = false
       for (const effect of passive.effects) {
-        executePassiveEffect(hero, effect, makeContext(turn, hero, allHeroes), cfg)
+        if (executePassiveEffect(hero, effect, makeContext(turn, hero, allHeroes), cfg)) anyApplied = true
       }
+      if (!anyApplied) continue
+
       hero.passiveUsage[usageKey] = 1
 
       cfg.onAction({

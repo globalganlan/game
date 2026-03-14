@@ -281,7 +281,7 @@ export function Hero({
 
         {/* 技能閃光 */}
         {skillFlashes.map((f) => (
-          <SkillFlash key={f.id} position={[0, 1.5, 0]} color="#ffa500" intensity={8} />
+          <SkillFlash key={f.id} position={[0, 1.2, 0]} color="#ffe080" intensity={10} />
         ))}
 
         <Html position={[0, 3.5, 0]} center zIndexRange={[1, 0]} wrapperClass="hero-name-html" style={{ pointerEvents: 'none' }}>

@@ -886,25 +886,48 @@ export function DotTickVFX({ position }: { position: Vector3Tuple }) {
    SkillFlash — 技能施放動態閃光
    ──────────────────────────── */
 
-/** 技能施放時在目標位置產生短暫閃光的 PointLight */
+/** 技能施放時在攻擊者位置產生可見閃光爆發（發光球 + PointLight） */
 export function SkillFlash({ position, color = '#ffffff', intensity = 6 }: { position: Vector3Tuple; color?: string; intensity?: number }) {
-  const ref = useRef<THREE.PointLight>(null)
+  const lightRef = useRef<THREE.PointLight>(null)
+  const meshRef = useRef<THREE.Mesh>(null)
+  const matRef = useRef<THREE.MeshBasicMaterial>(null)
   const elapsed = useRef(0)
   const [done, setDone] = useState(false)
 
   useFrame((_s, delta) => {
-    if (!ref.current || done) return
+    if (done) return
     elapsed.current += delta
     const t = elapsed.current
-    if (t > 0.4) { setDone(true); return }
+    if (t > 0.5) { setDone(true); return }
     // 快速升亮 → 緩慢衰減
-    const ramp = t < 0.06 ? t / 0.06 : 1 - (t - 0.06) / 0.34
-    ref.current.intensity = intensity * Math.max(0, ramp)
+    const ramp = t < 0.08 ? t / 0.08 : Math.max(0, 1 - (t - 0.08) / 0.42)
+    if (lightRef.current) lightRef.current.intensity = intensity * ramp
+    // 發光球：快速膨脹到 r=2.5 再縮回
+    if (meshRef.current) {
+      const s = ramp * 2.5
+      meshRef.current.scale.set(s, s, s)
+    }
+    if (matRef.current) matRef.current.opacity = ramp * 0.45
   })
 
   if (done) return null
 
-  return <pointLight ref={ref} position={position} color={color} intensity={0} distance={12} decay={2} />
+  return (
+    <group position={position}>
+      <pointLight ref={lightRef} color={color} intensity={0} distance={15} decay={2} />
+      <mesh ref={meshRef} renderOrder={25}>
+        <sphereGeometry args={[1, 16, 12]} />
+        <meshBasicMaterial
+          ref={matRef}
+          color={color}
+          transparent
+          opacity={0}
+          depthTest={false}
+          blending={THREE.AdditiveBlending}
+        />
+      </mesh>
+    </group>
+  )
 }
 
 /* ────────────────────────────

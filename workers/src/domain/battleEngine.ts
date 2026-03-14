@@ -546,9 +546,11 @@ function checkHpBelowPassives(
     if (hpPct < threshold) {
       const usageKey = passive.skillId + '_hp_below';
       if (hero.passiveUsage[usageKey]) continue;
+      let anyApplied = false;
       for (const eff of passive.effects) {
-        executePassiveEffect(rng, hero, eff, makeContext(turn, hero, allHeroes), emit, extraTurnQueue);
+        if (executePassiveEffect(rng, hero, eff, makeContext(turn, hero, allHeroes), emit, extraTurnQueue)) anyApplied = true;
       }
+      if (!anyApplied) continue;
       hero.passiveUsage[usageKey] = 1;
       emit({ type: 'PASSIVE_TRIGGER', heroUid: hero.uid, skillId: passive.skillId, skillName: passive.name });
     }
@@ -789,8 +791,9 @@ function runBattleEngine(rng: RngFn, players: BattleHero[], enemies: BattleHero[
         if (p.passiveTrigger !== 'every_n_turns') continue;
         const n = (p.description.includes('每 2') || p.description.includes('每2')) ? 2 : 3;
         if (turn % n === 0) {
-          for (const eff of p.effects) executePassiveEffect(rng, actor, eff, makeContext(turn, actor, allHeroes), emit, extraTurnQueue);
-          emit({ type: 'PASSIVE_TRIGGER', heroUid: actor.uid, skillId: p.skillId, skillName: p.name });
+          let anyApplied = false;
+          for (const eff of p.effects) { if (executePassiveEffect(rng, actor, eff, makeContext(turn, actor, allHeroes), emit, extraTurnQueue)) anyApplied = true; }
+          if (anyApplied) emit({ type: 'PASSIVE_TRIGGER', heroUid: actor.uid, skillId: p.skillId, skillName: p.name });
         }
       }
 
