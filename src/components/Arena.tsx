@@ -689,14 +689,23 @@ function generateDebris(theme: SceneTheme): DebrisItem[] {
     pushItem(x, z, items.length < 12)
   }
 
-  // Phase 2: 敵方後方加密（25 件碎片，填充鏡頭可見的背景區）
-  let backAttempts = 0
-  while (items.length < 105 && backAttempts < 500) {
-    backAttempts++
-    const x = (Math.random() - 0.5) * 28
-    const z = -5 - Math.random() * 12
-    if (Math.abs(x) < 3.5 && z > -8) continue
-    pushItem(x, z, false)
+  // Phase 2: 敵方後方叢集加密（~45 件，8 個叢集 × 5~6 件，視覺上有連續感）
+  const clusterCenters: [number, number][] = []
+  let clusterAttempts = 0
+  while (clusterCenters.length < 8 && clusterAttempts < 200) {
+    clusterAttempts++
+    const cx = (Math.random() - 0.5) * 28
+    const cz = -5 - Math.random() * 12
+    if (Math.abs(cx) < 3.5 && cz > -8) continue
+    clusterCenters.push([cx, cz])
+  }
+  for (const [cx, cz] of clusterCenters) {
+    const count = 5 + Math.floor(Math.random() * 2) // 5~6 per cluster
+    for (let i = 0; i < count; i++) {
+      const ox = (Math.random() - 0.5) * 3.0
+      const oz = (Math.random() - 0.5) * 2.6
+      pushItem(cx + ox, cz + oz, false)
+    }
   }
 
   return items

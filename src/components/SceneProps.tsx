@@ -67,6 +67,37 @@ function scatterBehind(
   return results
 }
 
+/**
+ * 叢集式後方散佈 — 以錨點為中心，在其周圍密集放置衛星物件
+ * 產生「連續群聚」的視覺效果，而非一個一個孤立矗立
+ */
+function clusterBehind(
+  clusters: number, perCluster: number, seed: number,
+  spreadX = 24, zMin = -17, zMax = -5,
+): { pos: [number, number, number]; rot: number }[] {
+  const rng = mulberry32(seed)
+  const results: { pos: [number, number, number]; rot: number }[] = []
+  let attempts = 0
+  const anchors: [number, number][] = []
+  // 產生錨點
+  while (anchors.length < clusters && attempts < clusters * 30) {
+    attempts++
+    const ax = (rng() - 0.5) * spreadX
+    const az = zMin + rng() * (zMax - zMin)
+    if (Math.abs(ax) < 3.5 && az > -8) continue
+    anchors.push([ax, az])
+  }
+  // 在每個錨點周圍放置衛星物件
+  for (const [ax, az] of anchors) {
+    for (let i = 0; i < perCluster; i++) {
+      const ox = (rng() - 0.5) * 2.8
+      const oz = (rng() - 0.5) * 2.4
+      results.push({ pos: [ax + ox, 0, az + oz], rot: rng() * Math.PI * 2 })
+    }
+  }
+  return results
+}
+
 /* ?��??��??��??��??��??��??��??��??��??��??��??��??��??��??��??��??��??��??��???
    ?�用氛�??��? ??碎石?�、�?漬、�???
    ?��??��??��??��??��??��??��??��??��??��??��??��??��??��??��??��??��??��??��???*/
@@ -1278,25 +1309,27 @@ function generateSceneElements(mode: SceneMode, stageId: string = '1-1'): React.
       scatter(4, seed + 10, 22, 8).forEach((s, i) => elements.push(<RubblePile key={`crub${i}`} position={s.pos} scale={0.6 + Math.abs(Math.sin(s.rot * 3)) * 0.4} />))
       scatter(3, seed + 11, 20, 7).forEach((s, i) => elements.push(<BloodStain key={`cbld${i}`} position={[s.pos[0], 0.01, s.pos[2]]} scale={0.4 + Math.abs(Math.sin(s.rot * 5)) * 0.5} />))
       scatter(5, seed + 12, 18, 7).forEach((s, i) => elements.push(<ScatteredLitter key={`clit${i}`} position={s.pos} rotation={s.rot} />))
-      // 敵方後方加密
-      scatterBehind(4, seed + 20).forEach((s, i) => elements.push(<BuildingRuin key={`bbld${i}`} position={s.pos} rotation={s.rot} />))
-      scatterBehind(3, seed + 21).forEach((s, i) => elements.push(<ConcreteBarrier key={`bbar${i}`} position={s.pos} rotation={s.rot} />))
-      scatterBehind(3, seed + 22).forEach((s, i) => elements.push(<StreetLight key={`bsl${i}`} position={s.pos} rotation={s.rot} />))
-      scatterBehind(4, seed + 23).forEach((s, i) => elements.push(<RubblePile key={`brub${i}`} position={s.pos} scale={0.5 + Math.abs(Math.sin(s.rot * 3)) * 0.5} />))
+      // 敵方後方叢集
+      clusterBehind(4, 4, seed + 20).forEach((s, i) => elements.push(<BuildingRuin key={`bbld${i}`} position={s.pos} rotation={s.rot} />))
+      clusterBehind(3, 4, seed + 21).forEach((s, i) => elements.push(<ConcreteBarrier key={`bbar${i}`} position={s.pos} rotation={s.rot} />))
+      clusterBehind(3, 3, seed + 22).forEach((s, i) => elements.push(<StreetLight key={`bsl${i}`} position={s.pos} rotation={s.rot} />))
+      clusterBehind(4, 4, seed + 23).forEach((s, i) => elements.push(<RubblePile key={`brub${i}`} position={s.pos} scale={0.5 + Math.abs(Math.sin(s.rot * 3)) * 0.5} />))
       break
+    }
+    case 'forest': {
       const trees = scatter(10, seed + 1, 26, 9)
       const logs = scatter(5, seed + 2, 22, 8)
       const mushrooms = scatter(8, seed + 3, 20, 7)
       trees.forEach((s, i) => elements.push(<TreeTrunk key={`tree${i}`} position={s.pos} rotation={s.rot} />))
       logs.forEach((s, i) => elements.push(<FallenLog key={`log${i}`} position={s.pos} rotation={s.rot} />))
       mushrooms.forEach((s, i) => elements.push(<Mushroom key={`mush${i}`} position={s.pos} rotation={s.rot} />))
-      // 氛�??��?
+      // 氛圍道具
       scatter(3, seed + 10, 22, 8).forEach((s, i) => elements.push(<BloodStain key={`fbld${i}`} position={[s.pos[0], 0.01, s.pos[2]]} scale={0.3 + Math.abs(Math.sin(s.rot * 4)) * 0.4} />))
       scatter(4, seed + 11, 18, 7).forEach((s, i) => elements.push(<ScatteredLitter key={`flit${i}`} position={s.pos} rotation={s.rot} />))
-      // 敵方後方加密
-      scatterBehind(5, seed + 20).forEach((s, i) => elements.push(<TreeTrunk key={`btree${i}`} position={s.pos} rotation={s.rot} />))
-      scatterBehind(3, seed + 21).forEach((s, i) => elements.push(<FallenLog key={`blog${i}`} position={s.pos} rotation={s.rot} />))
-      scatterBehind(4, seed + 22).forEach((s, i) => elements.push(<Mushroom key={`bmush${i}`} position={s.pos} rotation={s.rot} />))
+      // 敵方後方叢集
+      clusterBehind(4, 4, seed + 20).forEach((s, i) => elements.push(<TreeTrunk key={`btree${i}`} position={s.pos} rotation={s.rot} />))
+      clusterBehind(3, 3, seed + 21).forEach((s, i) => elements.push(<FallenLog key={`blog${i}`} position={s.pos} rotation={s.rot} />))
+      clusterBehind(3, 4, seed + 22).forEach((s, i) => elements.push(<Mushroom key={`bmush${i}`} position={s.pos} rotation={s.rot} />))
       break
     }
     case 'wasteland': {
@@ -1310,11 +1343,11 @@ function generateSceneElements(mode: SceneMode, stageId: string = '1-1'): React.
       scatter(5, seed + 10, 20, 8).forEach((s, i) => elements.push(<RubblePile key={`wrub${i}`} position={s.pos} scale={0.5 + Math.abs(Math.sin(s.rot * 2)) * 0.5} />))
       scatter(4, seed + 11, 18, 7).forEach((s, i) => elements.push(<ScatteredLitter key={`wlit${i}`} position={s.pos} rotation={s.rot} />))
       scatter(2, seed + 12, 20, 7).forEach((s, i) => elements.push(<BloodStain key={`wbld${i}`} position={[s.pos[0], 0.01, s.pos[2]]} scale={0.3 + Math.abs(Math.sin(s.rot * 6)) * 0.3} />))
-      // 敵方後方加密
-      scatterBehind(4, seed + 20).forEach((s, i) => elements.push(<OilDrum key={`bdrum${i}`} position={s.pos} rotation={s.rot} />))
-      scatterBehind(3, seed + 21).forEach((s, i) => elements.push(<BrokenShelf key={`bshelf${i}`} position={s.pos} rotation={s.rot} />))
-      scatterBehind(3, seed + 22).forEach((s, i) => elements.push(<ShoppingCart key={`bcart${i}`} position={s.pos} rotation={s.rot} />))
-      scatterBehind(4, seed + 23).forEach((s, i) => elements.push(<RubblePile key={`bwrub${i}`} position={s.pos} scale={0.5 + Math.abs(Math.sin(s.rot * 2)) * 0.5} />))
+      // 敵方後方叢集
+      clusterBehind(4, 4, seed + 20).forEach((s, i) => elements.push(<OilDrum key={`bdrum${i}`} position={s.pos} rotation={s.rot} />))
+      clusterBehind(3, 3, seed + 21).forEach((s, i) => elements.push(<BrokenShelf key={`bshelf${i}`} position={s.pos} rotation={s.rot} />))
+      clusterBehind(3, 4, seed + 22).forEach((s, i) => elements.push(<ShoppingCart key={`bcart${i}`} position={s.pos} rotation={s.rot} />))
+      clusterBehind(4, 4, seed + 23).forEach((s, i) => elements.push(<RubblePile key={`bwrub${i}`} position={s.pos} scale={0.5 + Math.abs(Math.sin(s.rot * 2)) * 0.5} />))
       break
     }
     case 'factory': {
@@ -1329,11 +1362,11 @@ function generateSceneElements(mode: SceneMode, stageId: string = '1-1'): React.
       // 氛�??��?
       scatter(4, seed + 10, 22, 8).forEach((s, i) => elements.push(<RubblePile key={`frub${i}`} position={s.pos} scale={0.5 + Math.abs(Math.sin(s.rot * 3)) * 0.5} />))
       scatter(3, seed + 11, 18, 7).forEach((s, i) => elements.push(<ScatteredLitter key={`flit${i}`} position={s.pos} rotation={s.rot} />))
-      // 敵方後方加密
-      scatterBehind(3, seed + 20).forEach((s, i) => elements.push(<MachineryGear key={`bgear${i}`} position={s.pos} rotation={s.rot} />))
-      scatterBehind(3, seed + 21).forEach((s, i) => elements.push(<PipeRack key={`bpipe${i}`} position={s.pos} rotation={s.rot} />))
-      scatterBehind(3, seed + 22).forEach((s, i) => elements.push(<OilDrum key={`bfdrum${i}`} position={s.pos} rotation={s.rot} />))
-      scatterBehind(2, seed + 23).forEach((s, i) => elements.push(<ConveyorFrame key={`bconv${i}`} position={s.pos} rotation={s.rot} />))
+      // 敵方後方叢集
+      clusterBehind(3, 4, seed + 20).forEach((s, i) => elements.push(<MachineryGear key={`bgear${i}`} position={s.pos} rotation={s.rot} />))
+      clusterBehind(3, 4, seed + 21).forEach((s, i) => elements.push(<PipeRack key={`bpipe${i}`} position={s.pos} rotation={s.rot} />))
+      clusterBehind(3, 3, seed + 22).forEach((s, i) => elements.push(<OilDrum key={`bfdrum${i}`} position={s.pos} rotation={s.rot} />))
+      clusterBehind(2, 4, seed + 23).forEach((s, i) => elements.push(<ConveyorFrame key={`bconv${i}`} position={s.pos} rotation={s.rot} />))
       break
     }
     case 'hospital': {
@@ -1346,10 +1379,10 @@ function generateSceneElements(mode: SceneMode, stageId: string = '1-1'): React.
       // 氛�??��?
       scatter(5, seed + 10, 20, 8).forEach((s, i) => elements.push(<BloodStain key={`hbld${i}`} position={[s.pos[0], 0.01, s.pos[2]]} scale={0.4 + Math.abs(Math.sin(s.rot * 3)) * 0.6} />))
       scatter(3, seed + 11, 18, 7).forEach((s, i) => elements.push(<ScatteredLitter key={`hlit${i}`} position={s.pos} rotation={s.rot} />))
-      // 敵方後方加密
-      scatterBehind(3, seed + 20).forEach((s, i) => elements.push(<HospitalBed key={`bbed${i}`} position={s.pos} rotation={s.rot} />))
-      scatterBehind(3, seed + 21).forEach((s, i) => elements.push(<IVStand key={`biv${i}`} position={s.pos} rotation={s.rot} />))
-      scatterBehind(3, seed + 22).forEach((s, i) => elements.push(<MedCabinet key={`bcab${i}`} position={s.pos} rotation={s.rot} />))
+      // 敵方後方叢集
+      clusterBehind(3, 4, seed + 20).forEach((s, i) => elements.push(<HospitalBed key={`bbed${i}`} position={s.pos} rotation={s.rot} />))
+      clusterBehind(3, 3, seed + 21).forEach((s, i) => elements.push(<IVStand key={`biv${i}`} position={s.pos} rotation={s.rot} />))
+      clusterBehind(3, 3, seed + 22).forEach((s, i) => elements.push(<MedCabinet key={`bcab${i}`} position={s.pos} rotation={s.rot} />))
       break
     }
     case 'residential': {
@@ -1365,11 +1398,11 @@ function generateSceneElements(mode: SceneMode, stageId: string = '1-1'): React.
       scatter(3, seed + 10, 20, 8).forEach((s, i) => elements.push(<RubblePile key={`rrub${i}`} position={s.pos} scale={0.4 + Math.abs(Math.sin(s.rot * 2)) * 0.4} />))
       scatter(3, seed + 11, 18, 7).forEach((s, i) => elements.push(<BloodStain key={`rbld${i}`} position={[s.pos[0], 0.01, s.pos[2]]} scale={0.3 + Math.abs(Math.sin(s.rot * 4)) * 0.3} />))
       scatter(4, seed + 12, 16, 6).forEach((s, i) => elements.push(<ScatteredLitter key={`rlit${i}`} position={s.pos} rotation={s.rot} />))
-      // 敵方後方加密
-      scatterBehind(3, seed + 20).forEach((s, i) => elements.push(<Table key={`btbl${i}`} position={s.pos} rotation={s.rot} />))
-      scatterBehind(4, seed + 21).forEach((s, i) => elements.push(<Chair key={`bchr${i}`} position={s.pos} rotation={s.rot} />))
-      scatterBehind(2, seed + 22).forEach((s, i) => elements.push(<Bookshelf key={`bbks${i}`} position={s.pos} rotation={s.rot} />))
-      scatterBehind(2, seed + 23).forEach((s, i) => elements.push(<TVSet key={`btv${i}`} position={s.pos} rotation={s.rot} />))
+      // 敵方後方叢集
+      clusterBehind(3, 4, seed + 20).forEach((s, i) => elements.push(<Table key={`btbl${i}`} position={s.pos} rotation={s.rot} />))
+      clusterBehind(4, 3, seed + 21).forEach((s, i) => elements.push(<Chair key={`bchr${i}`} position={s.pos} rotation={s.rot} />))
+      clusterBehind(2, 4, seed + 22).forEach((s, i) => elements.push(<Bookshelf key={`bbks${i}`} position={s.pos} rotation={s.rot} />))
+      clusterBehind(2, 3, seed + 23).forEach((s, i) => elements.push(<TVSet key={`btv${i}`} position={s.pos} rotation={s.rot} />))
       break
     }
     case 'underground': {
@@ -1385,11 +1418,11 @@ function generateSceneElements(mode: SceneMode, stageId: string = '1-1'): React.
       scatter(4, seed + 10, 22, 8).forEach((s, i) => elements.push(<RubblePile key={`urub${i}`} position={s.pos} scale={0.5 + Math.abs(Math.sin(s.rot * 3)) * 0.5} />))
       scatter(4, seed + 11, 20, 8).forEach((s, i) => elements.push(<BloodStain key={`ubld${i}`} position={[s.pos[0], 0.01, s.pos[2]]} scale={0.4 + Math.abs(Math.sin(s.rot * 5)) * 0.5} />))
       scatter(3, seed + 12, 18, 7).forEach((s, i) => elements.push(<ScatteredLitter key={`ulit${i}`} position={s.pos} rotation={s.rot} />))
-      // 敵方後方加密
-      scatterBehind(3, seed + 20).forEach((s, i) => elements.push(<CarWreck key={`bcar${i}`} position={s.pos} rotation={s.rot} />))
-      scatterBehind(4, seed + 21).forEach((s, i) => elements.push(<ConcreteColumn key={`bcol${i}`} position={s.pos} rotation={s.rot} />))
-      scatterBehind(4, seed + 22).forEach((s, i) => elements.push(<TrafficCone key={`bcone${i}`} position={s.pos} rotation={s.rot} />))
-      scatterBehind(2, seed + 23).forEach((s, i) => elements.push(<ParkingBarrier key={`bpbar${i}`} position={s.pos} rotation={s.rot} />))
+      // 敵方後方叢集
+      clusterBehind(3, 4, seed + 20).forEach((s, i) => elements.push(<CarWreck key={`bcar${i}`} position={s.pos} rotation={s.rot} />))
+      clusterBehind(4, 3, seed + 21).forEach((s, i) => elements.push(<ConcreteColumn key={`bcol${i}`} position={s.pos} rotation={s.rot} />))
+      clusterBehind(4, 4, seed + 22).forEach((s, i) => elements.push(<TrafficCone key={`bcone${i}`} position={s.pos} rotation={s.rot} />))
+      clusterBehind(2, 3, seed + 23).forEach((s, i) => elements.push(<ParkingBarrier key={`bpbar${i}`} position={s.pos} rotation={s.rot} />))
       break
     }
     case 'core': {
@@ -1402,10 +1435,10 @@ function generateSceneElements(mode: SceneMode, stageId: string = '1-1'): React.
       // 氛�??��?
       scatter(3, seed + 10, 20, 8).forEach((s, i) => elements.push(<RubblePile key={`xrub${i}`} position={s.pos} scale={0.4 + Math.abs(Math.sin(s.rot * 2)) * 0.4} />))
       scatter(2, seed + 11, 18, 7).forEach((s, i) => elements.push(<BloodStain key={`xbld${i}`} position={[s.pos[0], 0.01, s.pos[2]]} scale={0.3 + Math.abs(Math.sin(s.rot * 4)) * 0.4} />))
-      // 敵方後方加密
-      scatterBehind(4, seed + 20).forEach((s, i) => elements.push(<EnergyCrystal key={`bcrys${i}`} position={s.pos} rotation={s.rot} />))
-      scatterBehind(3, seed + 21).forEach((s, i) => elements.push(<GlowTube key={`btube${i}`} position={s.pos} rotation={s.rot} />))
-      scatterBehind(3, seed + 22).forEach((s, i) => elements.push(<TechConsole key={`bcons${i}`} position={s.pos} rotation={s.rot} />))
+      // 敵方後方叢集
+      clusterBehind(4, 4, seed + 20).forEach((s, i) => elements.push(<EnergyCrystal key={`bcrys${i}`} position={s.pos} rotation={s.rot} />))
+      clusterBehind(3, 3, seed + 21).forEach((s, i) => elements.push(<GlowTube key={`btube${i}`} position={s.pos} rotation={s.rot} />))
+      clusterBehind(3, 4, seed + 22).forEach((s, i) => elements.push(<TechConsole key={`bcons${i}`} position={s.pos} rotation={s.rot} />))
       break
     }
     // tower / daily / pvp / boss 不額外加道具（使用通用 debris）
