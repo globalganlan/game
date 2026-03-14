@@ -883,49 +883,92 @@ export function DotTickVFX({ position }: { position: Vector3Tuple }) {
 }
 
 /* ────────────────────────────
-   SkillFlash — 技能施放動態閃光
+   SkillFlash — KOF2002 風格四射光芒
    ──────────────────────────── */
 
-/** 技能施放時在攻擊者位置產生可見閃光爆發（發光球 + PointLight） */
-export function SkillFlash({ position, color = '#ffffff', intensity = 6 }: { position: Vector3Tuple; color?: string; intensity?: number }) {
-  const lightRef = useRef<THREE.PointLight>(null)
-  const meshRef = useRef<THREE.Mesh>(null)
+/** 預先生成光芒幾何：多條尖銳三角形射線從中心向外發散 */
+function makeBurstGeometry(rayCount: number, innerR: number, outerR: number, halfWidth: number): THREE.BufferGeometry {
+  const positions: number[] = []
+  for (let i = 0; i < rayCount; i++) {
+    // 隨機方向（球面分佈，偏 XY 平面）
+    const theta = Math.random() * Math.PI * 2
+    const phi = (Math.random() - 0.5) * Math.PI * 0.7 // 偏向水平展開
+    const dx = Math.cos(phi) * Math.cos(theta)
+    const dy = Math.sin(phi)
+    const dz = Math.cos(phi) * Math.sin(theta)
+    // 射線長度隨機變化
+    const len = outerR * (0.6 + Math.random() * 0.4)
+    // 尖端
+    const tx = dx * len, ty = dy * len, tz = dz * len
+    // 根部兩側（垂直於射線方向的偏移）
+    const perpX = -dz, perpZ = dx // 水平垂直向量
+    const norm = Math.sqrt(perpX * perpX + perpZ * perpZ) || 1
+    const px = (perpX / norm) * halfWidth
+    const pz = (perpZ / norm) * halfWidth
+    // 根部起點（離中心 innerR）
+    const bx = dx * innerR, by = dy * innerR, bz = dz * innerR
+    // 三角形：左根 → 尖端 → 右根
+    positions.push(bx + px, by, bz + pz)
+    positions.push(tx, ty, tz)
+    positions.push(bx - px, by, bz - pz)
+  }
+  const geo = new THREE.BufferGeometry()
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3))
+  geo.computeBoundingSphere()
+  return geo
+}
+
+/** KOF2002 風格技能閃光 — 從英雄身上向四周射出尖銳白色光芒 */
+export function SkillFlash({ position, color = '#ffffff', intensity = 8 }: { position: Vector3Tuple; color?: string; intensity?: number }) {
+  const groupRef = useRef<THREE.Group>(null)
   const matRef = useRef<THREE.MeshBasicMaterial>(null)
+  const lightRef = useRef<THREE.PointLight>(null)
   const elapsed = useRef(0)
   const [done, setDone] = useState(false)
+
+  // 隨機生成一次光芒幾何（16 條射線）
+  const burstGeo = useMemo(() => makeBurstGeometry(16, 0.15, 2.8, 0.08), [])
 
   useFrame((_s, delta) => {
     if (done) return
     elapsed.current += delta
     const t = elapsed.current
-    if (t > 0.5) { setDone(true); return }
-    // 快速升亮 → 緩慢衰減
-    const ramp = t < 0.08 ? t / 0.08 : Math.max(0, 1 - (t - 0.08) / 0.42)
-    if (lightRef.current) lightRef.current.intensity = intensity * ramp
-    // 發光球：快速膨脹到 r=2.5 再縮回
-    if (meshRef.current) {
-      const s = ramp * 2.5
-      meshRef.current.scale.set(s, s, s)
+    const duration = 0.45
+    if (t > duration) { setDone(true); return }
+
+    // 快速爆發 → 衰減
+    const progress = t / duration
+    const ramp = progress < 0.12
+      ? progress / 0.12                            // 快速升亮
+      : Math.max(0, 1 - (progress - 0.12) / 0.88)  // 緩慢衰減
+
+    // 光芒尺度：快速膨脹
+    if (groupRef.current) {
+      const s = 0.3 + ramp * 0.7
+      groupRef.current.scale.set(s, s, s)
     }
-    if (matRef.current) matRef.current.opacity = ramp * 0.45
+    if (matRef.current) matRef.current.opacity = ramp * 0.9
+    if (lightRef.current) lightRef.current.intensity = intensity * ramp
   })
 
   if (done) return null
 
   return (
     <group position={position}>
-      <pointLight ref={lightRef} color={color} intensity={0} distance={15} decay={2} />
-      <mesh ref={meshRef} renderOrder={25}>
-        <sphereGeometry args={[1, 16, 12]} />
-        <meshBasicMaterial
-          ref={matRef}
-          color={color}
-          transparent
-          opacity={0}
-          depthTest={false}
-          blending={THREE.AdditiveBlending}
-        />
-      </mesh>
+      <group ref={groupRef}>
+        <mesh geometry={burstGeo} renderOrder={30}>
+          <meshBasicMaterial
+            ref={matRef}
+            color={color}
+            transparent
+            opacity={0}
+            depthTest={false}
+            side={THREE.DoubleSide}
+            blending={THREE.AdditiveBlending}
+          />
+        </mesh>
+      </group>
+      <pointLight ref={lightRef} color={color} intensity={0} distance={12} decay={2} />
     </group>
   )
 }
