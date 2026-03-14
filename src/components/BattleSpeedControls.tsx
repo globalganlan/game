@@ -19,7 +19,7 @@ export function BattleSpeedControls({ speed, setSpeed, skipBattleRef, actionReso
     <div className="btn-speed-wrap">
       <button
         onClick={() => setSpeed((s) => {
-          const o = [1, 2, 4, 8]
+          const o = [1, 2, 4, 6]
           const nv = o[(o.indexOf(s) + 1) % o.length]
           localStorage.setItem('battleSpeed', String(nv))
           return nv

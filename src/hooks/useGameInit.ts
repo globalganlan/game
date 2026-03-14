@@ -144,7 +144,7 @@ export function useGameInit(deps: GameInitDeps) {
       // 恢復戰鬥倍速
       try {
         const savedSpeed = Number(localStorage.getItem('battleSpeed'))
-        if (savedSpeed && [1, 2, 4, 8].includes(savedSpeed)) {
+        if (savedSpeed && [1, 2, 4, 6].includes(savedSpeed)) {
           setSpeed(savedSpeed)
         }
       } catch (e) { console.warn('[speed restore]', e) }

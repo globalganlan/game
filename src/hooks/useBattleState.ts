@@ -70,7 +70,7 @@ export function useBattleState() {
     setTurn(0); turnRef.current = 0
     // 戰鬥倍速從 localStorage 恢復（使用者偏好應跨局保留）
     const savedSpd = Number(localStorage.getItem('battleSpeed'))
-    const restoredSpd = savedSpd && [1, 2, 4, 8].includes(savedSpd) ? savedSpd : 1
+    const restoredSpd = savedSpd && [1, 2, 4, 6].includes(savedSpd) ? savedSpd : 1
     setSpeed(restoredSpd); speedRef.current = restoredSpd
     skipBattleRef.current = false
     setActorStates({}); actorStatesRef.current = {}

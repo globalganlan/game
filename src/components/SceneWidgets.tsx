@@ -918,56 +918,85 @@ function makeBurstGeometry(rayCount: number, innerR: number, outerR: number, hal
   return geo
 }
 
-/** KOF2002 風格技能閃光 — 從英雄身上向四周射出尖銳白色光芒 */
+/** KOF2002 風格技能閃光 — 6 條射線 × 3 連發，從英雄身上向四周射出 */
 export function SkillFlash({ position, color = '#ffffff', intensity = 8 }: { position: Vector3Tuple; color?: string; intensity?: number }) {
   const groupRef = useRef<THREE.Group>(null)
-  const matRef = useRef<THREE.MeshBasicMaterial>(null)
+  const mat1Ref = useRef<THREE.MeshBasicMaterial>(null)
+  const mat2Ref = useRef<THREE.MeshBasicMaterial>(null)
+  const mat3Ref = useRef<THREE.MeshBasicMaterial>(null)
+  const mesh1Ref = useRef<THREE.Mesh>(null)
+  const mesh2Ref = useRef<THREE.Mesh>(null)
+  const mesh3Ref = useRef<THREE.Mesh>(null)
   const lightRef = useRef<THREE.PointLight>(null)
   const elapsed = useRef(0)
   const [done, setDone] = useState(false)
 
-  // 隨機生成一次光芒幾何（16 條射線）
-  const burstGeo = useMemo(() => makeBurstGeometry(16, 0.15, 2.8, 0.08), [])
+  // 三波各自獨立隨機方向（6 條 × 3 波）
+  const geo1 = useMemo(() => makeBurstGeometry(6, 0.12, 5.6, 0.07), [])
+  const geo2 = useMemo(() => makeBurstGeometry(6, 0.12, 5.6, 0.07), [])
+  const geo3 = useMemo(() => makeBurstGeometry(6, 0.12, 5.6, 0.07), [])
+
+  // 每波的時間設定：start, peak, end
+  const waves = useMemo(() => [
+    { start: 0,    peak: 0.04, end: 0.22 },
+    { start: 0.08, peak: 0.12, end: 0.30 },
+    { start: 0.16, peak: 0.20, end: 0.40 },
+  ], [])
+  const totalDuration = 0.42
 
   useFrame((_s, delta) => {
     if (done) return
     elapsed.current += delta
     const t = elapsed.current
-    const duration = 0.45
-    if (t > duration) { setDone(true); return }
+    if (t > totalDuration) { setDone(true); return }
 
-    // 快速爆發 → 衰減
-    const progress = t / duration
-    const ramp = progress < 0.12
-      ? progress / 0.12                            // 快速升亮
-      : Math.max(0, 1 - (progress - 0.12) / 0.88)  // 緩慢衰減
+    const matRefs = [mat1Ref, mat2Ref, mat3Ref]
+    const meshRefs = [mesh1Ref, mesh2Ref, mesh3Ref]
+    let maxRamp = 0
 
-    // 光芒尺度：快速膨脹
-    if (groupRef.current) {
-      const s = 0.3 + ramp * 0.7
-      groupRef.current.scale.set(s, s, s)
+    for (let i = 0; i < 3; i++) {
+      const w = waves[i]
+      let ramp = 0
+      if (t >= w.start && t < w.end) {
+        if (t < w.peak) {
+          ramp = (t - w.start) / (w.peak - w.start) // 升亮
+        } else {
+          ramp = Math.max(0, 1 - (t - w.peak) / (w.end - w.peak)) // 衰減
+        }
+      }
+      if (ramp > maxRamp) maxRamp = ramp
+      // 透明度 + 尺度
+      const mat = matRefs[i].current
+      const mesh = meshRefs[i].current
+      if (mat) mat.opacity = ramp * 0.85
+      if (mesh) {
+        const s = 0.4 + ramp * 0.6
+        mesh.scale.set(s, s, s)
+      }
     }
-    if (matRef.current) matRef.current.opacity = ramp * 0.9
-    if (lightRef.current) lightRef.current.intensity = intensity * ramp
+
+    if (lightRef.current) lightRef.current.intensity = intensity * maxRamp
   })
 
   if (done) return null
 
+  const matProps = {
+    color, transparent: true, opacity: 0,
+    depthTest: false, side: THREE.DoubleSide,
+    blending: THREE.AdditiveBlending,
+  } as const
+
   return (
     <group position={position}>
-      <group ref={groupRef}>
-        <mesh geometry={burstGeo} renderOrder={30}>
-          <meshBasicMaterial
-            ref={matRef}
-            color={color}
-            transparent
-            opacity={0}
-            depthTest={false}
-            side={THREE.DoubleSide}
-            blending={THREE.AdditiveBlending}
-          />
-        </mesh>
-      </group>
+      <mesh ref={mesh1Ref} geometry={geo1} renderOrder={30}>
+        <meshBasicMaterial ref={mat1Ref} {...matProps} />
+      </mesh>
+      <mesh ref={mesh2Ref} geometry={geo2} renderOrder={30}>
+        <meshBasicMaterial ref={mat2Ref} {...matProps} />
+      </mesh>
+      <mesh ref={mesh3Ref} geometry={geo3} renderOrder={30}>
+        <meshBasicMaterial ref={mat3Ref} {...matProps} />
+      </mesh>
       <pointLight ref={lightRef} color={color} intensity={0} distance={12} decay={2} />
     </group>
   )
