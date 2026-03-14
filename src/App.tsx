@@ -792,7 +792,7 @@ export default function App() {
 
           {/* ── HUD ── */}
           <div className="game-hud">
-            {turn > 0 && gameState !== 'GAMEOVER' && <div className="hud-round">第 {turn} 回合</div>}
+            {turn > 0 && gameState !== 'GAMEOVER' && stageMode !== 'boss' && <div className="hud-round">第 {turn} 回合</div>}
           </div>
 
           {/* ── 防守陣型配置 頂部提示 + 操作按鈕 ── */}

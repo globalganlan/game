@@ -435,17 +435,15 @@ export async function executeBattleLoop(ctx: BattleLoopContext, replayActions?: 
         // 2) 攻擊動作
         const atkDone = waitForAction(action.attackerUid, 'ATTACKING')
         setActorState(action.attackerUid, 'ATTACKING')
+        await delay(ATTACK_DELAY_MS)
 
-        // ★ 攻擊動畫開始 → 立即更新攻擊者能量
+        // 3) 命中時機 → 同時更新攻擊者 & 目標能量
         if (action._atkEnergyNew != null) {
           setBattleEnergy((prev) => {
             if (!prev[action.attackerUid]) return prev
             return { ...prev, [action.attackerUid]: { current: action._atkEnergyNew!, max: prev[action.attackerUid]?.max ?? 1000 } }
           })
         }
-        await delay(ATTACK_DELAY_MS)
-
-        // 3) 傷害/受傷 or 閃避/死亡
         if (action._tgtEnergyNew != null) {
           setBattleEnergy((prev) => {
             if (!prev[action.targetUid]) return prev
@@ -502,6 +500,17 @@ export async function executeBattleLoop(ctx: BattleLoopContext, replayActions?: 
         // ★ 攻擊者已死 → 跳過整個技能 action
         if (actorStatesRef.current[action.attackerUid] === 'DEAD') break
 
+        // ★ 大招施放前先確保能量條顯示為滿（能量滿才能施放，但前端可能還沒渲染到 1000）
+        setBattleEnergy((prev) => {
+          const entry = prev[action.attackerUid]
+          if (!entry) return prev
+          const maxE = entry.max ?? 1000
+          if (entry.current >= maxE) return prev // 已滿則不更新
+          return { ...prev, [action.attackerUid]: { current: maxE, max: maxE } }
+        })
+        // 短暫等待讓玩家看到能量條滿的狀態
+        await delay(250)
+
         if (!skipBattleRef.current) audioManager.playSfx('skill_cast')
 
         // Phase 7: 技能名稱彈幕
@@ -531,15 +540,15 @@ export async function executeBattleLoop(ctx: BattleLoopContext, replayActions?: 
         const atkDone = waitForAction(action.attackerUid, 'ATTACKING')
         setActorState(action.attackerUid, 'ATTACKING')
         addSkillFlash(action.attackerUid)
+        await delay(ATTACK_DELAY_MS)
 
-        // ★ 攻擊動畫開始 → 立即更新攻擊者能量
+        // ★ 命中時機 → 更新攻擊者能量（大招消耗歸零）
         if (action._atkEnergyNew != null) {
           setBattleEnergy((prev) => {
             if (!prev[action.attackerUid]) return prev
             return { ...prev, [action.attackerUid]: { current: action._atkEnergyNew!, max: prev[action.attackerUid]?.max ?? 1000 } }
           })
         }
-        await delay(ATTACK_DELAY_MS)
 
         // 3) 所有目標同時播放效果
         const mergedTargets = new Map<string, { uid: string; damage: number; killed: boolean; isDodge: boolean; heal: number }>()

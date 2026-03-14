@@ -93,16 +93,19 @@ export function useAnimationPromises(skipBattleRef: React.MutableRefObject<boole
       setDamagePopups((prev) => [...prev, { id, uid, value, damageType }])
       setTimeout(() => setDamagePopups((prev) => prev.filter((p) => p.id !== id)), 1500)
     }
-    // 觸發受擊閃光
-    setHitFlashSignals((prev) => {
-      const next = { ...prev }
-      for (const uid of uids) {
-        next[uid] = (next[uid] || 0) + 1
-      }
-      return next
-    })
-    // 觸發粒子特效（跳過模式不播）
-    if (!skipBattleRef.current) {
+    // 閃避（value===0）不觸發閃光與粒子
+    if (value !== 0) {
+      // 觸發受擊閃光
+      setHitFlashSignals((prev) => {
+        const next = { ...prev }
+        for (const uid of uids) {
+          next[uid] = (next[uid] || 0) + 1
+        }
+        return next
+      })
+    }
+    // 觸發粒子特效（跳過模式不播、閃避不播）
+    if (value !== 0 && !skipBattleRef.current) {
       const vfxType: VfxType = value < 0 ? 'heal' : damageType === 'crit' ? 'crit' : damageType === 'dot' ? 'dot' : 'hit'
       const now = Date.now()
       const newEvents = uids.map(uid => ({ id: Math.random(), uid, type: vfxType, timestamp: now }))

@@ -80,6 +80,8 @@ interface SkillEffect {
   statusMaxStacks?: number;
   min?: number;
   max?: number;
+  perAlly?: boolean;
+  targetHpThreshold?: number;
 }
 
 interface DamageResult {
@@ -413,9 +415,9 @@ function resolvePassiveTargets(hero: BattleHero, effectType: string, passiveTarg
 function executePassiveEffect(
   rng: RngFn, hero: BattleHero, effect: SkillEffect, context: BattleContext,
   emit: EmitFn, extraTurnQueue: string[]
-) {
+): boolean {
   const chance = effect.statusChance ?? 1.0;
-  if (rng() > chance) return;
+  if (rng() > chance) return false;
 
   const ownerPassive = hero.activePassives.find(p => p.effects?.includes(effect));
   const passiveTargetType = ownerPassive?.target ?? 'self';
@@ -423,42 +425,59 @@ function executePassiveEffect(
   switch (effect.type) {
     case 'buff':
     case 'debuff': {
-      if (!effect.status) return;
+      if (!effect.status) return false;
       const targets = resolvePassiveTargets(hero, effect.type, passiveTargetType, context);
+      let effectValue = effect.statusValue ?? 0;
+      if (effect.perAlly) {
+        const aliveAllies = context.allAllies.filter(h => h.side === hero.side && h.currentHP > 0).length;
+        effectValue *= aliveAllies;
+      }
       for (const t of targets) {
         applyStatus(t, {
-          type: effect.status, value: effect.statusValue ?? 0,
+          type: effect.status, value: effectValue,
           duration: effect.statusDuration ?? 0, maxStacks: effect.statusMaxStacks ?? 1,
           sourceHeroId: hero.uid,
         });
       }
-      break;
+      return true;
     }
     case 'heal': {
-      const targets = resolvePassiveTargets(hero, 'buff', passiveTargetType, context);
-      for (const ht of targets) {
+      const healTargets = resolvePassiveTargets(hero, 'buff', passiveTargetType, context);
+      for (const ht of healTargets) {
         if (ht.currentHP <= 0) continue;
-        const base = (ht.finalStats as any)[effect.scalingStat || 'HP'] ?? ht.maxHP;
+        const scalingStat = effect.scalingStat ?? 'HP';
+        const base = (ht.finalStats as any)[scalingStat] ?? ht.maxHP;
         const healAmt = Math.floor(base * (effect.multiplier ?? 0.1) + (effect.flatValue ?? 0));
         const actual = Math.min(healAmt, ht.maxHP - ht.currentHP);
         ht.currentHP += actual;
         hero.totalHealingDone += actual;
       }
-      break;
+      return true;
     }
     case 'energy': {
-      const targets = resolvePassiveTargets(hero, 'buff', passiveTargetType, context);
-      for (const et of targets) { if (et.currentHP > 0) addEnergy(et, effect.flatValue ?? 0); }
-      break;
+      const energyTargets = resolvePassiveTargets(hero, 'buff', passiveTargetType, context);
+      for (const et of energyTargets) { if (et.currentHP > 0) addEnergy(et, effect.flatValue ?? 0); }
+      return true;
     }
-    case 'damage_mult':
+    case 'dispel_debuff':
+      cleanse(hero, 1);
+      return true;
+    case 'damage_mult': {
+      if (effect.targetHpThreshold != null && context.target) {
+        const targetHpPct = context.target.currentHP / context.target.maxHP;
+        if (targetHpPct >= effect.targetHpThreshold) return false;
+      }
       context.damageMult = (context.damageMult ?? 1.0) * (effect.multiplier ?? 1.0);
-      break;
+      return true;
+    }
+    case 'reflect':
+      applyStatus(hero, { type: 'reflect', value: effect.multiplier ?? 0.15, duration: 0, maxStacks: 1, sourceHeroId: hero.uid });
+      return true;
     case 'damage_mult_random': {
       const min = effect.min ?? 0.5;
       const max = effect.max ?? 1.8;
       context.damageMult = (context.damageMult ?? 1.0) * (min + rng() * (max - min));
-      break;
+      return true;
     }
     case 'damage': {
       if (context.target && context.target.currentHP > 0) {
@@ -471,14 +490,25 @@ function executePassiveEffect(
           if (killed) emit({ type: 'DEATH', targetUid: context.target.uid });
         }
       }
-      break;
+      return true;
     }
-    case 'extra_turn': extraTurnQueue.push(hero.uid); break;
-    case 'dispel_debuff': cleanse(hero, 1); break;
-    case 'reflect':
-      applyStatus(hero, { type: 'reflect', value: effect.multiplier ?? 0.15, duration: 0, maxStacks: 1, sourceHeroId: hero.uid });
-      break;
-    default: break;
+    case 'revive':
+      return true;
+    case 'extra_turn': extraTurnQueue.push(hero.uid); return true;
+    case 'random_debuff': {
+      const debuffPool: string[] = ['atk_down', 'def_down', 'spd_down', 'silence'];
+      const randomDebuff = debuffPool[Math.floor(rng() * debuffPool.length)];
+      const debuffTargets = resolvePassiveTargets(hero, 'debuff', passiveTargetType, context);
+      for (const t of debuffTargets) {
+        applyStatus(t, {
+          type: randomDebuff, value: effect.statusValue ?? 0.15,
+          duration: effect.statusDuration ?? 1, maxStacks: 1,
+          sourceHeroId: hero.uid,
+        });
+      }
+      return true;
+    }
+    default: return false;
   }
 }
 
@@ -492,9 +522,11 @@ function triggerPassives(
     const usageKey = passive.skillId;
     const usageCount = hero.passiveUsage[usageKey] || 0;
     if (trigger === 'on_lethal' && usageCount >= getMaxUsage(passive)) continue;
+    let anyEffectApplied = false;
     for (const eff of passive.effects) {
-      executePassiveEffect(rng, hero, eff, context, emit, extraTurnQueue);
+      if (executePassiveEffect(rng, hero, eff, context, emit, extraTurnQueue)) anyEffectApplied = true;
     }
+    if (!anyEffectApplied) continue;
     hero.passiveUsage[usageKey] = usageCount + 1;
     emit({ type: 'PASSIVE_TRIGGER', heroUid: hero.uid, skillId: passive.skillId, skillName: passive.name });
   }

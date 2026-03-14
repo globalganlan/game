@@ -13,6 +13,10 @@ import * as SkeletonUtils from 'three/examples/jsm/utils/SkeletonUtils'
 import * as THREE from 'three'
 import { getGlbForSuspense, isGlbFallback } from '../loaders/glbLoader'
 import type { AnimationState } from '../types'
+import type { StatusType } from '../domain/types'
+
+/** 控制效果類型（用於模型染色） */
+export type CcType = Extract<StatusType, 'stun' | 'freeze' | 'silence' | 'fear'>
 
 /* ────────────────────────────
    Props
@@ -28,6 +32,8 @@ interface ZombieModelProps {
   speed?: number
   /** 每次遞增觸發一次受擊紅色閃光 */
   hitFlashSignal?: number
+  /** 當前受到的控制效果（染色 + 動畫減速） */
+  ccType?: CcType | null
 }
 
 /* ────────────────────────────
@@ -43,6 +49,7 @@ export function ZombieModel({
   isDragging = false,
   speed = 1,
   hitFlashSignal = 0,
+  ccType = null,
 }: ZombieModelProps) {
   // 穩定 ref — 避免 onActionDone 變化時觸發不必要的 useEffect
   const onActionDoneRef = useRef(onActionDone)
@@ -344,6 +351,25 @@ export function ZombieModel({
     }
   })
 
+  // ── 控制效果染色 ──
+  const CC_COLORS: Record<string, THREE.Color> = useMemo(() => ({
+    stun:    new THREE.Color(1.0, 0.85, 0.0),     // 亮金黃 — 暈眩
+    freeze:  new THREE.Color(0.1, 0.65, 1.0),     // 飽和冰藍 — 冰凍
+    silence: new THREE.Color(0.6, 0.15, 0.85),    // 飽和紫 — 沉默
+    fear:    new THREE.Color(0.1, 0.85, 0.2),     // 亮綠 — 恐懼
+  }), [])
+  const ccElapsedRef = useRef(0)
+
+  // ── 拖曳暫停動畫 ──
+  useEffect(() => {
+    if (!mixer) return
+    if (isDragging) {
+      mixer.timeScale = 0
+    } else {
+      mixer.timeScale = state === 'IDLE' ? 1 : speed
+    }
+  }, [mixer, isDragging, speed, state])
+
   // ── 受擊紅色閃光（color tint + emissive 雙管齊下，確保任何材質都可見）──
   const flashTimerRef = useRef(0)
   const prevFlashSignalRef = useRef(hitFlashSignal)
@@ -377,6 +403,25 @@ export function ZombieModel({
       flashTimerRef.current = FLASH_DURATION
     }
 
+    // ── 1) CC 染色（持續脈動）──
+    let baseColors: THREE.Color[] | null = null
+    if (ccType && CC_COLORS[ccType]) {
+      ccElapsedRef.current += delta
+      // 正弦脈動：在 0.6 ~ 0.9 之間強烈波動
+      const pulse = 0.6 + 0.15 * (1 + Math.sin(ccElapsedRef.current * 6))
+      baseColors = matData.map(({ origColor }) =>
+        origColor.clone().lerp(CC_COLORS[ccType!], pulse)
+      )
+    } else {
+      ccElapsedRef.current = 0
+    }
+
+    // 套用 base（CC 或原始）到材質
+    for (let i = 0; i < matData.length; i++) {
+      matData[i].mat.color.copy(baseColors ? baseColors[i] : matData[i].origColor)
+    }
+
+    // ── 2) 受擊紅色閃光（疊加在 CC 之上）──
     if (flashTimerRef.current <= 0) return
     flashTimerRef.current -= delta
 
@@ -384,28 +429,11 @@ export function ZombieModel({
     // 快亮快滅的 bell-curve 效果
     const intensity = t > 0.5 ? (1 - t) / 0.5 : t / 0.5
 
-    for (const { mat, origColor } of matData) {
-      // color tint：原始色混合亮紅
-      mat.color.copy(origColor).lerp(FLASH_TINT, intensity * 0.7)
-    }
-
-    // 結束時確保完全歸零
-    if (flashTimerRef.current <= 0) {
-      for (const { mat, origColor } of matData) {
-        mat.color.copy(origColor)
-      }
+    for (const { mat } of matData) {
+      // 在當前色（可能已有 CC 染色）上疊紅
+      mat.color.lerp(FLASH_TINT, intensity * 0.7)
     }
   })
-
-  // ── 拖曳時暫停動畫 ──
-  useEffect(() => {
-    if (!mixer) return
-    if (isDragging) {
-      mixer.timeScale = 0
-    } else {
-      mixer.timeScale = state === 'IDLE' ? 1 : speed
-    }
-  }, [isDragging, mixer, speed, state])
 
   // ★ GPU 資源清理 — unmount 時 dispose clone 的材質和幾何體，避免 iOS VRAM 洩漏
   useEffect(() => {

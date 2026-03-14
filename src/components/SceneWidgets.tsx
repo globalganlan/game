@@ -353,10 +353,10 @@ export function SkillToast3D({ heroName, skillName, position, textScale = 1 }: S
   useFrame((_state, delta) => {
     if (ref.current) {
       elapsed.current += delta
-      ref.current.position.y += delta * 0.12
-      // 前 0.8 秒保持完全不透明，之後才淡出
-      if (elapsed.current > 0.8) {
-        setOpacity((prev) => Math.max(0, prev - delta * 0.5))
+      ref.current.position.y += delta * 0.35
+      // 前 0.6 秒保持完全不透明，之後快速淡出
+      if (elapsed.current > 0.6) {
+        setOpacity((prev) => Math.max(0, prev - delta * 0.8))
       }
       // 開頭彈入動畫：前 0.15 秒放大到 1.15x 再縮回
       const t = elapsed.current

@@ -659,9 +659,13 @@ function triggerPassives(
     if (trigger === 'on_lethal' && usageCount >= getMaxUsage(passive)) continue
 
     // 執行被動效果
+    let anyEffectApplied = false
     for (const effect of passive.effects) {
-      executePassiveEffect(hero, effect, context, cfg)
+      if (executePassiveEffect(hero, effect, context, cfg)) anyEffectApplied = true
     }
+
+    // 條件型被動（如處決 HP 門檻不滿足）：效果全未生效就不通知前端
+    if (!anyEffectApplied) continue
 
     hero.passiveUsage[usageKey] = usageCount + 1
 
@@ -756,9 +760,9 @@ function executePassiveEffect(
   effect: SkillEffect,
   context: BattleContext,
   cfg: BattleEngineConfig,
-): void {
+): boolean {
   const chance = effect.statusChance ?? 1.0
-  if (Math.random() > chance) return
+  if (Math.random() > chance) return false
 
   // 解析被動目標的 target 欄位，找出對應的 SkillTemplate
   const ownerPassive = hero.activePassives.find(p => p.effects.includes(effect))
@@ -767,7 +771,7 @@ function executePassiveEffect(
   switch (effect.type) {
     case 'buff':
     case 'debuff': {
-      if (!effect.status) return
+      if (!effect.status) return false
       // 根據被動 target 欄位決定施加對象
       const targets = resolvePassiveTargets(hero, effect.type, passiveTargetType, context)
       // perAlly: 效果數值按存活隊友人數倍增
@@ -785,7 +789,7 @@ function executePassiveEffect(
           sourceHeroId: hero.uid,
         })
       }
-      break
+      return true
     }
     case 'heal': {
       const healTargets = resolvePassiveTargets(hero, 'buff', passiveTargetType, context)
@@ -798,7 +802,7 @@ function executePassiveEffect(
         ht.currentHP += actual
         hero.totalHealingDone += actual
       }
-      break
+      return true
     }
     case 'energy': {
       const energyTargets = resolvePassiveTargets(hero, 'buff', passiveTargetType, context)
@@ -806,22 +810,22 @@ function executePassiveEffect(
         if (et.currentHP <= 0) continue
         addEnergy(et, effect.flatValue ?? 0)
       }
-      break
+      return true
     }
     case 'dispel_debuff': {
       // 被動觸發淨化（如 PAS_7_4）
       cleanse(hero, 1)
-      break
+      return true
     }
     case 'damage_mult': {
       // on_attack 被動：乘算傷害倍率（多個被動可疊加）
       // 支援 targetHpThreshold：只在目標 HP% 低於閾值時才生效
       if (effect.targetHpThreshold != null && context.target) {
         const targetHpPct = context.target.currentHP / context.target.maxHP
-        if (targetHpPct >= effect.targetHpThreshold) break // 條件不滿足，跳過
+        if (targetHpPct >= effect.targetHpThreshold) return false // 條件不滿足，不生效
       }
       context.damageMult = (context.damageMult ?? 1.0) * (effect.multiplier ?? 1.0)
-      break
+      return true
     }
     case 'reflect': {
       // 被動觸發反彈效果（如 PAS_3_4、PAS_12_4）— 施加 reflect status
@@ -832,14 +836,14 @@ function executePassiveEffect(
         maxStacks: 1,
         sourceHeroId: hero.uid,
       })
-      break
+      return true
     }
     case 'damage_mult_random': {
       // on_attack 被動：隨機傷害倍率
       const min = effect.min ?? 0.5
       const max = effect.max ?? 1.8
       context.damageMult = (context.damageMult ?? 1.0) * (min + Math.random() * (max - min))
-      break
+      return true
     }
     case 'damage': {
       // 非 on_attack 觸發的額外傷害（如 on_dodge 反擊）
@@ -861,15 +865,15 @@ function executePassiveEffect(
           }
         }
       }
-      break
+      return true
     }
     case 'revive':
       // Handled by checkLethalPassive
-      break
+      return true
     case 'extra_turn':
       // 將英雄加入額外行動佇列
       if (cfg._extraTurnQueue) cfg._extraTurnQueue.push(hero.uid)
-      break
+      return true
     case 'random_debuff': {
       // 隨機施加一個減益效果（如 PAS_11_2 中場休息）
       const debuffPool: StatusType[] = ['atk_down', 'def_down', 'spd_down', 'silence']
@@ -884,10 +888,10 @@ function executePassiveEffect(
           sourceHeroId: hero.uid,
         })
       }
-      break
+      return true
     }
     default:
-      break
+      return false
   }
 }
 

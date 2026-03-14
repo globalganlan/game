@@ -5,12 +5,13 @@
  * 並透過 useFrame 實現前進 / 後退 / 拖曳位移。
  */
 
-import { useRef, useState, useEffect } from 'react'
+import { useRef, useState, useEffect, useMemo } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { Html } from '@react-three/drei'
 import * as THREE from 'three'
 
 import { ZombieModel } from './ZombieModel'
+import type { CcType } from './ZombieModel'
 import { DamagePopup, HealthBar3D, EnergyBar3D, SkillToast3D, PassiveHint3D, BuffIcons3D, BuffApplyToast3D, VfxRenderer, SkillFlash } from './SceneWidgets'
 import type { SlotHero, ActorState, AnimationState, DamagePopupData, VfxEvent } from '../types'
 import type { SkillToast, PassiveHint, BuffApplyHint } from './BattleHUD'
@@ -103,6 +104,16 @@ export function Hero({
   const downPosRef = useRef<{ x: number; y: number } | null>(null)
 
   const isAdvancing = actorState === 'ADVANCING'
+
+  // ── 從 battleBuffs 偵測控制效果（優先級：stun > freeze > silence > fear）──
+  const CC_PRIORITY: CcType[] = ['stun', 'freeze', 'silence', 'fear']
+  const activeCcType = useMemo<CcType | null>(() => {
+    for (const cc of CC_PRIORITY) {
+      if (battleBuffs.some(b => b.type === cc)) return cc
+    }
+    return null
+  }, [battleBuffs])
+
   const isAttacking = actorState === 'ATTACKING'
   const isRetreating = actorState === 'RETREATING'
   const isHurt = actorState === 'HURT'
@@ -238,15 +249,16 @@ export function Hero({
           isDragging={amIDragged()}
           speed={speed}
           hitFlashSignal={hitFlashSignal}
+          ccType={activeCcType}
         />
 
         {damagePopups.map((pop) => (
           <DamagePopup key={pop.id} value={pop.value} damageType={pop.damageType} position={[0, 2.5, 0]} textScale={textScale} />
         ))}
 
-        {/* 技能名稱浮動標示（身體位置） */}
+        {/* 技能名稱浮動標示（頭頂上方，避免遮擋身體閃光/粒子） */}
         {skillToasts.map((t) => (
-          <SkillToast3D key={t.id} heroName={t.heroName} skillName={t.skillName} position={[0, 1.5, 0]} textScale={textScale} />
+          <SkillToast3D key={t.id} heroName={t.heroName} skillName={t.skillName} position={[0, 2.8, 0]} textScale={textScale} />
         ))}
 
         {/* 被動觸發浮動標示（依序往上錯開避免重疊） */}
