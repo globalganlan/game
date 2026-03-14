@@ -946,12 +946,12 @@ function generateGroundNormalMap(): THREE.DataTexture {
     v += vnoise(x * 0.8 + 37, y * 0.8 + 91, 2.0) * 0.22
     // 碎塊
     v += vnoise(x * 2.5 + 113, y * 2.5 + 67, 3.0) * 0.18
-    // 主裂縫（abs → pow 銳化：越接近 0 的 V 谷越窄越深）
-    const c1 = Math.abs(vnoise(x * 5.0 + 200, y * 5.0 + 150, 4.0) - 0.5) * 2 // 0~1
-    v += Math.pow(c1, 0.35) * 0.35 // pow<1 讓谷底更銳利
-    // 交叉細裂縫（45° 偏移，更高頻）
-    const c2 = Math.abs(vnoise((x + y) * 4.5 + 80, (x - y) * 4.5 + 60, 8.0) - 0.5) * 2
-    v += Math.pow(c2, 0.3) * 0.22
+    // 主裂縫（高頻 + pow 銳化：細而深的裂痕）
+    const c1 = Math.abs(vnoise(x * 9.0 + 200, y * 9.0 + 150, 4.0) - 0.5) * 2 // 0~1
+    v += Math.pow(c1, 0.22) * 0.28 // pow 越小谷底越窄越銳
+    // 交叉細裂縫（45° 偏移，更高頻更細）
+    const c2 = Math.abs(vnoise((x + y) * 7.5 + 80, (x - y) * 7.5 + 60, 8.0) - 0.5) * 2
+    v += Math.pow(c2, 0.2) * 0.18
     // 小石子
     v += vnoise(x * 8.0 + 300, y * 8.0 + 250, 5.0) * 0.12
     // 粗砂
