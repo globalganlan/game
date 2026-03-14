@@ -910,45 +910,64 @@ const GROUND_NORMAL_SCALE = new THREE.Vector2(1.4, 1.4)
 
 /**
  * 程序化 1024×1024 法線貼圖
- * 7 層噪波：大地形 + 裂縫 + 碎石 + 砂粒，多 seed 避免重複感
+ * 使用雙線性插值 Value Noise（平滑，無馬賽克）
+ * 7 層 octave：大地形 + 裂縫 + 碎石 + 砂粒
  */
 function generateGroundNormalMap(): THREE.DataTexture {
   const size = 1024
   const data = new Uint8Array(size * size * 4)
 
-  // 多 seed hash 避免單調
-  const h = (x: number, y: number, sx: number, sy: number) => {
-    const v = Math.sin(x * sx + y * sy) * 43758.5453
+  // 格點 hash（整數座標 → 隨機 0~1）
+  const ghash = (ix: number, iy: number, seed: number) => {
+    const v = Math.sin(ix * 127.1 + iy * 311.7 + seed * 113.5) * 43758.5453
     return v - Math.floor(v)
   }
 
-  // 高度場（7 層：地形→裂縫→碎石→砂粒）
+  // 雙線性插值 Value Noise — 平滑的噪波
+  const vnoise = (x: number, y: number, seed: number) => {
+    const ix = Math.floor(x), iy = Math.floor(y)
+    const fx = x - ix, fy = y - iy
+    // Hermite smoothstep 消除線性插值的稜角
+    const sx = fx * fx * (3 - 2 * fx)
+    const sy = fy * fy * (3 - 2 * fy)
+    const a = ghash(ix, iy, seed)
+    const b = ghash(ix + 1, iy, seed)
+    const c = ghash(ix, iy + 1, seed)
+    const d = ghash(ix + 1, iy + 1, seed)
+    return a + (b - a) * sx + (c - a) * sy + (a - b - c + d) * sx * sy
+  }
+
+  // FBM（7 octave，多 seed 疊加）
+  const fbm = (x: number, y: number) => {
+    let v = 0
+    // 大起伏
+    v += vnoise(x * 0.3, y * 0.3, 1.0) * 0.28
+    // 中地形
+    v += vnoise(x * 0.8 + 37, y * 0.8 + 91, 2.0) * 0.22
+    // 碎塊
+    v += vnoise(x * 2.5 + 113, y * 2.5 + 67, 3.0) * 0.18
+    // 裂縫（abs 製造銳利邊緣）
+    v += Math.abs(vnoise(x * 4.0 + 200, y * 4.0 + 150, 4.0) - 0.5) * 0.3
+    // 小石子
+    v += vnoise(x * 8.0 + 300, y * 8.0 + 250, 5.0) * 0.12
+    // 粗砂
+    v += vnoise(x * 18 + 500, y * 18 + 430, 6.0) * 0.07
+    // 細砂
+    v += vnoise(x * 40 + 700, y * 40 + 680, 7.0) * 0.04
+    return v
+  }
+
+  // 高度場
   const heights = new Float32Array(size * size)
   for (let j = 0; j < size; j++) {
     for (let i = 0; i < size; i++) {
       const wx = (i / size) * 60 - 30
       const wy = (j / size) * 60 - 30
-
-      // 大起伏
-      const o1 = h(wx * 0.3, wy * 0.3, 127.1, 311.7) * 0.28
-      // 中地形
-      const o2 = h(wx * 0.8 + 37, wy * 0.8 + 91, 269.5, 183.3) * 0.22
-      // 碎塊
-      const o3 = h(wx * 2.5 + 113, wy * 2.5 + 67, 157.3, 243.1) * 0.18
-      // 裂縫（用 abs 製造銳利邊緣）
-      const crack = Math.abs(h(wx * 4.0 + 200, wy * 4.0 + 150, 317.1, 191.7) - 0.5) * 0.3
-      // 小石子
-      const o5 = h(wx * 8.0 + 300, wy * 8.0 + 250, 419.7, 371.3) * 0.12
-      // 粗砂
-      const o6 = h(wx * 18 + 500, wy * 18 + 430, 523.1, 617.9) * 0.07
-      // 細砂
-      const o7 = h(wx * 40 + 700, wy * 40 + 680, 739.3, 821.7) * 0.04
-
-      heights[j * size + i] = o1 + o2 + o3 + crack + o5 + o6 + o7
+      heights[j * size + i] = fbm(wx, wy)
     }
   }
 
-  // 中央差分法推導法線（強度提高）
+  // 中央差分法推導法線
   const str = 6.0
   for (let j = 0; j < size; j++) {
     for (let i = 0; i < size; i++) {
