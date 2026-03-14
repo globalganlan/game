@@ -355,6 +355,9 @@ export async function executeBattleLoop(ctx: BattleLoopContext, replayActions?: 
   const pendingRetreats = new Map<string, Promise<void>>()
   /** 背景動畫（死亡等長動畫）—— 不阻塞下一個 action，Phase C 前統一等待 */
   const backgroundAnims: Promise<void>[] = []
+  /** 被動 hint 批次 gen：同一英雄連續 PASSIVE_TRIGGER 共享同一 gen，遇到其他 action 時 gen 遞增 */
+  const passiveGenMap = new Map<string, number>()
+  let lastActionWasPassive = false
 
   const onAction = async (action: BattleAction) => {
     // ── 戰鬥過程 log ──
@@ -399,6 +402,11 @@ export async function executeBattleLoop(ctx: BattleLoopContext, replayActions?: 
         await Promise.all(pendingRetreats.values())
         pendingRetreats.clear()
       }
+    }
+
+    // ★ 被動 hint gen 管理：非 PASSIVE_TRIGGER action 表示新一輪開始
+    if (action.type !== 'PASSIVE_TRIGGER') {
+      lastActionWasPassive = false
     }
 
     switch (action.type) {
@@ -740,11 +748,19 @@ export async function executeBattleLoop(ctx: BattleLoopContext, replayActions?: 
 
       case 'PASSIVE_TRIGGER': {
         const phId = ++passiveHintIdRef.current
-        setPassiveHints((prev) => [...prev, {
+        // 同一英雄連續 PASSIVE_TRIGGER → 同一 gen 共存；中間穿插其他 action → 新 gen 清舊的
+        if (!lastActionWasPassive) {
+          // 開始新一批：遞增該英雄的 gen
+          passiveGenMap.set(action.heroUid, (passiveGenMap.get(action.heroUid) ?? 0) + 1)
+        }
+        lastActionWasPassive = true
+        const gen = passiveGenMap.get(action.heroUid)!
+        setPassiveHints((prev) => [...prev.filter((h) => h.heroUid !== action.heroUid || h.gen === gen), {
           id: phId,
           skillName: action.skillName,
           timestamp: Date.now(),
           heroUid: action.heroUid,
+          gen,
         }])
         setTimeout(() => setPassiveHints((prev) => prev.filter((h) => h.id !== phId)), 2000)
         break

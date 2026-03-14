@@ -39,6 +39,7 @@ export interface PassiveHint {
   skillName: string
   timestamp: number
   heroUid: string
+  gen: number  // 同一批被動共享 gen，換批時清舊 gen
 }
 
 export interface BuffApplyHint {
