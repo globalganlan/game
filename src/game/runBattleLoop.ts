@@ -98,6 +98,8 @@ export interface BattleLoopContext {
 
   /* ── Animation promise callbacks ── */
   addDamage: (targetUids: string | string[], value: number, damageType?: import('../types').DamageDisplayType) => void
+  addSkillFlash: (uid: string) => void
+  addBuffVfx: (targetUids: string | string[]) => void
   waitForAction: (uid: string, expectedState?: AnimationState | null) => Promise<void>
   waitForMove: (uid: string) => Promise<void>
   clearAllPromises: () => void
@@ -140,7 +142,7 @@ export async function executeBattleLoop(ctx: BattleLoopContext, replayActions?: 
     setBattleBuffs, setBattleEnergy, setSkillToasts,
     setPassiveHints, setBuffApplyHints,
     setBossDamageProgress,
-    addDamage, waitForAction, waitForMove, clearAllPromises,
+    addDamage, addSkillFlash, addBuffVfx, waitForAction, waitForMove, clearAllPromises,
     actionResolveRefs, moveResolveRefs,
     doSaveFormation, doUpdateProgress, doUpdateStory,
     acquireShow, showToast,
@@ -528,6 +530,7 @@ export async function executeBattleLoop(ctx: BattleLoopContext, replayActions?: 
         // 2) 攻擊動作
         const atkDone = waitForAction(action.attackerUid, 'ATTACKING')
         setActorState(action.attackerUid, 'ATTACKING')
+        addSkillFlash(action.attackerUid)
 
         // ★ 攻擊動畫開始 → 立即更新攻擊者能量
         if (action._atkEnergyNew != null) {
@@ -704,6 +707,7 @@ export async function executeBattleLoop(ctx: BattleLoopContext, replayActions?: 
           heroUid: targetUid,
         }])
         setTimeout(() => setBuffApplyHints((prev) => prev.filter((h) => h.id !== bhId)), 2000)
+        addBuffVfx(targetUid)
         break
       }
 

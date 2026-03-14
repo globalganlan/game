@@ -8,11 +8,13 @@
  *   - clearAllPromises（清除殘留 Promise，避免 stale timeout）
  */
 import { useState, useRef, useCallback } from 'react'
-import type { DamagePopupData, DamageDisplayType, ActionResolveEntry, AnimationState } from '../types'
+import type { DamagePopupData, DamageDisplayType, ActionResolveEntry, AnimationState, VfxEvent, VfxType } from '../types'
 
 export function useAnimationPromises(skipBattleRef: React.MutableRefObject<boolean>) {
   const [damagePopups, setDamagePopups] = useState<DamagePopupData[]>([])
   const [hitFlashSignals, setHitFlashSignals] = useState<Record<string, number>>({})
+  const [vfxEvents, setVfxEvents] = useState<VfxEvent[]>([])
+  const [skillFlashes, setSkillFlashes] = useState<{ id: number; uid: string; timestamp: number }[]>([])
   const actionResolveRefs = useRef<Record<string, ActionResolveEntry>>({})
   const moveResolveRefs = useRef<Record<string, () => void>>({})
 
@@ -83,7 +85,7 @@ export function useAnimationPromises(skipBattleRef: React.MutableRefObject<boole
 
   const handleModelReady = useCallback(() => { /* 保留介面 */ }, [])
 
-  /** 新增傷害彈窗 + 觸發受擊閃光（支援複數目標） */
+  /** 新增傷害彈窗 + 觸發受擊閃光 + 粒子特效（支援複數目標） */
   const addDamage = useCallback((targetUids: string | string[], value: number, damageType?: DamageDisplayType) => {
     const uids = Array.isArray(targetUids) ? targetUids : [targetUids]
     for (const uid of uids) {
@@ -99,7 +101,18 @@ export function useAnimationPromises(skipBattleRef: React.MutableRefObject<boole
       }
       return next
     })
-  }, [])
+    // 觸發粒子特效（跳過模式不播）
+    if (!skipBattleRef.current) {
+      const vfxType: VfxType = value < 0 ? 'heal' : damageType === 'crit' ? 'crit' : damageType === 'dot' ? 'dot' : 'hit'
+      const now = Date.now()
+      const newEvents = uids.map(uid => ({ id: Math.random(), uid, type: vfxType, timestamp: now }))
+      setVfxEvents((prev) => [...prev, ...newEvents])
+      setTimeout(() => {
+        const ids = new Set(newEvents.map(e => e.id))
+        setVfxEvents((prev) => prev.filter((e) => !ids.has(e.id)))
+      }, 1000)
+    }
+  }, [skipBattleRef])
 
   /** 清除所有殘留的動畫/移動 Promise — 避免 stale timeout 漏進新戰鬥 */
   const clearAllPromises = useCallback(() => {
@@ -113,13 +126,37 @@ export function useAnimationPromises(skipBattleRef: React.MutableRefObject<boole
     }
   }, [])
 
+  /** 技能施放閃光（目標位置短暫閃光） */
+  const addSkillFlash = useCallback((uid: string) => {
+    if (skipBattleRef.current) return
+    const id = Math.random()
+    setSkillFlashes((prev) => [...prev, { id, uid, timestamp: Date.now() }])
+    setTimeout(() => setSkillFlashes((prev) => prev.filter((f) => f.id !== id)), 600)
+  }, [skipBattleRef])
+
+  /** Buff 施加粒子 */
+  const addBuffVfx = useCallback((targetUids: string | string[]) => {
+    if (skipBattleRef.current) return
+    const uids = Array.isArray(targetUids) ? targetUids : [targetUids]
+    const now = Date.now()
+    const newEvents = uids.map(uid => ({ id: Math.random(), uid, type: 'buff' as VfxType, timestamp: now }))
+    setVfxEvents((prev) => [...prev, ...newEvents])
+    setTimeout(() => {
+      const ids = new Set(newEvents.map(e => e.id))
+      setVfxEvents((prev) => prev.filter((e) => !ids.has(e.id)))
+    }, 900)
+  }, [skipBattleRef])
+
   return {
     damagePopups, setDamagePopups,
     hitFlashSignals, setHitFlashSignals,
+    vfxEvents, setVfxEvents,
+    skillFlashes, setSkillFlashes,
     actionResolveRefs, moveResolveRefs,
     waitForAction, handleActorActionDone,
     waitForMove, handleMoveDone,
     handleModelReady, addDamage,
+    addSkillFlash, addBuffVfx,
     clearAllPromises,
   }
 }

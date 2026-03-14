@@ -10,6 +10,7 @@ import { OrbitControls, Billboard, Text } from '@react-three/drei'
 import * as THREE from 'three'
 import type { Vector3Tuple } from 'three'
 import type { StatusEffect, StatusType } from '../domain/types'
+import type { VfxType } from '../types'
 
 import { preloadFont } from 'troika-three-text'
 import { preload as suspendPreload } from 'suspend-react'
@@ -683,4 +684,240 @@ export function BuffApplyToast3D({ effectType, isBuff, position, textScale = 1 }
       </Text>
     </Billboard>
   )
+}
+
+/* ────────────────────────────
+   HitBurstVFX — 攻擊命中粒子爆發
+   ──────────────────────────── */
+
+const BURST_COUNT = 18
+
+/** 命中/暴擊時在目標位置爆發粒子 */
+export function HitBurstVFX({ position, isCrit = false }: { position: Vector3Tuple; isCrit?: boolean }) {
+  const ref = useRef<THREE.Points>(null)
+  const elapsed = useRef(0)
+  const velocities = useMemo(() => {
+    const v = new Float32Array(BURST_COUNT * 3)
+    for (let i = 0; i < BURST_COUNT; i++) {
+      const theta = Math.random() * Math.PI * 2
+      const phi = Math.random() * Math.PI * 0.6
+      const spd = 1.5 + Math.random() * 2.5
+      v[i * 3] = Math.sin(phi) * Math.cos(theta) * spd
+      v[i * 3 + 1] = Math.cos(phi) * spd + 1.0
+      v[i * 3 + 2] = Math.sin(phi) * Math.sin(theta) * spd
+    }
+    return v
+  }, [])
+  const positions = useMemo(() => new Float32Array(BURST_COUNT * 3), [])
+  const [done, setDone] = useState(false)
+
+  useFrame((_s, delta) => {
+    if (!ref.current || done) return
+    elapsed.current += delta
+    const t = elapsed.current
+    if (t > 0.6) { setDone(true); return }
+    const posArr = ref.current.geometry.attributes.position.array as Float32Array
+    for (let i = 0; i < BURST_COUNT; i++) {
+      posArr[i * 3] = velocities[i * 3] * t
+      posArr[i * 3 + 1] = velocities[i * 3 + 1] * t - 4.9 * t * t
+      posArr[i * 3 + 2] = velocities[i * 3 + 2] * t
+    }
+    ref.current.geometry.attributes.position.needsUpdate = true
+    const mat = ref.current.material as THREE.PointsMaterial
+    mat.opacity = Math.max(0, 1 - t / 0.6)
+  })
+
+  if (done) return null
+
+  return (
+    <points ref={ref} position={position}>
+      <bufferGeometry>
+        <bufferAttribute attach="attributes-position" args={[positions, 3]} count={BURST_COUNT} />
+      </bufferGeometry>
+      <pointsMaterial
+        color={isCrit ? '#ffaa00' : '#ff4422'}
+        size={isCrit ? 0.18 : 0.12}
+        transparent
+        depthTest={false}
+        sizeAttenuation
+      />
+    </points>
+  )
+}
+
+/* ────────────────────────────
+   HealVFX — 治療綠光上升粒子
+   ──────────────────────────── */
+
+const HEAL_COUNT = 14
+
+export function HealVFX({ position }: { position: Vector3Tuple }) {
+  const ref = useRef<THREE.Points>(null)
+  const elapsed = useRef(0)
+  const offsets = useMemo(() => {
+    const o = new Float32Array(HEAL_COUNT * 3)
+    for (let i = 0; i < HEAL_COUNT; i++) {
+      const angle = (i / HEAL_COUNT) * Math.PI * 2
+      const r = 0.3 + Math.random() * 0.4
+      o[i * 3] = Math.cos(angle) * r
+      o[i * 3 + 1] = Math.random() * 0.3
+      o[i * 3 + 2] = Math.sin(angle) * r
+    }
+    return o
+  }, [])
+  const positions = useMemo(() => new Float32Array(HEAL_COUNT * 3), [])
+  const [done, setDone] = useState(false)
+
+  useFrame((_s, delta) => {
+    if (!ref.current || done) return
+    elapsed.current += delta
+    const t = elapsed.current
+    if (t > 0.8) { setDone(true); return }
+    const posArr = ref.current.geometry.attributes.position.array as Float32Array
+    for (let i = 0; i < HEAL_COUNT; i++) {
+      const angle = (i / HEAL_COUNT) * Math.PI * 2 + t * 3
+      const r = 0.3 + Math.sin(t * 5 + i) * 0.15
+      posArr[i * 3] = Math.cos(angle) * r
+      posArr[i * 3 + 1] = offsets[i * 3 + 1] + t * 2.0
+      posArr[i * 3 + 2] = Math.sin(angle) * r
+    }
+    ref.current.geometry.attributes.position.needsUpdate = true
+    const mat = ref.current.material as THREE.PointsMaterial
+    mat.opacity = Math.max(0, 1 - t / 0.8)
+  })
+
+  if (done) return null
+
+  return (
+    <points ref={ref} position={position}>
+      <bufferGeometry>
+        <bufferAttribute attach="attributes-position" args={[positions, 3]} count={HEAL_COUNT} />
+      </bufferGeometry>
+      <pointsMaterial color="#00ff88" size={0.1} transparent depthTest={false} sizeAttenuation />
+    </points>
+  )
+}
+
+/* ────────────────────────────
+   BuffShimmerVFX — Buff 施加光點
+   ──────────────────────────── */
+
+const SHIMMER_COUNT = 10
+
+export function BuffShimmerVFX({ position }: { position: Vector3Tuple }) {
+  const ref = useRef<THREE.Points>(null)
+  const elapsed = useRef(0)
+  const positions = useMemo(() => new Float32Array(SHIMMER_COUNT * 3), [])
+  const [done, setDone] = useState(false)
+
+  useFrame((_s, delta) => {
+    if (!ref.current || done) return
+    elapsed.current += delta
+    const t = elapsed.current
+    if (t > 0.7) { setDone(true); return }
+    const posArr = ref.current.geometry.attributes.position.array as Float32Array
+    for (let i = 0; i < SHIMMER_COUNT; i++) {
+      const angle = (i / SHIMMER_COUNT) * Math.PI * 2 + t * 4
+      const r = 0.5 + Math.sin(t * 8 + i * 0.7) * 0.3
+      posArr[i * 3] = Math.cos(angle) * r
+      posArr[i * 3 + 1] = 0.8 + Math.sin(t * 6 + i) * 0.4
+      posArr[i * 3 + 2] = Math.sin(angle) * r
+    }
+    ref.current.geometry.attributes.position.needsUpdate = true
+    const mat = ref.current.material as THREE.PointsMaterial
+    mat.opacity = Math.max(0, 1 - t / 0.7)
+  })
+
+  if (done) return null
+
+  return (
+    <points ref={ref} position={position}>
+      <bufferGeometry>
+        <bufferAttribute attach="attributes-position" args={[positions, 3]} count={SHIMMER_COUNT} />
+      </bufferGeometry>
+      <pointsMaterial color="#66ccff" size={0.09} transparent depthTest={false} sizeAttenuation />
+    </points>
+  )
+}
+
+/* ────────────────────────────
+   DotTickVFX — DOT 持續傷害粒子
+   ──────────────────────────── */
+
+const DOT_COUNT = 8
+
+export function DotTickVFX({ position }: { position: Vector3Tuple }) {
+  const ref = useRef<THREE.Points>(null)
+  const elapsed = useRef(0)
+  const positions = useMemo(() => new Float32Array(DOT_COUNT * 3), [])
+  const [done, setDone] = useState(false)
+
+  useFrame((_s, delta) => {
+    if (!ref.current || done) return
+    elapsed.current += delta
+    const t = elapsed.current
+    if (t > 0.5) { setDone(true); return }
+    const posArr = ref.current.geometry.attributes.position.array as Float32Array
+    for (let i = 0; i < DOT_COUNT; i++) {
+      const angle = (i / DOT_COUNT) * Math.PI * 2 + t * 5
+      const r = 0.2 + t * 0.6
+      posArr[i * 3] = Math.cos(angle) * r
+      posArr[i * 3 + 1] = 0.5 + t * 1.5
+      posArr[i * 3 + 2] = Math.sin(angle) * r
+    }
+    ref.current.geometry.attributes.position.needsUpdate = true
+    const mat = ref.current.material as THREE.PointsMaterial
+    mat.opacity = Math.max(0, 1 - t / 0.5)
+  })
+
+  if (done) return null
+
+  return (
+    <points ref={ref} position={position}>
+      <bufferGeometry>
+        <bufferAttribute attach="attributes-position" args={[positions, 3]} count={DOT_COUNT} />
+      </bufferGeometry>
+      <pointsMaterial color="#cc44ff" size={0.08} transparent depthTest={false} sizeAttenuation />
+    </points>
+  )
+}
+
+/* ────────────────────────────
+   SkillFlash — 技能施放動態閃光
+   ──────────────────────────── */
+
+/** 技能施放時在目標位置產生短暫閃光的 PointLight */
+export function SkillFlash({ position, color = '#ffffff', intensity = 6 }: { position: Vector3Tuple; color?: string; intensity?: number }) {
+  const ref = useRef<THREE.PointLight>(null)
+  const elapsed = useRef(0)
+  const [done, setDone] = useState(false)
+
+  useFrame((_s, delta) => {
+    if (!ref.current || done) return
+    elapsed.current += delta
+    const t = elapsed.current
+    if (t > 0.4) { setDone(true); return }
+    // 快速升亮 → 緩慢衰減
+    const ramp = t < 0.06 ? t / 0.06 : 1 - (t - 0.06) / 0.34
+    ref.current.intensity = intensity * Math.max(0, ramp)
+  })
+
+  if (done) return null
+
+  return <pointLight ref={ref} position={position} color={color} intensity={0} distance={12} decay={2} />
+}
+
+/* ────────────────────────────
+   VfxRenderer — 根據 VfxType 渲染對應特效
+   ──────────────────────────── */
+
+export function VfxRenderer({ type, position }: { type: VfxType; position: Vector3Tuple }) {
+  switch (type) {
+    case 'hit': return <HitBurstVFX position={position} />
+    case 'crit': return <HitBurstVFX position={position} isCrit />
+    case 'heal': return <HealVFX position={position} />
+    case 'buff': return <BuffShimmerVFX position={position} />
+    case 'dot': return <DotTickVFX position={position} />
+    default: return null
+  }
 }

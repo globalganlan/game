@@ -11,8 +11,8 @@ import { Html } from '@react-three/drei'
 import * as THREE from 'three'
 
 import { ZombieModel } from './ZombieModel'
-import { DamagePopup, HealthBar3D, EnergyBar3D, SkillToast3D, PassiveHint3D, BuffIcons3D, BuffApplyToast3D } from './SceneWidgets'
-import type { SlotHero, ActorState, AnimationState, DamagePopupData } from '../types'
+import { DamagePopup, HealthBar3D, EnergyBar3D, SkillToast3D, PassiveHint3D, BuffIcons3D, BuffApplyToast3D, VfxRenderer, SkillFlash } from './SceneWidgets'
+import type { SlotHero, ActorState, AnimationState, DamagePopupData, VfxEvent } from '../types'
 import type { SkillToast, PassiveHint, BuffApplyHint } from './BattleHUD'
 import type { StatusEffect } from '../domain/types'
 
@@ -56,6 +56,10 @@ interface HeroProps {
   battleBuffs?: StatusEffect[]
   /** Buff/Debuff 施加漂浮文字 */
   buffApplyHints?: BuffApplyHint[]
+  /** 粒子特效事件 */
+  vfxEvents?: VfxEvent[]
+  /** 技能閃光事件 */
+  skillFlashes?: { id: number; uid: string; timestamp: number }[]
 }
 
 /* ────────────────────────────
@@ -89,6 +93,8 @@ export function Hero({
   passiveHints = [],
   battleBuffs = [],
   buffApplyHints = [],
+  vfxEvents = [],
+  skillFlashes = [],
 }: HeroProps) {
   const meshRef = useRef<THREE.Group>(null)
   const [basePosition] = useState<Vector3Tuple>(position)
@@ -255,6 +261,16 @@ export function Hero({
 
         {/* Buff/Debuff 3D 圖示列 */}
         <BuffIcons3D effects={battleBuffs} textScale={textScale} />
+
+        {/* 粒子特效 */}
+        {vfxEvents.map((v) => (
+          <VfxRenderer key={v.id} type={v.type} position={[0, 1.2, 0]} />
+        ))}
+
+        {/* 技能閃光 */}
+        {skillFlashes.map((f) => (
+          <SkillFlash key={f.id} position={[0, 1.5, 0]} color="#ffa500" intensity={8} />
+        ))}
 
         <Html position={[0, 3.5, 0]} center zIndexRange={[1, 0]} wrapperClass="hero-name-html" style={{ pointerEvents: 'none' }}>
           <div className="hero-name-label">{heroData.Name}</div>

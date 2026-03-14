@@ -125,3 +125,18 @@ export interface ActionResolveEntry {
   resolve: () => void
   expectedState: AnimationState | null
 }
+
+/* ────────────────────────────
+   技能特效 (VFX)
+   ──────────────────────────── */
+
+/** VFX 類型 */
+export type VfxType = 'hit' | 'crit' | 'heal' | 'buff' | 'dot'
+
+/** 單一特效事件 */
+export interface VfxEvent {
+  id: number
+  uid: string
+  type: VfxType
+  timestamp: number
+}

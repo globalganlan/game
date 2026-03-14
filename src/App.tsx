@@ -211,9 +211,10 @@ export default function App() {
   const animPromises = useAnimationPromises(skipBattleRef)
   const {
     damagePopups, setDamagePopups, hitFlashSignals, setHitFlashSignals,
+    vfxEvents, setVfxEvents, skillFlashes, setSkillFlashes,
     actionResolveRefs, moveResolveRefs,
     waitForAction, handleActorActionDone, waitForMove, handleMoveDone,
-    handleModelReady, addDamage, clearAllPromises,
+    handleModelReady, addDamage, addSkillFlash, addBuffVfx, clearAllPromises,
   } = animPromises
 
 
@@ -328,7 +329,7 @@ export default function App() {
     battleHUD.fullResetBattleHUD()
     resetBattleRefs()
     setStageId('1-1'); setStageMode('story'); setSceneTheme('story')
-    setDamagePopups([]); setHitFlashSignals({})
+    setDamagePopups([]); setHitFlashSignals({}); setVfxEvents([]); setSkillFlashes([])
     clearAllPromises()
     setShowBattleScene(false)
 
@@ -452,7 +453,7 @@ export default function App() {
     setPassiveHints, setBuffApplyHints,
     setBossDamageProgress,
     setCurtainVisible, setCurtainFading, setCurtainText, curtainClosePromiseRef, closeCurtain,
-    addDamage, waitForAction, waitForMove, clearAllPromises,
+    addDamage, addSkillFlash, addBuffVfx, waitForAction, waitForMove, clearAllPromises,
     resetBattleHUD: battleHUD.resetBattleHUD,
     doSaveFormation: saveHook.doSaveFormation,
     doUpdateProgress: saveHook.doUpdateProgress as (changes: Record<string, unknown>) => void,
@@ -637,6 +638,8 @@ export default function App() {
                     passiveHints={passiveHints.filter((ph) => ph.heroUid === p._uid)}
                     battleBuffs={battleBuffs[p._uid] || []}
                     buffApplyHints={buffApplyHints.filter((bh) => bh.heroUid === p._uid)}
+                    vfxEvents={vfxEvents.filter((v) => v.uid === p._uid)}
+                    skillFlashes={skillFlashes.filter((f) => f.uid === p._uid)}
                   />
                   </Suspense>
                 ) : null,
@@ -673,6 +676,8 @@ export default function App() {
                     passiveHints={passiveHints.filter((ph) => ph.heroUid === e._uid)}
                     battleBuffs={battleBuffs[e._uid] || []}
                     buffApplyHints={buffApplyHints.filter((bh) => bh.heroUid === e._uid)}
+                    vfxEvents={vfxEvents.filter((v) => v.uid === e._uid)}
+                    skillFlashes={skillFlashes.filter((f) => f.uid === e._uid)}
                   />
                   </Suspense>
                 ) : null,

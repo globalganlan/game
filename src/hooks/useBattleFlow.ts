@@ -85,6 +85,8 @@ export interface BattleFlowDeps {
 
   /* ── Animation ── */
   addDamage: (targetUids: string | string[], value: number) => void
+  addSkillFlash: (uid: string) => void
+  addBuffVfx: (targetUids: string | string[]) => void
   waitForAction: (uid: string, expectedState?: AnimationState | null) => Promise<void>
   waitForMove: (uid: string) => Promise<void>
   clearAllPromises: () => void
@@ -181,6 +183,8 @@ export function useBattleFlow(deps: BattleFlowDeps) {
     setBuffApplyHints: deps.setBuffApplyHints,
     setBossDamageProgress: deps.setBossDamageProgress,
     addDamage: deps.addDamage,
+    addSkillFlash: deps.addSkillFlash,
+    addBuffVfx: deps.addBuffVfx,
     waitForAction: deps.waitForAction,
     waitForMove: deps.waitForMove,
     clearAllPromises: deps.clearAllPromises,
@@ -200,7 +204,7 @@ export function useBattleFlow(deps: BattleFlowDeps) {
   }), [
     deps.playerSlots, deps.enemySlots, deps.stageMode, deps.stageId,
     deps.updatePlayerSlots, deps.updateEnemySlots, deps.setActorState,
-    deps.addDamage, deps.waitForAction, deps.waitForMove, deps.clearAllPromises,
+    deps.addDamage, deps.addSkillFlash, deps.addBuffVfx, deps.waitForAction, deps.waitForMove, deps.clearAllPromises,
     deps.doSaveFormation, deps.doUpdateProgress, deps.doUpdateStory,
     deps.acquireShow, deps.showToast,
     deps.setBattleBuffs, deps.setBattleEnergy, deps.setSkillToasts,
