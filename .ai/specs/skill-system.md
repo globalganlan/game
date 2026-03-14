@@ -1,6 +1,6 @@
 # 技能系統 Spec
 
-> 版本：v1.5 ｜ 狀態：🟢 已實作
+> 版本：v1.6 ｜ 狀態：🟢 已實作
 > 最後更新：2026-03-09
 > 負責角色：🎯 GAME_DESIGN → 🔧 CODING
 > 原始碼：`src/domain/types.ts`（型別）、`src/domain/battleEngine.ts`（執行）、`src/services/dataService.ts`（資料載入）
@@ -376,3 +376,4 @@ getHeroSkillSet(heroId, skillsMap, heroSkillsMap)
 | v1.3 | 2026-03-01 | **extra_turn 機制實作**：新增 `_extraTurnQueue` + `processExtraTurns()`（每回合每位英雄最多 1 次，安全上限 MAX_EXTRA=10）；新增 `on_ally_death` / `on_ally_skill` 觸發點；`PassiveTrigger` 型別更新；`BattleAction` 新增 `EXTRA_TURN` 類型；App.tsx 表現層處理；5 項新增測試（47→594 全通過） |
 | v1.4 | 2026-03-01 | Spec 同步：SkillEffect.type 新增 `damage_mult` / `damage_mult_random`、新增 `min`/`max` 欄位、`hitCount` 標記為已使用、效果實作狀態表更新 |
 | v1.5 | 2026-03-09 | **12 項技能 Bug 修復 + 3 項引擎新功能**：新增 `random_debuff`/`targetHpThreshold`/`perAlly` 效果欄位；修正 SPD buff 絕對值→百分比（PAS_4_1/10_1/10_4/14_4）；PAS_4_4 斬殺加 HP 門檻；PAS_5_1/5_4 治療改 ATK 基準；PAS_14_1 閃避改 always 觸發；PAS_11_2 改 random_debuff；PAS_9_4 加機率；PAS_6_3 加 perAlly；`getStatusValue` 修正 value×stacks 雙重計算 bug |
+| v1.6 | 2026-03-16 | **PAS_4_4 斬殺誤觸修正**：`triggerPassives` 改為條件式 emit — `executePassiveEffect` 返回 `boolean`，`damage_mult` 的 `targetHpThreshold` 不滿足時返回 `false`，全部效果未生效則跳過 `PASSIVE_TRIGGER` 通知（修復 Boss 模式每次普攻都顯示斬殺飄字的問題） |

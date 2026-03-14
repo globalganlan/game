@@ -1,6 +1,6 @@
 # 關卡系統 Spec
 
-> 版本：v3.1 ｜ 狀態：🟢 已實作
+> 版本：v3.2 ｜ 狀態：🟢 已實作
 > 最後更新：2026-03-12
 > 負責角色：🎯 GAME_DESIGN → 🔧 CODING
 
@@ -639,3 +639,4 @@ mergeDrops(items: InventoryItem[]): InventoryItem[]   // 合併同 itemId
 | v2.9 | 2026-03-05 | **每日限制 + 獎勵預覽 + battle.ts 重寫**：①`battle.ts` 完全重寫 — 新增 `DAILY_LIMITS`（daily:3/pvp:5/boss:3）、`DailyCounts` 介面 + `parseDailyCounts()` + `checkDailyLimit()`、後端強制每日限制（超過拒絕，敗北也消耗）、per-mode 獎勵計算（daily=依 tier 發 gold/exp/items、pvp=gold/exp/diamond/pvp_coin、boss=S/A/B/C rank-based gold/diamond）②新 `/daily-counts` API 端點 ③D1 `save_data` 新增 `dailyCounts TEXT` 欄位 ④前端 `stageSystem.ts` 新增 `DAILY_LIMITS` + `getDailyLimit()` ⑤`StageSelect.tsx` 大幅改版 — TowerPanel 獎勵預覽、DailyPanel 獎勵+剩餘次數+耗盡訊息、PvPPanel 獎勵+pvp_coin+剩餘次數、BossPanel2 段位獎勵提示+剩餘次數、全 Tab 紅點 badge ⑥`CurrencyIcon` 新增 `pvp_coin` 類型（🏅）⑦`MainMenu` 新增 `stagesHasDaily` prop + 關卡按鈕紅點 ⑧`App.tsx` 在 MAIN_MENU 時 fetch daily-counts ⑨`App.css` 新增 tower-rewards/sc-reward-tag/daily-attempts/daily-exhausted/daily-tier-rewards/pvp-meta-row/pvp-reward-preview/boss-card-reward-hint 樣式 |
 | v3.0 | 2026-03-06 | **UX 修正+獎勵清理**：①Boss B/C 段位移除重複 EXP items（前端 `getBossRewardByBossAndRank` + 後端 `battle.ts`）②關卡選擇鑽石為 0 時不顯示圖示（修正 React JSX `{0 && ...}` 渲染 "0" 的 gotcha，改用 `(diamond ?? 0) > 0`）③PvP 對手獎勵 + Boss 段位獎勵鑽石顯示同步修正 ④MainMenu 紅點增加 `isModeUnlocked` 檢查（未解鎖的 daily/pvp/boss 不計入紅點）⑤`backToLobby` 移除過場動畫（直接返回 StageSelect/MainMenu）⑥戰鬥準備戰力改為即時計算（`battlePrepPower` useMemo 基於 `playerSlots` 而非 saved `formation`）|
 | v3.1 | 2026-03-12 | **Boss 回合限制下修 + 戰力顯示**：①BOSS_CONFIGS 三位 Boss 的 `turnLimit` 從 30 下修為 20；`runBattleLoop.ts` 改為從 boss config 動態讀取 turnLimit（取代 hardcoded 值）；StageSelect 文字更新「限時 20 回合」②新增 `getBossCombatPower(boss)` 函式，計算 Boss 戰力值；StageSelect Boss 選關卡片新增戰力顯示（`.boss-card-cp` CSS）③BossDamageBar 新增回合顯示「回合 N/20」（App.tsx 傳 `currentTurn={turn}` 至 BattleHUD）④App.css 新增 `.boss-dmg-round` + `.boss-card-cp` 樣式 |
+| v3.2 | 2026-03-16 | **Boss 模式 HUD 回合標示去重**：戰鬥中隱藏通用 `ROUND N` HUD 標示（`stageMode !== 'boss'`），BossDamageBar 已顯示「回合 N/20」不重複 |

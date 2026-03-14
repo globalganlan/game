@@ -1,6 +1,6 @@
 # Buff/Debuff 3D 狀態圖示 Spec
 
-> 版本：v1.2 ｜ 狀態：🟢 已實作
+> 版本：v1.3 ｜ 狀態：🟢 已實作
 > 最後更新：2026-03-02
 > 負責角色：🎯 GAME_DESIGN → 🔧 CODING → 🎨 UI_DESIGN
 > 原始碼：`src/components/SceneWidgets.tsx`（`BuffIcons3D` / `BuffApplyToast3D`）、`src/components/Hero.tsx`、`src/App.tsx`
@@ -122,3 +122,4 @@ export function BuffIcons3D({ effects, textScale = 1 }: BuffIcons3DProps): JSX.E
 | v1.0 | 2026-03-01 | 初版：3D Buff/Debuff Icon 顯示於英雄模型上方 |
 | v1.1 | 2026-03-01 | Emoji→中文短代號（troika 字型相容）；超過 8 個顯示 7+「+N」溢出卡片 |
 | v1.2 | 2026-03-02 | **改用 `<Html>` DOM overlay**：中文短代號→原生彩色 emoji（瀏覽器渲染），BuffIcons3D 和 BuffApplyToast3D 都改為 Html 元件，無需額外字型下載 |
+| v1.3 | 2026-03-16 | **CC 模型染色效果**：ZombieModel 新增 `ccType` prop，stun/freeze/silence/fear 四種控場狀態透過 emissive+color tint 直接著色於 3D 模型材質（0.6~0.9 正弦脈衝）；stun=金色、freeze=冰藍、silence=紫色、fear=綠色；Hero.tsx 依 `CC_PRIORITY` 取最高優先 CC 傳入 |

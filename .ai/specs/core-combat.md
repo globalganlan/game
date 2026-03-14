@@ -1,6 +1,6 @@
 # 戰鬥系統 Spec
 
-> 版本：v4.0 ｜ 狀態：🟢 已實作
+> 版本：v4.1 ｜ 狀態：🟢 已實作
 > 最後更新：2026-03-15
 > 負責角色：🎯 GAME_DESIGN → 🔧 CODING
 > 原始碼：`src/domain/battleEngine.ts`（前端邏輯）、`gas/battleEngine.js`（後端引擎）、`src/App.tsx`（3D 演出整合）、`gas/程式碼.js`（`handleCompleteBattle_` 伺服器端結算）
@@ -880,3 +880,4 @@ App.tsx
 | v3.8 | 2026-03-05 | **後端權威戰鬥模式**：完全移除前端本地戰鬥模擬（`runBattleCollect()`、`generateBattleSeed()`），Phase A 改為阻塞式 `await completeBattle()` 等待後端回傳 `actions[]` + `winner`；移除 `completeBattleRef`（不再需要背景 Promise）；前端僅負責 Phase B 3D 動畫回放 + Phase C 狀態同步；後端 `complete-battle` 為戰鬥唯一計算源，消除前後端資料不一致風險 |
 | v3.9 | 2026-03-12 | **被動技能飄字防疊痌 + Boss 回合計數器**：(1) `PassiveHint3D`（Hero.tsx）多個同時觸發時依 `idx * 0.55` 垂直偏移，避免文字重疊；(2) `BossDamageBar`（BattleHUD.tsx）新增回合顯示「回合 N/20」，App.tsx 傳 `currentTurn={turn}` 至 BattleHUD |
 | v4.0 | 2026-03-15 | **Spec 全面校正**：(1) PASSIVE_DAMAGE 型別修正為 `damage: number`（非 `result: DamageResult`），移除不存在的 `skillId` 欄位；(2) EXTRA_TURN 補上 `reason: string` 欄位；(3) 新增 `random_debuff` 到 executePassiveEffect 效果表；(4) 新增 `resolvePassiveTargets()` 目標解析規則文檔（含 on_be_attacked 上下文說明）；(5) 新增 `perAlly` 欄位說明；(6) 新增 `duration=0` 永久效果說明；(7) 修正 Buff 疊加規則（value 直接加算、getStatusValue 不再乘 stacks） |
+| v4.1 | 2026-03-16 | **能量條時序 + 被動觸發守衛**：(1) runBattleLoop 能量更新（`setBattleEnergy`）從攻擊動畫前移至 `ATTACK_DELAY_MS` 後（與攻擊命中時機同步）；SKILL_CAST 同理並新增施放前能量條充滿預覽（250ms）；(2) `executePassiveEffect` 返回值改為 `boolean`，`triggerPassives` 僅在至少一個效果實際生效時才 emit `PASSIVE_TRIGGER` 並遞增 `passiveUsage`（修復 PAS_4_4 斬殺在 Boss 每次攻擊都誤報的問題） |

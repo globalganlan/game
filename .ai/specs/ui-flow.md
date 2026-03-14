@@ -1,6 +1,6 @@
 # UI 流程與畫面定義 Spec
 
-> 版本：v3.0 ｜ 狀態：🟢 已實作
+> 版本：v3.1 ｜ 狀態：🟢 已實作
 > 最後更新：2026-03-15
 > 最後更新：2026-03-12
 > 負責角色：🎨 UI_DESIGN → 🔧 CODING
@@ -735,3 +735,4 @@ GAMEOVER
 | v2.9 | 2026-03-12 | **BattleHUD Boss 回合計數 + 被動技能飄字防疊痌**：①BossDamageBar 新增回合計數顯示「回合 N/M」（App.tsx 傳 `currentTurn` 至 BattleHUD）②Hero.tsx `PassiveHint3D` 多個同時觸發時依 `idx * 0.55` 垂直偏移避免文字重疊 ③Boss 選關卡片新增戰力顯示（`.boss-card-cp` CSS）④App.css 新增 `.boss-dmg-round` + `.boss-card-cp` 樣式 |
 | v2.3 | 2026-03-05 | **StageSelect 5 分頁 + 紅點 + pvp_coin**：①StageSelect 從 3 分頁擴充至 5 分頁（主線/爬塔/每日/PvP/Boss），各面板顯示獎勵預覽 + 剩餘每日次數（fetch `/daily-counts` API）+ 耗盡時按鍵 disabled ②StageSelect Tab 剩餘次數 > 0 時顯示紅點 badge ③MainMenu 新增 `stagesHasDaily` prop，關卡按鈕剩餘次數 > 0 時顯示紅點 ④App.tsx 在 MAIN_MENU 時 fetch daily-counts 傳入 MainMenu ⑤CurrencyIcon 新增 `pvp_coin` 類型（🏅），PvP 獎勵預覽中使用 ⑥App.css 新增 tower-rewards/sc-reward-tag/daily-attempts/daily-exhausted/daily-tier-rewards/pvp-meta-row/pvp-reward-preview/boss-card-reward-hint 樣式 |
 | v3.0 | 2026-03-15 | **Spec 校正**：① MenuScreen 新增 `'arena'`（10 值）+ ArenaPanel 對應元件；② GachaScreen 十連抽費用修正 1440→1,600 鑽石 |
+| v3.1 | 2026-03-16 | **Boss 模式回合標示去重**：`hud-round` 新增 `stageMode !== 'boss'` 條件，Boss 模式隱藏通用 ROUND 標示（BossDamageBar 已有「回合 N/M」，不再重複顯示）；SkillToast3D 位置上移至 `[0, 2.8, 0]`、加速飄浮與淡出（避免遮蔽 VFX 粒子） |
