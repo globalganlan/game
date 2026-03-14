@@ -99,7 +99,7 @@ export interface ResponsiveInfo {
    碎片 (Debris)
    ──────────────────────────── */
 
-export type DebrisType = 'box' | 'slab' | 'pillar' | 'rock' | 'rebar' | 'chunk'
+export type DebrisType = 'box' | 'slab' | 'pillar' | 'rock' | 'rebar' | 'chunk' | 'barrel' | 'pipe' | 'plate'
 
 export interface DebrisItem {
   position: Vector3Tuple

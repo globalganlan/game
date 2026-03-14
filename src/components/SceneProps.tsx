@@ -1,18 +1,18 @@
 /**
- * SceneProps ??ç« ç?å°ˆå±¬ 3D ?´æ™¯?“å…·
+ * SceneProps ??ç« ï¿½?å°ˆå±¬ 3D ?ï¿½æ™¯?ï¿½å…·
  *
- * æ¯å€?SceneMode ?‰ç¨?¹ç??´æ™¯?“å…·ï¼Œè??°é¬¥?«é¢?´å…·æ²‰æµ¸?Ÿï?
- * - city: è·¯ç??å»ºç¯‰æ?éª¸ã€è??ˆã€è·¯??
- * - forest: æ¨¹å¹¹?å€’æœ¨?è???
- * - wasteland: è³¼ç‰©è»Šã€ç ´?¶å??æ²¹æ¡?
- * - factory: æ©Ÿæ¢°é½’è¼ª?ç®¡ç·šæ¶?éµæ¡?
- * - hospital: ?…å??é?æ»´æ¶?é†«?‚æ?
- * - residential: æ¡Œå??æ?å­ã€æ›¸??
- * - underground: æ±½è??äº¤?šé??æ°´æ³¥æŸ±
- * - core: ?½é?æ°´æ™¶?ç??€ä¸»æ??ç™¼?‰ç®¡
+ * æ¯ï¿½?SceneMode ?ï¿½ç¨?ï¿½ï¿½??ï¿½æ™¯?ï¿½å…·ï¼Œï¿½??ï¿½é¬¥?ï¿½é¢?ï¿½å…·æ²‰æµ¸?ï¿½ï¿½?
+ * - city: è·¯ï¿½??ï¿½å»ºç¯‰ï¿½?éª¸ã€ï¿½??ï¿½ã€è·¯??
+ * - forest: æ¨¹å¹¹?ï¿½å€’æœ¨?ï¿½ï¿½???
+ * - wasteland: è³¼ç‰©è»Šã€ç ´?ï¿½ï¿½??ï¿½æ²¹ï¿½?
+ * - factory: æ©Ÿæ¢°é½’è¼ª?ï¿½ç®¡ç·šæ¶?ï¿½éµï¿½?
+ * - hospital: ?ï¿½ï¿½??ï¿½ï¿½?æ»´æ¶?ï¿½é†«?ï¿½ï¿½?
+ * - residential: æ¡Œï¿½??ï¿½ï¿½?å­ã€æ›¸??
+ * - underground: æ±½ï¿½??ï¿½äº¤?ï¿½ï¿½??ï¿½æ°´æ³¥æŸ±
+ * - core: ?ï¿½ï¿½?æ°´æ™¶?ï¿½ï¿½??ï¿½ä¸»ï¿½??ï¿½ç™¼?ï¿½ç®¡
  *
- * ?“å…·?¾ç½®ä½¿ç”¨ deterministic seeded RNGï¼Œé¿?æ?æ¬¡é??°æ¸²?“ä??Œä?å±€??
- * ä¸­å¤®?°é¬¥?€??(|x|<7, |z|<9) ä¸æ”¾ç½®é??·ã€?
+ * ?ï¿½å…·?ï¿½ç½®ä½¿ç”¨ deterministic seeded RNGï¼Œé¿?ï¿½ï¿½?æ¬¡ï¿½??ï¿½æ¸²?ï¿½ï¿½??ï¿½ï¿½?å±€??
+ * ä¸­å¤®?ï¿½é¬¥?ï¿½??(|x|<7, |z|<9) ä¸æ”¾ç½®ï¿½??ï¿½ï¿½?
  */
 
 import { useMemo, useRef } from 'react'
@@ -20,9 +20,9 @@ import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import type { SceneMode } from './Arena'
 
-/* ?â??â??â??â??â??â??â??â??â??â??â??â??â??â??â??â??â??â??â???
+/* ?ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½???
    Seeded PRNG & Scatter Placement
-   ?â??â??â??â??â??â??â??â??â??â??â??â??â??â??â??â??â??â??â???*/
+   ?ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½???*/
 
 function mulberry32(seed: number) {
   return () => {
@@ -33,7 +33,7 @@ function mulberry32(seed: number) {
   }
 }
 
-/** ?¢ç????ä½ç½®ï¼Œé¿?‹ä¸­å¤®æˆ°é¬¥å???*/
+/** ?ï¿½ï¿½????ä½ç½®ï¼Œé¿?ï¿½ä¸­å¤®æˆ°é¬¥ï¿½???*/
 function scatter(
   count: number, seed: number, spread = 26, minDist = 7,
 ): { pos: [number, number, number]; rot: number }[] {
@@ -50,15 +50,32 @@ function scatter(
   return results
 }
 
-/* ?â??â??â??â??â??â??â??â??â??â??â??â??â??â??â??â??â??â??â???
-   ?±ç”¨æ°›å??ƒç? ??ç¢çŸ³?†ã€è?æ¼¬ã€å???
-   ?â??â??â??â??â??â??â??â??â??â??â??â??â??â??â??â??â??â??â???*/
+/** æ•µæ–¹å¾Œæ–¹å°ˆç”¨æ•£ä½ˆï¼ˆz: -5 ~ -17ï¼Œå¡«å……é¡é ­å¯è¦‹çš„èƒŒæ™¯å€ï¼‰ */
+function scatterBehind(
+  count: number, seed: number, spreadX = 24, zMin = -17, zMax = -5,
+): { pos: [number, number, number]; rot: number }[] {
+  const rng = mulberry32(seed)
+  const results: { pos: [number, number, number]; rot: number }[] = []
+  let attempts = 0
+  while (results.length < count && attempts < count * 20) {
+    attempts++
+    const x = (rng() - 0.5) * spreadX
+    const z = zMin + rng() * (zMax - zMin)
+    if (Math.abs(x) < 3.5 && z > -8) continue
+    results.push({ pos: [x, 0, z], rot: rng() * Math.PI * 2 })
+  }
+  return results
+}
 
-/** ?°é¢ç¢çŸ³????å¢å?å»¢å???*/
+/* ?ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½???
+   ?ï¿½ç”¨æ°›ï¿½??ï¿½ï¿½? ??ç¢çŸ³?ï¿½ã€ï¿½?æ¼¬ã€ï¿½???
+   ?ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½???*/
+
+/** ?ï¿½é¢ç¢çŸ³????å¢ï¿½?å»¢ï¿½???*/
 function RubblePile({ position, rotation = 0, scale = 1, color = '#5a5048' }: { position: [number, number, number]; rotation?: number; scale?: number; color?: string }) {
   return (
     <group position={position} rotation={[0, rotation, 0]} scale={scale}>
-      {/* å¤§çŸ³å¡?*/}
+      {/* å¤§çŸ³ï¿½?*/}
       <mesh position={[0, 0.08, 0]} rotation={[0.3, 0.5, 0.2]} castShadow receiveShadow>
         <dodecahedronGeometry args={[0.15, 0]} />
         <meshBasicMaterial color={color} />
@@ -71,7 +88,7 @@ function RubblePile({ position, rotation = 0, scale = 1, color = '#5a5048' }: { 
         <dodecahedronGeometry args={[0.08, 0]} />
         <meshBasicMaterial color={color} />
       </mesh>
-      {/* ç¢å???? */}
+      {/* ç¢ï¿½???? */}
       <mesh position={[0.25, 0.02, -0.15]} rotation={[0.4, 1.2, 0]}>
         <dodecahedronGeometry args={[0.05, 0]} />
         <meshBasicMaterial color={color} />
@@ -84,7 +101,7 @@ function RubblePile({ position, rotation = 0, scale = 1, color = '#5a5048' }: { 
   )
 }
 
-/** è¡€æ¼?æ±¡æ¼¬ ???°é¢ä¸è??‡æ·±?²è²¼??*/
+/** è¡€ï¿½?æ±¡æ¼¬ ???ï¿½é¢ä¸ï¿½??ï¿½æ·±?ï¿½è²¼??*/
 function BloodStain({ position, scale = 1 }: { position: [number, number, number]; scale?: number }) {
   return (
     <group position={position} scale={scale}>
@@ -104,7 +121,7 @@ function BloodStain({ position, scale = 1 }: { position: [number, number, number
   )
 }
 
-/** ??½?ƒåœ¾ ??ç´™å¼µ?ç??­ç???*/
+/** ??ï¿½ï¿½?ï¿½åœ¾ ??ç´™å¼µ?ï¿½ï¿½??ï¿½ï¿½???*/
 function ScatteredLitter({ position, rotation }: { position: [number, number, number]; rotation: number }) {
   return (
     <group position={position} rotation={[0, rotation, 0]}>
@@ -113,12 +130,12 @@ function ScatteredLitter({ position, rotation }: { position: [number, number, nu
         <planeGeometry args={[0.25, 0.18]} />
         <meshBasicMaterial color="#c8c0a8" side={THREE.DoubleSide} />
       </mesh>
-      {/* å£“æ?ç½é ­ */}
+      {/* å£“ï¿½?ç½é ­ */}
       <mesh position={[0.3, 0.03, 0.15]} rotation={[Math.PI / 2, 0, rotation]}>
         <cylinderGeometry args={[0.04, 0.04, 0.08, 6]} />
         <meshBasicMaterial color="#888888" />
       </mesh>
-      {/* ç¢ç»??(å°–éŠ³ä¸‰è??? */}
+      {/* ç¢ç»??(å°–éŠ³ä¸‰ï¿½??? */}
       <mesh position={[-0.2, 0.005, 0.1]} rotation={[-Math.PI / 2, 0, rotation * 1.5]}>
         <circleGeometry args={[0.06, 3]} />
         <meshBasicMaterial color="#aabbcc" transparent opacity={0.4} />
@@ -127,7 +144,7 @@ function ScatteredLitter({ position, rotation }: { position: [number, number, nu
   )
 }
 
-/** ?½è??•è·¡ ???¨åœ¨?‘å±¬è¡¨é¢ */
+/** ?ï¿½ï¿½??ï¿½è·¡ ???ï¿½åœ¨?ï¿½å±¬è¡¨é¢ */
 function RustMark({ position, normal = [0, 0, 1] as [number, number, number], scale = 1 }: { position: [number, number, number]; normal?: [number, number, number]; scale?: number }) {
   const rot = normal[1] > 0.5 ? [-Math.PI / 2, 0, 0] as [number, number, number] : [0, 0, 0] as [number, number, number]
   return (
@@ -138,24 +155,24 @@ function RustMark({ position, normal = [0, 0, 1] as [number, number, number], sc
   )
 }
 
-/* ?â??â??â??â??â??â??â??â??â??â??â??â??â??â??â??â??â??â??â???
-   City Props ???å??¥å£
-   è·¯ç??å»ºç¯‰æ?éª¸ã€è??ˆã€æ··?å?è·¯é?
-   ?â??â??â??â??â??â??â??â??â??â??â??â??â??â??â??â??â??â??â???*/
+/* ?ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½???
+   City Props ???ï¿½ï¿½??ï¿½å£
+   è·¯ï¿½??ï¿½å»ºç¯‰ï¿½?éª¸ã€ï¿½??ï¿½ã€æ··?ï¿½ï¿½?è·¯ï¿½?
+   ?ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½???*/
 
 function Signpost({ position, rotation }: { position: [number, number, number]; rotation: number }) {
   const bent = (Math.sin(rotation * 7) - 0.5) * 0.2
   return (
     <group position={position} rotation={[bent, rotation, 0]}>
-      {/* å½æ›²?Ÿé½?„æ¡¿ */}
+      {/* å½æ›²?ï¿½é½?ï¿½æ¡¿ */}
       <mesh position={[0, 1.5, 0]} castShadow>
         <cylinderGeometry args={[0.05, 0.06, 3, 6]} />
         <meshBasicMaterial color="#4a4038" />
       </mesh>
-      {/* ?½è??•è·¡ */}
+      {/* ?ï¿½ï¿½??ï¿½è·¡ */}
       <RustMark position={[0.06, 1.2, 0]} scale={0.8} />
       <RustMark position={[-0.04, 2.0, 0]} scale={0.6} />
-      {/* è¤ªè‰²è·¯ç? */}
+      {/* è¤ªè‰²è·¯ï¿½? */}
       <mesh position={[0, 2.7, 0]} castShadow>
         <boxGeometry args={[1.0, 0.5, 0.06]} />
         <meshBasicMaterial color="#1a3a18" />
@@ -164,12 +181,12 @@ function Signpost({ position, rotation }: { position: [number, number, number]; 
         <boxGeometry args={[0.85, 0.35, 0.02]} />
         <meshBasicMaterial color="#6a7a58" />
       </mesh>
-      {/* ?Œé¢?½è? */}
+      {/* ?ï¿½é¢?ï¿½ï¿½? */}
       <mesh position={[0.2, 2.8, 0.05]} rotation={[0, 0, 0.5]}>
         <circleGeometry args={[0.1, 5]} />
         <meshBasicMaterial color="#5a3a18" transparent opacity={0.5} side={THREE.DoubleSide} />
       </mesh>
-      {/* ?³ä?ç¢çŸ³ */}
+      {/* ?ï¿½ï¿½?ç¢çŸ³ */}
       <RubblePile position={[0.3, 0, 0.2]} rotation={rotation * 2} color="#5a5048" />
     </group>
   )
@@ -180,12 +197,12 @@ function BuildingRuin({ position, rotation }: { position: [number, number, numbe
   const w = 1.5 + Math.abs(Math.sin(position[2] * 3.1)) * 2
   return (
     <group position={position} rotation={[0, rotation, (Math.sin(rotation * 3) - 0.5) * 0.08]}>
-      {/* ä¸»ç?é«????‘é???*/}
+      {/* ä¸»ï¿½?ï¿½????ï¿½ï¿½???*/}
       <mesh position={[0, h / 2, 0]} castShadow receiveShadow>
         <boxGeometry args={[w, h, 0.4]} />
         <meshBasicMaterial color="#5a4a38" />
       </mesh>
-      {/* è£¸éœ²ç£šå?ç´‹ç?ï¼ˆæ·±?²æ?ç´‹ï? */}
+      {/* è£¸éœ²ç£šï¿½?ç´‹ï¿½?ï¼ˆæ·±?ï¿½ï¿½?ç´‹ï¿½? */}
       <mesh position={[-w * 0.15, h * 0.3, 0.21]}>
         <boxGeometry args={[w * 0.3, 0.08, 0.01]} />
         <meshBasicMaterial color="#4a3828" />
@@ -194,14 +211,14 @@ function BuildingRuin({ position, rotation }: { position: [number, number, numbe
         <boxGeometry args={[w * 0.25, 0.08, 0.01]} />
         <meshBasicMaterial color="#4a3828" />
       </mesh>
-      {/* çª—æˆ¶æ´?+ ç¢ç»?ƒæ???*/}
+      {/* çª—æˆ¶ï¿½?+ ç¢ç»?ï¿½ï¿½???*/}
       {h > 4 && (
         <>
           <mesh position={[-w * 0.25, h * 0.55, 0.21]}>
             <boxGeometry args={[0.4, 0.5, 0.02]} />
             <meshBasicMaterial color="#0a0a12" />
           </mesh>
-          {/* ?»ç?ç¢ç?æ®˜ç??¨ç?æ¡†å? */}
+          {/* ?ï¿½ï¿½?ç¢ï¿½?æ®˜ï¿½??ï¿½ï¿½?æ¡†ï¿½? */}
           <mesh position={[-w * 0.25, h * 0.55 - 0.22, 0.22]} rotation={[0, 0, 0.1]}>
             <boxGeometry args={[0.15, 0.08, 0.01]} />
             <meshBasicMaterial color="#99aabb" transparent opacity={0.3} />
@@ -212,7 +229,7 @@ function BuildingRuin({ position, rotation }: { position: [number, number, numbe
           </mesh>
         </>
       )}
-      {/* ç¢è??‚éƒ¨ï¼ˆå?ç¢å?ï¼?*/}
+      {/* ç¢ï¿½??ï¿½éƒ¨ï¼ˆï¿½?ç¢ï¿½?ï¿½?*/}
       <mesh position={[w * 0.2, h - 0.1, 0]} rotation={[0, 0, 0.3]} castShadow>
         <boxGeometry args={[w * 0.4, 0.3, 0.4]} />
         <meshBasicMaterial color="#6a5a48" />
@@ -221,9 +238,9 @@ function BuildingRuin({ position, rotation }: { position: [number, number, numbe
         <dodecahedronGeometry args={[0.2, 0]} />
         <meshBasicMaterial color="#5a4a38" />
       </mesh>
-      {/* ?†è?è¡€æ¼?*/}
+      {/* ?ï¿½ï¿½?è¡€ï¿½?*/}
       <BloodStain position={[w * 0.3, 0, 0.25]} scale={0.7} />
-      {/* åº•éƒ¨?¦ç¤«??*/}
+      {/* åº•éƒ¨?ï¿½ç¤«??*/}
       <RubblePile position={[-w * 0.3, 0, 0.4]} rotation={rotation * 3} />
       <RubblePile position={[w * 0.2, 0, -0.3]} rotation={rotation * 5} color="#6a5a48" />
     </group>
@@ -234,25 +251,25 @@ function StreetLight({ position, rotation }: { position: [number, number, number
   const tilt = (Math.sin(rotation * 5) - 0.5) * 0.2
   return (
     <group position={position} rotation={[tilt, rotation, tilt * 0.5]}>
-      {/* ?½è??ˆæŸ± */}
+      {/* ?ï¿½ï¿½??ï¿½æŸ± */}
       <mesh position={[0, 2, 0]} castShadow>
         <cylinderGeometry args={[0.06, 0.08, 4, 6]} />
         <meshBasicMaterial color="#3a3a35" />
       </mesh>
-      {/* ?½æ? */}
+      {/* ?ï¿½ï¿½? */}
       <RustMark position={[0.07, 1.0, 0]} scale={1.2} />
       <RustMark position={[-0.05, 2.5, 0]} scale={0.7} />
-      {/* å½æ›²?ˆè? */}
+      {/* å½æ›²?ï¿½ï¿½? */}
       <mesh position={[0.4, 3.8, 0]} rotation={[0, 0, -0.5]} castShadow>
         <cylinderGeometry args={[0.03, 0.04, 1, 5]} />
         <meshBasicMaterial color="#3a3a38" />
       </mesh>
-      {/* ?´ç??ˆç½© ??å¾®å¼±?ƒç? */}
+      {/* ?ï¿½ï¿½??ï¿½ç½© ??å¾®å¼±?ï¿½ï¿½? */}
       <mesh position={[0.7, 3.7, 0]}>
         <boxGeometry args={[0.3, 0.12, 0.2]} />
         <meshBasicMaterial color="#666650" />
       </mesh>
-      {/* ?Šæ??»ç? */}
+      {/* ?ï¿½ï¿½??ï¿½ï¿½? */}
       <mesh position={[0.35, 3.2, 0.1]} rotation={[0.3, 0, -0.8]}>
         <cylinderGeometry args={[0.008, 0.008, 1.2, 4]} />
         <meshBasicMaterial color="#222222" />
@@ -271,7 +288,7 @@ function ConcreteBarrier({ position, rotation }: { position: [number, number, nu
         <boxGeometry args={[1.8, 0.7, 0.5]} />
         <meshBasicMaterial color="#7a7870" />
       </mesh>
-      {/* æ±¡æ¼¬?Œè???*/}
+      {/* æ±¡æ¼¬?ï¿½ï¿½???*/}
       <mesh position={[-0.3, 0.4, 0.26]}>
         <circleGeometry args={[0.15, 5]} />
         <meshBasicMaterial color="#5a5850" transparent opacity={0.5} side={THREE.DoubleSide} />
@@ -282,12 +299,12 @@ function ConcreteBarrier({ position, rotation }: { position: [number, number, nu
           <meshBasicMaterial color="#3a3830" />
         </mesh>
       )}
-      {/* è¤ªè‰²?å?æ¢?*/}
+      {/* è¤ªè‰²?ï¿½ï¿½?ï¿½?*/}
       <mesh position={[0, 0.55, 0.26]}>
         <boxGeometry args={[1.6, 0.1, 0.01]} />
         <meshBasicMaterial color="#aa7722" />
       </mesh>
-      {/* ?Šè??´æ? */}
+      {/* ?ï¿½ï¿½??ï¿½ï¿½? */}
       <mesh position={[-0.85, 0.6, 0.2]} rotation={[0.3, 0.5, 0.2]}>
         <dodecahedronGeometry args={[0.08, 0]} />
         <meshBasicMaterial color="#7a7870" />
@@ -296,10 +313,10 @@ function ConcreteBarrier({ position, rotation }: { position: [number, number, nu
   )
 }
 
-/* ?â??â??â??â??â??â??â??â??â??â??â??â??â??â??â??â??â??â??â???
-   Forest Props ???—å?æ£®æ?
-   æ¨¹å¹¹?å€’æœ¨?è??‡ã€ç??¨å¢
-   ?â??â??â??â??â??â??â??â??â??â??â??â??â??â??â??â??â??â??â???*/
+/* ?ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½???
+   Forest Props ???ï¿½ï¿½?æ£®ï¿½?
+   æ¨¹å¹¹?ï¿½å€’æœ¨?ï¿½ï¿½??ï¿½ã€ï¿½??ï¿½å¢
+   ?ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½???*/
 
 function TreeTrunk({ position, rotation }: { position: [number, number, number]; rotation: number }) {
   const h = 3 + Math.abs(Math.sin(position[0] * 5)) * 3
@@ -309,24 +326,24 @@ function TreeTrunk({ position, rotation }: { position: [number, number, number];
         <cylinderGeometry args={[0.2, 0.35, h, 7]} />
         <meshBasicMaterial color="#3a2a18" />
       </mesh>
-      {/* ?·è??„æ¨¹? æ?é¤?*/}
+      {/* ?ï¿½ï¿½??ï¿½æ¨¹?ï¿½ï¿½?ï¿½?*/}
       {h > 4 && (
         <mesh position={[0.15, h - 0.2, 0]} rotation={[0.3, 0, 0.5]}>
           <cylinderGeometry args={[0.1, 0.18, 1.2, 5]} />
           <meshBasicMaterial color="#2a1a10" />
         </mesh>
       )}
-      {/* ?¹éƒ¨é¼“èµ· */}
+      {/* ?ï¿½éƒ¨é¼“èµ· */}
       <mesh position={[0, 0.15, 0]}>
         <dodecahedronGeometry args={[0.45, 1]} />
         <meshBasicMaterial color="#2a1a0a" />
       </mesh>
-      {/* æ¨¹çš®?è½?•è·¡ */}
+      {/* æ¨¹çš®?ï¿½è½?ï¿½è·¡ */}
       <mesh position={[0.22, h * 0.3, 0.1]} rotation={[0, 0.3, 0.2]}>
         <boxGeometry args={[0.08, 0.4, 0.02]} />
         <meshBasicMaterial color="#5a4028" />
       </mesh>
-      {/* ?Œé?å¯„ç? */}
+      {/* ?ï¿½ï¿½?å¯„ï¿½? */}
       <mesh position={[-0.2, h * 0.25, 0.15]} rotation={[0.3, 0, -0.5]}>
         <circleGeometry args={[0.1, 5]} />
         <meshBasicMaterial color="#5a7a3a" side={THREE.DoubleSide} />
@@ -335,7 +352,7 @@ function TreeTrunk({ position, rotation }: { position: [number, number, number];
         <circleGeometry args={[0.07, 5]} />
         <meshBasicMaterial color="#4a6a2a" side={THREE.DoubleSide} />
       </mesh>
-      {/* ?ªç? */}
+      {/* ?ï¿½ï¿½? */}
       {h > 3.5 && (
         <group position={[0.25, h * 0.5, 0]}>
           {[0, 0.06, 0.12].map((off, i) => (
@@ -346,7 +363,7 @@ function TreeTrunk({ position, rotation }: { position: [number, number, number];
           ))}
         </group>
       )}
-      {/* ?°é¢?½è?ç¢å? */}
+      {/* ?ï¿½é¢?ï¿½ï¿½?ç¢ï¿½? */}
       <RubblePile position={[0.3, 0, 0.2]} rotation={rotation * 2} color="#3a2a10" />
     </group>
   )
@@ -359,7 +376,7 @@ function FallenLog({ position, rotation }: { position: [number, number, number];
         <cylinderGeometry args={[0.18, 0.22, 2.5, 6]} />
         <meshBasicMaterial color="#3a2818" />
       </mesh>
-      {/* ?”è? ??å¤šå?ä¸è??‡è???*/}
+      {/* ?ï¿½ï¿½? ??å¤šï¿½?ä¸ï¿½??ï¿½ï¿½???*/}
       <mesh position={[0, 0.4, 0.1]}>
         <boxGeometry args={[1.5, 0.05, 0.3]} />
         <meshBasicMaterial color="#2a5a20" />
@@ -368,12 +385,12 @@ function FallenLog({ position, rotation }: { position: [number, number, number];
         <circleGeometry args={[0.2, 5]} />
         <meshBasicMaterial color="#1a4a15" side={THREE.DoubleSide} />
       </mesh>
-      {/* ?·è?ç«¯é¢ */}
+      {/* ?ï¿½ï¿½?ç«¯é¢ */}
       <mesh position={[1.25, 0.25, 0]} rotation={[0, 0, Math.PI / 2]}>
         <circleGeometry args={[0.2, 7]} />
         <meshBasicMaterial color="#5a4028" side={THREE.DoubleSide} />
       </mesh>
-      {/* å°è??‡å¢ */}
+      {/* å°ï¿½??ï¿½å¢ */}
       <mesh position={[0.3, 0.45, 0.12]}>
         <coneGeometry args={[0.05, 0.1, 4]} />
         <meshBasicMaterial color="#8a6a40" />
@@ -382,7 +399,7 @@ function FallenLog({ position, rotation }: { position: [number, number, number];
         <coneGeometry args={[0.035, 0.07, 4]} />
         <meshBasicMaterial color="#7a5a30" />
       </mesh>
-      {/* æ¨¹çš®ç¢ç???½ */}
+      {/* æ¨¹çš®ç¢ï¿½???ï¿½ï¿½ */}
       <mesh position={[-0.6, 0.02, 0.3]} rotation={[-Math.PI / 2 + 0.1, 0, rotation]}>
         <boxGeometry args={[0.12, 0.08, 0.02]} />
         <meshBasicMaterial color="#4a3820" />
@@ -408,7 +425,7 @@ function Mushroom({ position, rotation }: { position: [number, number, number]; 
         <sphereGeometry args={[0.22, 8, 6, 0, Math.PI * 2, 0, Math.PI / 2]} />
         <meshBasicMaterial color="#8b2020" />
       </mesh>
-      {/* ?‘é? */}
+      {/* ?ï¿½ï¿½? */}
       <mesh position={[0.08, 0.7, 0.08]}>
         <sphereGeometry args={[0.04, 4, 4]} />
         <meshBasicMaterial color="#ddddcc" />
@@ -417,12 +434,12 @@ function Mushroom({ position, rotation }: { position: [number, number, number]; 
         <sphereGeometry args={[0.03, 4, 4]} />
         <meshBasicMaterial color="#ccccbb" />
       </mesh>
-      {/* ?Œçµ²?“å»¶?°é¢ */}
+      {/* ?ï¿½çµ²?ï¿½å»¶?ï¿½é¢ */}
       <mesh position={[0, 0.005, 0]} rotation={[-Math.PI / 2, 0, rotation]}>
         <circleGeometry args={[0.3, 6]} />
         <meshBasicMaterial color="#3a4a2a" transparent opacity={0.35} side={THREE.DoubleSide} />
       </mesh>
-      {/* ?é?å°è? */}
+      {/* ?ï¿½ï¿½?å°ï¿½? */}
       <mesh position={[0.2, 0.12, 0.1]}>
         <cylinderGeometry args={[0.02, 0.03, 0.24, 4]} />
         <meshBasicMaterial color="#c8b888" />
@@ -435,45 +452,45 @@ function Mushroom({ position, rotation }: { position: [number, number, number]; 
   )
 }
 
-/* ?â??â??â??â??â??â??â??â??â??â??â??â??â??â??â??â??â??â??â???
-   Wasteland Props ??æ­»å??’å? / å»¢æ??†å ´
-   è³¼ç‰©è»Šã€ç ´?¶å??æ²¹æ¡¶ã€ç¿»?’æ?
-   ?â??â??â??â??â??â??â??â??â??â??â??â??â??â??â??â??â??â??â???*/
+/* ?ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½???
+   Wasteland Props ??æ­»ï¿½??ï¿½ï¿½? / å»¢ï¿½??ï¿½å ´
+   è³¼ç‰©è»Šã€ç ´?ï¿½ï¿½??ï¿½æ²¹æ¡¶ã€ç¿»?ï¿½ï¿½?
+   ?ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½???*/
 
 function ShoppingCart({ position, rotation }: { position: [number, number, number]; rotation: number }) {
   return (
     <group position={position} rotation={[(Math.sin(rotation * 3) - 0.5) * 0.3, rotation, 0]}>
-      {/* è»Šç? ???½è??‘å±¬ */}
+      {/* è»Šï¿½? ???ï¿½ï¿½??ï¿½å±¬ */}
       <mesh position={[0, 0.55, 0]} castShadow>
         <boxGeometry args={[0.6, 0.4, 0.45]} />
         <meshBasicMaterial color="#7a7068" wireframe />
       </mesh>
-      {/* è»Šç?åº•æ¿ */}
+      {/* è»Šï¿½?åº•æ¿ */}
       <mesh position={[0, 0.36, 0]}>
         <boxGeometry args={[0.58, 0.02, 0.43]} />
         <meshBasicMaterial color="#6a6058" />
       </mesh>
-      {/* ?Šæ? */}
+      {/* ?ï¿½ï¿½? */}
       <mesh position={[0, 0.8, -0.22]} castShadow>
         <boxGeometry args={[0.5, 0.04, 0.04]} />
         <meshBasicMaterial color="#5a5550" />
       </mesh>
-      {/* è¼ªå? ???¨å?ç¼ºå¤± */}
+      {/* è¼ªï¿½? ???ï¿½ï¿½?ç¼ºå¤± */}
       {[[-0.22, 0.08, 0.15], [0.22, 0.08, 0.15], [-0.22, 0.08, -0.15]].map((p, i) => (
         <mesh key={i} position={p as [number, number, number]} rotation={[Math.PI / 2, 0, 0]}>
           <cylinderGeometry args={[0.06, 0.06, 0.03, 8]} />
           <meshBasicMaterial color="#333330" />
         </mesh>
       ))}
-      {/* ?½æ? */}
+      {/* ?ï¿½ï¿½? */}
       <RustMark position={[0.25, 0.5, 0.23]} scale={0.8} />
       <RustMark position={[-0.2, 0.65, -0.23]} scale={0.6} />
-      {/* è»Šå…§??½?ƒåœ¾ */}
+      {/* è»Šå…§??ï¿½ï¿½?ï¿½åœ¾ */}
       <mesh position={[0.1, 0.4, 0.05]} rotation={[0.3, 0.5, 0.1]}>
         <boxGeometry args={[0.12, 0.08, 0.08]} />
         <meshBasicMaterial color="#4a6a3a" />
       </mesh>
-      {/* ?°é¢ç¢çŸ³ */}
+      {/* ?ï¿½é¢ç¢çŸ³ */}
       <RubblePile position={[0.35, 0, 0.25]} rotation={rotation * 2} color="#5a5048" />
     </group>
   )
@@ -482,7 +499,7 @@ function ShoppingCart({ position, rotation }: { position: [number, number, numbe
 function BrokenShelf({ position, rotation }: { position: [number, number, number]; rotation: number }) {
   return (
     <group position={position} rotation={[0, rotation, (Math.sin(rotation * 7) - 0.5) * 0.15]}>
-      {/* ?´æ¿ */}
+      {/* ?ï¿½æ¿ */}
       <mesh position={[-0.55, 1, 0]} castShadow>
         <boxGeometry args={[0.06, 2, 0.4]} />
         <meshBasicMaterial color="#7a6040" />
@@ -500,7 +517,7 @@ function BrokenShelf({ position, rotation }: { position: [number, number, number
         <boxGeometry args={[1.0, 0.04, 0.38]} />
         <meshBasicMaterial color="#7a6848" />
       </mesh>
-      {/* ??½?†å? ??ç½é ­?ç“¶å­?*/}
+      {/* ??ï¿½ï¿½?ï¿½ï¿½? ??ç½é ­?ï¿½ç“¶ï¿½?*/}
       <mesh position={[-0.2, 0.46, 0.1]} rotation={[0, 0.4, 0.1]}>
         <cylinderGeometry args={[0.04, 0.04, 0.1, 6]} />
         <meshBasicMaterial color="#aa4422" />
@@ -509,13 +526,13 @@ function BrokenShelf({ position, rotation }: { position: [number, number, number
         <cylinderGeometry args={[0.03, 0.03, 0.12, 6]} />
         <meshBasicMaterial color="#448844" />
       </mesh>
-      {/* ?‰è½?????°é¢??½ */}
+      {/* ?ï¿½è½?????ï¿½é¢??ï¿½ï¿½ */}
       <mesh position={[0.2, 0.02, 0.25]} rotation={[-Math.PI / 2, 0, 0.7]}>
         <boxGeometry args={[0.15, 0.1, 0.02]} />
         <meshBasicMaterial color="#8a7050" />
       </mesh>
       <ScatteredLitter position={[-0.4, 0, 0.3]} rotation={rotation * 3} />
-      {/* ?°å¡µæ±¡æ¼¬ */}
+      {/* ?ï¿½å¡µæ±¡æ¼¬ */}
       <mesh position={[-0.3, 0.8, 0.21]} rotation={[0, 0, 0.3]}>
         <circleGeometry args={[0.12, 5]} />
         <meshBasicMaterial color="#5a4838" transparent opacity={0.4} side={THREE.DoubleSide} />
@@ -533,25 +550,25 @@ function OilDrum({ position, rotation }: { position: [number, number, number]; r
         <cylinderGeometry args={[0.28, 0.28, 0.9, 10]} />
         <meshBasicMaterial color="#8a5518" />
       </mesh>
-      {/* æ¡¶è? */}
+      {/* æ¡¶ï¿½? */}
       <mesh position={[0, tipped ? 0.73 : 0.95, 0]}>
         <cylinderGeometry args={[0.26, 0.26, 0.04, 10]} />
         <meshBasicMaterial color="#7a5518" />
       </mesh>
-      {/* ?½å¸¶ */}
+      {/* ?ï¿½å¸¶ */}
       <mesh position={[0, tipped ? 0.15 : 0.35, 0]}>
         <cylinderGeometry args={[0.29, 0.29, 0.06, 10]} />
         <meshBasicMaterial color="#5a3010" />
       </mesh>
       <RustMark position={[0.2, tipped ? 0.3 : 0.6, 0.15]} scale={1.0} />
-      {/* æ¼æ²¹?•è·¡ */}
+      {/* æ¼æ²¹?ï¿½è·¡ */}
       {leaking && tipped && (
         <mesh position={[0.4, 0.005, 0]} rotation={[-Math.PI / 2, 0, rotation]}>
           <circleGeometry args={[0.3, 6]} />
           <meshBasicMaterial color="#1a1508" transparent opacity={0.5} />
         </mesh>
       )}
-      {/* æ¨™ç±¤æ®˜ç? */}
+      {/* æ¨™ç±¤æ®˜ï¿½? */}
       <mesh position={[0, tipped ? 0.28 : 0.5, 0.285]}>
         <boxGeometry args={[0.2, 0.15, 0.005]} />
         <meshBasicMaterial color="#c8b888" />
@@ -560,39 +577,39 @@ function OilDrum({ position, rotation }: { position: [number, number, number]; r
   )
 }
 
-/* ?â??â??â??â??â??â??â??â??â??â??â??â??â??â??â??â??â??â??â???
-   Factory Props ??å·¥æ¥­å»¢å?
-   æ©Ÿæ¢°é½’è¼ª?ç®¡ç·šæ¶?å·¥æ¥­æ¡¶?è¼¸?å¸¶??
-   ?â??â??â??â??â??â??â??â??â??â??â??â??â??â??â??â??â??â??â???*/
+/* ?ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½???
+   Factory Props ??å·¥æ¥­å»¢ï¿½?
+   æ©Ÿæ¢°é½’è¼ª?ï¿½ç®¡ç·šæ¶?ï¿½å·¥æ¥­æ¡¶?ï¿½è¼¸?ï¿½å¸¶??
+   ?ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½???*/
 
 function MachineryGear({ position, rotation }: { position: [number, number, number]; rotation: number }) {
   const s = 0.8 + Math.abs(Math.sin(position[0] * 3)) * 0.6
   return (
     <group position={position} rotation={[0, rotation, 0]} scale={s}>
-      {/* é½’è¼ª?¬é? */}
+      {/* é½’è¼ª?ï¿½ï¿½? */}
       <mesh position={[0, 0.8, 0]} rotation={[Math.PI / 2, 0, 0]} castShadow>
         <torusGeometry args={[0.6, 0.12, 6, 12]} />
         <meshBasicMaterial color="#454550" />
       </mesh>
-      {/* ä¸­å?è»?*/}
+      {/* ä¸­ï¿½?ï¿½?*/}
       <mesh position={[0, 0.8, 0]} rotation={[Math.PI / 2, 0, 0]} castShadow>
         <cylinderGeometry args={[0.15, 0.15, 0.3, 8]} />
         <meshBasicMaterial color="#555560" />
       </mesh>
-      {/* ?¯æ?åº?*/}
+      {/* ?ï¿½ï¿½?ï¿½?*/}
       <mesh position={[0, 0.3, 0]} castShadow receiveShadow>
         <boxGeometry args={[0.8, 0.6, 0.5]} />
         <meshBasicMaterial color="#3a3a42" />
       </mesh>
-      {/* ?½è?å¤§å??‘å? */}
+      {/* ?ï¿½ï¿½?å¤§ï¿½??ï¿½ï¿½? */}
       <RustMark position={[0.5, 0.8, 0.1]} scale={1.5} />
       <RustMark position={[-0.3, 0.4, 0.26]} scale={1.0} />
-      {/* æ²¹æ¼¬?°é¢ */}
+      {/* æ²¹æ¼¬?ï¿½é¢ */}
       <mesh position={[0, 0.005, 0.2]} rotation={[-Math.PI / 2, 0, 0]}>
         <circleGeometry args={[0.25, 6]} />
         <meshBasicMaterial color="#1a1a10" transparent opacity={0.4} />
       </mesh>
-      {/* åº•éƒ¨ç¢å? */}
+      {/* åº•éƒ¨ç¢ï¿½? */}
       <RubblePile position={[0.5, 0, 0.3]} rotation={rotation * 2} color="#4a4a48" />
     </group>
   )
@@ -601,7 +618,7 @@ function MachineryGear({ position, rotation }: { position: [number, number, numb
 function PipeRack({ position, rotation }: { position: [number, number, number]; rotation: number }) {
   return (
     <group position={position} rotation={[0, rotation, 0]}>
-      {/* æ©«ç®¡ ???½è???*/}
+      {/* æ©«ç®¡ ???ï¿½ï¿½???*/}
       <mesh position={[0, 1.2, 0]} rotation={[0, 0, Math.PI / 2]} castShadow>
         <cylinderGeometry args={[0.12, 0.12, 2.5, 8]} />
         <meshBasicMaterial color="#7a6050" />
@@ -610,19 +627,19 @@ function PipeRack({ position, rotation }: { position: [number, number, number]; 
         <cylinderGeometry args={[0.08, 0.08, 2.2, 7]} />
         <meshBasicMaterial color="#8a6e38" />
       </mesh>
-      {/* ?¯æ¶ */}
+      {/* ?ï¿½æ¶ */}
       {[-0.9, 0.9].map(x => (
         <mesh key={x} position={[x, 0.6, 0.15]} castShadow>
           <boxGeometry args={[0.08, 1.2, 0.08]} />
           <meshBasicMaterial color="#4a4a52" />
         </mesh>
       ))}
-      {/* ç®¡å??¥å£æ¼æ°´ */}
+      {/* ç®¡ï¿½??ï¿½å£æ¼æ°´ */}
       <mesh position={[0.5, 0.9, 0.15]} rotation={[-Math.PI / 2 + 0.2, 0, 0]}>
         <circleGeometry args={[0.08, 5]} />
         <meshBasicMaterial color="#3a5a4a" transparent opacity={0.5} side={THREE.DoubleSide} />
       </mesh>
-      {/* ?½å° */}
+      {/* ?ï¿½å° */}
       <RustMark position={[-0.3, 1.22, 0.12]} scale={0.9} />
       <RustMark position={[0.6, 0.82, 0.38]} scale={0.7} />
     </group>
@@ -637,7 +654,7 @@ function ConveyorFrame({ position, rotation }: { position: [number, number, numb
         <boxGeometry args={[2.5, 0.08, 0.8]} />
         <meshBasicMaterial color="#484850" />
       </mesh>
-      {/* ?³æ¶ */}
+      {/* ?ï¿½æ¶ */}
       {[[-1, 0.22, 0.3], [1, 0.22, 0.3], [-1, 0.22, -0.3], [1, 0.22, -0.3]].map((p, i) => (
         <mesh key={i} position={p as [number, number, number]} castShadow>
           <boxGeometry args={[0.08, 0.44, 0.08]} />
@@ -651,33 +668,33 @@ function ConveyorFrame({ position, rotation }: { position: [number, number, numb
           <meshBasicMaterial color="#5a5a62" />
         </mesh>
       ))}
-      {/* ?·è??³é€å¸¶æ®˜ç? */}
+      {/* ?ï¿½ï¿½??ï¿½é€å¸¶æ®˜ï¿½? */}
       <mesh position={[0.3, 0.52, 0]} rotation={[0, 0, 0.05]}>
         <boxGeometry args={[1.2, 0.02, 0.65]} />
         <meshBasicMaterial color="#2a2a28" />
       </mesh>
-      {/* ?½æ? */}
+      {/* ?ï¿½ï¿½? */}
       <RustMark position={[-0.8, 0.46, 0.41]} scale={1.1} />
-      {/* ?°é¢??½?¶ä»¶ */}
+      {/* ?ï¿½é¢??ï¿½ï¿½?ï¿½ä»¶ */}
       <ScatteredLitter position={[0.6, 0, 0.5]} rotation={rotation} />
     </group>
   )
 }
 
-/* ?â??â??â??â??â??â??â??â??â??â??â??â??â??â??â??â??â??â??â???
-   Hospital Props ??æ²‰é??«é™¢
-   ?…å??é?æ»´æ¶?é†«?‚æ??è¼ªæ¤?
-   ?â??â??â??â??â??â??â??â??â??â??â??â??â??â??â??â??â??â??â???*/
+/* ?ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½???
+   Hospital Props ??æ²‰ï¿½??ï¿½é™¢
+   ?ï¿½ï¿½??ï¿½ï¿½?æ»´æ¶?ï¿½é†«?ï¿½ï¿½??ï¿½è¼ªï¿½?
+   ?ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½???*/
 
 function HospitalBed({ position, rotation }: { position: [number, number, number]; rotation: number }) {
   return (
     <group position={position} rotation={[0, rotation, 0]}>
-      {/* åºŠå? ??æ±¡æ¼¬??*/}
+      {/* åºŠï¿½? ??æ±¡æ¼¬??*/}
       <mesh position={[0, 0.5, 0]} castShadow receiveShadow>
         <boxGeometry args={[0.9, 0.12, 2.0]} />
         <meshBasicMaterial color="#b8b0a0" />
       </mesh>
-      {/* è¡€æ¼¬åœ¨åºŠå?ä¸?*/}
+      {/* è¡€æ¼¬åœ¨åºŠï¿½?ï¿½?*/}
       <mesh position={[0.15, 0.565, 0.2]} rotation={[-Math.PI / 2, 0, 0.3]}>
         <circleGeometry args={[0.18, 6]} />
         <meshBasicMaterial color="#4a1515" transparent opacity={0.5} />
@@ -699,14 +716,14 @@ function HospitalBed({ position, rotation }: { position: [number, number, number
         <boxGeometry args={[0.9, 0.5, 0.05]} />
         <meshBasicMaterial color="#7a8899" />
       </mesh>
-      {/* ?•é ­ ??æ­ªæ? */}
+      {/* ?ï¿½é ­ ??æ­ªï¿½? */}
       <mesh position={[0.08, 0.6, -0.7]} rotation={[0, 0.15, 0.05]}>
         <boxGeometry args={[0.5, 0.08, 0.3]} />
         <meshBasicMaterial color="#c8c0b0" />
       </mesh>
-      {/* åºŠä???½??*/}
+      {/* åºŠï¿½???ï¿½ï¿½??*/}
       <ScatteredLitter position={[0.5, 0, 0.3]} rotation={rotation * 2} />
-      {/* ?°é¢è¡€æ¼?*/}
+      {/* ?ï¿½é¢è¡€ï¿½?*/}
       <BloodStain position={[-0.3, 0, 0.5]} scale={0.6} />
     </group>
   )
@@ -720,17 +737,17 @@ function IVStand({ position, rotation }: { position: [number, number, number]; r
         <cylinderGeometry args={[0.02, 0.025, 1.8, 5]} />
         <meshBasicMaterial color="#aaaaaa" />
       </mesh>
-      {/* ?‚éƒ¨?›é‰¤ */}
+      {/* ?ï¿½éƒ¨?ï¿½é‰¤ */}
       <mesh position={[0, 1.82, 0]}>
         <boxGeometry args={[0.25, 0.03, 0.03]} />
         <meshBasicMaterial color="#999999" />
       </mesh>
-      {/* é»æ»´è¢?*/}
+      {/* é»æ»´ï¿½?*/}
       <mesh position={[0.08, 1.6, 0]}>
         <boxGeometry args={[0.1, 0.2, 0.06]} />
         <meshBasicMaterial color="#8aaa99" transparent opacity={0.6} />
       </mesh>
-      {/* è¼¸æ¶²ç®????‚ä? */}
+      {/* è¼¸æ¶²ï¿½????ï¿½ï¿½? */}
       <mesh position={[0.06, 1.35, 0.02]} rotation={[0.1, 0, 0.05]}>
         <cylinderGeometry args={[0.005, 0.005, 0.4, 4]} />
         <meshBasicMaterial color="#ccccbb" />
@@ -740,9 +757,9 @@ function IVStand({ position, rotation }: { position: [number, number, number]; r
         <cylinderGeometry args={[0.15, 0.18, 0.04, 8]} />
         <meshBasicMaterial color="#888888" />
       </mesh>
-      {/* ?½å° */}
+      {/* ?ï¿½å° */}
       <RustMark position={[0.025, 0.5, 0]} scale={0.5} />
-      {/* ?°é¢æ»´æ¶² */}
+      {/* ?ï¿½é¢æ»´æ¶² */}
       <mesh position={[0.1, 0.005, 0.05]} rotation={[-Math.PI / 2, 0, 0]}>
         <circleGeometry args={[0.06, 5]} />
         <meshBasicMaterial color="#3a5a4a" transparent opacity={0.35} />
@@ -759,17 +776,17 @@ function MedCabinet({ position, rotation }: { position: [number, number, number]
         <boxGeometry args={[0.6, 1.2, 0.35]} />
         <meshBasicMaterial color="#c8c8c0" />
       </mesh>
-      {/* ?€ ???¨å??‹å? */}
+      {/* ?ï¿½ ???ï¿½ï¿½??ï¿½ï¿½? */}
       <mesh position={[doorOpen ? 0.25 : 0, 0.6, doorOpen ? 0.25 : 0.18]} rotation={[0, doorOpen ? 0.8 : 0, 0]}>
         <boxGeometry args={[0.55, 1.1, 0.02]} />
         <meshBasicMaterial color="#bbc0bb" />
       </mesh>
-      {/* ?Šæ? */}
+      {/* ?ï¿½ï¿½? */}
       <mesh position={[doorOpen ? 0.05 : 0.2, 0.6, doorOpen ? 0.35 : 0.2]}>
         <boxGeometry args={[0.04, 0.12, 0.03]} />
         <meshBasicMaterial color="#999999" />
       </mesh>
-      {/* ç´…å?å­???è¤®è‰² */}
+      {/* ç´…ï¿½?ï¿½???è¤®è‰² */}
       <mesh position={[0, 0.9, 0.19]}>
         <boxGeometry args={[0.15, 0.04, 0.01]} />
         <meshBasicMaterial color="#993333" />
@@ -778,7 +795,7 @@ function MedCabinet({ position, rotation }: { position: [number, number, number]
         <boxGeometry args={[0.04, 0.15, 0.01]} />
         <meshBasicMaterial color="#993333" />
       </mesh>
-      {/* æ«ƒå…§?¥ç“¶??½ (?ªæ??€?‹æ??¯è?) */}
+      {/* æ«ƒå…§?ï¿½ç“¶??ï¿½ï¿½ (?ï¿½ï¿½??ï¿½?ï¿½ï¿½??ï¿½ï¿½?) */}
       {doorOpen && (
         <>
           <mesh position={[-0.1, 0.45, 0.05]}>
@@ -791,7 +808,7 @@ function MedCabinet({ position, rotation }: { position: [number, number, number]
           </mesh>
         </>
       )}
-      {/* æ«ƒå?ä¸‹æ–¹?°é¢??½?¥ç“¶ */}
+      {/* æ«ƒï¿½?ä¸‹æ–¹?ï¿½é¢??ï¿½ï¿½?ï¿½ç“¶ */}
       <mesh position={[0.2, 0.02, 0.25]} rotation={[Math.PI / 2, 0, rotation * 2]}>
         <cylinderGeometry args={[0.025, 0.025, 0.08, 5]} />
         <meshBasicMaterial color="#ddaa44" />
@@ -805,15 +822,15 @@ function MedCabinet({ position, rotation }: { position: [number, number, number]
   )
 }
 
-/* ?â??â??â??â??â??â??â??â??â??â??â??â??â??â??â??â??â??â??â???
-   Residential Props ??å»¢æ?ä½å??€
-   æ¡Œå??æ?å­ã€æ›¸?¶ã€é›»è¦–æ?
-   ?â??â??â??â??â??â??â??â??â??â??â??â??â??â??â??â??â??â??â???*/
+/* ?ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½???
+   Residential Props ??å»¢ï¿½?ä½ï¿½??ï¿½
+   æ¡Œï¿½??ï¿½ï¿½?å­ã€æ›¸?ï¿½ã€é›»è¦–ï¿½?
+   ?ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½???*/
 
 function Table({ position, rotation }: { position: [number, number, number]; rotation: number }) {
   return (
     <group position={position} rotation={[0, rotation, 0]}>
-      {/* æ¡Œé¢ ???®ç???*/}
+      {/* æ¡Œé¢ ???ï¿½ï¿½???*/}
       <mesh position={[0, 0.65, 0]} castShadow receiveShadow>
         <boxGeometry args={[1.0, 0.06, 0.6]} />
         <meshBasicMaterial color="#6a4820" />
@@ -830,12 +847,12 @@ function Table({ position, rotation }: { position: [number, number, number]; rot
         <circleGeometry args={[0.1, 5]} />
         <meshBasicMaterial color="#4a3015" transparent opacity={0.35} />
       </mesh>
-      {/* æ¡Œä???½?????´ç›¤å­?*/}
+      {/* æ¡Œï¿½???ï¿½ï¿½?????ï¿½ç›¤ï¿½?*/}
       <mesh position={[-0.2, 0.7, 0.1]} rotation={[-Math.PI / 2 + 0.03, 0, rotation]}>
         <circleGeometry args={[0.1, 7]} />
         <meshBasicMaterial color="#c8c0b0" side={THREE.DoubleSide} />
       </mesh>
-      {/* æ¡Œä??ƒåœ¾ */}
+      {/* æ¡Œï¿½??ï¿½åœ¾ */}
       <ScatteredLitter position={[0.3, 0, -0.2]} rotation={rotation * 2} />
     </group>
   )
@@ -850,7 +867,7 @@ function Chair({ position, rotation }: { position: [number, number, number]; rot
         <boxGeometry args={[0.4, 0.04, 0.4]} />
         <meshBasicMaterial color="#7a5828" />
       </mesh>
-      {/* æ¤…è? ???‰å?å£è?ç¸?*/}
+      {/* æ¤…ï¿½? ???ï¿½ï¿½?å£ï¿½?ï¿½?*/}
       <mesh position={[0, 0.65, -0.18]} castShadow>
         <boxGeometry args={[0.38, 0.5, 0.04]} />
         <meshBasicMaterial color="#6a4818" />
@@ -860,7 +877,7 @@ function Chair({ position, rotation }: { position: [number, number, number]; rot
         <boxGeometry args={[0.015, 0.25, 0.005]} />
         <meshBasicMaterial color="#3a2008" />
       </mesh>
-      {/* æ¤…è…³ ??ä¸€?»çŸ­ä¸€äº?*/}
+      {/* æ¤…è…³ ??ä¸€?ï¿½çŸ­ä¸€ï¿½?*/}
       {[[-0.16, 0.2, 0.16], [0.16, 0.2, 0.16], [-0.16, 0.18, -0.16], [0.16, 0.2, -0.16]].map((p, i) => (
         <mesh key={i} position={p as [number, number, number]}>
           <boxGeometry args={[0.03, i === 2 ? 0.36 : 0.4, 0.03]} />
@@ -874,7 +891,7 @@ function Chair({ position, rotation }: { position: [number, number, number]; rot
 function Bookshelf({ position, rotation }: { position: [number, number, number]; rotation: number }) {
   return (
     <group position={position} rotation={[0, rotation, (Math.sin(rotation * 5) - 0.5) * 0.1]}>
-      {/* å¤–æ? */}
+      {/* å¤–ï¿½? */}
       <mesh position={[0, 0.9, 0]} castShadow receiveShadow>
         <boxGeometry args={[0.8, 1.8, 0.3]} />
         <meshBasicMaterial color="#5a4018" />
@@ -886,7 +903,7 @@ function Bookshelf({ position, rotation }: { position: [number, number, number];
           <meshBasicMaterial color="#4a3010" />
         </mesh>
       ))}
-      {/* ??½?„æ›¸ ???´å??¸æœ¬ */}
+      {/* ??ï¿½ï¿½?ï¿½æ›¸ ???ï¿½ï¿½??ï¿½æœ¬ */}
       <mesh position={[-0.1, 0.5, 0.05]} rotation={[0, 0.2, 0.1]}>
         <boxGeometry args={[0.15, 0.2, 0.1]} />
         <meshBasicMaterial color="#884422" />
@@ -899,7 +916,7 @@ function Bookshelf({ position, rotation }: { position: [number, number, number];
         <boxGeometry args={[0.1, 0.16, 0.07]} />
         <meshBasicMaterial color="#445588" />
       </mesh>
-      {/* ?°é¢?‰è½?„æ›¸ */}
+      {/* ?ï¿½é¢?ï¿½è½?ï¿½æ›¸ */}
       <mesh position={[-0.3, 0.04, 0.22]} rotation={[-0.1, 0.8, 0.05]}>
         <boxGeometry args={[0.14, 0.02, 0.2]} />
         <meshBasicMaterial color="#774433" />
@@ -908,7 +925,7 @@ function Bookshelf({ position, rotation }: { position: [number, number, number];
         <boxGeometry args={[0.12, 0.02, 0.16]} />
         <meshBasicMaterial color="#225544" />
       </mesh>
-      {/* ?°å¡µ */}
+      {/* ?ï¿½å¡µ */}
       <mesh position={[0, 1.8, 0.02]} rotation={[-Math.PI / 2, 0, 0]}>
         <boxGeometry args={[0.75, 0.28, 0.005]} />
         <meshBasicMaterial color="#8a8878" transparent opacity={0.25} />
@@ -921,17 +938,17 @@ function TVSet({ position, rotation }: { position: [number, number, number]; rot
   const cracked = Math.sin(rotation * 9) > 0
   return (
     <group position={position} rotation={[0, rotation, 0]}>
-      {/* ?»è?æ©Ÿæ®¼ */}
+      {/* ?ï¿½ï¿½?æ©Ÿæ®¼ */}
       <mesh position={[0, 0.5, 0]} castShadow>
         <boxGeometry args={[0.7, 0.45, 0.08]} />
         <meshBasicMaterial color="#2a2a32" />
       </mesh>
-      {/* ?¢å? (ç¢è?) */}
+      {/* ?ï¿½ï¿½? (ç¢ï¿½?) */}
       <mesh position={[0, 0.5, 0.045]}>
         <boxGeometry args={[0.6, 0.36, 0.01]} />
         <meshBasicMaterial color="#1a1a28" />
       </mesh>
-      {/* ç¢è?ç´?*/}
+      {/* ç¢ï¿½?ï¿½?*/}
       {cracked && (
         <>
           <mesh position={[-0.05, 0.55, 0.052]} rotation={[0, 0, 0.7]}>
@@ -942,7 +959,7 @@ function TVSet({ position, rotation }: { position: [number, number, number]; rot
             <boxGeometry args={[0.01, 0.2, 0.002]} />
             <meshBasicMaterial color="#444450" />
           </mesh>
-          {/* è£‚ç¸«äº¤å?é»å? */}
+          {/* è£‚ç¸«äº¤ï¿½?é»ï¿½? */}
           <mesh position={[0, 0.5, 0.053]}>
             <circleGeometry args={[0.02, 4]} />
             <meshBasicMaterial color="#667788" transparent opacity={0.3} />
@@ -954,7 +971,7 @@ function TVSet({ position, rotation }: { position: [number, number, number]; rot
         <boxGeometry args={[0.3, 0.08, 0.15]} />
         <meshBasicMaterial color="#333340" />
       </mesh>
-      {/* ?°å¡µ */}
+      {/* ?ï¿½å¡µ */}
       <mesh position={[0, 0.74, 0.01]} rotation={[-Math.PI / 2, 0, 0]}>
         <boxGeometry args={[0.65, 0.06, 0.005]} />
         <meshBasicMaterial color="#7a7868" transparent opacity={0.3} />
@@ -963,55 +980,55 @@ function TVSet({ position, rotation }: { position: [number, number, number]; rot
   )
 }
 
-/* ?â??â??â??â??â??â??â??â??â??â??â??â??â??â??â??â??â??â??â???
-   Underground Props ???°ä??œè???
-   æ±½è?æ®˜éª¸?äº¤?šé??æ°´æ³¥æŸ±?æ???
-   ?â??â??â??â??â??â??â??â??â??â??â??â??â??â??â??â??â??â??â???*/
+/* ?ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½???
+   Underground Props ???ï¿½ï¿½??ï¿½ï¿½???
+   æ±½ï¿½?æ®˜éª¸?ï¿½äº¤?ï¿½ï¿½??ï¿½æ°´æ³¥æŸ±?ï¿½ï¿½???
+   ?ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½???*/
 
 function CarWreck({ position, rotation }: { position: [number, number, number]; rotation: number }) {
   const burned = Math.sin(rotation * 5) > 0.3
   return (
     <group position={position} rotation={[(Math.sin(rotation * 3) - 0.5) * 0.08, rotation, 0]}>
-      {/* è»Šèº« ???«æ???*/}
+      {/* è»Šèº« ???ï¿½ï¿½???*/}
       <mesh position={[0, 0.45, 0]} castShadow receiveShadow>
         <boxGeometry args={[1.6, 0.6, 0.9]} />
         <meshBasicMaterial color={burned ? '#2a2020' : '#3a4050'} />
       </mesh>
-      {/* è»Šé?/é§•é??????¹é™· */}
+      {/* è»Šï¿½?/é§•ï¿½??????ï¿½é™· */}
       <mesh position={[0.1, burned ? 0.85 : 0.9, 0]} castShadow>
         <boxGeometry args={[0.9, burned ? 0.38 : 0.45, 0.8]} />
         <meshBasicMaterial color={burned ? '#1a1818' : '#2a3040'} />
       </mesh>
-      {/* è»Šç? ???´ç? */}
+      {/* è»Šï¿½? ???ï¿½ï¿½? */}
       <mesh position={[0.1, 0.92, 0.41]}>
         <boxGeometry args={[0.5, 0.2, 0.01]} />
         <meshBasicMaterial color="#445566" transparent opacity={0.35} />
       </mesh>
-      {/* ç¢ç»?ƒæ•£??*/}
+      {/* ç¢ç»?ï¿½æ•£??*/}
       {[[-0.2, 0.02, 0.55], [0.3, 0.02, 0.6]].map((p, i) => (
         <mesh key={`g${i}`} position={p as [number, number, number]} rotation={[-Math.PI / 2, 0, rotation * (i + 1)]}>
           <circleGeometry args={[0.06, 4]} />
           <meshBasicMaterial color="#88aacc" transparent opacity={0.3} />
         </mesh>
       ))}
-      {/* è¼ªå? ??ç¼ºä???*/}
+      {/* è¼ªï¿½? ??ç¼ºï¿½???*/}
       {[[-0.55, 0.18, 0.45], [0.55, 0.18, 0.45], [-0.55, 0.18, -0.45]].map((p, i) => (
         <mesh key={i} position={p as [number, number, number]} rotation={[Math.PI / 2, 0, 0]}>
           <cylinderGeometry args={[0.18, 0.18, 0.12, 8]} />
           <meshBasicMaterial color="#222228" />
         </mesh>
       ))}
-      {/* è»Šé ­??(ç¢è?) */}
+      {/* è»Šé ­??(ç¢ï¿½?) */}
       <mesh position={[-0.75, 0.45, 0.3]}>
         <sphereGeometry args={[0.08, 6, 6]} />
         <meshBasicMaterial color="#998866" />
       </mesh>
-      {/* ?½æ? */}
+      {/* ?ï¿½ï¿½? */}
       <RustMark position={[0.4, 0.3, 0.46]} scale={0.3} />
       <RustMark position={[-0.6, 0.55, 0.46]} scale={0.2} />
-      {/* è¡€è·?*/}
+      {/* è¡€ï¿½?*/}
       <BloodStain position={[0.5, 0.01, 0.7]} scale={0.5} />
-      {/* ?°é¢æ¼æ²¹ */}
+      {/* ?ï¿½é¢æ¼æ²¹ */}
       <mesh position={[-0.3, 0.01, -0.3]} rotation={[-Math.PI / 2, 0, 0]}>
         <circleGeometry args={[0.25, 6]} />
         <meshBasicMaterial color="#1a1a10" transparent opacity={0.35} />
@@ -1028,7 +1045,7 @@ function TrafficCone({ position, rotation }: { position: [number, number, number
         <coneGeometry args={[0.15, 0.5, 6]} />
         <meshBasicMaterial color="#aa4400" />
       </mesh>
-      {/* ?å?å¸???è¤ªè‰² */}
+      {/* ?ï¿½ï¿½?ï¿½???è¤ªè‰² */}
       <mesh position={[0, fallen ? 0.22 : 0.32, 0]}>
         <coneGeometry args={[0.12, 0.1, 6]} />
         <meshBasicMaterial color="#ccccaa" />
@@ -1055,7 +1072,7 @@ function ConcreteColumn({ position, rotation }: { position: [number, number, num
         <cylinderGeometry args={[0.35, 0.4, h, 8]} />
         <meshBasicMaterial color="#585e68" />
       </mesh>
-      {/* è£‚ç¸«ç´‹è·¯ ??å¤šæ? */}
+      {/* è£‚ç¸«ç´‹è·¯ ??å¤šï¿½? */}
       <mesh position={[0.3, h * 0.4, 0]} rotation={[0, 0, 0.3]}>
         <boxGeometry args={[0.02, h * 0.3, 0.02]} />
         <meshBasicMaterial color="#383840" />
@@ -1064,7 +1081,7 @@ function ConcreteColumn({ position, rotation }: { position: [number, number, num
         <boxGeometry args={[0.015, h * 0.2, 0.015]} />
         <meshBasicMaterial color="#404448" />
       </mesh>
-      {/* ?¼ç?å¤–éœ² */}
+      {/* ?ï¿½ï¿½?å¤–éœ² */}
       <mesh position={[0.28, h * 0.7, 0.1]} rotation={[0, 0, 0.1]}>
         <cylinderGeometry args={[0.015, 0.015, 0.5, 4]} />
         <meshBasicMaterial color="#8a5030" />
@@ -1074,7 +1091,7 @@ function ConcreteColumn({ position, rotation }: { position: [number, number, num
         <circleGeometry args={[0.5, 8]} />
         <meshBasicMaterial color="#4a5058" transparent opacity={0.2} />
       </mesh>
-      {/* ?¹æ? */}
+      {/* ?ï¿½ï¿½? */}
       <RustMark position={[0.15, h * 0.35, 0.35]} scale={0.15} />
     </group>
   )
@@ -1096,17 +1113,17 @@ function ParkingBarrier({ position, rotation }: { position: [number, number, num
           <meshBasicMaterial color="#bbaa18" />
         </mesh>
       ))}
-      {/* ?½æ? */}
+      {/* ?ï¿½ï¿½? */}
       <RustMark position={[-0.4, 0.55, 0.05]} scale={0.12} />
       <RustMark position={[0.6, 0.62, -0.04]} scale={0.1} />
     </group>
   )
 }
 
-/* ?â??â??â??â??â??â??â??â??â??â??â??â??â??â??â??â??â??â??â???
-   Core Props ???«æ—¥?¸å?
-   ?½é?æ°´æ™¶?ç??€ä¸»æ??ç™¼?‰ç®¡?æµ®?•ç?
-   ?â??â??â??â??â??â??â??â??â??â??â??â??â??â??â??â??â??â??â???*/
+/* ?ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½???
+   Core Props ???ï¿½æ—¥?ï¿½ï¿½?
+   ?ï¿½ï¿½?æ°´æ™¶?ï¿½ï¿½??ï¿½ä¸»ï¿½??ï¿½ç™¼?ï¿½ç®¡?ï¿½æµ®?ï¿½ï¿½?
+   ?ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½???*/
 
 function EnergyCrystal({ position, rotation }: { position: [number, number, number]; rotation: number }) {
   const ref = useRef<THREE.Group>(null)
@@ -1131,7 +1148,7 @@ function EnergyCrystal({ position, rotation }: { position: [number, number, numb
           opacity={0.85}
         />
       </mesh>
-      {/* å°è??Ÿç???*/}
+      {/* å°ï¿½??ï¿½ï¿½???*/}
       <mesh position={[0.5, 0.3, 0]}>
         <octahedronGeometry args={[0.15, 0]} />
         <meshBasicMaterial color="#cc66ee" transparent opacity={0.7} />
@@ -1140,12 +1157,12 @@ function EnergyCrystal({ position, rotation }: { position: [number, number, numb
         <octahedronGeometry args={[0.1, 0]} />
         <meshBasicMaterial color="#bb55dd" transparent opacity={0.6} />
       </mesh>
-      {/* åº•åº§?‰ç’° */}
+      {/* åº•åº§?ï¿½ç’° */}
       <mesh position={[0, -0.4, 0]} rotation={[Math.PI / 2, 0, 0]}>
         <torusGeometry args={[0.4, 0.03, 6, 16]} />
         <meshBasicMaterial color="#884488" transparent opacity={0.5} />
       </mesh>
-      {/* ?°é¢è£‚ç¸«?”èƒ½?ä¾µ??*/}
+      {/* ?ï¿½é¢è£‚ç¸«?ï¿½èƒ½?ï¿½ä¾µ??*/}
       <mesh position={[0, -0.48, 0]} rotation={[-Math.PI / 2, 0, rotation * 3]}>
         <ringGeometry args={[0.5, 0.8, 6]} />
         <meshBasicMaterial color="#6622aa" transparent opacity={0.2} side={THREE.DoubleSide} />
@@ -1158,12 +1175,12 @@ function TechConsole({ position, rotation }: { position: [number, number, number
   const damaged = Math.sin(rotation * 7) > 0.2
   return (
     <group position={position} rotation={[0, rotation, 0]}>
-      {/* ä¸»æ?ç®?*/}
+      {/* ä¸»ï¿½?ï¿½?*/}
       <mesh position={[0, 0.5, 0]} castShadow receiveShadow>
         <boxGeometry args={[0.8, 1.0, 0.5]} />
         <meshBasicMaterial color="#2a1830" />
       </mesh>
-      {/* ?¢å? ??ç¢è?/æ­?¸¸ */}
+      {/* ?ï¿½ï¿½? ??ç¢ï¿½?/ï¿½?ï¿½ï¿½ */}
       <mesh position={[0, 0.7, 0.26]}>
         <boxGeometry args={[0.6, 0.35, 0.02]} />
         <meshBasicMaterial
@@ -1172,14 +1189,14 @@ function TechConsole({ position, rotation }: { position: [number, number, number
          
         />
       </mesh>
-      {/* ç¢è?ç´?*/}
+      {/* ç¢ï¿½?ï¿½?*/}
       {damaged && (
         <mesh position={[-0.08, 0.75, 0.275]} rotation={[0, 0, 0.5]}>
           <boxGeometry args={[0.01, 0.25, 0.002]} />
           <meshBasicMaterial color="#443355" />
         </mesh>
       )}
-      {/* ?‡ç¤º??*/}
+      {/* ?ï¿½ç¤º??*/}
       {[[-0.25, 0.35], [0, 0.35], [0.25, 0.35]].map(([x, y], i) => (
         <mesh key={i} position={[x, y, 0.26]}>
           <sphereGeometry args={[0.03, 6, 6]} />
@@ -1190,12 +1207,12 @@ function TechConsole({ position, rotation }: { position: [number, number, number
           />
         </mesh>
       ))}
-      {/* ?°é¢?»ç? */}
+      {/* ?ï¿½é¢?ï¿½ï¿½? */}
       <mesh position={[0.3, 0.02, 0.35]} rotation={[-Math.PI / 2, 0, rotation * 2]}>
         <torusGeometry args={[0.15, 0.01, 4, 8]} />
         <meshBasicMaterial color="#222230" />
       </mesh>
-      {/* ?½æ? */}
+      {/* ?ï¿½ï¿½? */}
       <RustMark position={[-0.35, 0.3, 0.26]} scale={0.12} />
     </group>
   )
@@ -1221,12 +1238,12 @@ function GlowTube({ position, rotation }: { position: [number, number, number]; 
         <cylinderGeometry args={[0.15, 0.18, 0.1, 8]} />
         <meshBasicMaterial color="#3a2048" />
       </mesh>
-      {/* ?‚åº§ */}
+      {/* ?ï¿½åº§ */}
       <mesh position={[0, h + 0.05, 0]}>
         <cylinderGeometry args={[0.18, 0.15, 0.1, 8]} />
         <meshBasicMaterial color="#3a2048" />
       </mesh>
-      {/* åº•éƒ¨æ¶²é?æ»´è½ */}
+      {/* åº•éƒ¨æ¶²ï¿½?æ»´è½ */}
       <mesh position={[0.05, 0.01, 0.1]} rotation={[-Math.PI / 2, 0, 0]}>
         <circleGeometry args={[0.06, 5]} />
         <meshBasicMaterial color="#5522aa" transparent opacity={0.25} />
@@ -1235,13 +1252,13 @@ function GlowTube({ position, rotation }: { position: [number, number, number]; 
   )
 }
 
-/* ?â??â??â??â??â??â??â??â??â??â??â??â??â??â??â??â??â??â??â???
-   Scene Prop Generator ??ä¾å ´?¯æ¨¡å¼ç”¢?Ÿé???
-   ?â??â??â??â??â??â??â??â??â??â??â??â??â??â??â??â??â??â??â???*/
+/* ?ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½???
+   Scene Prop Generator ??ä¾å ´?ï¿½æ¨¡å¼ç”¢?ï¿½ï¿½???
+   ?ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½???*/
 
 function generateSceneElements(mode: SceneMode, stageId: string = '1-1'): React.ReactNode[] {
   const elements: React.ReactNode[] = []
-  // å°?stageIdï¼ˆå? "3-5"ï¼‰è??ºæ•¸?¼å?ç§»ï?è®“å?ç« ä??Œå??œæ?ä¸å??“å…·ä½ˆå?
+  // ï¿½?stageIdï¼ˆï¿½? "3-5"ï¼‰ï¿½??ï¿½æ•¸?ï¿½ï¿½?ç§»ï¿½?è®“ï¿½?ç« ï¿½??ï¿½ï¿½??ï¿½ï¿½?ä¸ï¿½??ï¿½å…·ä½ˆï¿½?
   const [ch, st] = stageId.split('-').map(Number)
   const stageSeed = (isNaN(ch) ? 1 : ch) * 100 + (isNaN(st) ? 1 : st)
   const seed = mode.charCodeAt(0) * 1000 + mode.charCodeAt(1) * 100 + (mode.charCodeAt(2) ?? 0) + stageSeed
@@ -1257,22 +1274,29 @@ function generateSceneElements(mode: SceneMode, stageId: string = '1-1'): React.
       buildings.forEach((s, i) => elements.push(<BuildingRuin key={`bld${i}`} position={s.pos} rotation={s.rot} />))
       lights.forEach((s, i) => elements.push(<StreetLight key={`sl${i}`} position={s.pos} rotation={s.rot} />))
       barriers.forEach((s, i) => elements.push(<ConcreteBarrier key={`bar${i}`} position={s.pos} rotation={s.rot} />))
-      // æ°›å??ƒç?
+      // æ°›ï¿½??ï¿½ï¿½?
       scatter(4, seed + 10, 22, 8).forEach((s, i) => elements.push(<RubblePile key={`crub${i}`} position={s.pos} scale={0.6 + Math.abs(Math.sin(s.rot * 3)) * 0.4} />))
       scatter(3, seed + 11, 20, 7).forEach((s, i) => elements.push(<BloodStain key={`cbld${i}`} position={[s.pos[0], 0.01, s.pos[2]]} scale={0.4 + Math.abs(Math.sin(s.rot * 5)) * 0.5} />))
       scatter(5, seed + 12, 18, 7).forEach((s, i) => elements.push(<ScatteredLitter key={`clit${i}`} position={s.pos} rotation={s.rot} />))
+      // æ•µæ–¹å¾Œæ–¹åŠ å¯†
+      scatterBehind(4, seed + 20).forEach((s, i) => elements.push(<BuildingRuin key={`bbld${i}`} position={s.pos} rotation={s.rot} />))
+      scatterBehind(3, seed + 21).forEach((s, i) => elements.push(<ConcreteBarrier key={`bbar${i}`} position={s.pos} rotation={s.rot} />))
+      scatterBehind(3, seed + 22).forEach((s, i) => elements.push(<StreetLight key={`bsl${i}`} position={s.pos} rotation={s.rot} />))
+      scatterBehind(4, seed + 23).forEach((s, i) => elements.push(<RubblePile key={`brub${i}`} position={s.pos} scale={0.5 + Math.abs(Math.sin(s.rot * 3)) * 0.5} />))
       break
-    }
-    case 'forest': {
       const trees = scatter(10, seed + 1, 26, 9)
       const logs = scatter(5, seed + 2, 22, 8)
       const mushrooms = scatter(8, seed + 3, 20, 7)
       trees.forEach((s, i) => elements.push(<TreeTrunk key={`tree${i}`} position={s.pos} rotation={s.rot} />))
       logs.forEach((s, i) => elements.push(<FallenLog key={`log${i}`} position={s.pos} rotation={s.rot} />))
       mushrooms.forEach((s, i) => elements.push(<Mushroom key={`mush${i}`} position={s.pos} rotation={s.rot} />))
-      // æ°›å??ƒç?
+      // æ°›ï¿½??ï¿½ï¿½?
       scatter(3, seed + 10, 22, 8).forEach((s, i) => elements.push(<BloodStain key={`fbld${i}`} position={[s.pos[0], 0.01, s.pos[2]]} scale={0.3 + Math.abs(Math.sin(s.rot * 4)) * 0.4} />))
       scatter(4, seed + 11, 18, 7).forEach((s, i) => elements.push(<ScatteredLitter key={`flit${i}`} position={s.pos} rotation={s.rot} />))
+      // æ•µæ–¹å¾Œæ–¹åŠ å¯†
+      scatterBehind(5, seed + 20).forEach((s, i) => elements.push(<TreeTrunk key={`btree${i}`} position={s.pos} rotation={s.rot} />))
+      scatterBehind(3, seed + 21).forEach((s, i) => elements.push(<FallenLog key={`blog${i}`} position={s.pos} rotation={s.rot} />))
+      scatterBehind(4, seed + 22).forEach((s, i) => elements.push(<Mushroom key={`bmush${i}`} position={s.pos} rotation={s.rot} />))
       break
     }
     case 'wasteland': {
@@ -1282,10 +1306,15 @@ function generateSceneElements(mode: SceneMode, stageId: string = '1-1'): React.
       carts.forEach((s, i) => elements.push(<ShoppingCart key={`cart${i}`} position={s.pos} rotation={s.rot} />))
       shelves.forEach((s, i) => elements.push(<BrokenShelf key={`shelf${i}`} position={s.pos} rotation={s.rot} />))
       drums.forEach((s, i) => elements.push(<OilDrum key={`drum${i}`} position={s.pos} rotation={s.rot} />))
-      // æ°›å??ƒç?
+      // æ°›ï¿½??ï¿½ï¿½?
       scatter(5, seed + 10, 20, 8).forEach((s, i) => elements.push(<RubblePile key={`wrub${i}`} position={s.pos} scale={0.5 + Math.abs(Math.sin(s.rot * 2)) * 0.5} />))
       scatter(4, seed + 11, 18, 7).forEach((s, i) => elements.push(<ScatteredLitter key={`wlit${i}`} position={s.pos} rotation={s.rot} />))
       scatter(2, seed + 12, 20, 7).forEach((s, i) => elements.push(<BloodStain key={`wbld${i}`} position={[s.pos[0], 0.01, s.pos[2]]} scale={0.3 + Math.abs(Math.sin(s.rot * 6)) * 0.3} />))
+      // æ•µæ–¹å¾Œæ–¹åŠ å¯†
+      scatterBehind(4, seed + 20).forEach((s, i) => elements.push(<OilDrum key={`bdrum${i}`} position={s.pos} rotation={s.rot} />))
+      scatterBehind(3, seed + 21).forEach((s, i) => elements.push(<BrokenShelf key={`bshelf${i}`} position={s.pos} rotation={s.rot} />))
+      scatterBehind(3, seed + 22).forEach((s, i) => elements.push(<ShoppingCart key={`bcart${i}`} position={s.pos} rotation={s.rot} />))
+      scatterBehind(4, seed + 23).forEach((s, i) => elements.push(<RubblePile key={`bwrub${i}`} position={s.pos} scale={0.5 + Math.abs(Math.sin(s.rot * 2)) * 0.5} />))
       break
     }
     case 'factory': {
@@ -1297,9 +1326,14 @@ function generateSceneElements(mode: SceneMode, stageId: string = '1-1'): React.
       pipes.forEach((s, i) => elements.push(<PipeRack key={`pipe${i}`} position={s.pos} rotation={s.rot} />))
       conveyors.forEach((s, i) => elements.push(<ConveyorFrame key={`conv${i}`} position={s.pos} rotation={s.rot} />))
       drums.forEach((s, i) => elements.push(<OilDrum key={`fdrum${i}`} position={s.pos} rotation={s.rot} />))
-      // æ°›å??ƒç?
+      // æ°›ï¿½??ï¿½ï¿½?
       scatter(4, seed + 10, 22, 8).forEach((s, i) => elements.push(<RubblePile key={`frub${i}`} position={s.pos} scale={0.5 + Math.abs(Math.sin(s.rot * 3)) * 0.5} />))
       scatter(3, seed + 11, 18, 7).forEach((s, i) => elements.push(<ScatteredLitter key={`flit${i}`} position={s.pos} rotation={s.rot} />))
+      // æ•µæ–¹å¾Œæ–¹åŠ å¯†
+      scatterBehind(3, seed + 20).forEach((s, i) => elements.push(<MachineryGear key={`bgear${i}`} position={s.pos} rotation={s.rot} />))
+      scatterBehind(3, seed + 21).forEach((s, i) => elements.push(<PipeRack key={`bpipe${i}`} position={s.pos} rotation={s.rot} />))
+      scatterBehind(3, seed + 22).forEach((s, i) => elements.push(<OilDrum key={`bfdrum${i}`} position={s.pos} rotation={s.rot} />))
+      scatterBehind(2, seed + 23).forEach((s, i) => elements.push(<ConveyorFrame key={`bconv${i}`} position={s.pos} rotation={s.rot} />))
       break
     }
     case 'hospital': {
@@ -1309,9 +1343,13 @@ function generateSceneElements(mode: SceneMode, stageId: string = '1-1'): React.
       beds.forEach((s, i) => elements.push(<HospitalBed key={`bed${i}`} position={s.pos} rotation={s.rot} />))
       ivs.forEach((s, i) => elements.push(<IVStand key={`iv${i}`} position={s.pos} rotation={s.rot} />))
       cabinets.forEach((s, i) => elements.push(<MedCabinet key={`cab${i}`} position={s.pos} rotation={s.rot} />))
-      // æ°›å??ƒç?
+      // æ°›ï¿½??ï¿½ï¿½?
       scatter(5, seed + 10, 20, 8).forEach((s, i) => elements.push(<BloodStain key={`hbld${i}`} position={[s.pos[0], 0.01, s.pos[2]]} scale={0.4 + Math.abs(Math.sin(s.rot * 3)) * 0.6} />))
       scatter(3, seed + 11, 18, 7).forEach((s, i) => elements.push(<ScatteredLitter key={`hlit${i}`} position={s.pos} rotation={s.rot} />))
+      // æ•µæ–¹å¾Œæ–¹åŠ å¯†
+      scatterBehind(3, seed + 20).forEach((s, i) => elements.push(<HospitalBed key={`bbed${i}`} position={s.pos} rotation={s.rot} />))
+      scatterBehind(3, seed + 21).forEach((s, i) => elements.push(<IVStand key={`biv${i}`} position={s.pos} rotation={s.rot} />))
+      scatterBehind(3, seed + 22).forEach((s, i) => elements.push(<MedCabinet key={`bcab${i}`} position={s.pos} rotation={s.rot} />))
       break
     }
     case 'residential': {
@@ -1323,10 +1361,15 @@ function generateSceneElements(mode: SceneMode, stageId: string = '1-1'): React.
       chairs.forEach((s, i) => elements.push(<Chair key={`chr${i}`} position={s.pos} rotation={s.rot} />))
       shelves.forEach((s, i) => elements.push(<Bookshelf key={`bks${i}`} position={s.pos} rotation={s.rot} />))
       tvs.forEach((s, i) => elements.push(<TVSet key={`tv${i}`} position={s.pos} rotation={s.rot} />))
-      // æ°›å??ƒç?
+      // æ°›ï¿½??ï¿½ï¿½?
       scatter(3, seed + 10, 20, 8).forEach((s, i) => elements.push(<RubblePile key={`rrub${i}`} position={s.pos} scale={0.4 + Math.abs(Math.sin(s.rot * 2)) * 0.4} />))
       scatter(3, seed + 11, 18, 7).forEach((s, i) => elements.push(<BloodStain key={`rbld${i}`} position={[s.pos[0], 0.01, s.pos[2]]} scale={0.3 + Math.abs(Math.sin(s.rot * 4)) * 0.3} />))
       scatter(4, seed + 12, 16, 6).forEach((s, i) => elements.push(<ScatteredLitter key={`rlit${i}`} position={s.pos} rotation={s.rot} />))
+      // æ•µæ–¹å¾Œæ–¹åŠ å¯†
+      scatterBehind(3, seed + 20).forEach((s, i) => elements.push(<Table key={`btbl${i}`} position={s.pos} rotation={s.rot} />))
+      scatterBehind(4, seed + 21).forEach((s, i) => elements.push(<Chair key={`bchr${i}`} position={s.pos} rotation={s.rot} />))
+      scatterBehind(2, seed + 22).forEach((s, i) => elements.push(<Bookshelf key={`bbks${i}`} position={s.pos} rotation={s.rot} />))
+      scatterBehind(2, seed + 23).forEach((s, i) => elements.push(<TVSet key={`btv${i}`} position={s.pos} rotation={s.rot} />))
       break
     }
     case 'underground': {
@@ -1338,10 +1381,15 @@ function generateSceneElements(mode: SceneMode, stageId: string = '1-1'): React.
       cones.forEach((s, i) => elements.push(<TrafficCone key={`cone${i}`} position={s.pos} rotation={s.rot} />))
       columns.forEach((s, i) => elements.push(<ConcreteColumn key={`col${i}`} position={s.pos} rotation={s.rot} />))
       barriers.forEach((s, i) => elements.push(<ParkingBarrier key={`pbar${i}`} position={s.pos} rotation={s.rot} />))
-      // æ°›å??ƒç?
+      // æ°›ï¿½??ï¿½ï¿½?
       scatter(4, seed + 10, 22, 8).forEach((s, i) => elements.push(<RubblePile key={`urub${i}`} position={s.pos} scale={0.5 + Math.abs(Math.sin(s.rot * 3)) * 0.5} />))
       scatter(4, seed + 11, 20, 8).forEach((s, i) => elements.push(<BloodStain key={`ubld${i}`} position={[s.pos[0], 0.01, s.pos[2]]} scale={0.4 + Math.abs(Math.sin(s.rot * 5)) * 0.5} />))
       scatter(3, seed + 12, 18, 7).forEach((s, i) => elements.push(<ScatteredLitter key={`ulit${i}`} position={s.pos} rotation={s.rot} />))
+      // æ•µæ–¹å¾Œæ–¹åŠ å¯†
+      scatterBehind(3, seed + 20).forEach((s, i) => elements.push(<CarWreck key={`bcar${i}`} position={s.pos} rotation={s.rot} />))
+      scatterBehind(4, seed + 21).forEach((s, i) => elements.push(<ConcreteColumn key={`bcol${i}`} position={s.pos} rotation={s.rot} />))
+      scatterBehind(4, seed + 22).forEach((s, i) => elements.push(<TrafficCone key={`bcone${i}`} position={s.pos} rotation={s.rot} />))
+      scatterBehind(2, seed + 23).forEach((s, i) => elements.push(<ParkingBarrier key={`bpbar${i}`} position={s.pos} rotation={s.rot} />))
       break
     }
     case 'core': {
@@ -1351,21 +1399,25 @@ function generateSceneElements(mode: SceneMode, stageId: string = '1-1'): React.
       crystals.forEach((s, i) => elements.push(<EnergyCrystal key={`crys${i}`} position={s.pos} rotation={s.rot} />))
       consoles.forEach((s, i) => elements.push(<TechConsole key={`cons${i}`} position={s.pos} rotation={s.rot} />))
       tubes.forEach((s, i) => elements.push(<GlowTube key={`tube${i}`} position={s.pos} rotation={s.rot} />))
-      // æ°›å??ƒç?
+      // æ°›ï¿½??ï¿½ï¿½?
       scatter(3, seed + 10, 20, 8).forEach((s, i) => elements.push(<RubblePile key={`xrub${i}`} position={s.pos} scale={0.4 + Math.abs(Math.sin(s.rot * 2)) * 0.4} />))
       scatter(2, seed + 11, 18, 7).forEach((s, i) => elements.push(<BloodStain key={`xbld${i}`} position={[s.pos[0], 0.01, s.pos[2]]} scale={0.3 + Math.abs(Math.sin(s.rot * 4)) * 0.4} />))
+      // æ•µæ–¹å¾Œæ–¹åŠ å¯†
+      scatterBehind(4, seed + 20).forEach((s, i) => elements.push(<EnergyCrystal key={`bcrys${i}`} position={s.pos} rotation={s.rot} />))
+      scatterBehind(3, seed + 21).forEach((s, i) => elements.push(<GlowTube key={`btube${i}`} position={s.pos} rotation={s.rot} />))
+      scatterBehind(3, seed + 22).forEach((s, i) => elements.push(<TechConsole key={`bcons${i}`} position={s.pos} rotation={s.rot} />))
       break
     }
-    // tower / daily / pvp / boss ??ä¸é?å¤–å??“å…·ï¼ˆä½¿?¨å???debrisï¼?
+    // tower / daily / pvp / boss ä¸é¡å¤–åŠ é“å…·ï¼ˆä½¿ç”¨é€šç”¨ debrisï¼‰
     default:
       break
   }
   return elements
 }
 
-/* ?â??â??â??â??â??â??â??â??â??â??â??â??â??â??â??â??â??â??â???
-   ä¸»å?ä»?
-   ?â??â??â??â??â??â??â??â??â??â??â??â??â??â??â??â??â??â??â???*/
+/* ?ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½???
+   ä¸»ï¿½?ï¿½?
+   ?ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½??ï¿½ï¿½???*/
 
 export function SceneProps({ sceneMode, stageId = '1-1' }: { sceneMode: SceneMode; stageId?: string }) {
   // eslint-disable-next-line react-hooks/exhaustive-deps

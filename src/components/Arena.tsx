@@ -410,6 +410,14 @@ const THEMES: Record<SceneMode, SceneTheme> = {
   },
 }
 
+// 為新碎片類型自動衍生顏色（barrel/pipe/plate）
+for (const t of Object.values(THEMES)) {
+  const rc = t.rubbleColors
+  if (!rc['barrel']) rc['barrel'] = rc['rock'] || ['#555']
+  if (!rc['pipe']) rc['pipe'] = rc['rebar'] || rc['rock'] || ['#555']
+  if (!rc['plate']) rc['plate'] = rc['slab'] || rc['rock'] || ['#555']
+}
+
 /* ────────────────────────────
    Debris（單一碎片）
    ──────────────────────────── */
@@ -437,6 +445,12 @@ function Debris({ position, scale, rotation, color = '#222', type = 'box' }: Deb
         geo = new THREE.CylinderGeometry(0.06, 0.1, 1, 5, 5); break
       case 'chunk':
         geo = new THREE.TetrahedronGeometry(0.5, 2); break
+      case 'barrel':
+        geo = new THREE.CylinderGeometry(0.4, 0.4, 1, 8, 4); break
+      case 'pipe':
+        geo = new THREE.CylinderGeometry(0.12, 0.12, 1, 6, 4); break
+      case 'plate':
+        geo = new THREE.BoxGeometry(1, 0.15, 1, 4, 2, 4); break
       default:
         geo = new THREE.BoxGeometry(1, 1, 1, 5, 5, 5)
     }
@@ -445,7 +459,7 @@ function Debris({ position, scale, rotation, color = '#222', type = 'box' }: Deb
     const normals = geo.attributes.normal as THREE.BufferAttribute
     const colors = new Float32Array(pos.count * 3)
     const baseColor = new THREE.Color(color)
-    const strength = type === 'rebar' ? 0.015 : type === 'pillar' ? 0.08 : 0.18
+    const strength = type === 'rebar' || type === 'pipe' ? 0.015 : type === 'pillar' || type === 'barrel' ? 0.08 : type === 'plate' ? 0.1 : 0.18
 
     for (let i = 0; i < pos.count; i++) {
       const px = pos.getX(i), py = pos.getY(i), pz = pos.getZ(i)
@@ -628,38 +642,27 @@ function FallingParticles({
 function generateDebris(theme: SceneTheme): DebrisItem[] {
   const items: DebrisItem[] = []
   const wallTypes: DebrisType[] = ['slab', 'box', 'pillar']
-  const rubbleTypes: DebrisType[] = ['rock', 'chunk', 'slab', 'box', 'rebar']
+  const rubbleTypes: DebrisType[] = ['rock', 'chunk', 'slab', 'box', 'rebar', 'barrel', 'pipe', 'plate']
 
-  while (items.length < 80) {
-    const x = (Math.random() - 0.5) * 35
-    const z = (Math.random() - 0.5) * 35
-    if (Math.abs(x) < 6 && z > -16 && z < 16) continue
+  const scaleFor = (type: DebrisType, isWall: boolean): [number, number, number] => {
+    if (isWall) {
+      if (type === 'pillar') return [0.8 + Math.random() * 0.5, Math.random() * 5 + 3, 0.8 + Math.random() * 0.5]
+      return [Math.random() * 3 + 1, Math.random() * 6 + 2, 0.3 + Math.random() * 0.5]
+    }
+    if (type === 'rebar' || type === 'pipe') return [1, Math.random() * 2 + 1, 1]
+    if (type === 'barrel') { const r = 0.5 + Math.random() * 0.5; return [r, 0.6 + Math.random() * 0.8, r] }
+    if (type === 'plate') return [0.8 + Math.random() * 1.5, 0.1 + Math.random() * 0.1, 0.8 + Math.random() * 1.5]
+    return [Math.random() * 1.5 + 0.3, 0.15 + Math.random() * 0.6, Math.random() * 1.5 + 0.3]
+  }
 
-    const isWall = items.length < 12
+  const pushItem = (x: number, z: number, isWall: boolean) => {
     const typePool = isWall ? wallTypes : rubbleTypes
     const type = typePool[Math.floor(Math.random() * typePool.length)]
-
-    const colorPool = isWall
-      ? (theme.wallColors[type] || ['#888'])
-      : (theme.rubbleColors[type] || ['#555'])
+    const colorPool = isWall ? (theme.wallColors[type] || ['#888']) : (theme.rubbleColors[type] || ['#555'])
     const chosenColor = colorPool[Math.floor(Math.random() * colorPool.length)]
-
-    let sx: number, sy: number, sz: number
-    if (isWall) {
-      if (type === 'pillar') {
-        sx = 0.8 + Math.random() * 0.5; sy = Math.random() * 5 + 3; sz = 0.8 + Math.random() * 0.5
-      } else {
-        sx = Math.random() * 3 + 1; sy = Math.random() * 6 + 2; sz = 0.3 + Math.random() * 0.5
-      }
-    } else if (type === 'rebar') {
-      sx = 1; sy = Math.random() * 2 + 1; sz = 1
-    } else {
-      sx = Math.random() * 1.5 + 0.3; sy = 0.15 + Math.random() * 0.6; sz = Math.random() * 1.5 + 0.3
-    }
-
+    const [sx, sy, sz] = scaleFor(type, isWall)
     const baseY = isWall ? sy * 0.5 : (type === 'rock' || type === 'chunk' ? sy * 0.25 : sy * 0.5)
     const groundY = isWall ? baseY : baseY * 0.6 - 0.05
-
     items.push({
       position: [x, groundY, z],
       scale: [sx, sy, sz],
@@ -672,6 +675,30 @@ function generateDebris(theme: SceneTheme): DebrisItem[] {
       type,
     })
   }
+
+  // Phase 1: 基礎分佈（80 件：12 牆 + 68 碎片）
+  while (items.length < 80) {
+    const x = (Math.random() - 0.5) * 35
+    const z = (Math.random() - 0.5) * 35
+    // 敵方後方（z < -6）排除帶收窄，讓更多物件出現在鏡頭可見區
+    if (z < -6) {
+      if (Math.abs(x) < 3.5) continue
+    } else if (Math.abs(x) < 6 && z < 16) {
+      continue
+    }
+    pushItem(x, z, items.length < 12)
+  }
+
+  // Phase 2: 敵方後方加密（25 件碎片，填充鏡頭可見的背景區）
+  let backAttempts = 0
+  while (items.length < 105 && backAttempts < 500) {
+    backAttempts++
+    const x = (Math.random() - 0.5) * 28
+    const z = -5 - Math.random() * 12
+    if (Math.abs(x) < 3.5 && z > -8) continue
+    pushItem(x, z, false)
+  }
+
   return items
 }
 
