@@ -937,7 +937,7 @@ function generateGroundNormalMap(): THREE.DataTexture {
     return a + (b - a) * sx + (c - a) * sy + (a - b - c + d) * sx * sy
   }
 
-  // FBM（7 octave，多 seed 疊加）
+  // FBM（多 octave + 銳利裂縫）
   const fbm = (x: number, y: number) => {
     let v = 0
     // 大起伏
@@ -946,8 +946,12 @@ function generateGroundNormalMap(): THREE.DataTexture {
     v += vnoise(x * 0.8 + 37, y * 0.8 + 91, 2.0) * 0.22
     // 碎塊
     v += vnoise(x * 2.5 + 113, y * 2.5 + 67, 3.0) * 0.18
-    // 裂縫（abs 製造銳利邊緣）
-    v += Math.abs(vnoise(x * 4.0 + 200, y * 4.0 + 150, 4.0) - 0.5) * 0.3
+    // 主裂縫（abs → pow 銳化：越接近 0 的 V 谷越窄越深）
+    const c1 = Math.abs(vnoise(x * 5.0 + 200, y * 5.0 + 150, 4.0) - 0.5) * 2 // 0~1
+    v += Math.pow(c1, 0.35) * 0.25 // pow<1 讓谷底更銳利
+    // 交叉細裂縫（45° 偏移，更高頻）
+    const c2 = Math.abs(vnoise((x + y) * 4.5 + 80, (x - y) * 4.5 + 60, 8.0) - 0.5) * 2
+    v += Math.pow(c2, 0.3) * 0.15
     // 小石子
     v += vnoise(x * 8.0 + 300, y * 8.0 + 250, 5.0) * 0.12
     // 粗砂
