@@ -906,7 +906,7 @@ function SkylineSilhouettes({ theme, sceneMode }: { theme: SceneTheme; sceneMode
    地面法線貼圖（程序化生成）
    ──────────────────────────── */
 
-const GROUND_NORMAL_SCALE = new THREE.Vector2(1.4, 1.4)
+const GROUND_NORMAL_SCALE = new THREE.Vector2(1.8, 1.8)
 
 /**
  * 程序化 1024×1024 法線貼圖
@@ -914,7 +914,7 @@ const GROUND_NORMAL_SCALE = new THREE.Vector2(1.4, 1.4)
  * 7 層 octave：大地形 + 裂縫 + 碎石 + 砂粒
  */
 function generateGroundNormalMap(): THREE.DataTexture {
-  const size = 1024
+  const size = 2048
   const data = new Uint8Array(size * size * 4)
 
   // 格點 hash（整數座標 → 隨機 0~1）
@@ -1000,6 +1000,7 @@ function generateGroundNormalMap(): THREE.DataTexture {
   tex.generateMipmaps = true
   tex.magFilter = THREE.LinearFilter
   tex.minFilter = THREE.LinearMipmapLinearFilter
+  tex.anisotropy = 16 // 斜角觀看不模糊（GPU 會自動 clamp 到裝置最大值）
   tex.needsUpdate = true
   return tex
 }
