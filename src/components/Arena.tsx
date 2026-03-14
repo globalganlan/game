@@ -948,10 +948,10 @@ function generateGroundNormalMap(): THREE.DataTexture {
     v += vnoise(x * 2.5 + 113, y * 2.5 + 67, 3.0) * 0.18
     // 主裂縫（abs → pow 銳化：越接近 0 的 V 谷越窄越深）
     const c1 = Math.abs(vnoise(x * 5.0 + 200, y * 5.0 + 150, 4.0) - 0.5) * 2 // 0~1
-    v += Math.pow(c1, 0.35) * 0.25 // pow<1 讓谷底更銳利
+    v += Math.pow(c1, 0.35) * 0.35 // pow<1 讓谷底更銳利
     // 交叉細裂縫（45° 偏移，更高頻）
     const c2 = Math.abs(vnoise((x + y) * 4.5 + 80, (x - y) * 4.5 + 60, 8.0) - 0.5) * 2
-    v += Math.pow(c2, 0.3) * 0.15
+    v += Math.pow(c2, 0.3) * 0.22
     // 小石子
     v += vnoise(x * 8.0 + 300, y * 8.0 + 250, 5.0) * 0.12
     // 粗砂
@@ -972,7 +972,7 @@ function generateGroundNormalMap(): THREE.DataTexture {
   }
 
   // 中央差分法推導法線
-  const str = 6.0
+  const str = 8.0
   for (let j = 0; j < size; j++) {
     for (let i = 0; i < size; i++) {
       const idx = j * size + i
