@@ -15,6 +15,7 @@ export function useAnimationPromises(skipBattleRef: React.MutableRefObject<boole
   const [hitFlashSignals, setHitFlashSignals] = useState<Record<string, number>>({})
   const [vfxEvents, setVfxEvents] = useState<VfxEvent[]>([])
   const [skillFlashes, setSkillFlashes] = useState<{ id: number; uid: string; timestamp: number }[]>([])
+  const [skillFlashOverlayKey, setSkillFlashOverlayKey] = useState(0)
   const actionResolveRefs = useRef<Record<string, ActionResolveEntry>>({})
   const moveResolveRefs = useRef<Record<string, () => void>>({})
 
@@ -129,12 +130,14 @@ export function useAnimationPromises(skipBattleRef: React.MutableRefObject<boole
     }
   }, [])
 
-  /** 技能施放閃光（目標位置短暫閃光） */
+  /** 技能施放閃光（目標位置短暫閃光 + 全螢幕 KOF98 連閃） */
   const addSkillFlash = useCallback((uid: string) => {
     if (skipBattleRef.current) return
     const id = Math.random()
     setSkillFlashes((prev) => [...prev, { id, uid, timestamp: Date.now() }])
     setTimeout(() => setSkillFlashes((prev) => prev.filter((f) => f.id !== id)), 600)
+    // 全螢幕白閃 overlay（遞增 key 重新觸發 CSS 動畫）
+    setSkillFlashOverlayKey((k) => k + 1)
   }, [skipBattleRef])
 
   /** Buff 施加粒子 */
@@ -155,6 +158,7 @@ export function useAnimationPromises(skipBattleRef: React.MutableRefObject<boole
     hitFlashSignals, setHitFlashSignals,
     vfxEvents, setVfxEvents,
     skillFlashes, setSkillFlashes,
+    skillFlashOverlayKey,
     actionResolveRefs, moveResolveRefs,
     waitForAction, handleActorActionDone,
     waitForMove, handleMoveDone,

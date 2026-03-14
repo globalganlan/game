@@ -212,6 +212,7 @@ export default function App() {
   const {
     damagePopups, setDamagePopups, hitFlashSignals, setHitFlashSignals,
     vfxEvents, setVfxEvents, skillFlashes, setSkillFlashes,
+    skillFlashOverlayKey,
     actionResolveRefs, moveResolveRefs,
     waitForAction, handleActorActionDone, waitForMove, handleMoveDone,
     handleModelReady, addDamage, addSkillFlash, addBuffVfx, clearAllPromises,
@@ -688,6 +689,15 @@ export default function App() {
             </Suspense>
             )}
           </Canvas>
+
+          {/* ── 終結技全螢幕白閃（KOF98 風格） ── */}
+          {skillFlashOverlayKey > 0 && (
+            <div
+              key={skillFlashOverlayKey}
+              className="kof-flash-overlay"
+              onAnimationEnd={(e) => (e.currentTarget.style.display = 'none')}
+            />
+          )}
 
           {/* ── 橫屏遮罩（CSS 控制顯示） ── */}
           <div className="landscape-block">
