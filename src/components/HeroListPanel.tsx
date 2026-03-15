@@ -295,10 +295,11 @@ interface HeroListPanelProps {
    ──────────────────────────── */
 
 function StarDisplay({ count }: { count: number }) {
+  const maxStars = 10
   return (
     <span className="hero-stars">
-      {Array.from({ length: 6 }, (_, i) => (
-        <span key={i} className={i < count ? 'star-filled' : 'star-empty'}>★</span>
+      {Array.from({ length: maxStars }, (_, i) => (
+        <span key={i} className={i < count ? (i >= 6 ? 'star-gold' : 'star-filled') : 'star-empty'}>★</span>
       ))}
     </span>
   )

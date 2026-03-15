@@ -296,6 +296,28 @@ export async function loadSkillEffectsMap(): Promise<Map<string, SkillEffectLink
 }
 
 /**
+ * 技能等級自動縮放倍率（Lv.1~5）
+ * 當 DB 無該等級的 overrideParams 時，自動根據此倍率提升數值
+ */
+const LEVEL_SCALE = [1.0, 1.15, 1.30, 1.50, 1.75]
+
+/** 對數值欄位套用等級縮放 */
+function applyLevelScaling<T extends { multiplier?: number; statusValue?: number; flatValue?: number }>(
+  effect: T,
+  actualLevel: number,
+  requestedLevel: number,
+): T {
+  if (requestedLevel <= 1 || actualLevel >= requestedLevel) return effect
+  const scale = LEVEL_SCALE[requestedLevel - 1] ?? LEVEL_SCALE[LEVEL_SCALE.length - 1]
+  const scaled = { ...effect }
+  const r2 = (v: number) => Math.round(v * 100) / 100
+  if (scaled.multiplier != null) scaled.multiplier = r2(scaled.multiplier * scale)
+  if (scaled.statusValue != null) scaled.statusValue = r2(scaled.statusValue * scale)
+  if (scaled.flatValue != null) scaled.flatValue = Math.round(scaled.flatValue * scale)
+  return scaled
+}
+
+/**
  * 根據技能等級解析效果列表
  */
 export function resolveSkillEffects(
@@ -309,12 +331,14 @@ export function resolveSkillEffects(
 
   // Filter by skillLevel: take exact match, or fallback to the highest level <= requested
   const atLevel = links.filter(l => l.skillLevel === skillLevel)
+  const usedLevel = atLevel.length > 0 ? skillLevel : undefined
   const candidates = atLevel.length > 0
     ? atLevel
     : links.filter(l => l.skillLevel <= skillLevel).sort((a, b) => b.skillLevel - a.skillLevel)
       .filter((l, _, arr) => l.skillLevel === arr[0]?.skillLevel)
 
   if (candidates.length === 0) return []
+  const actualLevel = usedLevel ?? (candidates[0]?.skillLevel ?? 1)
 
   const effectNameMap = new Map<string, string>()
   const results: ResolvedEffect[] = []
@@ -327,7 +351,10 @@ export function resolveSkillEffects(
     let override: Record<string, unknown> = {}
     try { override = JSON.parse(link.overrideParams || '{}') } catch { /* ignore */ }
 
-    const resolved: ResolvedEffect = { ...template, ...override } as ResolvedEffect
+    let resolved: ResolvedEffect = { ...template, ...override } as ResolvedEffect
+    // Auto-scale when DB has no level-specific data
+    resolved = applyLevelScaling(resolved, actualLevel, skillLevel)
+
     if (link.dependsOn) {
       const depSrc = effectTemplates.get(link.dependsOn)
       resolved.dependsOnName = depSrc?.name ?? link.dependsOn
@@ -354,11 +381,13 @@ export function resolveSkillEffectsForBattle(
   if (!links || links.length === 0) return null
 
   const atLevel = links.filter(l => l.skillLevel === skillLevel)
+  const usedLevel = atLevel.length > 0 ? skillLevel : undefined
   const candidates = atLevel.length > 0
     ? atLevel
     : links.filter(l => l.skillLevel <= skillLevel).sort((a, b) => b.skillLevel - a.skillLevel)
       .filter((l, _, arr) => l.skillLevel === arr[0]?.skillLevel)
   if (candidates.length === 0) return null
+  const actualLevel = usedLevel ?? (candidates[0]?.skillLevel ?? 1)
 
   // Build effectId → index map for dependsOn conversion
   const effectIdToIdx = new Map<string, number>()
@@ -370,7 +399,9 @@ export function resolveSkillEffectsForBattle(
     if (!template) continue
     let override: Record<string, unknown> = {}
     try { override = JSON.parse(link.overrideParams || '{}') } catch { /* ignore */ }
-    const merged = { ...template, ...override } as EffectTemplate
+    const raw = { ...template, ...override } as EffectTemplate
+    // Auto-scale when DB has no level-specific data
+    const merged = applyLevelScaling(raw, actualLevel, skillLevel)
 
     // Convert effectId-based dependsOn to index-based
     let dependsOn: string | undefined
