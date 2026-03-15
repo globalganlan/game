@@ -74,7 +74,7 @@ describe('progressionSystem - 進階測試', () => {
       expect(bonuses[0].setId).toBe('berserker')
     })
 
-    it('4 件同套裝只激活一次', () => {
+    it('4 件同套裝激活 2pc + 4pc 兩條', () => {
       const eq = [
         makeEquipment({ setId: 'berserker', slot: 'weapon' }),
         makeEquipment({ setId: 'berserker', slot: 'armor' }),
@@ -82,7 +82,7 @@ describe('progressionSystem - 進階測試', () => {
         makeEquipment({ setId: 'berserker', slot: 'boots' }),
       ]
       const bonuses = getActiveSetBonuses(eq)
-      expect(bonuses).toHaveLength(1) // requiredCount=2 只判斷 >=2，不重複加
+      expect(bonuses).toHaveLength(2) // 2pc + 4pc
     })
 
     it('混搭 2+2 套同時激活', () => {
@@ -316,9 +316,10 @@ describe('progressionSystem - 進階測試', () => {
   /* ═══════ EQUIPMENT_SETS 常數驗證 ═══════ */
 
   describe('EQUIPMENT_SETS 常數', () => {
-    it('每個套裝有唯一 setId', () => {
+    it('每個套裝有 2pc + 4pc 兩條（8 套 × 2 = 16 條）', () => {
       const ids = EQUIPMENT_SETS.map(s => s.setId)
-      expect(new Set(ids).size).toBe(ids.length)
+      expect(new Set(ids).size).toBe(8)
+      expect(ids.length).toBe(16)
     })
 
     it('每個套裝 requiredCount >= 2', () => {

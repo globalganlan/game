@@ -21,6 +21,7 @@ import { MailboxPanel } from './MailboxPanel'
 import { ShopPanel } from './ShopPanel'
 import { CheckinPanel } from './CheckinPanel'
 import { ArenaPanel } from './ArenaPanel'
+import { BattleTestPanel } from './BattleTestPanel'
 import { addHeroesLocally, getSaveState, updateProgress } from '../services/saveService'
 import { addItemsLocally } from '../services/inventoryService'
 import { getItemName } from '../constants/rarity'
@@ -212,6 +213,9 @@ export function MenuScreenRouter(props: MenuScreenRouterProps) {
           showAcquire={showAcquire}
         />
       )
+
+    case 'battleTest':
+      return <BattleTestPanel onBack={onBack} />
 
     default:
       return null

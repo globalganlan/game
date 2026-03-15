@@ -123,6 +123,7 @@
 | `.ai/memory/README.md` | 記憶持久化機制說明 |
 | `.ai/docs/FBX轉GLB壓縮指南.md` | FBX→GLB 批次轉換流程、Draco/Decimate/JPEG 壓縮、前端載入架構 |
 | `.ai/docs/大頭照生成指南.md` | Puppeteer + Three.js 離線渲染角色大頭照 |
+| `.ai/docs/英雄模型自動生成指南.md` | AI 生成 3D 模型 + Mixamo 綁骨動畫 + GLB 轉換全流程 |
 | `.ai/docs/2D-to-3D-Model-Generation-Guide.md` | TripoSR 模型生成流程 |
 | `.ai/docs/Mixamo使用指南.md` | Mixamo 動畫下載與整合 |
 
@@ -133,4 +134,5 @@
 | `.ai/scripts/fbx_to_glb.py` | FBX→GLB 批次轉換（Blender Python） | `blender --background --python .ai/scripts/fbx_to_glb.py` |
 | `.ai/scripts/convert_models.ps1` | 上述腳本的 PowerShell 包裝器 | `.\.ai\scripts\convert_models.ps1` |
 | `.ai/scripts/generate_thumbnails.js` | 角色大頭照生成（Puppeteer） | `node .ai/scripts/generate_thumbnails.js` |
+| `.ai/scripts/generate_hero.mjs` | 英雄模型自動生成管線（Meshy + Mixamo + Blender） | `node .ai/scripts/generate_hero.mjs --help` |
 

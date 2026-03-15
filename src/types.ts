@@ -20,7 +20,7 @@ export type GameState =
   | 'GAMEOVER'
 
 /** 主選單子畫面 */
-export type MenuScreen = 'none' | 'heroes' | 'inventory' | 'gacha' | 'stages' | 'settings' | 'mailbox' | 'shop' | 'arena' | 'checkin'
+export type MenuScreen = 'none' | 'heroes' | 'inventory' | 'gacha' | 'stages' | 'settings' | 'mailbox' | 'shop' | 'arena' | 'checkin' | 'battleTest'
 
 /** 單一角色的即時狀態 */
 export type ActorState =
@@ -69,7 +69,7 @@ export interface SlotHero extends RawHeroData {
    傷害彈窗
    ──────────────────────────── */
 
-export type DamageDisplayType = 'normal' | 'crit' | 'heal' | 'dot' | 'reflect'
+export type DamageDisplayType = 'normal' | 'crit' | 'heal' | 'dot' | 'reflect' | 'shield' | 'execute'
 
 export interface DamagePopupData {
   id: number

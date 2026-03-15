@@ -7,6 +7,15 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 const mockFetch = vi.fn()
 vi.stubGlobal('fetch', mockFetch)
 
+// Mock localStorage (Node env doesn't have it)
+const _store: Record<string, string> = {}
+vi.stubGlobal('localStorage', {
+  getItem: (k: string) => _store[k] ?? null,
+  setItem: (k: string, v: string) => { _store[k] = v },
+  removeItem: (k: string) => { delete _store[k] },
+  clear: () => { for (const k in _store) delete _store[k] },
+})
+
 // Dynamic import so mock is in place
 const { runBattleRemote } = await import('../../services/battleService')
 import { makeHero, resetUidCounter, makeSkill, makeDamageEffect } from '../../domain/__tests__/testHelper'
@@ -167,7 +176,7 @@ describe('battleService', () => {
 
       await expect(
         runBattleRemote(makeTestPlayers(), makeTestEnemies()),
-      ).rejects.toThrow('run-battle API HTTP 500')
+      ).rejects.toThrow('API HTTP 500')
     })
 
     it('API 回傳 success=false → 拋出例外', async () => {

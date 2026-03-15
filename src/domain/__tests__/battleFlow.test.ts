@@ -152,19 +152,18 @@ describe('BattleFlowValidator', () => {
       expect(v.getErrors().some(e => e.message.includes('already dead'))).toBe(true)
     })
 
-    it('重複 DEATH 對同一角色 → error', () => {
+    it('重複 DEATH 對同一角色 → warn（DOT/被動致死後預期）', () => {
       v.transition('e1', 'DEAD')
       v.beforeAction({ type: 'DEATH', targetUid: 'e1' })
-      expect(v.getErrors().some(e => e.message.includes('already dead'))).toBe(true)
+      expect(v.getWarnings().some(e => e.message.includes('already dead'))).toBe(true)
     })
   })
 
   describe('afterAction 結束狀態驗證', () => {
-    it('攻擊結束後攻擊者不在 IDLE → warn', () => {
-      // 模擬：忘記把攻擊者設回 IDLE（bug）
+    it('攻擊結束後攻擊者在 ADVANCING → warn', () => {
+      // 模擬：角色在 ADVANCING 狀態就觸發 afterAction（bug）
       v.transition('p1', 'ADVANCING')
-      v.transition('p1', 'ATTACKING')
-      // 忘了 RETREATING → IDLE ...
+      // 注意：ATTACKING 被刻意排除（pendingRetreats 正常行為）
 
       v.afterAction({
         type: 'NORMAL_ATTACK',
@@ -172,7 +171,7 @@ describe('BattleFlowValidator', () => {
         result: dmgResult(),
         killed: false,
       })
-      expect(v.getWarnings().some(w => w.message.includes('still in ATTACKING'))).toBe(true)
+      expect(v.getWarnings().some(w => w.message.includes('unexpected state ADVANCING'))).toBe(true)
     })
   })
 

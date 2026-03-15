@@ -69,6 +69,8 @@ const MENU_ITEMS: MenuItem[] = [
   { key: 'arena', icon: '⚔️', label: '競技場', sub: '排名·對戰·獎勵', color: '#e74c3c', unlock: { chapter: 2, stage: 1, hint: '通關 1-8 後解鎖' } },
   /* ── 設定 ── */
   { key: 'settings', icon: '⚙️', label: '設定', sub: '帳號·綁定', color: '#888' },
+  /* ── 開發工具 ── */
+  { key: 'battleTest', icon: '🧪', label: '戰鬥測試', sub: '效果沙盒驗證', color: '#e74c3c' },
 ]
 
 /* ────────────────────────────

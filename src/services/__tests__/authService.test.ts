@@ -23,10 +23,10 @@ const mockFetch = vi.fn()
 vi.stubGlobal('fetch', mockFetch)
 
 function apiOk(extra: Record<string, unknown> = {}) {
-  return { json: () => Promise.resolve({ success: true, playerId: 'P1', displayName: '測試者', isBound: false, ...extra }) }
+  return { ok: true, json: () => Promise.resolve({ success: true, playerId: 'P1', displayName: '測試者', isBound: false, ...extra }) }
 }
 function apiFail(error = 'invalid_token') {
-  return { json: () => Promise.resolve({ success: false, error }) }
+  return { ok: true, json: () => Promise.resolve({ success: false, error }) }
 }
 
 // ── 動態 import（讓每個 test 拿到乾淨的模組狀態）──

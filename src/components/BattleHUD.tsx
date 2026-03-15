@@ -102,6 +102,7 @@ interface BattleHUDProps {
     name: string
     currentHP: number
     maxHP: number
+    shieldTotal?: number
   }>
   /** 敵方英雄資訊 */
   enemyHeroes: Array<{
@@ -109,6 +110,7 @@ interface BattleHUDProps {
     name: string
     currentHP: number
     maxHP: number
+    shieldTotal?: number
   }>
   /** 各英雄身上的 Buff/Debuff */
   buffMap: BattleBuffMap
@@ -127,7 +129,7 @@ function BuffBar({ effects }: { effects: StatusEffect[] }) {
 
   return (
     <div className="bhud-buffs">
-      {effects.slice(0, 8).map((eff, i) => {
+      {effects.map((eff, i) => {
         const cfg = STATUS_ICONS[eff.type]
         if (!cfg) return null
         return (
@@ -174,6 +176,7 @@ function HeroPanel({
 }) {
   const hpPct = hero.maxHP > 0 ? Math.min(100, (hero.currentHP / hero.maxHP) * 100) : 0
   const hpColor = hpPct > 50 ? '#2a9d8f' : hpPct > 25 ? '#e9c46a' : '#e63946'
+  const shieldPct = hero.maxHP > 0 && hero.shieldTotal ? Math.min(100, (hero.shieldTotal / hero.maxHP) * 100) : 0
 
   return (
     <div className="bhud-hero-panel">
@@ -185,6 +188,13 @@ function HeroPanel({
       {/* Info */}
       <div className="bhud-info">
         <span className="bhud-hero-name">{hero.name}</span>
+
+        {/* Shield bar (above HP bar) */}
+        {shieldPct > 0 && (
+          <div className="bhud-shield-bar">
+            <div className="bhud-shield-fill" style={{ width: `${shieldPct}%` }} />
+          </div>
+        )}
 
         {/* HP bar */}
         <div className="bhud-hp-bar">

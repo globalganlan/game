@@ -24,6 +24,7 @@ import type { RawHeroInput, HeroInstanceData } from '../domain'
 import { BattleFlowValidator } from '../domain/battleFlowValidator'
 import { createBattleHero } from '../domain'
 import { getHeroSkillSet } from '../services'
+import { getEffectTemplatesCache, getSkillEffectsCache, resolveSkillEffectsForBattle } from '../services/dataService'
 import { completeBattle, type CompleteBattleResult } from '../services/progressionService'
 import {
   rollDrops, mergeDrops, getBossConfig,
@@ -33,6 +34,7 @@ import { getTimerYield } from '../services/saveService'
 import { addItemsLocally, getHeroEquipment } from '../services/inventoryService'
 import { audioManager } from '../services/audioService'
 import { getItemName, toRarityNum } from '../constants/rarity'
+import { statusZh } from '../constants/statNames'
 import { completeArenaChallenge } from '../services/arenaService'
 import type { SaveData, HeroInstance } from '../services/saveService'
 
@@ -214,12 +216,15 @@ export async function executeBattleLoop(ctx: BattleLoopContext, replayActions?: 
 
   // 使用渲染中的 state 快照（與 JSX 中 Hero 的 uid 一致），
   // 避免 ref 因 startTransition / batching 與已渲染 UI 產生 UID 不匹配。
+  const effTemplates = getEffectTemplatesCache()
+  const effLinks = getSkillEffectsCache()
+
   for (let i = 0; i < 6; i++) {
     const p = currentPlayerSlots[i]
     if (!p) continue
     const heroId = Number(p.HeroID ?? p.id ?? 0)
     const input = slotToInput(p, heroId)
-    const { activeSkill, passives } = getHeroSkillSet(heroId, skills, heroSkillsMap)
+    let { activeSkill, passives } = getHeroSkillSet(heroId, skills, heroSkillsMap)
 
     // Build HeroInstanceData from save data (progression → combat)
     const inst = heroInstances.find(h => h.heroId === heroId)
@@ -233,6 +238,17 @@ export async function executeBattleLoop(ctx: BattleLoopContext, replayActions?: 
     } : undefined
     const starLevel = heroInstanceData?.stars ?? 0
     const heroRarity = toRarityNum((p as Record<string, unknown>).Rarity)
+
+    // v2.0: 根據技能等級（★7→Lv.2 … ★10→Lv.5）解析效果覆寫
+    const skillLevel = starLevel > 6 ? starLevel - 5 : 1
+    if (activeSkill) {
+      const resolved = resolveSkillEffectsForBattle(activeSkill.skillId, skillLevel, effTemplates, effLinks)
+      if (resolved) activeSkill = { ...activeSkill, effects: resolved }
+    }
+    passives = passives.map(p => {
+      const resolved = resolveSkillEffectsForBattle(p.skillId, skillLevel, effTemplates, effLinks)
+      return resolved ? { ...p, effects: resolved } : p
+    })
 
     const bh = createBattleHero(input, 'player', i, activeSkill, passives, starLevel, p._uid, heroInstanceData, heroRarity)
     playerBH.push(bh)
@@ -381,14 +397,21 @@ export async function executeBattleLoop(ctx: BattleLoopContext, replayActions?: 
             }).join(', ')
             return `${name(a.attackerUid)} 技能【${a.skillName}】→ ${tgts}`
           }
-          case 'DOT_TICK': return `${name(a.targetUid)} ${a.dotType} -${a.damage}`
-          case 'BUFF_APPLY': return `${name(a.targetUid)} +${a.effect.type}${a.effect.stacks > 1 ? `×${a.effect.stacks}` : ''} (${a.effect.duration}t)`
-          case 'BUFF_EXPIRE': return `${name(a.targetUid)} -${a.effectType} 到期`
+          case 'DOT_TICK': return `${name(a.targetUid)} ${statusZh(a.dotType)} -${a.damage}`
+          case 'BUFF_APPLY': return `${name(a.targetUid)} +${statusZh(a.effect.type)}${a.effect.stacks > 1 ? `×${a.effect.stacks}` : ''} (${a.effect.duration}t)`
+          case 'BUFF_EXPIRE': return `${name(a.targetUid)} -${statusZh(a.effectType)} 到期`
           case 'DEATH': return `${name(a.targetUid)} 💀 死亡`
           case 'PASSIVE_TRIGGER': return `${name(a.heroUid)} 被動【${a.skillName}】觸發`
           case 'PASSIVE_DAMAGE': return `${name(a.attackerUid)} → ${name(a.targetUid)} 被動傷害 ${a.damage}${a.killed ? ' 💀' : ''}`
           case 'ENERGY_CHANGE': return `${name(a.heroUid)} 能量 +${a.delta} → ${a.newValue}`
           case 'EXTRA_TURN': return `${name(a.heroUid)} 額外行動（${a.reason}）`
+          case 'COUNTER_ATTACK': return `${name(a.attackerUid)} ↩️反擊 → ${name(a.targetUid)} ${a.damage}${a.killed ? ' 💀' : ''}`
+          case 'CHASE_ATTACK': return `${name(a.attackerUid)} ⚡追擊 → ${name(a.targetUid)} ${a.damage}${a.killed ? ' 💀' : ''}`
+          case 'EXECUTE': return `${name(a.attackerUid)} 💀斬殺 → ${name(a.targetUid)}`
+          case 'STEAL_BUFF': return `${name(a.heroUid)} 偷取 ${name(a.targetUid)} 的 ${statusZh(a.buffType)}`
+          case 'TRANSFER_DEBUFF': return `${name(a.heroUid)} 轉移 ${statusZh(a.debuffType)} → ${name(a.targetUid)}`
+          case 'SHIELD_APPLY': return `${name(a.targetUid)} +護盾 ${a.value}`
+          case 'SHIELD_BREAK': return `${name(a.heroUid)} 護盾破碎`
           case 'BATTLE_END': return `══ 戰鬥結束：${a.winner === 'player' ? '勝利' : a.winner === 'enemy' ? '失敗' : '平手'} ══`
           default: return JSON.stringify(a)
         }
@@ -767,6 +790,79 @@ export async function executeBattleLoop(ctx: BattleLoopContext, replayActions?: 
       }
 
       case 'EXTRA_TURN':
+        break
+
+      // v2.0 新增 action 類型
+      case 'COUNTER_ATTACK':
+      case 'CHASE_ATTACK': {
+        const cAtk = heroMap.get(action.attackerUid)
+        const cTgt = heroMap.get(action.targetUid)
+        if (!cAtk || actorStatesRef.current[action.attackerUid] === 'DEAD') break
+
+        // 1) 前進到目標位置
+        if (cTgt && actorStatesRef.current[action.targetUid] !== 'DEAD') {
+          moveTargetsRef.current = { ...moveTargetsRef.current, [action.attackerUid]: getAdvancePos(cAtk, cTgt.slot, false) }
+          setActorState(action.attackerUid, 'ADVANCING')
+          await waitForMove(action.attackerUid)
+        }
+
+        // 2) 攻擊動作
+        const caDone = waitForAction(action.attackerUid, 'ATTACKING')
+        setActorState(action.attackerUid, 'ATTACKING')
+        await delay(ATTACK_DELAY_MS * 0.6)
+
+        // 3) 傷害 + 受擊
+        const dmg = action.damage
+        if (dmg > 0) {
+          addDamage(action.targetUid, dmg, 'normal')
+          if (!skipBattleRef.current) audioManager.playSfx('hit_normal')
+          const tgtHero = heroMap.get(action.targetUid)
+          if (tgtHero) syncHpToSlot(tgtHero)
+          if (action.killed && actorStatesRef.current[action.targetUid] !== 'DEAD') {
+            if (!skipBattleRef.current) audioManager.playSfx('death')
+            const deadDone = waitForAction(action.targetUid, 'DEAD')
+            setActorState(action.targetUid, 'DEAD')
+            backgroundAnims.push(deadDone.then(() => { const dh = heroMap.get(action.targetUid); if (dh) removeSlot(dh) }))
+          } else if (cTgt && actorStatesRef.current[action.targetUid] !== 'DEAD') {
+            const hDone = waitForAction(action.targetUid, 'HURT')
+            setActorState(action.targetUid, 'HURT')
+            await hDone
+            setActorState(action.targetUid, 'IDLE')
+          }
+        }
+
+        // 4) 後退
+        await caDone
+        if ((cAtk.currentHP ?? 0) > 0 && actorStatesRef.current[action.attackerUid] !== 'DEAD') {
+          setActorState(action.attackerUid, 'RETREATING')
+          await waitForMove(action.attackerUid)
+          setActorState(action.attackerUid, 'IDLE')
+        }
+        break
+      }
+
+      case 'EXECUTE': {
+        addDamage(action.targetUid, 0, 'execute')
+        if (!skipBattleRef.current) audioManager.playSfx('hit_critical')
+        const exHero = heroMap.get(action.targetUid)
+        if (exHero) syncHpToSlot(exHero)
+        await delay(300)
+        // DEATH action follows separately
+        break
+      }
+
+      case 'STEAL_BUFF':
+      case 'TRANSFER_DEBUFF':
+        // 視覺效果由 BUFF_APPLY / BUFF_EXPIRE 處理
+        break
+
+      case 'SHIELD_APPLY': {
+        const hero = heroMap.get(action.targetUid)
+        if (hero) syncHpToSlot(hero)
+        break
+      }
+
+      case 'SHIELD_BREAK':
         break
 
       case 'BATTLE_END':

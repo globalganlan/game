@@ -18,7 +18,8 @@
 | `.ai/specs/core-combat.md` | 回合制戰鬥系統（Domain Engine + Command Pattern） | v4.0 | 🟢 已實作 |
 | `.ai/specs/hero-schema.md` | 英雄資料結構（三層型別：RawHeroData → RawHeroInput → BattleHero + HeroInstance.stars） | v2.6 | 🟢 已實作 |
 | `.ai/specs/damage-formula.md` | 傷害公式（11 步流程 0-10：閃避→DEF→暴擊→護盾→反彈） | v1.3 | 🟢 已實作 |
-| `.ai/specs/skill-system.md` | 技能系統（SkillTemplate + SkillEffect + Sheets 資料管線） | v1.5 | 🟢 已實作 |
+| `.ai/specs/skill-system.md` | 技能系統（SkillTemplate + SkillEffect + Sheets 資料管線） | v1.7 | 🟢 已實作 |
+| `.ai/specs/effect-system.md` | 效果模組化系統（EffectTemplate + skill_effects 關聯 + dependsOn + 6 種新機制） | v2.4 | ✅ 已實作 |
 | ~~`.ai/specs/element-system.md`~~ | ~~屬性剋制系統（7 屬性矩陣 + 動態載入 + 中英對照）~~ — 2026-03-11 完整移除 | v1.1 | 🔴 已廢棄 |
 | `.ai/specs/tech-architecture.md` | 技術架構（含 Domain + Services 分層 + Audio Engine + CurrencyIcon + 戰力 + 競技場） | v2.9 | 🟢 定稿 |
 | `.ai/specs/progression.md` | 養成系統（等級/突破/星級/裝備模板制 v2/套裝 + UI 全面實作） | v2.8 | 🟢 已實作 |

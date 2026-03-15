@@ -98,11 +98,16 @@ export function DamagePopup({ value, position, textScale = 1, damageType }: Dama
   const [opacity, setOpacity] = useState(1)
 
   const isCrit = damageType === 'crit'
-  const fadeSpeed = isCrit ? 0.6 : 0.8  // 暴擊飄字停留更久
+  const isExecute = damageType === 'execute'
+  const isShield = damageType === 'shield'
+  const isDot = damageType === 'dot'
+  const isReflect = damageType === 'reflect'
+  const isSpecial = isCrit || isExecute
+  const fadeSpeed = isSpecial ? 0.6 : 0.8
 
   useFrame((_state, delta) => {
     if (ref.current) {
-      ref.current.position.y += delta * (isCrit ? 0.25 : 0.2)
+      ref.current.position.y += delta * (isSpecial ? 0.25 : 0.2)
       setOpacity((prev) => Math.max(0, prev - delta * fadeSpeed))
     }
   })
@@ -115,20 +120,36 @@ export function DamagePopup({ value, position, textScale = 1, damageType }: Dama
   let textColor: string
   let fontSize = 1.0
 
-  if (isHeal) {
+  if (isExecute) {
+    displayText = '💀 斬殺！'
+    textColor = '#cc0000'
+    fontSize = 1.4
+  } else if (isHeal) {
     displayText = `+${displayValue}`
     textColor = '#00ff88'
-  } else if (value === 0) {
+  } else if (value === 0 && !isShield) {
     displayText = '閃避'
     textColor = '#aaaaaa'
   } else if (isCrit) {
     displayText = `💥${displayValue}`
     textColor = '#ffaa00'
-    fontSize = 1.35  // 暴擊放大 35%
+    fontSize = 1.35
+  } else if (isShield) {
+    displayText = `🛡️${displayValue}`
+    textColor = '#ffd700'
+  } else if (isDot) {
+    displayText = `-${displayValue}`
+    textColor = '#ff6600'
+  } else if (isReflect) {
+    displayText = `-${displayValue}`
+    textColor = '#cc88ff'
   } else {
     displayText = `-${displayValue}`
     textColor = '#ff0000'
   }
+
+  const outlineColor = isExecute ? '#330000' : isCrit ? '#663300' : isShield ? '#665500' : 'white'
+  const outlineWidth = isSpecial || isShield ? 0.08 : 0.05
 
   return (
     <Billboard position={position} ref={ref}>
@@ -136,8 +157,8 @@ export function DamagePopup({ value, position, textScale = 1, damageType }: Dama
         font={LOCAL_FONT}
         fontSize={fontSize * textScale}
         color={textColor}
-        outlineColor={isCrit ? '#663300' : 'white'}
-        outlineWidth={isCrit ? 0.08 : 0.05}
+        outlineColor={outlineColor}
+        outlineWidth={outlineWidth}
         fillOpacity={opacity}
         outlineOpacity={opacity}
       >
@@ -157,15 +178,17 @@ interface HealthBar3DProps {
   width?: number
   height?: number
   color?: string
+  shieldRatio?: number  // v2.0: 護盾值 / maxHP
 }
 
-/** 3D 血條：背景灰 + 前景色，始終面向鏡頭（圓角藥丸形） */
+/** 3D 血條：背景灰 + 前景色，始終面向鏡頭（圓角藥丸形）+ 護盾層 */
 export function HealthBar3D({
   position,
   ratio,
   width = 1.6,
   height = 0.12,
   color = '#1aff50',
+  shieldRatio = 0,
 }: HealthBar3DProps) {
   const bgMat = useMemo(
     () => new THREE.MeshBasicMaterial({ color: '#333', transparent: true, opacity: 0.6, depthTest: false }),
@@ -175,8 +198,13 @@ export function HealthBar3D({
     () => new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.9, depthTest: false }),
     [color],
   )
+  const shieldMat = useMemo(
+    () => new THREE.MeshBasicMaterial({ color: '#ffd43b', transparent: true, opacity: 0.7, depthTest: false }),
+    [],
+  )
 
   const clampedRatio = Math.max(0, Math.min(1, ratio))
+  const clampedShield = Math.max(0, Math.min(1, shieldRatio))
   const radius = height * 0.5
 
   const bgGeo = useMemo(
@@ -190,6 +218,16 @@ export function HealthBar3D({
     return new THREE.ShapeGeometry(makeRoundedRect(fgW, fgH, Math.min(radius, fgW / 2, fgH / 2)))
   }, [width, height, clampedRatio, radius])
 
+  const shieldGeo = useMemo(() => {
+    if (clampedShield <= 0) return null
+    const sW = width * clampedShield
+    const sH = height * 0.5
+    const sR = Math.min(sH * 0.5, sW / 2)
+    return new THREE.ShapeGeometry(makeRoundedRect(sW, sH, sR))
+  }, [width, height, clampedShield])
+
+  const shieldY = height * 0.5 + height * 0.35  // above HP bar
+
   return (
     <Billboard position={position} renderOrder={16}>
       <mesh position={[0, 0, 0]} geometry={bgGeo} material={bgMat} renderOrder={16} />
@@ -199,6 +237,14 @@ export function HealthBar3D({
           geometry={fgGeo}
           material={fgMat}
           renderOrder={17}
+        />
+      )}
+      {clampedShield > 0 && shieldGeo && (
+        <mesh
+          position={[(clampedShield - 1) * width * 0.5, shieldY, 0.001]}
+          geometry={shieldGeo}
+          material={shieldMat}
+          renderOrder={18}
         />
       )}
     </Billboard>
@@ -539,22 +585,36 @@ interface BuffIcons3DProps {
 
 /** 在英雄頭頂橫排顯示目前身上的 Buff（綠底）/ Debuff（紅底）icon（純 3D Billboard mesh + troika Text） */
 export function BuffIcons3D({ effects, textScale = 1 }: BuffIcons3DProps) {
-  const MAX_VISIBLE = 8
-  const overflow = effects.length > MAX_VISIBLE ? effects.length - (MAX_VISIBLE - 1) : 0
-  const visible = overflow > 0 ? effects.slice(0, MAX_VISIBLE - 1) : effects.slice(0, MAX_VISIBLE)
+  // v2.0: 同類型合併顯示，不再有數量限制
+  // 將同一 StatusType 的效果合併，顯示總層數
+  const merged = useMemo(() => {
+    const map = new Map<string, { type: StatusEffect['type']; totalStacks: number; count: number }>()
+    for (const eff of effects) {
+      const key = eff.type
+      const existing = map.get(key)
+      if (existing) {
+        existing.totalStacks += eff.stacks
+        existing.count++
+      } else {
+        map.set(key, { type: eff.type, totalStacks: eff.stacks, count: 1 })
+      }
+    }
+    return Array.from(map.values())
+  }, [effects])
+
+  const visible = merged
 
   if (visible.length === 0) return null
 
   const boxSize = 0.4 * textScale
   const gap = 0.06 * textScale
-  const count = visible.length + (overflow > 0 ? 1 : 0)
+  const count = visible.length
   const totalWidth = count * boxSize + (count - 1) * gap
   const startX = -totalWidth / 2 + boxSize / 2
 
-  // 背景材質（綠 buff / 紅 debuff / 灰 overflow）
+  // 背景材質（綠 buff / 紅 debuff）
   const buffBg = useMemo(() => new THREE.MeshBasicMaterial({ color: '#22c55e', transparent: true, opacity: 0.75, depthTest: false }), [])
   const debuffBg = useMemo(() => new THREE.MeshBasicMaterial({ color: '#ef4444', transparent: true, opacity: 0.75, depthTest: false }), [])
-  const overflowBg = useMemo(() => new THREE.MeshBasicMaterial({ color: '#6b7280', transparent: true, opacity: 0.80, depthTest: false }), [])
   const boxGeo = useMemo(() => new THREE.PlaneGeometry(boxSize, boxSize), [boxSize])
 
   return (
@@ -586,7 +646,7 @@ export function BuffIcons3D({ effects, textScale = 1 }: BuffIcons3DProps) {
             >
               {label}
             </Text>
-            {eff.stacks > 1 && (
+            {eff.totalStacks > 1 && (
               <Text
                 font={LOCAL_FONT}
                 fontSize={boxSize * 0.28}
@@ -600,30 +660,12 @@ export function BuffIcons3D({ effects, textScale = 1 }: BuffIcons3DProps) {
                 /* @ts-expect-error troika depthTest */
                 depthTest={false}
               >
-                {`×${eff.stacks}`}
+                {`×${eff.totalStacks}`}
               </Text>
             )}
           </group>
         )
       })}
-      {overflow > 0 && (
-        <group position={[startX + visible.length * (boxSize + gap), 0, 0]}>
-          <mesh geometry={boxGeo} material={overflowBg} renderOrder={15} />
-          <Text
-            font={LOCAL_FONT}
-            fontSize={boxSize * 0.5}
-            color="white"
-            anchorX="center"
-            anchorY="middle"
-            position={[0, 0, 0.001]}
-            renderOrder={16}
-            /* @ts-expect-error troika depthTest */
-            depthTest={false}
-          >
-            {`+${overflow}`}
-          </Text>
-        </group>
-      )}
     </Billboard>
   )
 }

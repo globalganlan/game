@@ -11,8 +11,12 @@ export {
   loadHeroes,
   loadSkillTemplates,
   loadHeroSkills,
+  loadEffectTemplates,
+  loadSkillEffectsMap,
   loadAllGameData,
   getHeroSkillSet,
+  resolveSkillEffects,
+  resolveSkillEffectsForBattle,
   clearGameDataCache,
 } from './dataService'
 

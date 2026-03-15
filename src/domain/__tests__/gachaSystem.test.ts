@@ -165,15 +165,15 @@ describe('gachaSystem — getDuplicateReward', () => {
 describe('gachaSystem — costs', () => {
   it('canAffordPull: 夠 → true', () => {
     expect(canAffordPull(160, 1)).toBe(true)
-    expect(canAffordPull(1440, 10)).toBe(true)
+    expect(canAffordPull(1600, 10)).toBe(true)
   })
 
   it('canAffordPull: 不夠 → false', () => {
     expect(canAffordPull(159, 1)).toBe(false)
-    expect(canAffordPull(1439, 10)).toBe(false)
+    expect(canAffordPull(1599, 10)).toBe(false)
   })
 
-  it('getPullCost: 單抽=160, 十連=1440', () => {
+  it('getPullCost: 單抽=160, 十連=1600', () => {
     expect(getPullCost(1)).toBe(SINGLE_PULL_COST)
     expect(getPullCost(10)).toBe(TEN_PULL_COST)
   })

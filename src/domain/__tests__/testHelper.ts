@@ -49,6 +49,7 @@ export function makeHero(overrides: Partial<BattleHero> = {}): BattleHero {
 
     statusEffects: [],
     shields: [],
+    targetModifiers: [],
     passiveUsage: {},
 
     totalDamageDealt: 0,

@@ -37,7 +37,7 @@ describe('equipmentGacha', () => {
     })
     it('diamond pool costs', () => {
       expect(EQUIP_DIAMOND_SINGLE).toBe(200)
-      expect(EQUIP_DIAMOND_TEN).toBe(1_800)
+      expect(EQUIP_DIAMOND_TEN).toBe(2_000)
     })
     it('SET_NAMES has 8 sets', () => {
       expect(Object.keys(SET_NAMES)).toHaveLength(8)
@@ -194,7 +194,7 @@ describe('equipmentGacha', () => {
     })
     it('diamond ten', () => {
       const c = getEquipPullCost('diamond', 10)
-      expect(c).toEqual({ type: 'diamond', amount: 1_800 })
+      expect(c).toEqual({ type: 'diamond', amount: 2_000 })
     })
   })
 

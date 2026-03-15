@@ -39,8 +39,8 @@ describe('stageSystem - 進階測試', () => {
       expect(getNextStageId('2-8')).toBe('3-1')
     })
 
-    it('3-8 → null（全部通關）', () => {
-      expect(getNextStageId('3-8')).toBeNull()
+    it('3-8 → 4-1（繼續推進）', () => {
+      expect(getNextStageId('3-8')).toBe('4-1')
     })
 
     it('連續推進覆蓋所有關卡', () => {
@@ -51,7 +51,7 @@ describe('stageSystem - 進階測試', () => {
         current = getNextStageId(current)
         if (count > 100) break // 安全上限
       }
-      expect(count).toBe(MAX_CHAPTER * STAGES_PER_CHAPTER) // 24 關
+      expect(count).toBe(MAX_CHAPTER * STAGES_PER_CHAPTER) // 64 關
     })
   })
 
@@ -251,8 +251,8 @@ describe('stageSystem - 進階測試', () => {
   /* ═══════ 常數一致性 ═══════ */
 
   describe('常數一致性', () => {
-    it('MAX_CHAPTER × STAGES_PER_CHAPTER = 24', () => {
-      expect(MAX_CHAPTER * STAGES_PER_CHAPTER).toBe(24)
+    it('MAX_CHAPTER × STAGES_PER_CHAPTER = 64', () => {
+      expect(MAX_CHAPTER * STAGES_PER_CHAPTER).toBe(64)
     })
 
     it('BOSS_CONFIGS 有 3 個 Boss', () => {

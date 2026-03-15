@@ -32,7 +32,7 @@ const ASCENSION_LEVEL_CAP: Record<number, number> = {
 };
 
 // 升星碎片消耗
-const STAR_FRAGMENT_COST = [5, 10, 20, 40, 80, 160];
+const STAR_FRAGMENT_COST = [5, 10, 20, 40, 80, 160, 320, 640, 1280, 2560];
 
 // ── 英雄升級（使用 EXP 資源） ──────────────────────────────────
 progression.post('/upgrade-hero', async (c) => {
@@ -194,7 +194,7 @@ progression.post('/star-up-hero', async (c) => {
     'SELECT * FROM hero_instances WHERE instanceId = ? AND playerId = ?'
   ).bind(instanceId, playerId).first<HeroInstanceRow>();
   if (!hero) return c.json({ success: false, error: 'hero_not_found' });
-  if (hero.stars >= 6) return c.json({ success: false, error: 'max_stars' });
+  if (hero.stars >= 10) return c.json({ success: false, error: 'max_stars' });
 
   const fragId = `asc_fragment_${hero.heroId}`;
   const cost = STAR_FRAGMENT_COST[hero.stars] ?? 999;

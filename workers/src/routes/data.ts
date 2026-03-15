@@ -44,11 +44,35 @@ async function readHeroSkills(db: D1Database) {
   return rows.results ?? [];
 }
 
+async function readEffectTemplates(db: D1Database) {
+  const rows = await db.prepare(`
+    SELECT effectId, name, category, trigger_type AS trigger,
+           triggerParam, triggerChance, triggerLimit, target,
+           scalingStat, multiplier, flatValue, hitCount,
+           min, max, status, statusChance, statusValue,
+           statusDuration, statusMaxStacks, targetHpThreshold,
+           perAlly, targetOverride, applyTo
+    FROM effect_templates ORDER BY effectId
+  `).all();
+  return rows.results ?? [];
+}
+
+async function readSkillEffects(db: D1Database) {
+  const rows = await db.prepare(`
+    SELECT skillId, effectId, sortOrder, overrideParams,
+           dependsOn, skillLevel
+    FROM skill_effects ORDER BY skillId, skillLevel, sortOrder
+  `).all();
+  return rows.results ?? [];
+}
+
 /** 正規化表對照 */
 const DEDICATED_READERS: Record<string, (db: D1Database) => Promise<unknown[]>> = {
   heroes: readHeroes,
   skill_templates: readSkillTemplates,
   hero_skills: readHeroSkills,
+  effect_templates: readEffectTemplates,
+  skill_effects: readSkillEffects,
 };
 
 /**
@@ -74,6 +98,5 @@ data.post('/readSheet', async (c) => {
   // 未知的 sheetName 回傳空陣列
   return c.json({ success: true, data: [] });
 });
-
 
 export default data;

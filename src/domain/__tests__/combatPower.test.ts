@@ -83,8 +83,8 @@ describe('Spec CP-2 ~ CP-4: 技能 & 套裝常數', () => {
    ════════════════════════════════════ */
 
 describe('getSkillPowerBonus', () => {
-  it('0 星 = 100 (大招固定 + 0被動)', () => {
-    expect(getSkillPowerBonus(0)).toBe(100 + 0 * 50)
+  it('0 星 = 150 (STAR_PASSIVE_SLOTS[0]=1, 100 + 1*50)', () => {
+    expect(getSkillPowerBonus(0)).toBe(100 + 1 * 50)
   })
 
   it('1 星 = 100 + 1*50 = 150', () => {
@@ -143,12 +143,12 @@ describe('getSetBonusPower', () => {
     expect(getSetBonusPower(equips)).toBe(SET_2PC_POWER + SET_4PC_POWER)
   })
 
-  it('不同稀有度不計套裝', () => {
+  it('不同稀有度仍觸發套裝（混搭向上相容）', () => {
     const equips = [
       makeEquip('berserker', 'SR', 'weapon'),
       makeEquip('berserker', 'SSR', 'armor'),
     ]
-    expect(getSetBonusPower(equips)).toBe(0)
+    expect(getSetBonusPower(equips)).toBe(SET_2PC_POWER)
   })
 })
 
@@ -161,10 +161,10 @@ describe('Spec CP-5: getHeroCombatPower 手算驗證', () => {
     const stats = makeStats() // HP:1000 ATK:100 DEF:50 SPD:100 CR:15 CD:50
     // basePower = 1000*0.5 + 100*3 + 50*2.5 + 100*8 + 15*5 + 50*2
     //           = 500 + 300 + 125 + 800 + 75 + 100 = 1900
-    // skillBonus = 100 (0 star → 0 passive)
+    // skillBonus = 150 (0 star → STAR_PASSIVE_SLOTS[0]=1 → 100+50)
     // setBonus = 0
-    // total = floor(1900 + 100 + 0) = 2000
-    expect(getHeroCombatPower(stats, 0)).toBe(2000)
+    // total = floor(1900 + 150 + 0) = 2050
+    expect(getHeroCombatPower(stats, 0)).toBe(2050)
   })
 
   it('3 星英雄（無裝）', () => {
@@ -175,7 +175,7 @@ describe('Spec CP-5: getHeroCombatPower 手算驗證', () => {
 
   it('全零屬性 = floor(0 + skillBonus)', () => {
     const stats = makeStats({ HP: 0, ATK: 0, DEF: 0, SPD: 0, CritRate: 0, CritDmg: 0 })
-    expect(getHeroCombatPower(stats, 0)).toBe(100) // 只有大招加成
+    expect(getHeroCombatPower(stats, 0)).toBe(150) // 只有大招+1被動加成
   })
 })
 
@@ -194,7 +194,7 @@ describe('Spec CP-6: getTeamCombatPower', () => {
       stars: 0,
       equipment: [],
     }
-    expect(getTeamCombatPower([hero])).toBe(2000)
+    expect(getTeamCombatPower([hero])).toBe(2050)
   })
 
   it('多英雄加總', () => {
@@ -204,7 +204,7 @@ describe('Spec CP-6: getTeamCombatPower', () => {
     //             = 500 + 600 + 125 + 800 + 75 + 100 = 2200
     // h2 skillBonus = 200
     // h2 total = floor(2200 + 200) = 2400
-    expect(getTeamCombatPower([h1, h2])).toBe(2000 + 2400)
+    expect(getTeamCombatPower([h1, h2])).toBe(2050 + 2400)
   })
 })
 

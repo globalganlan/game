@@ -29,6 +29,7 @@ export interface BattleHero {
   statusEffects: StatusEffect[];
   shields: Shield[];
   passiveUsage: Record<string, number>;
+  targetModifiers: { targetOverride: string; applyTo: string; multiplier?: number; sourceSkillId: string }[];
   activePassives: Passive[];
   passives?: Passive[];
   activeSkill: Skill | null;
@@ -105,6 +106,10 @@ interface BattleContext {
   isCrit: boolean;
   isDodge: boolean;
   damageMult?: number;
+  /** triggerPassives 設定：目前觸發器名稱，用於 damage case 區分反擊/追擊 */
+  _currentTrigger?: string;
+  /** on_ally_attacked 專用：記錄發動攻擊的敵方英雄（追擊目標） */
+  _originalAttacker?: BattleHero;
 }
 
 type EmitFn = (action: Record<string, unknown>) => void;
@@ -480,14 +485,26 @@ function executePassiveEffect(
       return true;
     }
     case 'damage': {
-      if (context.target && context.target.currentHP > 0) {
-        const dmg = calculateDamage(rng, hero, context.target, effect);
+      const trigger = context._currentTrigger;
+      let actualTarget: BattleHero | null = context.target;
+      let actionType: string = 'PASSIVE_DAMAGE';
+      if (trigger === 'on_be_attacked') {
+        actualTarget = context.attacker;
+        actionType = 'COUNTER_ATTACK';
+      } else if (trigger === 'on_ally_skill' || trigger === 'on_ally_attacked') {
+        if (trigger === 'on_ally_attacked' && context._originalAttacker) {
+          actualTarget = context._originalAttacker;
+        }
+        actionType = 'CHASE_ATTACK';
+      }
+      if (actualTarget && actualTarget.currentHP > 0 && actualTarget.uid !== hero.uid) {
+        const dmg = calculateDamage(rng, hero, actualTarget, effect);
         if (!dmg.isDodge) {
-          context.target.currentHP = Math.max(0, context.target.currentHP - dmg.damage);
+          actualTarget.currentHP = Math.max(0, actualTarget.currentHP - dmg.damage);
           hero.totalDamageDealt += dmg.damage;
-          const killed = context.target.currentHP <= 0;
-          emit({ type: 'PASSIVE_DAMAGE', attackerUid: hero.uid, targetUid: context.target.uid, damage: dmg.damage, killed });
-          if (killed) emit({ type: 'DEATH', targetUid: context.target.uid });
+          const killed = actualTarget.currentHP <= 0;
+          emit({ type: actionType, attackerUid: hero.uid, targetUid: actualTarget.uid, damage: dmg.damage, killed });
+          if (killed) { emit({ type: 'DEATH', targetUid: actualTarget.uid }); hero.killCount++; }
         }
       }
       return true;
@@ -517,6 +534,8 @@ function triggerPassives(
   emit: EmitFn, extraTurnQueue: string[]
 ) {
   if (hero.currentHP <= 0) return;
+  // 記錄目前觸發器，讓 executePassiveEffect 的 damage case 判斷反擊/追擊
+  context._currentTrigger = trigger;
   for (const passive of hero.activePassives) {
     if (passive.passiveTrigger !== trigger) continue;
     const usageKey = passive.skillId;
@@ -586,9 +605,22 @@ function executeNormalAttack(
     if (!killed) {
       triggerPassives(rng, target, 'on_be_attacked', makeContext(turn, attacker, allHeroes, target), emit, extraTurnQueue);
       triggerPassives(rng, target, 'on_take_damage', makeContext(turn, attacker, allHeroes, target), emit, extraTurnQueue);
+      // v2.9: 觸發被攻擊者隊友的 on_ally_attacked 被動
+      const attackedSideAllies = allHeroes.filter(h => h.side === target.side && h.uid !== target.uid && h.currentHP > 0);
+      for (const ally of attackedSideAllies) {
+        const allyCtx = makeContext(turn, ally, allHeroes, target);
+        allyCtx._originalAttacker = attacker;
+        triggerPassives(rng, ally, 'on_ally_attacked', allyCtx, emit, extraTurnQueue);
+      }
     }
     if (result.isCrit) triggerPassives(rng, attacker, 'on_crit', makeContext(turn, attacker, allHeroes, target), emit, extraTurnQueue);
-    if (killed) triggerPassives(rng, attacker, 'on_kill', makeContext(turn, attacker, allHeroes, target, true), emit, extraTurnQueue);
+    if (killed) {
+      triggerPassives(rng, attacker, 'on_kill', makeContext(turn, attacker, allHeroes, target, true), emit, extraTurnQueue);
+      const deadSideAllies = allHeroes.filter(h => h.side === target.side && h.uid !== target.uid && h.currentHP > 0);
+      for (const ally of deadSideAllies) {
+        triggerPassives(rng, ally, 'on_ally_death', makeContext(turn, ally, allHeroes, target), emit, extraTurnQueue);
+      }
+    }
   } else {
     triggerPassives(rng, target, 'on_dodge', makeContext(turn, attacker, allHeroes, target), emit, extraTurnQueue);
   }
@@ -626,6 +658,13 @@ function executeSkill(
               if (onBeAttackedEnergy(target) > 0) _tgtEnergyMap[target.uid] = target.energy;
               triggerPassives(rng, target, 'on_be_attacked', makeContext(turn, attacker, allHeroes, target), emit, extraTurnQueue);
               triggerPassives(rng, target, 'on_take_damage', makeContext(turn, attacker, allHeroes, target), emit, extraTurnQueue);
+              // v2.9: 觸發被攻擊者隊友的 on_ally_attacked 被動
+              const attackedSideAllies = allHeroes.filter(h => h.side === target.side && h.uid !== target.uid && h.currentHP > 0);
+              for (const ally of attackedSideAllies) {
+                const allyCtx = makeContext(turn, ally, allHeroes, target);
+                allyCtx._originalAttacker = attacker;
+                triggerPassives(rng, ally, 'on_ally_attacked', allyCtx, emit, extraTurnQueue);
+              }
             }
             if (killed) { attacker.killCount++; onKillEnergy(attacker); triggerPassives(rng, attacker, 'on_kill', makeContext(turn, attacker, allHeroes, target, true), emit, extraTurnQueue); }
             if (result.isCrit) triggerPassives(rng, attacker, 'on_crit', makeContext(turn, attacker, allHeroes, target), emit, extraTurnQueue);
@@ -668,6 +707,12 @@ function executeSkill(
   }
   consumeEnergy(attacker);
   emit({ type: 'SKILL_CAST', attackerUid: attacker.uid, skillId: skill.skillId, skillName: skill.name, targets: skillResults, _atkEnergyNew: attacker.energy, _tgtEnergyMap: Object.keys(_tgtEnergyMap).length ? _tgtEnergyMap : undefined });
+  // v2.9: 觸發隊友的 on_ally_skill 被動
+  const firstEnemyTarget = targets.find(t => t.side !== attacker.side && t.currentHP > 0) ?? null;
+  const allySkillAllies = allHeroes.filter(h => h.side === attacker.side && h.uid !== attacker.uid && h.currentHP > 0);
+  for (const ally of allySkillAllies) {
+    triggerPassives(rng, ally, 'on_ally_skill', makeContext(turn, ally, allHeroes, firstEnemyTarget!), emit, extraTurnQueue);
+  }
   for (const t of targets) checkHpBelowPassives(rng, t, turn, allHeroes, emit, extraTurnQueue);
   checkHpBelowPassives(rng, attacker, turn, allHeroes, emit, extraTurnQueue);
 }
@@ -742,6 +787,7 @@ function runBattleEngine(rng: RngFn, players: BattleHero[], enemies: BattleHero[
     hero.statusEffects ??= [];
     hero.shields ??= [];
     hero.passiveUsage ??= {};
+    hero.targetModifiers ??= [];
     hero.activePassives ??= hero.passives?.slice() ?? [];
     hero.totalDamageDealt ??= 0;
     hero.totalHealingDone ??= 0;

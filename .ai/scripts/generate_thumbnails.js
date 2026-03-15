@@ -29,7 +29,7 @@ function writeDataUrlToFile(dataUrl, outPath) {
 
 (async ()=>{
   const __filename = fileURLToPath(import.meta.url);
-  const projectRoot = path.join(path.dirname(__filename), '..');
+  const projectRoot = path.join(path.dirname(__filename), '..', '..');
   const publicRoot = path.join(projectRoot, 'public');
   const modelsRoot = path.join(publicRoot, 'models');
 

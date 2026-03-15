@@ -17,6 +17,8 @@ import { PanelInfoTip, PANEL_DESCRIPTIONS } from './PanelInfoTip'
 import { updateHeroLocally, getSaveState, applyCurrenciesFromServer } from '../services/saveService'
 import type { SkillTemplate, HeroSkillConfig } from '../domain/types'
 import { getHeroSkillSet } from '../services/dataService'
+import { getEffectTemplatesCache, getSkillEffectsCache, resolveSkillEffects } from '../services/dataService'
+import { SkillDescPanel, effectDescription } from './SkillDescPanel'
 import {
   getStarPassiveSlots, getAscensionMultiplier, getStarMultiplier,
   getStatAtLevel, getLevelCap, expToNextLevel,
@@ -107,12 +109,15 @@ const TARGET_LABEL: Record<string, string> = {
   single_ally: '單體隊友',
   all_allies: '全體隊友',
   self: '自身',
+  trigger_source: '觸發來源',
 }
 const TRIGGER_LABEL: Record<string, string> = {
   battle_start: '戰鬥開始',
   turn_start: '回合開始',
   turn_end: '回合結束',
   on_attack: '攻擊時',
+  on_normal_attack: '普攻時',
+  on_skill_cast: '施放大招時',
   on_kill: '擊殺時',
   on_be_attacked: '被攻擊時',
   on_take_damage: '受傷時',
@@ -121,13 +126,18 @@ const TRIGGER_LABEL: Record<string, string> = {
   on_crit: '暴擊時',
   on_ally_death: '隊友陣亡',
   on_ally_skill: '隊友施技',
+  on_ally_attacked: '隊友被攻擊時',
   hp_below_pct: 'HP低於閾值',
+  hp_above_pct: 'HP高於閾值',
   every_n_turns: '每N回合',
+  enemy_count_below: '敵人≤N時',
+  ally_count_below: '隊友≤N時',
+  has_status: '帶有狀態時',
   always: '常駐',
 }
 
-/** 依技能的 target / passiveTrigger 產生標籤 JSX */
-function SkillDescWithTags({ skill }: { skill: SkillTemplate }) {
+/** 依技能的 target / passiveTrigger 產生標籤 JSX，並用效果驅動描述 */
+function SkillDescWithTags({ skill, skillLevel }: { skill: SkillTemplate; skillLevel?: number }) {
   const tags: { label: string; cls: string }[] = []
   // trigger tag（被動技才有）
   if (skill.passiveTrigger) {
@@ -139,6 +149,18 @@ function SkillDescWithTags({ skill }: { skill: SkillTemplate }) {
     const tl = TARGET_LABEL[skill.target] || skill.target
     tags.push({ label: tl, cls: 'target' })
   }
+
+  // 效果驅動描述：嘗試從 effect_templates 生成
+  let descText = skill.description || '—'
+  const effTemplates = getEffectTemplatesCache()
+  const effLinks = getSkillEffectsCache()
+  if (effTemplates.size > 0 && effLinks.size > 0) {
+    const resolved = resolveSkillEffects(skill.skillId, skillLevel ?? 1, effTemplates, effLinks)
+    if (resolved.length > 0) {
+      descText = resolved.map(eff => effectDescription(eff)).join('；')
+    }
+  }
+
   return (
     <div className="hd2-skill-desc">
       {tags.length > 0 && (
@@ -148,7 +170,7 @@ function SkillDescWithTags({ skill }: { skill: SkillTemplate }) {
           ))}
         </span>
       )}
-      {skill.description || '—'}
+      {descText}
     </div>
   )
 }
@@ -323,6 +345,7 @@ function HeroDetail({ hero, instance, onClose, skills, heroSkills }: HeroDetailP
   const rarity = toRarity(heroAny.Rarity)
   const rcfg = RARITY_CONFIG[rarity]
   const passiveSlots = getStarPassiveSlots(stars)
+  const skillLevel = stars > 6 ? stars - 5 : 1
   const heroType = String(heroAny.Type ?? '?')
   const description = String(heroAny.Description ?? '')
   const modelId = resolveModelId(hero)
@@ -470,7 +493,7 @@ function HeroDetail({ hero, instance, onClose, skills, heroSkills }: HeroDetailP
   }, [instance, canDoAscend, hasAscMaterials, isProcessing, asc, heroId, ascCost, fragmentId, classStoneId])
 
   // ── 升星 helpers ──
-  const starCost = stars < 6 ? getStarUpCost(stars) : Infinity
+  const starCost = stars < 10 ? getStarUpCost(stars) : Infinity
   const canDoStarUp = isOwned && canStarUp(stars, ownedFragments)
 
   const handleConfirmStarUp = useCallback(async () => {
@@ -485,7 +508,7 @@ function HeroDetail({ hero, instance, onClose, skills, heroSkills }: HeroDetailP
         }
         setResultMsg(`升星成功！★${stars} → ★${res.newStars}`)
         // 滿星自動關閉升星 modal
-        if (res.newStars >= 6) {
+        if (res.newStars >= 10) {
           setTimeout(() => setModalMode('none'), 1200)
         }
       } else {
@@ -590,6 +613,9 @@ function HeroDetail({ hero, instance, onClose, skills, heroSkills }: HeroDetailP
     }
   }, [enhanceTarget, isProcessing])
 
+  // ── 技能詳情面板 ──
+  const [selectedSkill, setSelectedSkill] = useState<{ skill: SkillTemplate; isLocked?: boolean; unlockStar?: number } | null>(null)
+
   return (
     <div className="hero-detail-backdrop" onClick={onClose}>
       <div className="hd2-card" onClick={(e) => e.stopPropagation()}>
@@ -670,15 +696,19 @@ function HeroDetail({ hero, instance, onClose, skills, heroSkills }: HeroDetailP
         })()}
 
         {/* ── 技能 ── */}
-        <div className="hd2-section-title">技能</div>
+        <div className="hd2-section-title">
+          技能
+          {skillLevel > 1 && <span className="hd2-section-hint" style={{ color: '#f0c040' }}>　技能等級 Lv.{skillLevel}</span>}
+        </div>
         <div className="hd2-skills">
           {/* 主動技 */}
           {skillSet.activeSkill ? (
-            <div className="hd2-skill hd2-skill-active">
+            <div className="hd2-skill hd2-skill-active hd2-skill-clickable"
+                 onClick={() => setSelectedSkill({ skill: skillSet.activeSkill! })}>
               <div className="hd2-skill-icon">{resolveSkillIcon(skillSet.activeSkill.icon, 'active')}</div>
               <div className="hd2-skill-body">
                 <div className="hd2-skill-name"><span className="hd2-skill-badge active">主動</span> {skillSet.activeSkill.name}</div>
-                <SkillDescWithTags skill={skillSet.activeSkill} />
+                <SkillDescWithTags skill={skillSet.activeSkill} skillLevel={skillLevel} />
               </div>
             </div>
           ) : (
@@ -695,7 +725,8 @@ function HeroDetail({ hero, instance, onClose, skills, heroSkills }: HeroDetailP
             const reqStars = getPassiveUnlockStars(i)
             const unlocked = i < passiveSlots
             return (
-              <div key={i} className={`hd2-skill ${unlocked ? '' : 'hd2-skill-locked'}`}>
+              <div key={i} className={`hd2-skill ${unlocked ? '' : 'hd2-skill-locked'} ${passive ? 'hd2-skill-clickable' : ''}`}
+                   onClick={() => passive && setSelectedSkill({ skill: passive, isLocked: !unlocked, unlockStar: reqStars })}>
                 <div className="hd2-skill-icon">{passive ? resolveSkillIcon(passive.icon, 'passive') : '🔒'}</div>
                 <div className="hd2-skill-body">
                   {passive ? (
@@ -706,7 +737,7 @@ function HeroDetail({ hero, instance, onClose, skills, heroSkills }: HeroDetailP
                         </span>
                         {passive.name}
                       </div>
-                      <SkillDescWithTags skill={passive} />
+                      <SkillDescWithTags skill={passive} skillLevel={skillLevel} />
                     </>
                   ) : (
                     <div className="hd2-skill-name hd2-skill-na">🔒 ★{reqStars} 解鎖</div>
@@ -820,8 +851,8 @@ function HeroDetail({ hero, instance, onClose, skills, heroSkills }: HeroDetailP
           </button>
           <button
             className="hd2-btn hd2-btn-star"
-            disabled={!isOwned || stars >= 6}
-            title={!isOwned ? '尚未擁有' : stars >= 6 ? '已達最高星級' : '消耗碎片提升星級'}
+            disabled={!isOwned || stars >= 10}
+            title={!isOwned ? '尚未擁有' : stars >= 10 ? '已達最高星級' : '消耗碎片提升星級'}
             onClick={() => { setResultMsg(''); setModalMode('starUp') }}
           >
             <span className="hd2-btn-icon">⭐</span><span>升星</span>
@@ -1013,7 +1044,7 @@ function HeroDetail({ hero, instance, onClose, skills, heroSkills }: HeroDetailP
                       </div>
                       {unlockPassive.description && (
                         <div className="hd2-star-skill-desc">
-                          <SkillDescWithTags skill={unlockPassive} />
+                          <SkillDescWithTags skill={unlockPassive} skillLevel={skillLevel} />
                         </div>
                       )}
                     </>
@@ -1027,6 +1058,12 @@ function HeroDetail({ hero, instance, onClose, skills, heroSkills }: HeroDetailP
               {!newPassiveUnlocked && (
                 <div className="hd2-star-bonus">
                   被動欄位：{curSlots} 個（不變）
+                </div>
+              )}
+              {/* ★7+ 技能等級提升預覽 */}
+              {nextStars > 6 && (
+                <div className="hd2-star-bonus" style={{ color: '#f0c040' }}>
+                  📈 技能等級：Lv.{stars > 6 ? stars - 5 : 1} → Lv.{nextStars - 5}（全技能效果提升）
                 </div>
               )}
 
@@ -1241,6 +1278,42 @@ function HeroDetail({ hero, instance, onClose, skills, heroSkills }: HeroDetailP
                   <button className="hd2-modal-cancel" onClick={() => setModalMode('none')}>關閉</button>
                 </div>
               </div>
+            </div>
+          )
+        })()}
+
+        {/* ── 技能詳情面板 ── */}
+        {selectedSkill && (() => {
+          const effTemplates = getEffectTemplatesCache()
+          const effLinks = getSkillEffectsCache()
+          const skillLevel = stars > 6 ? stars - 5 : 1
+          const effects = resolveSkillEffects(selectedSkill.skill.skillId, skillLevel, effTemplates, effLinks)
+          // 各等級效果對比（只有等級間確實有差異時才顯示）
+          const allLevels = new Map<number, typeof effects>()
+          for (let lv = 1; lv <= 5; lv++) {
+            const lvEffects = resolveSkillEffects(selectedSkill.skill.skillId, lv, effTemplates, effLinks)
+            if (lvEffects.length > 0) allLevels.set(lv, lvEffects)
+          }
+          // 比對各等級是否真有差異（用 JSON 快速比對）
+          let hasDiff = false
+          if (allLevels.size > 1) {
+            const signatures = new Set<string>()
+            for (const effs of allLevels.values()) {
+              signatures.add(JSON.stringify(effs.map(e => ({ m: e.multiplier, sc: e.statusChance, sv: e.statusValue, sd: e.statusDuration, fv: e.flatValue, hc: e.hitCount }))))
+            }
+            hasDiff = signatures.size > 1
+          }
+          return (
+            <div className="skill-desc-overlay" onClick={() => setSelectedSkill(null)}>
+              <SkillDescPanel
+                skill={selectedSkill.skill}
+                effects={effects}
+                skillLevel={skillLevel}
+                allLevelEffects={hasDiff ? allLevels : undefined}
+                isLocked={selectedSkill.isLocked}
+                unlockStar={selectedSkill.unlockStar}
+                onClose={() => setSelectedSkill(null)}
+              />
             </div>
           )
         })()}

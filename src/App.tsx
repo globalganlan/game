@@ -771,20 +771,28 @@ export default function App() {
               currentTurn={turn}
               playerHeroes={playerSlots
                 .filter((s): s is SlotHero => s !== null)
-                .map(s => ({
-                  uid: s._uid,
-                  name: String(s.Name ?? ''),
-                  currentHP: s.currentHP,
-                  maxHP: battleHeroesRef.current?.get(s._uid)?.maxHP ?? Number(s.HP ?? s.currentHP ?? 1),
-                }))}
+                .map(s => {
+                  const bh = battleHeroesRef.current?.get(s._uid)
+                  return {
+                    uid: s._uid,
+                    name: String(s.Name ?? ''),
+                    currentHP: s.currentHP,
+                    maxHP: bh?.maxHP ?? Number(s.HP ?? s.currentHP ?? 1),
+                    shieldTotal: bh?.shields.reduce((sum, sh) => sum + sh.value, 0) ?? 0,
+                  }
+                })}
               enemyHeroes={enemySlots
                 .filter((s): s is SlotHero => s !== null)
-                .map(s => ({
-                  uid: s._uid,
-                  name: String(s.Name ?? ''),
-                  currentHP: s.currentHP,
-                  maxHP: battleHeroesRef.current?.get(s._uid)?.maxHP ?? Number(s.HP ?? s.currentHP ?? 1),
-                }))}
+                .map(s => {
+                  const bh = battleHeroesRef.current?.get(s._uid)
+                  return {
+                    uid: s._uid,
+                    name: String(s.Name ?? ''),
+                    currentHP: s.currentHP,
+                    maxHP: bh?.maxHP ?? Number(s.HP ?? s.currentHP ?? 1),
+                    shieldTotal: bh?.shields.reduce((sum, sh) => sum + sh.value, 0) ?? 0,
+                  }
+                })}
               buffMap={battleBuffs}
               energyMap={battleEnergy}
               skillToasts={skillToasts}

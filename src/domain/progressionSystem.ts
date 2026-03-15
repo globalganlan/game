@@ -96,13 +96,17 @@ export const ASCENSION_MULTIPLIER: Record<number, number> = {
   5: 1.30,
 }
 
-/** 星級屬性加成（乘算）— ★3 預設，向下相容 */
+/** 星級屬性加成（乘算）— ★3 預設，向下相容；★7-10 為技能等級區間 */
 export const STAR_MULTIPLIER: Record<number, number> = {  0: 0.90,  1: 1.0,
   2: 1.05,
   3: 1.10,
   4: 1.15,
   5: 1.20,
   6: 1.30,
+  7: 1.35,
+  8: 1.40,
+  9: 1.45,
+  10: 1.50,
 }
 
 /* ════════════════════════════════════
@@ -125,15 +129,15 @@ export const RARITY_ASC_MULT: Record<number, Record<number, number>> = {
   4: { 0: 1.00, 1: 1.07, 2: 1.14, 3: 1.22, 4: 1.30, 5: 1.42 },
 }
 
-/** 星級加成（依稀有度）— ★0 為初始狀態，HP/ATK/DEF ×0.90（-10%），想提升須升星 */
+/** 星級加成（依稀有度）— ★0 為初始狀態 ×0.90；★7-10 提升技能等級 + 小幅屬性 */
 export const RARITY_STAR_MULT: Record<number, Record<number, number>> = {
-  1: { 0: 0.90, 1: 1.00, 2: 1.03, 3: 1.06, 4: 1.09, 5: 1.13, 6: 1.18 },
-  2: { 0: 0.90, 1: 1.00, 2: 1.04, 3: 1.08, 4: 1.12, 5: 1.17, 6: 1.24 },
-  3: { 0: 0.90, 1: 1.00, 2: 1.05, 3: 1.10, 4: 1.15, 5: 1.20, 6: 1.30 },
-  4: { 0: 0.90, 1: 1.00, 2: 1.07, 3: 1.14, 4: 1.22, 5: 1.30, 6: 1.42 },
+  1: { 0: 0.90, 1: 1.00, 2: 1.03, 3: 1.06, 4: 1.09, 5: 1.13, 6: 1.18, 7: 1.21, 8: 1.24, 9: 1.27, 10: 1.30 },
+  2: { 0: 0.90, 1: 1.00, 2: 1.04, 3: 1.08, 4: 1.12, 5: 1.17, 6: 1.24, 7: 1.28, 8: 1.32, 9: 1.36, 10: 1.40 },
+  3: { 0: 0.90, 1: 1.00, 2: 1.05, 3: 1.10, 4: 1.15, 5: 1.20, 6: 1.30, 7: 1.35, 8: 1.40, 9: 1.45, 10: 1.50 },
+  4: { 0: 0.90, 1: 1.00, 2: 1.07, 3: 1.14, 4: 1.22, 5: 1.30, 6: 1.42, 7: 1.48, 8: 1.54, 9: 1.60, 10: 1.68 },
 }
 
-/** 星級解鎖被動數量（★0 仍給 1 個被動，與 battleEngine 一致） */
+/** 星級解鎖被動數量（★0 仍給 1 個被動；★7-10 不再增加被動，改為提升技能等級） */
 export const STAR_PASSIVE_SLOTS: Record<number, number> = {
   0: 1,
   1: 1,
@@ -142,6 +146,10 @@ export const STAR_PASSIVE_SLOTS: Record<number, number> = {
   4: 3,
   5: 3,
   6: 4,
+  7: 4,
+  8: 4,
+  9: 4,
+  10: 4,
 }
 
 /** 升星所需碎片 */
@@ -153,6 +161,10 @@ export const STAR_UP_COST: Record<number, number> = {
   3: 40,    // ★3→★4
   4: 80,    // ★4→★5
   5: 160,   // ★5→★6
+  6: 320,   // ★6→★7（技能等級 Lv.2）
+  7: 640,   // ★7→★8（技能等級 Lv.3）
+  8: 1280,  // ★8→★9（技能等級 Lv.4）
+  9: 2560,  // ★9→★10（技能等級 Lv.5）
 }
 
 /** 突破素材消耗（與後端 progression.ts 一致） */
@@ -329,7 +341,7 @@ export function getStarUpCost(currentStars: number): number {
 
 /** 檢查是否可以升星 */
 export function canStarUp(currentStars: number, fragmentsOwned: number): boolean {
-  if (currentStars >= 6) return false
+  if (currentStars >= 10) return false
   return fragmentsOwned >= getStarUpCost(currentStars)
 }
 

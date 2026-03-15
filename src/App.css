@@ -2182,6 +2182,162 @@
   border: 1px solid rgba(250, 176, 5, 0.35);
 }
 
+/* ── Skill row clickable ── */
+.hd2-skill-clickable {
+  cursor: pointer;
+}
+.hd2-skill-clickable:hover {
+  background: rgba(255,255,255,0.08);
+}
+.hd2-skill-clickable:active {
+  background: rgba(255,255,255,0.12);
+}
+
+/* ── SkillDescPanel Overlay ── */
+.skill-desc-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 900;
+  background: rgba(0,0,0,0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+.skill-desc-panel {
+  background: linear-gradient(160deg, #1e1e2e 0%, #181825 100%);
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 12px;
+  padding: 16px;
+  max-width: 380px;
+  width: 100%;
+  max-height: 80vh;
+  overflow-y: auto;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+  color: #cdd6f4;
+  font-size: 0.85rem;
+}
+.skill-desc-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+.skill-desc-name {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #e8e8e8;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.skill-desc-level {
+  font-size: 0.72rem;
+  background: #5c7cfa;
+  color: #fff;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-weight: 600;
+}
+.skill-desc-close {
+  background: none;
+  border: none;
+  color: #888;
+  font-size: 1.1rem;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
+}
+.skill-desc-close:hover {
+  color: #fff;
+  background: rgba(255,255,255,0.1);
+}
+.skill-desc-type {
+  font-size: 0.78rem;
+  color: #8ba4ff;
+  margin-bottom: 6px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.skill-desc-locked {
+  color: #f87171;
+  font-size: 0.72rem;
+}
+.skill-desc-text {
+  color: #aaa;
+  font-size: 0.8rem;
+  line-height: 1.45;
+  margin-bottom: 10px;
+  padding: 6px 8px;
+  background: rgba(255,255,255,0.04);
+  border-radius: 6px;
+}
+.skill-desc-effects {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+.skill-desc-effect-row {
+  padding: 6px 8px;
+  background: rgba(255,255,255,0.04);
+  border-radius: 6px;
+  border-left: 3px solid #555;
+  font-size: 0.8rem;
+}
+.skill-desc-effect-num {
+  color: #888;
+  font-size: 0.72rem;
+  margin-right: 4px;
+}
+.skill-desc-effect-desc {
+  color: #cdd6f4;
+}
+.skill-desc-depends {
+  display: block;
+  color: #f0c040;
+  font-size: 0.7rem;
+  margin-top: 3px;
+  padding-left: 4px;
+}
+.skill-desc-levels {
+  border-top: 1px solid rgba(255,255,255,0.08);
+  padding-top: 8px;
+}
+.skill-desc-levels-title {
+  font-size: 0.75rem;
+  color: #888;
+  margin-bottom: 6px;
+  font-weight: 600;
+}
+.skill-desc-level-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 6px;
+  border-radius: 4px;
+  font-size: 0.78rem;
+}
+.skill-desc-level-row.current {
+  background: rgba(92, 124, 250, 0.15);
+  border: 1px solid rgba(92, 124, 250, 0.3);
+}
+.skill-desc-lv {
+  color: #888;
+  min-width: 40px;
+  font-weight: 600;
+}
+.skill-desc-level-row.current .skill-desc-lv {
+  color: #8ba4ff;
+}
+.skill-desc-lv-desc {
+  color: #aaa;
+}
+.skill-desc-level-row.current .skill-desc-lv-desc {
+  color: #cdd6f4;
+}
+
 /* ── Equipment ── */
 .hd2-equip-row {
   display: grid;
@@ -5691,6 +5847,22 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/* Shield bar (above HP bar) */
+.bhud-shield-bar {
+  height: 3px;
+  background: rgba(255,215,0,0.15);
+  border-radius: 2px;
+  overflow: hidden;
+  margin-bottom: 1px;
+}
+
+.bhud-shield-fill {
+  height: 100%;
+  border-radius: 2px;
+  background: linear-gradient(90deg, #ffd700, #ffec80);
+  transition: width 0.3s;
 }
 
 /* HP bar */

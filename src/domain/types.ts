@@ -42,6 +42,7 @@ export interface StatusEffect {
   stacks: number         // 當前疊加層數
   maxStacks: number      // 最大疊加層數
   sourceHeroId: string   // 施加者 UID
+  sourceEffectId?: string // v2.0: 來源 effectId（用於同源/異源判斷）
 }
 
 export interface Shield {
@@ -54,6 +55,14 @@ export interface Shield {
    技能系統
    ════════════════════════════════════ */
 
+/** v2.0: 目標變更修飾（modify_target 被動效果） */
+export interface TargetModifier {
+  targetOverride: EffectTarget   // 新目標類型
+  applyTo: 'normal' | 'active' | 'both'  // 影響哪種攻擊
+  multiplier?: number            // 傷害修正（多目標降低倍率）
+  sourceSkillId: string          // 來源被動 skillId
+}
+
 /** 技能目標類型 */
 export type TargetType =
   | 'single_enemy'
@@ -64,6 +73,9 @@ export type TargetType =
   | 'single_ally'
   | 'all_allies'
   | 'self'
+
+/** 效果目標類型（TargetType + trigger_source） */
+export type EffectTarget = TargetType | 'trigger_source'
 
 /** 被動觸發時機 */
 export type PassiveTrigger =
@@ -82,10 +94,72 @@ export type PassiveTrigger =
   | 'hp_below_pct'
   | 'every_n_turns'
   | 'always'
+  // v2.0 新增觸發
+  | 'on_normal_attack'
+  | 'on_skill_cast'
+  | 'on_ally_attacked'
+  | 'hp_above_pct'
+  | 'enemy_count_below'
+  | 'ally_count_below'
+  | 'has_status'
+
+/** 效果觸發條件（含 immediate） */
+export type EffectTrigger = 'immediate' | PassiveTrigger
+
+/** 效果分類（19 種） */
+export type EffectCategory =
+  | 'damage' | 'dot' | 'heal' | 'buff' | 'debuff' | 'cc'
+  | 'shield' | 'energy' | 'extra_turn' | 'counter_attack'
+  | 'chase_attack' | 'revive' | 'dispel_debuff' | 'dispel_buff'
+  | 'reflect' | 'steal_buff' | 'transfer_debuff' | 'execute'
+  | 'modify_target'
+
+/** 效果模板（對應 D1: effect_templates） */
+export interface EffectTemplate {
+  effectId: string
+  name: string
+  category: EffectCategory
+  trigger: EffectTrigger
+  triggerParam?: number | string
+  triggerChance?: number     // 0~1, 預設 1.0
+  triggerLimit?: number      // 每場觸發上限, 0=無限
+  target: EffectTarget
+  scalingStat?: keyof FinalStats
+  multiplier?: number
+  flatValue?: number
+  hitCount?: number
+  min?: number
+  max?: number
+  status?: StatusType
+  statusChance?: number
+  statusValue?: number
+  statusDuration?: number
+  statusMaxStacks?: number
+  targetHpThreshold?: number
+  perAlly?: boolean
+  targetOverride?: EffectTarget   // modify_target 用
+  applyTo?: 'normal' | 'active' | 'both'  // modify_target 用
+}
+
+/** 技能效果關聯（對應 D1: skill_effects） */
+export interface SkillEffectLink {
+  skillId: string
+  effectId: string
+  sortOrder: number
+  overrideParams: string     // JSON
+  dependsOn?: string         // 前置 effectId
+  skillLevel: number         // 1~5
+}
+
+/** 解析後的效果（EffectTemplate + overrideParams 合併 + 依賴資訊） */
+export interface ResolvedEffect extends EffectTemplate {
+  dependsOnName?: string
+}
 
 /** 技能效果模組（一個技能可包含多個效果） */
 export interface SkillEffect {
   type: 'damage' | 'heal' | 'buff' | 'debuff' | 'energy' | 'revive' | 'dispel_debuff' | 'extra_turn' | 'reflect' | 'damage_mult' | 'damage_mult_random' | 'random_debuff'
+    | 'dispel_buff' | 'steal_buff' | 'transfer_debuff' | 'execute' | 'counter_attack' | 'chase_attack' | 'shield' | 'cc' | 'dot' | 'modify_target'
   scalingStat?: keyof FinalStats  // 基於哪個數值（ATK / HP / DEF）
   multiplier?: number             // 倍率（1.8 = 180%）
   flatValue?: number              // 固定值加成
@@ -99,6 +173,9 @@ export interface SkillEffect {
   statusMaxStacks?: number        // 最大疊加數
   targetHpThreshold?: number      // damage_mult 條件：目標 HP% 低於閾值才生效（0~1）
   perAlly?: boolean               // buff 效果按存活隊友人數倍增
+  dependsOn?: string              // v2.0: 前置效果 ID（命中才觸發後續）
+  targetOverride?: EffectTarget   // v2.0: modify_target 用：新目標類型
+  applyTo?: 'normal' | 'active' | 'both'  // v2.0: modify_target 用：影響哪種攻擊
 }
 
 /** 技能模板（對應 Google Sheet: skill_templates） */
@@ -157,6 +234,9 @@ export interface BattleHero {
   // 被動觸發次數追蹤（如"每場一次"的限制）
   passiveUsage: Record<string, number>
 
+  // v2.0: modify_target 目標變更修飾
+  targetModifiers: TargetModifier[]
+
   // 戰鬥統計
   totalDamageDealt: number
   totalHealingDone: number
@@ -180,6 +260,14 @@ export interface BattleContext {
   isDodge: boolean
   /** on_attack 被動設定的傷害倍率修正（多個被動乘算） */
   damageMult?: number
+  /** 連鎖防護：當前為反擊中，不可再觸發反擊 */
+  _isCounterAttack?: boolean
+  /** 連鎖防護：當前為追擊中，不可再觸發追擊 */
+  _isChaseAttack?: boolean
+  /** triggerPassives 設定：目前觸發器名稱，用於 damage case 區分反擊/追擊 */
+  _currentTrigger?: string
+  /** on_ally_attacked 專用：記錄發動攻擊的敵方英雄（追擊目標） */
+  _originalAttacker?: BattleHero
 }
 
 /* ════════════════════════════════════
@@ -243,3 +331,11 @@ export type BattleAction =
   | { type: 'TURN_START'; turn: number }
   | { type: 'TURN_END'; turn: number }
   | { type: 'BATTLE_END'; winner: 'player' | 'enemy' | 'draw' }
+  // v2.0 新增 action 類型
+  | { type: 'COUNTER_ATTACK'; attackerUid: string; targetUid: string; damage: number; killed: boolean }
+  | { type: 'CHASE_ATTACK'; attackerUid: string; targetUid: string; damage: number; killed: boolean }
+  | { type: 'EXECUTE'; attackerUid: string; targetUid: string }
+  | { type: 'STEAL_BUFF'; heroUid: string; targetUid: string; buffType: StatusType }
+  | { type: 'TRANSFER_DEBUFF'; heroUid: string; targetUid: string; debuffType: StatusType }
+  | { type: 'SHIELD_APPLY'; heroUid: string; targetUid: string; value: number }
+  | { type: 'SHIELD_BREAK'; heroUid: string }

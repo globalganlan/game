@@ -32,18 +32,16 @@ import type { EquipmentInstance, HeroInstanceData, BaseStats } from '../progress
    等級 & 經驗
    ════════════════════════════════════ */
 describe('progressionSystem — 等級經驗', () => {
-  it('expToNextLevel(1) = 114 (base 100, tier0, floor(100*1*(1+1*0.15))=114)', () => {
-    // floor(100 * 1.0^0 * (1 + 1*0.15)) = floor(115) but lv%10=1→1*0.15=0.15→115? Actually 114
-    expect(expToNextLevel(1)).toBe(114)
+  it('expToNextLevel(1) = 100 (level * 100)', () => {
+    expect(expToNextLevel(1)).toBe(100)
   })
 
-  it('expToNextLevel(10) = 100 (lv10 %10=0)', () => {
-    expect(expToNextLevel(10)).toBe(100)
+  it('expToNextLevel(10) = 1000 (level * 100)', () => {
+    expect(expToNextLevel(10)).toBe(1000)
   })
 
-  it('expToNextLevel(11) = 206 (tier1, 1.8x)', () => {
-    // floor(100 * 1.8^1 * (1 + 1*0.15)) = floor(180 * 1.15) = floor(207) = 206
-    expect(expToNextLevel(11)).toBe(206)
+  it('expToNextLevel(11) = 1100 (level * 100)', () => {
+    expect(expToNextLevel(11)).toBe(1100)
   })
 
   it('totalExpForLevel(1) = 0', () => {
@@ -80,8 +78,8 @@ describe('progressionSystem — 等級經驗', () => {
     expect(getLevelCap(0)).toBe(20)
   })
 
-  it('getLevelCap: ascension 5 → 60', () => {
-    expect(getLevelCap(5)).toBe(60)
+  it('getLevelCap: ascension 5 → 100', () => {
+    expect(getLevelCap(5)).toBe(100)
   })
 })
 
@@ -201,8 +199,12 @@ describe('progressionSystem — 星級', () => {
     expect(canStarUp(1, 0)).toBe(false)
   })
 
-  it('canStarUp: 已 6 星 → false', () => {
-    expect(canStarUp(6, 99999)).toBe(false)
+  it('canStarUp: 已 10 星 → false', () => {
+    expect(canStarUp(10, 99999)).toBe(false)
+  })
+
+  it('canStarUp: 7 星仍可升 → true', () => {
+    expect(canStarUp(7, 99999)).toBe(true)
   })
 
   it('getInitialStars: rarity 4 (SSR) → 0', () => {

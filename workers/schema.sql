@@ -223,3 +223,45 @@ CREATE TABLE IF NOT EXISTS shop_purchases (
 );
 
 CREATE INDEX IF NOT EXISTS idx_shop_purchases_player ON shop_purchases(playerId, purchaseDate);
+
+-- ═══════════════════════════════════════════════
+-- 13. effect_templates — 效果模板（靜態）
+-- ═══════════════════════════════════════════════
+CREATE TABLE IF NOT EXISTS effect_templates (
+  effectId        TEXT PRIMARY KEY,
+  name            TEXT NOT NULL DEFAULT '',
+  category        TEXT NOT NULL,
+  trigger_type    TEXT NOT NULL DEFAULT 'immediate',
+  triggerParam    TEXT,
+  triggerChance   REAL NOT NULL DEFAULT 1.0,
+  triggerLimit    INTEGER NOT NULL DEFAULT 0,
+  target          TEXT NOT NULL DEFAULT 'single_enemy',
+  scalingStat     TEXT,
+  multiplier      REAL,
+  flatValue       REAL,
+  hitCount        INTEGER,
+  min             REAL,
+  max             REAL,
+  status          TEXT,
+  statusChance    REAL,
+  statusValue     REAL,
+  statusDuration  INTEGER,
+  statusMaxStacks INTEGER,
+  targetHpThreshold REAL,
+  perAlly         INTEGER NOT NULL DEFAULT 0,
+  targetOverride  TEXT,
+  applyTo         TEXT
+);
+
+-- ═══════════════════════════════════════════════
+-- 14. skill_effects — 技能效果關聯表
+-- ═══════════════════════════════════════════════
+CREATE TABLE IF NOT EXISTS skill_effects (
+  skillId        TEXT NOT NULL,
+  effectId       TEXT NOT NULL,
+  sortOrder      INTEGER NOT NULL DEFAULT 0,
+  overrideParams TEXT NOT NULL DEFAULT '{}',
+  dependsOn      TEXT,
+  skillLevel     INTEGER NOT NULL DEFAULT 1,
+  PRIMARY KEY (skillId, effectId, skillLevel)
+);

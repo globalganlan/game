@@ -3,6 +3,7 @@
  *
  * 純函式模組，管理角色身上的狀態效果。
  * 對應 .ai/specs/core-combat.md v2.0 第五節
+ * 對應 .ai/specs/effect-system.md v2.4 第十三節（疊加規則）
  */
 
 import type { BattleHero, StatusEffect, StatusType, Shield, FinalStats } from './types'
@@ -19,47 +20,125 @@ const BUFF_TYPES: StatusType[] = [
   'dodge_up', 'reflect', 'taunt',
 ]
 
+/** 互斥對照表：增益 ↔ 減益 */
+const MUTUAL_EXCLUSIVE_MAP: Partial<Record<StatusType, StatusType>> = {
+  atk_up: 'atk_down',
+  atk_down: 'atk_up',
+  def_up: 'def_down',
+  def_down: 'def_up',
+  spd_up: 'spd_down',
+  spd_down: 'spd_up',
+  crit_rate_up: 'crit_rate_down',
+  crit_rate_down: 'crit_rate_up',
+}
+
 /* ════════════════════════════════════
    施加效果
    ════════════════════════════════════ */
 
 /**
- * 嘗試對目標施加一個狀態效果
+ * 嘗試對目標施加一個狀態效果（不帶 sourceEffectId）
  * @returns 是否成功施加
  */
 export function applyStatus(
   target: BattleHero,
   effect: Omit<StatusEffect, 'stacks'>,
 ): boolean {
+  return applyStatusV2(target, effect)
+}
+
+/**
+ * v2 效果施加（支援 sourceEffectId, 互斥, 同源/異源疊加）
+ * @returns 是否成功施加
+ */
+export function applyStatusV2(
+  target: BattleHero,
+  effect: Omit<StatusEffect, 'stacks'>,
+  sourceEffectId?: string,
+): boolean {
   // 免疫判定
   if (isDebuff(effect.type) && hasStatus(target, 'immunity')) {
     return false
   }
 
-  // 機率判定已在外層處理，此處直接施加
-
-  const existing = target.statusEffects.find(s => s.type === effect.type)
-
-  if (existing) {
-    // 控制效果不疊加，刷新時間
-    if (CONTROL_TYPES.includes(effect.type)) {
+  // 控制效果不疊加，刷新時間
+  if (CONTROL_TYPES.includes(effect.type)) {
+    const existing = target.statusEffects.find(s => s.type === effect.type)
+    if (existing) {
       existing.duration = Math.max(existing.duration, effect.duration)
       return true
     }
-    // 可疊加效果
+    target.statusEffects.push({ ...effect, stacks: 1, sourceEffectId })
+    return true
+  }
+
+  // 互斥覆蓋檢查 (同回合數合併、不同回合數共存)
+  const opposite = MUTUAL_EXCLUSIVE_MAP[effect.type]
+  if (opposite) {
+    const existingOpp = target.statusEffects.find(
+      s => s.type === opposite && s.duration === effect.duration
+    )
+    if (existingOpp) {
+      // 同回合數 → 合併（舊值 - 新值 or 新值 - 舊值）
+      const isBuff = BUFF_TYPES.includes(effect.type)
+      if (isBuff) {
+        // 新效果是 buff，舊效果是對應 debuff → 淨值 = buff.value - debuff.value
+        existingOpp.value = Math.max(0, existingOpp.value - effect.value)
+        if (existingOpp.value <= 0) {
+          // debuff 被完全抵消，轉為 buff
+          target.statusEffects = target.statusEffects.filter(s => s !== existingOpp)
+          const net = effect.value - (existingOpp.value + effect.value) // 淨 buff
+          if (effect.value > 0) {
+            target.statusEffects.push({ ...effect, stacks: 1, sourceEffectId })
+          }
+        }
+        return true
+      } else {
+        // 新效果是 debuff，舊效果是 buff
+        existingOpp.value = Math.max(0, existingOpp.value - effect.value)
+        if (existingOpp.value <= 0) {
+          target.statusEffects = target.statusEffects.filter(s => s !== existingOpp)
+          if (effect.value > existingOpp.value + effect.value) {
+            target.statusEffects.push({ ...effect, stacks: 1, sourceEffectId })
+          }
+        }
+        return true
+      }
+    }
+    // 不同回合數 → 共存（各自獨立）
+  }
+
+  // 同源 + 同回合數 → 合併疊加
+  const existing = target.statusEffects.find(
+    s => s.type === effect.type
+      && s.sourceEffectId === sourceEffectId
+      && sourceEffectId != null
+      && s.duration === effect.duration
+  )
+
+  if (existing) {
     if (existing.stacks < existing.maxStacks) {
       existing.stacks++
       existing.value += effect.value
     }
-    existing.duration = Math.max(existing.duration, effect.duration)
     return true
   }
 
-  // 新增效果
-  target.statusEffects.push({
-    ...effect,
-    stacks: 1,
-  })
+  // 無 sourceEffectId：同 type 直接疊加
+  if (!sourceEffectId) {
+    const existing = target.statusEffects.find(s => s.type === effect.type && !s.sourceEffectId)
+    if (existing) {
+      if (existing.stacks < existing.maxStacks) {
+        existing.stacks++
+        existing.value += effect.value
+      }
+      existing.duration = Math.max(existing.duration, effect.duration)
+      return true
+    }
+  }
+
+  // 新增獨立效果
+  target.statusEffects.push({ ...effect, stacks: 1, sourceEffectId })
   return true
 }
 
@@ -71,18 +150,81 @@ export function removeStatus(target: BattleHero, type: StatusType): void {
 }
 
 /**
- * 淨化（移除一個 debuff）
+ * 淨化 debuff
+ * v2: 若指定 statusType，移除該類型的所有效果
+ *     若未指定，隨機移除 count 個 debuff
  */
-export function cleanse(target: BattleHero, count: number = 1): StatusType[] {
+export function cleanse(target: BattleHero, count: number = 1, statusType?: StatusType): StatusType[] {
   const removed: StatusType[] = []
-  for (let i = 0; i < count; i++) {
-    const idx = target.statusEffects.findIndex(s => isDebuff(s.type))
-    if (idx >= 0) {
-      removed.push(target.statusEffects[idx].type)
-      target.statusEffects.splice(idx, 1)
+
+  if (statusType) {
+    // 移除指定類型的所有效果
+    const toRemove = target.statusEffects.filter(s => s.type === statusType && isDebuff(s.type))
+    for (const s of toRemove) {
+      removed.push(s.type)
+    }
+    target.statusEffects = target.statusEffects.filter(s => !(s.type === statusType && isDebuff(s.type)))
+  } else {
+    // 隨機移除 count 個 debuff
+    for (let i = 0; i < count; i++) {
+      const idx = target.statusEffects.findIndex(s => isDebuff(s.type))
+      if (idx >= 0) {
+        removed.push(target.statusEffects[idx].type)
+        target.statusEffects.splice(idx, 1)
+      }
     }
   }
   return removed
+}
+
+/**
+ * 驅散 buff（v2 新增）
+ * 若指定 statusType，移除該類型的所有 buff
+ * 若未指定，隨機移除 count 個 buff
+ * @returns 被移除的 StatusEffect 陣列（可能用於偷取等操作）
+ */
+export function dispelBuff(target: BattleHero, count: number = 1, statusType?: StatusType): StatusEffect[] {
+  const removed: StatusEffect[] = []
+
+  if (statusType) {
+    const toRemove = target.statusEffects.filter(s => s.type === statusType && !isDebuff(s.type))
+    removed.push(...toRemove)
+    target.statusEffects = target.statusEffects.filter(s => !(s.type === statusType && !isDebuff(s.type)))
+  } else {
+    for (let i = 0; i < count; i++) {
+      const idx = target.statusEffects.findIndex(s => !isDebuff(s.type) && s.type !== 'immunity')
+      if (idx >= 0) {
+        removed.push(target.statusEffects[idx])
+        target.statusEffects.splice(idx, 1)
+      }
+    }
+  }
+  return removed
+}
+
+/**
+ * 偷取 buff（v2 新增）：從目標移除 1 個 buff 並施加到自己
+ */
+export function stealBuff(source: BattleHero, target: BattleHero): StatusType | null {
+  const stolen = dispelBuff(target, 1)
+  if (stolen.length === 0) return null
+  const buff = stolen[0]
+  source.statusEffects.push({ ...buff, sourceHeroId: source.uid })
+  return buff.type
+}
+
+/**
+ * 轉移 debuff（v2 新增）：從自己移除 1 個 debuff 並施加到目標
+ */
+export function transferDebuff(source: BattleHero, target: BattleHero): StatusType | null {
+  const idx = source.statusEffects.findIndex(s => isDebuff(s.type))
+  if (idx < 0) return null
+  const debuff = source.statusEffects[idx]
+  source.statusEffects.splice(idx, 1)
+  // 目標免疫判定
+  if (hasStatus(target, 'immunity')) return null
+  target.statusEffects.push({ ...debuff, sourceHeroId: source.uid })
+  return debuff.type
 }
 
 /* ════════════════════════════════════

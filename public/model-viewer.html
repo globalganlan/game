@@ -1,0 +1,652 @@
+<!doctype html>
+<html lang="zh-TW">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>英雄模型預覽器 — GlobalGanLan</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Segoe UI', 'Microsoft JhengHei', sans-serif;
+      background: #0d0d0d; color: #e0e0e0;
+      display: flex; height: 100vh; overflow: hidden;
+    }
+
+    /* ─── 左側英雄列表 ─── */
+    #sidebar {
+      width: 220px; min-width: 220px;
+      background: #161616; border-right: 1px solid #333;
+      display: flex; flex-direction: column; overflow: hidden;
+    }
+    #sidebar h2 {
+      padding: 16px; font-size: 16px; color: #ff9944;
+      border-bottom: 1px solid #333; text-align: center;
+      flex-shrink: 0;
+    }
+    #hero-list {
+      flex: 1; overflow-y: auto; padding: 8px;
+    }
+    #hero-list::-webkit-scrollbar { width: 6px; }
+    #hero-list::-webkit-scrollbar-thumb { background: #555; border-radius: 3px; }
+    .hero-item {
+      display: flex; align-items: center; gap: 10px;
+      padding: 8px 10px; margin-bottom: 4px;
+      border-radius: 8px; cursor: pointer;
+      transition: background 0.2s;
+    }
+    .hero-item:hover { background: #2a2a2a; }
+    .hero-item.active { background: #3a2200; border: 1px solid #ff9944; }
+    .hero-item img {
+      width: 44px; height: 44px; border-radius: 6px;
+      object-fit: cover; background: #222;
+    }
+    .hero-item .hero-name { font-size: 13px; font-weight: 600; }
+    .hero-item .hero-id { font-size: 11px; color: #888; }
+
+    /* ─── 右側 3D 場景 ─── */
+    #main {
+      flex: 1; display: flex; flex-direction: column; position: relative;
+    }
+
+    /* 頂部工具列 */
+    #toolbar {
+      display: flex; align-items: center; gap: 12px;
+      padding: 12px 20px;
+      background: #1a1a1a; border-bottom: 1px solid #333;
+      flex-wrap: wrap;
+    }
+    #toolbar .label {
+      font-size: 12px; color: #888; margin-right: -4px;
+    }
+
+    /* 動畫按鈕 */
+    .anim-btn {
+      padding: 7px 18px; border: 1px solid #555; border-radius: 6px;
+      background: #222; color: #ccc; font-size: 13px;
+      cursor: pointer; transition: all 0.15s;
+      font-family: inherit;
+    }
+    .anim-btn:hover { background: #333; border-color: #888; }
+    .anim-btn.active { background: #ff9944; color: #000; border-color: #ff9944; font-weight: 700; }
+    .anim-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+
+    /* 速度控制 */
+    .slider-group {
+      display: flex; align-items: center; gap: 6px;
+    }
+    #speed-group { margin-left: auto; }
+    .slider-group input[type=range] { width: 80px; accent-color: #ff9944; }
+    .slider-group .val { font-size: 12px; color: #aaa; min-width: 40px; }
+
+    /* 場景資訊 */
+    #info-bar {
+      display: flex; gap: 20px; padding: 8px 20px;
+      background: #141414; border-bottom: 1px solid #222;
+      font-size: 11px; color: #666;
+    }
+    #info-bar span { white-space: nowrap; }
+
+    /* Canvas 容器 */
+    #canvas-wrap {
+      flex: 1; position: relative; overflow: hidden;
+    }
+    #canvas-wrap canvas { display: block; width: 100%; height: 100%; }
+
+    /* 載入狀態 */
+    #loading-overlay {
+      position: absolute; inset: 0;
+      display: flex; align-items: center; justify-content: center;
+      background: rgba(0,0,0,0.7); z-index: 10;
+      font-size: 18px; color: #ff9944;
+    }
+    #loading-overlay.hidden { display: none; }
+
+    /* Grid helper toggle */
+    .toggle-btn {
+      padding: 7px 12px; border: 1px solid #555; border-radius: 6px;
+      background: #222; color: #ccc; font-size: 12px;
+      cursor: pointer; font-family: inherit;
+    }
+    .toggle-btn.on { background: #334; border-color: #66aaff; color: #88ccff; }
+
+    /* 拖曳提示 */
+    #drag-hint {
+      position: absolute; bottom: 16px; left: 50%;
+      transform: translateX(-50%);
+      padding: 6px 16px; border-radius: 20px;
+      background: rgba(0,0,0,0.6); color: #888;
+      font-size: 11px; pointer-events: none;
+      transition: opacity 0.5s;
+    }
+  </style>
+</head>
+<body>
+
+<!-- ─── 左側列表 ─── -->
+<div id="sidebar">
+  <h2>🧟 英雄列表</h2>
+  <div id="hero-list"></div>
+</div>
+
+<!-- ─── 右側場景 ─── -->
+<div id="main">
+  <div id="toolbar">
+    <span class="label">動畫：</span>
+    <button class="anim-btn active" data-anim="idle">Idle</button>
+    <button class="anim-btn" data-anim="attack">Attack</button>
+    <button class="anim-btn" data-anim="hurt">Hurt</button>
+    <button class="anim-btn" data-anim="dying">Dying</button>
+    <button class="anim-btn" data-anim="run">Run</button>
+
+    <span class="label" style="margin-left:16px">工具：</span>
+    <button class="toggle-btn on" id="btn-grid">Grid</button>
+    <button class="toggle-btn" id="btn-wireframe">Wireframe</button>
+    <button class="toggle-btn on" id="btn-autorotate">Auto Rotate</button>
+
+    <div id="speed-group" class="slider-group">
+      <span class="label">速度：</span>
+      <input type="range" id="speed-slider" min="0.1" max="3" step="0.1" value="1">
+      <span class="val" id="speed-label">1.0x</span>
+    </div>
+    <div class="slider-group">
+      <span class="label">亮度：</span>
+      <input type="range" id="brightness-slider" min="0.2" max="4" step="0.1" value="2">
+      <span class="val" id="brightness-label">2.0</span>
+    </div>
+  </div>
+
+  <div id="info-bar">
+    <span id="info-model">模型：—</span>
+    <span id="info-faces">面數：—</span>
+    <span id="info-verts">頂點：—</span>
+    <span id="info-size">大小：—</span>
+    <span id="info-anim">動畫：—</span>
+    <span id="info-fps">FPS：—</span>
+  </div>
+
+  <div id="canvas-wrap">
+    <canvas id="c"></canvas>
+    <div id="loading-overlay" class="hidden">⏳ 載入中...</div>
+    <div id="drag-hint">🖱 左鍵旋轉 ｜ 右鍵平移 ｜ 滾輪縮放</div>
+  </div>
+</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "/node_modules/three/build/three.module.js",
+    "three/addons/": "/node_modules/three/examples/jsm/"
+  }
+}
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+// ─── 全域狀態 ───
+let scene, camera, renderer, controls, mixer, clock;
+let currentModel = null;
+let animActions = {};   // { idle, attack, hurt, dying, run }
+let activeAction = null;
+let activeAnimName = 'idle';
+let gridHelper = null;
+let wireframeOn = false;
+let autoRotate = true;
+let animSpeed = 1.0;
+let brightness = 2.0;
+let hemiLight, dirLight, fillLight, rimLight;
+
+const ANIM_NAMES = ['idle', 'attack', 'hurt', 'dying', 'run'];
+const FADE_DUR = 0.25;
+
+// ─── Loader 設定 ───
+const dracoLoader = new DRACOLoader();
+dracoLoader.setDecoderPath(`/draco/`);
+dracoLoader.setDecoderConfig({ type: 'js' });
+
+const gltfLoader = new GLTFLoader();
+gltfLoader.setDRACOLoader(dracoLoader);
+
+// ─── 初始化場景 ───
+function initScene() {
+  clock = new THREE.Clock();
+  scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x1a1a1a);
+  scene.fog = new THREE.Fog(0x1a1a1a, 20, 50);
+
+  // 相機
+  const canvas = document.getElementById('c');
+  const rect = canvas.parentElement.getBoundingClientRect();
+  camera = new THREE.PerspectiveCamera(45, rect.width / rect.height, 0.1, 100);
+  camera.position.set(0, 3, 6);
+
+  // 渲染器
+  renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+  renderer.setSize(rect.width, rect.height);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.outputColorSpace = THREE.SRGBColorSpace;
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1.6;
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFShadowMap;
+
+  // 控制器
+  controls = new OrbitControls(camera, canvas);
+  controls.enableDamping = true;
+  controls.dampingFactor = 0.08;
+  controls.target.set(0, 1.5, 0);
+  controls.autoRotate = true;
+  controls.autoRotateSpeed = 1.5;
+  controls.maxPolarAngle = Math.PI * 0.85;
+  controls.update();
+
+  // 燈光（預設亮度 2.0）
+  hemiLight = new THREE.HemisphereLight(0xc8d8e8, 0x3a3022, 2.0);
+  scene.add(hemiLight);
+
+  dirLight = new THREE.DirectionalLight(0xffeecc, 3.5);
+  dirLight.position.set(4, 8, 5);
+  dirLight.castShadow = true;
+  dirLight.shadow.mapSize.set(1024, 1024);
+  dirLight.shadow.camera.near = 0.5;
+  dirLight.shadow.camera.far = 30;
+  dirLight.shadow.camera.left = -5;
+  dirLight.shadow.camera.right = 5;
+  dirLight.shadow.camera.top = 5;
+  dirLight.shadow.camera.bottom = -5;
+  scene.add(dirLight);
+
+  fillLight = new THREE.DirectionalLight(0x8899bb, 1.2);
+  fillLight.position.set(-3, 4, -2);
+  scene.add(fillLight);
+
+  rimLight = new THREE.DirectionalLight(0xff8844, 0.8);
+  rimLight.position.set(0, 3, -5);
+  scene.add(rimLight);
+
+  // 地面
+  const groundGeo = new THREE.PlaneGeometry(30, 30);
+  const groundMat = new THREE.MeshStandardMaterial({
+    color: 0x222222, roughness: 0.9, metalness: 0.1,
+  });
+  const ground = new THREE.Mesh(groundGeo, groundMat);
+  ground.rotation.x = -Math.PI / 2;
+  ground.receiveShadow = true;
+  scene.add(ground);
+
+  // Grid
+  gridHelper = new THREE.GridHelper(20, 20, 0x444444, 0x2a2a2a);
+  gridHelper.position.y = 0.01;
+  scene.add(gridHelper);
+
+  // Resize
+  window.addEventListener('resize', onResize);
+  onResize();
+}
+
+function onResize() {
+  const wrap = document.getElementById('canvas-wrap');
+  const w = wrap.clientWidth;
+  const h = wrap.clientHeight;
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+  renderer.setSize(w, h);
+}
+
+// ─── 模型載入 ───
+async function loadHero(zombieId) {
+  showLoading(true);
+  disableAnimButtons(true);
+
+  // 清舊模型
+  if (currentModel) {
+    scene.remove(currentModel);
+    currentModel.traverse(child => {
+      if (child.isMesh) {
+        child.geometry?.dispose();
+        const mats = Array.isArray(child.material) ? child.material : [child.material];
+        mats.forEach(m => { m?.map?.dispose(); m?.dispose(); });
+      }
+    });
+    currentModel = null;
+  }
+  if (mixer) { mixer.stopAllAction(); mixer = null; }
+  animActions = {};
+  activeAction = null;
+
+  const base = `/models/${zombieId}`;
+  try {
+    // 並行載入 Mesh + 5 動畫
+    const [meshGltf, ...animGltfs] = await Promise.all([
+      loadGlb(`${base}/${zombieId}.glb`),
+      ...ANIM_NAMES.map(name => loadGlb(`${base}/${zombieId}_${name}.glb`).catch(e => {
+        console.warn(`動畫 ${name} 載入失敗:`, e.message || e);
+        return null;
+      })),
+    ]);
+
+    if (!meshGltf || !meshGltf.scene) {
+      throw new Error('Mesh GLB 載入失敗');
+    }
+
+    const model = meshGltf.scene;
+    currentModel = model;
+    scene.add(model);
+
+    // 計算 bounding box（GLB 用 Z 軸做高度）
+    const bbox = new THREE.Box3().setFromObject(model);
+    const sz = new THREE.Vector3();
+    bbox.getSize(sz);
+    const height = bbox.max.z - bbox.min.z; // Z-up from Blender
+    const modelScale = height > 0 ? 2.5 / height : 1;
+    model.scale.setScalar(modelScale);
+
+    // 重新計算 bbox
+    const bbox2 = new THREE.Box3().setFromObject(model);
+    const center = new THREE.Vector3();
+    bbox2.getCenter(center);
+    const sz2 = new THREE.Vector3();
+    bbox2.getSize(sz2);
+
+    // 接地
+    model.position.y -= bbox2.min.y;
+
+    // 調整相機（全身視角）
+    const finalBbox = new THREE.Box3().setFromObject(model);
+    const finalCenter = new THREE.Vector3();
+    finalBbox.getCenter(finalCenter);
+    const finalSize = new THREE.Vector3();
+    finalBbox.getSize(finalSize);
+    const maxDim = Math.max(finalSize.x, finalSize.y, finalSize.z);
+    const fov = camera.fov * (Math.PI / 180);
+    const dist = (maxDim / 2) / Math.tan(fov / 2) * 1.4; // 1.4 留白
+    controls.target.copy(finalCenter);
+    camera.position.set(finalCenter.x, finalCenter.y, finalCenter.z + dist);
+    controls.update();
+
+    // 材質設定
+    let faceCount = 0, vertCount = 0;
+    model.traverse(node => {
+      if (node.isMesh) {
+        node.castShadow = true;
+        node.receiveShadow = true;
+        node.frustumCulled = false;
+        if (node.geometry) {
+          const idx = node.geometry.index;
+          faceCount += idx ? idx.count / 3 : (node.geometry.attributes.position?.count || 0) / 3;
+          vertCount += node.geometry.attributes.position?.count || 0;
+        }
+      }
+    });
+
+    // 設定 AnimationMixer
+    mixer = new THREE.AnimationMixer(model);
+
+    // 載入動畫 clips
+    ANIM_NAMES.forEach((name, i) => {
+      const gltf = animGltfs[i];
+      if (!gltf || !gltf.animations || !gltf.animations.length) return;
+      const clip = gltf.animations[0];
+      // 過濾 root position track（移除 root motion）
+      if (name === 'run') {
+        clip.tracks = clip.tracks.filter(t => !t.name.endsWith('.position'));
+      }
+      const action = mixer.clipAction(clip);
+      if (name === 'idle' || name === 'run') {
+        action.setLoop(THREE.LoopRepeat);
+      } else {
+        action.setLoop(THREE.LoopOnce);
+        action.clampWhenFinished = true;
+      }
+      animActions[name] = action;
+    });
+
+    // 播放 idle
+    switchAnim('idle');
+
+    // 更新資訊
+    updateInfo({
+      model: zombieId,
+      faces: faceCount,
+      verts: vertCount,
+      size: sz,
+      animCount: Object.keys(animActions).length,
+    });
+
+    disableAnimButtons(false);
+  } catch (err) {
+    console.error('載入失敗:', err);
+    document.getElementById('info-model').textContent = `模型：載入失敗 (${err.message})`;
+  }
+  showLoading(false);
+}
+
+function loadGlb(url) {
+  return new Promise((resolve, reject) => {
+    gltfLoader.load(url, resolve, undefined, reject);
+  });
+}
+
+// ─── 動畫控制 ───
+function switchAnim(name) {
+  const action = animActions[name];
+  if (!action) return;
+
+  if (activeAction && activeAction !== action) {
+    action.reset();
+    activeAction.crossFadeTo(action, FADE_DUR, false);
+    action.play();
+  } else if (!activeAction) {
+    action.reset().play();
+  }
+
+  activeAction = action;
+  activeAnimName = name;
+
+  // 單次動畫結束後自動回 idle
+  if (name !== 'idle' && name !== 'run') {
+    const onFinished = (e) => {
+      if (e.action === action) {
+        mixer.removeEventListener('finished', onFinished);
+        switchAnim('idle');
+        highlightAnimBtn('idle');
+      }
+    };
+    mixer.addEventListener('finished', onFinished);
+  }
+}
+
+// ─── UI 綁定 ───
+function initUI() {
+  // 動畫按鈕
+  document.querySelectorAll('.anim-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const anim = btn.dataset.anim;
+      switchAnim(anim);
+      highlightAnimBtn(anim);
+    });
+  });
+
+  // 速度滑桿
+  const slider = document.getElementById('speed-slider');
+  const label = document.getElementById('speed-label');
+  slider.addEventListener('input', () => {
+    animSpeed = parseFloat(slider.value);
+    label.textContent = animSpeed.toFixed(1) + 'x';
+  });
+
+  // 亮度滑桿
+  const bSlider = document.getElementById('brightness-slider');
+  const bLabel = document.getElementById('brightness-label');
+  bSlider.addEventListener('input', () => {
+    brightness = parseFloat(bSlider.value);
+    bLabel.textContent = brightness.toFixed(1);
+    applyBrightness(brightness);
+  });
+
+  // Grid toggle
+  document.getElementById('btn-grid').addEventListener('click', function() {
+    this.classList.toggle('on');
+    if (gridHelper) gridHelper.visible = this.classList.contains('on');
+  });
+
+  // Wireframe toggle
+  document.getElementById('btn-wireframe').addEventListener('click', function() {
+    this.classList.toggle('on');
+    wireframeOn = this.classList.contains('on');
+    if (currentModel) {
+      currentModel.traverse(node => {
+        if (node.isMesh) {
+          const mats = Array.isArray(node.material) ? node.material : [node.material];
+          mats.forEach(m => { if (m) m.wireframe = wireframeOn; });
+        }
+      });
+    }
+  });
+
+  // Auto-rotate toggle
+  document.getElementById('btn-autorotate').addEventListener('click', function() {
+    this.classList.toggle('on');
+    autoRotate = this.classList.contains('on');
+    controls.autoRotate = autoRotate;
+  });
+
+  // 隱藏拖曳提示
+  const hint = document.getElementById('drag-hint');
+  const canvas = document.getElementById('c');
+  canvas.addEventListener('pointerdown', () => {
+    hint.style.opacity = '0';
+    setTimeout(() => hint.style.display = 'none', 500);
+  }, { once: true });
+}
+
+function highlightAnimBtn(name) {
+  document.querySelectorAll('.anim-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.anim === name);
+  });
+}
+
+function disableAnimButtons(disabled) {
+  document.querySelectorAll('.anim-btn').forEach(btn => {
+    btn.disabled = disabled;
+  });
+}
+
+function showLoading(show) {
+  document.getElementById('loading-overlay').classList.toggle('hidden', !show);
+}
+
+function applyBrightness(val) {
+  const ratio = val / 2.0; // 2.0 is the default
+  if (hemiLight) hemiLight.intensity = 2.0 * ratio;
+  if (dirLight) dirLight.intensity = 3.5 * ratio;
+  if (fillLight) fillLight.intensity = 1.2 * ratio;
+  if (rimLight) rimLight.intensity = 0.8 * ratio;
+  if (renderer) renderer.toneMappingExposure = 1.6 * ratio;
+}
+
+function updateInfo({ model, faces, verts, size, animCount }) {
+  document.getElementById('info-model').textContent = `模型：${model}`;
+  document.getElementById('info-faces').textContent = `面數：${Math.round(faces).toLocaleString()}`;
+  document.getElementById('info-verts').textContent = `頂點：${Math.round(verts).toLocaleString()}`;
+  const mb = (sz) => (sz / 1024 / 1024).toFixed(2);
+  document.getElementById('info-size').textContent = `尺寸：${size.x.toFixed(2)} × ${size.y.toFixed(2)} × ${size.z.toFixed(2)}`;
+  document.getElementById('info-anim').textContent = `動畫：${animCount}/5`;
+}
+
+// ─── 英雄列表 ───
+async function buildHeroList() {
+  const listEl = document.getElementById('hero-list');
+  // 掃描 models 目錄（透過逐一偵測，檢查 Content-Type 排除 SPA fallback）
+  const heroes = [];
+  const checks = [];
+  for (let i = 1; i <= 50; i++) {
+    const id = `zombie_${i}`;
+    checks.push(
+      fetch(`/models/${id}/${id}.glb`, { method: 'HEAD' })
+        .then(res => {
+          const ct = res.headers.get('content-type') || '';
+          if (res.ok && !ct.includes('text/html')) {
+            heroes.push({ id, num: i });
+          }
+        })
+        .catch(() => {})
+    );
+  }
+  await Promise.all(checks);
+  heroes.sort((a, b) => a.num - b.num);
+
+  for (const { id } of heroes) {
+    const item = document.createElement('div');
+    item.className = 'hero-item';
+    item.dataset.id = id;
+
+    const num = id.replace('zombie_', '');
+
+    // 嘗試載入大頭照
+    const img = document.createElement('img');
+    img.src = `/models/${id}/thumbnail.png`;
+    img.alt = id;
+    img.onerror = function() {
+      // 如果沒有大頭照，用色塊替代
+      this.style.background = `hsl(${num * 25}, 40%, 30%)`;
+      this.style.display = 'flex';
+      this.src = 'data:image/svg+xml,' + encodeURIComponent(
+        `<svg xmlns="http://www.w3.org/2000/svg" width="44" height="44"><text x="50%" y="54%" dominant-baseline="middle" text-anchor="middle" font-size="20" fill="#888">🧟</text></svg>`
+      );
+    };
+
+    const info = document.createElement('div');
+    info.innerHTML = `<div class="hero-name">zombie_${num}</div><div class="hero-id">#${num}</div>`;
+
+    item.appendChild(img);
+    item.appendChild(info);
+
+    item.addEventListener('click', () => {
+      document.querySelectorAll('.hero-item').forEach(el => el.classList.remove('active'));
+      item.classList.add('active');
+      loadHero(id);
+      highlightAnimBtn('idle');
+    });
+
+    listEl.appendChild(item);
+  }
+
+  // 自動載入第一個
+  if (heroes.length > 0) {
+    listEl.children[0].classList.add('active');
+    loadHero(heroes[0].id);
+  }
+}
+
+// ─── 動畫循環 ───
+let frameCount = 0;
+let lastFpsTime = 0;
+function animate() {
+  requestAnimationFrame(animate);
+  const delta = clock.getDelta();
+
+  if (mixer) mixer.update(delta * animSpeed);
+  controls.update();
+  renderer.render(scene, camera);
+
+  // FPS 計數
+  frameCount++;
+  const now = performance.now();
+  if (now - lastFpsTime >= 1000) {
+    document.getElementById('info-fps').textContent = `FPS：${frameCount}`;
+    frameCount = 0;
+    lastFpsTime = now;
+  }
+}
+
+// ─── 啟動 ───
+initScene();
+initUI();
+buildHeroList();
+animate();
+</script>
+</body>
+</html>

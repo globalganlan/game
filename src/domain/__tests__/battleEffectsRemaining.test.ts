@@ -183,7 +183,7 @@ describe('hp_below_pct 被動', () => {
 
   it('PAS_3_4 鐵壁（hp<50% dmg_reduce 40% + reflect 15%）', async () => {
     const pas = mkP('PAS_3_4', 'hp_below_pct', 'self', [
-      { type: 'buff', status: 'dmg_reduce', statusValue: 0.4 },
+      { type: 'buff', status: 'dmg_reduce', statusValue: 0.4, targetHpThreshold: 0.50 },
       { type: 'reflect', multiplier: 0.15 },
     ])
     pas.description = 'HP 低於 50%'
