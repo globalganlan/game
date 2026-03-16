@@ -2638,6 +2638,58 @@
   line-height: 1.35; padding: 0 2px;
 }
 
+/* ── 升星技能等級提升預覽（★7+） ── */
+.hd2-star-skill-upgrade {
+  background: rgba(240,192,64,0.08);
+  border: 1px solid rgba(240,192,64,0.25);
+  border-radius: 8px;
+  padding: 8px 12px;
+  margin-bottom: 8px;
+}
+.hd2-star-skill-upgrade-title {
+  font-size: 0.82rem;
+  color: #f0c040;
+  font-weight: 600;
+  margin-bottom: 8px;
+  text-align: center;
+}
+.hd2-star-skill-upgrade-item {
+  margin-bottom: 6px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+.hd2-star-skill-upgrade-item:last-child {
+  margin-bottom: 0; padding-bottom: 0; border-bottom: none;
+}
+.hd2-star-skill-upgrade-name {
+  font-size: 0.78rem;
+  color: #eee;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+.hd2-star-skill-upgrade-compare {
+  padding-left: 8px;
+}
+.hd2-star-skill-lv-row {
+  display: flex;
+  gap: 6px;
+  font-size: 0.72rem;
+  line-height: 1.4;
+  padding: 1px 0;
+}
+.hd2-star-skill-lv-row.old { color: #999; }
+.hd2-star-skill-lv-row.new { color: #51cf66; }
+.hd2-star-skill-lv-label {
+  flex-shrink: 0;
+  min-width: 32px;
+  font-weight: 600;
+}
+.hd2-star-skill-upgrade-same {
+  font-size: 0.72rem;
+  color: #888;
+  padding-left: 8px;
+}
+
 .hd2-result-msg {
   text-align: center;
   color: #ffd43b;

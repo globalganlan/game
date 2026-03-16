@@ -973,7 +973,7 @@ function HeroDetail({ hero, instance, onClose, skills, heroSkills }: HeroDetailP
 
         {/* ═══════ 升星 Modal ═══════ */}
         {modalMode === 'starUp' && (() => {
-          const nextStars = Math.min(6, stars + 1)
+          const nextStars = Math.min(10, stars + 1)
           const curMult = getStarMultiplier(stars, rarityNum)
           const nextMult = getStarMultiplier(nextStars, rarityNum)
           const curSlots = getStarPassiveSlots(stars)
@@ -1056,17 +1056,59 @@ function HeroDetail({ hero, instance, onClose, skills, heroSkills }: HeroDetailP
                   )}
                 </div>
               )}
-              {!newPassiveUnlocked && (
+              {!newPassiveUnlocked && nextStars <= 6 && (
                 <div className="hd2-star-bonus">
                   被動欄位：{curSlots} 個（不變）
                 </div>
               )}
               {/* ★7+ 技能等級提升預覽 */}
-              {nextStars > 6 && (
-                <div className="hd2-star-bonus" style={{ color: '#f0c040' }}>
-                  📈 技能等級：Lv.{stars > 6 ? stars - 5 : 1} → Lv.{nextStars - 5}（全技能效果提升）
-                </div>
-              )}
+              {nextStars > 6 && (() => {
+                const curLv = stars > 6 ? stars - 5 : 1
+                const nextLv = nextStars - 5
+                const effTemplates = getEffectTemplatesCache()
+                const effLinks = getSkillEffectsCache()
+                const allSkills = [
+                  skillSet.activeSkill ? { skill: skillSet.activeSkill, type: '主動' as const, slotIdx: 0 } : null,
+                  ...skillSet.passives.slice(0, curSlots).map((p, i) => p ? { skill: p, type: '被動' as const, slotIdx: i + 1 } : null),
+                ].filter(Boolean) as { skill: SkillTemplate; type: '主動' | '被動'; slotIdx: number }[]
+                return (
+                  <div className="hd2-star-skill-upgrade">
+                    <div className="hd2-star-skill-upgrade-title">
+                      📈 技能等級提升　Lv.{curLv} → <span className="hd2-star-stat-new">Lv.{nextLv}</span>
+                    </div>
+                    {allSkills.map(({ skill, type, slotIdx }) => {
+                      const curEffects = resolveSkillEffects(skill.skillId, curLv, effTemplates, effLinks)
+                      const nextEffects = resolveSkillEffects(skill.skillId, nextLv, effTemplates, effLinks)
+                      if (curEffects.length === 0 && nextEffects.length === 0) return null
+                      const curDesc = curEffects.map(eff => effectDescription(eff)).join('；')
+                      const nextDesc = nextEffects.map(eff => effectDescription(eff)).join('；')
+                      const hasChange = curDesc !== nextDesc
+                      return (
+                        <div key={skill.skillId} className="hd2-star-skill-upgrade-item">
+                          <div className="hd2-star-skill-upgrade-name">
+                            <span className={`hd2-skill-badge ${type === '主動' ? 'active' : 'passive'}`}>{type}{slotIdx > 0 ? slotIdx : ''}</span>
+                            {' '}{resolveSkillIcon(skill.icon, type === '主動' ? 'active' : 'passive')} {skill.name}
+                          </div>
+                          {hasChange ? (
+                            <div className="hd2-star-skill-upgrade-compare">
+                              <div className="hd2-star-skill-lv-row old">
+                                <span className="hd2-star-skill-lv-label">Lv.{curLv}</span>
+                                <span>{curDesc}</span>
+                              </div>
+                              <div className="hd2-star-skill-lv-row new">
+                                <span className="hd2-star-skill-lv-label">Lv.{nextLv}</span>
+                                <span>{nextDesc}</span>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="hd2-star-skill-upgrade-same">{curDesc || '（無效果資料）'}</div>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+                )
+              })()}
 
               {resultMsg && <div className="hd2-result-msg">{resultMsg}</div>}
               <div className="hd2-modal-btns">
