@@ -211,7 +211,9 @@ export function MainMenu({
 
       {/* ── 功能按鈕列 ── */}
       <div className="menu-grid">
-        {MENU_ITEMS.map((item) => {
+        {MENU_ITEMS.filter((item) =>
+          item.key !== 'battleTest' || (saveData?.playerId ?? '').startsWith('PQA'),
+        ).map((item) => {
           const locked = isItemLocked(item)
           return (
             <button

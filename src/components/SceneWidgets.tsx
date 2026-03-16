@@ -604,18 +604,19 @@ export function BuffIcons3D({ effects, textScale = 1 }: BuffIcons3DProps) {
 
   const visible = merged
 
-  if (visible.length === 0) return null
-
   const boxSize = 0.4 * textScale
   const gap = 0.06 * textScale
-  const count = visible.length
-  const totalWidth = count * boxSize + (count - 1) * gap
-  const startX = -totalWidth / 2 + boxSize / 2
 
-  // 背景材質（綠 buff / 紅 debuff）
+  // 背景材質（綠 buff / 紅 debuff）— 必須在 early return 之前呼叫，保持 hooks 順序一致
   const buffBg = useMemo(() => new THREE.MeshBasicMaterial({ color: '#22c55e', transparent: true, opacity: 0.75, depthTest: false }), [])
   const debuffBg = useMemo(() => new THREE.MeshBasicMaterial({ color: '#ef4444', transparent: true, opacity: 0.75, depthTest: false }), [])
   const boxGeo = useMemo(() => new THREE.PlaneGeometry(boxSize, boxSize), [boxSize])
+
+  if (visible.length === 0) return null
+
+  const count = visible.length
+  const totalWidth = count * boxSize + (count - 1) * gap
+  const startX = -totalWidth / 2 + boxSize / 2
 
   return (
     <Billboard position={[0, 3.2, 0]} renderOrder={15}>

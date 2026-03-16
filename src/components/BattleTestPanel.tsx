@@ -68,9 +68,9 @@ function formatAction(action: BattleAction, heroMap: Map<string, BattleHero>): B
     case 'DEATH':
       return { turn, type: 'DEATH', detail: `${name(action.targetUid)} 💀 死亡`, raw: action }
     case 'PASSIVE_TRIGGER':
-      return { turn, type: 'PASSIVE_TRIGGER', detail: `${name(action.heroUid)} 被動【${action.skillName}】觸發`, raw: action }
+      return { turn, type: 'PASSIVE_TRIGGER', detail: `${name(action.heroUid)} 效果【${action.skillName}】觸發`, raw: action }
     case 'PASSIVE_DAMAGE':
-      return { turn, type: 'PASSIVE_DAMAGE', detail: `${name(action.attackerUid)} → ${name(action.targetUid)} 被動傷害 ${action.damage}${action.killed ? ' 💀' : ''}`, raw: action }
+      return { turn, type: 'PASSIVE_DAMAGE', detail: `${name(action.attackerUid)} → ${name(action.targetUid)} 效果傷害 ${action.damage}${action.killed ? ' 💀' : ''}`, raw: action }
     case 'ENERGY_CHANGE':
       return { turn, type: 'ENERGY_CHANGE', detail: `${name(action.heroUid)} 能量 +${action.delta} → ${action.newValue}`, raw: action }
     case 'EXTRA_TURN':
@@ -207,8 +207,8 @@ const ACTION_TYPE_ZH: Record<string, string> = {
   BUFF_APPLY: '狀態施加',
   BUFF_EXPIRE: '狀態消失',
   DEATH: '死亡',
-  PASSIVE_TRIGGER: '被動觸發',
-  PASSIVE_DAMAGE: '被動傷害',
+  PASSIVE_TRIGGER: '效果觸發',
+  PASSIVE_DAMAGE: '效果傷害',
   ENERGY_CHANGE: '能量變化',
   COUNTER_ATTACK: '反擊',
   CHASE_ATTACK: '追擊',

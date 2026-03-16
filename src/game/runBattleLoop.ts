@@ -402,8 +402,8 @@ export async function executeBattleLoop(ctx: BattleLoopContext, replayActions?: 
           case 'BUFF_APPLY': return `${name(a.targetUid)} +${statusZh(a.effect.type)}${a.effect.stacks > 1 ? `×${a.effect.stacks}` : ''} (${a.effect.duration}t)`
           case 'BUFF_EXPIRE': return `${name(a.targetUid)} -${statusZh(a.effectType)} 到期`
           case 'DEATH': return `${name(a.targetUid)} 💀 死亡`
-          case 'PASSIVE_TRIGGER': return `${name(a.heroUid)} 被動【${a.skillName}】觸發`
-          case 'PASSIVE_DAMAGE': return `${name(a.attackerUid)} → ${name(a.targetUid)} 被動傷害 ${a.damage}${a.killed ? ' 💀' : ''}`
+          case 'PASSIVE_TRIGGER': return `${name(a.heroUid)} 效果【${a.skillName}】觸發`
+          case 'PASSIVE_DAMAGE': return `${name(a.attackerUid)} → ${name(a.targetUid)} 效果傷害 ${a.damage}${a.killed ? ' 💀' : ''}`
           case 'ENERGY_CHANGE': return `${name(a.heroUid)} 能量 +${a.delta} → ${a.newValue}`
           case 'EXTRA_TURN': return `${name(a.heroUid)} 額外行動（${a.reason}）`
           case 'COUNTER_ATTACK': return `${name(a.attackerUid)} ↩️反擊 → ${name(a.targetUid)} ${a.damage}${a.killed ? ' 💀' : ''}`
