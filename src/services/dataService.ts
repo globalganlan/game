@@ -357,8 +357,9 @@ export function resolveSkillEffects(
     resolved = applyLevelScaling(resolved, actualLevel, skillLevel)
 
     if (link.dependsOn) {
-      const depSrc = effectTemplates.get(link.dependsOn)
-      resolved.dependsOnName = depSrc?.name ?? link.dependsOn
+      // 用「效果 N」序號顯示，不用 DB 的泛用名稱
+      const depIdx = candidates.findIndex(c => c.effectId === link.dependsOn)
+      resolved.dependsOnName = depIdx >= 0 ? `效果 ${depIdx + 1}` : (effectTemplates.get(link.dependsOn)?.name ?? link.dependsOn)
     }
 
     effectNameMap.set(link.effectId, resolved.name)
