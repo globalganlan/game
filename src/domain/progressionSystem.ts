@@ -9,6 +9,19 @@
 import type { FinalStats } from './types'
 
 /* ════════════════════════════════════
+   星級系統核心常數（全域唯一真相來源）
+   ════════════════════════════════════ */
+
+/** 星級上限 */
+export const MAX_STARS = 10
+/** 被動 slot 全滿的星級閾值（超過此值改為提升技能等級） */
+export const SKILL_LEVEL_STAR_THRESHOLD = 6
+/** 計算技能等級：★1-6 → Lv.1, ★7 → Lv.2, ..., ★10 → Lv.5 */
+export function getSkillLevel(stars: number): number {
+  return stars > SKILL_LEVEL_STAR_THRESHOLD ? stars - SKILL_LEVEL_STAR_THRESHOLD + 1 : 1
+}
+
+/* ════════════════════════════════════
    型別
    ════════════════════════════════════ */
 
@@ -341,7 +354,7 @@ export function getStarUpCost(currentStars: number): number {
 
 /** 檢查是否可以升星 */
 export function canStarUp(currentStars: number, fragmentsOwned: number): boolean {
-  if (currentStars >= 10) return false
+  if (currentStars >= MAX_STARS) return false
   return fragmentsOwned >= getStarUpCost(currentStars)
 }
 

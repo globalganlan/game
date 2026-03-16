@@ -20,6 +20,7 @@ import { getHeroSkillSet } from '../services/dataService'
 import { getEffectTemplatesCache, getSkillEffectsCache, resolveSkillEffects } from '../services/dataService'
 import { SkillDescPanel, effectDescription } from './SkillDescPanel'
 import {
+  MAX_STARS, SKILL_LEVEL_STAR_THRESHOLD, getSkillLevel,
   getStarPassiveSlots, getAscensionMultiplier, getStarMultiplier,
   getStatAtLevel, getLevelCap, expToNextLevel,
   canAscend, canStarUp, getAscensionCost, getStarUpCost,
@@ -295,11 +296,10 @@ interface HeroListPanelProps {
    ──────────────────────────── */
 
 function StarDisplay({ count }: { count: number }) {
-  const maxStars = 10
   return (
     <span className="hero-stars">
-      {Array.from({ length: maxStars }, (_, i) => (
-        <span key={i} className={i < count ? (i >= 6 ? 'star-gold' : 'star-filled') : 'star-empty'}>★</span>
+      {Array.from({ length: MAX_STARS }, (_, i) => (
+        <span key={i} className={i < count ? (i >= SKILL_LEVEL_STAR_THRESHOLD ? 'star-gold' : 'star-filled') : 'star-empty'}>★</span>
       ))}
     </span>
   )
@@ -346,7 +346,7 @@ function HeroDetail({ hero, instance, onClose, skills, heroSkills }: HeroDetailP
   const rarity = toRarity(heroAny.Rarity)
   const rcfg = RARITY_CONFIG[rarity]
   const passiveSlots = getStarPassiveSlots(stars)
-  const skillLevel = stars > 6 ? stars - 5 : 1
+  const skillLevel = getSkillLevel(stars)
   const heroType = String(heroAny.Type ?? '?')
   const description = String(heroAny.Description ?? '')
   const modelId = resolveModelId(hero)
@@ -494,7 +494,7 @@ function HeroDetail({ hero, instance, onClose, skills, heroSkills }: HeroDetailP
   }, [instance, canDoAscend, hasAscMaterials, isProcessing, asc, heroId, ascCost, fragmentId, classStoneId])
 
   // ── 升星 helpers ──
-  const starCost = stars < 10 ? getStarUpCost(stars) : Infinity
+  const starCost = stars < MAX_STARS ? getStarUpCost(stars) : Infinity
   const canDoStarUp = isOwned && canStarUp(stars, ownedFragments)
 
   const handleConfirmStarUp = useCallback(async () => {
@@ -509,7 +509,7 @@ function HeroDetail({ hero, instance, onClose, skills, heroSkills }: HeroDetailP
         }
         setResultMsg(`升星成功！★${stars} → ★${res.newStars}`)
         // 滿星自動關閉升星 modal
-        if (res.newStars >= 10) {
+        if (res.newStars >= MAX_STARS) {
           setTimeout(() => setModalMode('none'), 1200)
         }
       } else {
@@ -852,8 +852,8 @@ function HeroDetail({ hero, instance, onClose, skills, heroSkills }: HeroDetailP
           </button>
           <button
             className="hd2-btn hd2-btn-star"
-            disabled={!isOwned || stars >= 10}
-            title={!isOwned ? '尚未擁有' : stars >= 10 ? '已達最高星級' : '消耗碎片提升星級'}
+            disabled={!isOwned || stars >= MAX_STARS}
+            title={!isOwned ? '尚未擁有' : stars >= MAX_STARS ? '已達最高星級' : '消耗碎片提升星級'}
             onClick={() => { setResultMsg(''); setModalMode('starUp') }}
           >
             <span className="hd2-btn-icon">⭐</span><span>升星</span>
@@ -973,7 +973,7 @@ function HeroDetail({ hero, instance, onClose, skills, heroSkills }: HeroDetailP
 
         {/* ═══════ 升星 Modal ═══════ */}
         {modalMode === 'starUp' && (() => {
-          const nextStars = Math.min(10, stars + 1)
+          const nextStars = Math.min(MAX_STARS, stars + 1)
           const curMult = getStarMultiplier(stars, rarityNum)
           const nextMult = getStarMultiplier(nextStars, rarityNum)
           const curSlots = getStarPassiveSlots(stars)
@@ -1056,15 +1056,15 @@ function HeroDetail({ hero, instance, onClose, skills, heroSkills }: HeroDetailP
                   )}
                 </div>
               )}
-              {!newPassiveUnlocked && nextStars <= 6 && (
+              {!newPassiveUnlocked && nextStars <= SKILL_LEVEL_STAR_THRESHOLD && (
                 <div className="hd2-star-bonus">
                   被動欄位：{curSlots} 個（不變）
                 </div>
               )}
               {/* ★7+ 技能等級提升預覽 */}
-              {nextStars > 6 && (() => {
-                const curLv = stars > 6 ? stars - 5 : 1
-                const nextLv = nextStars - 5
+              {nextStars > SKILL_LEVEL_STAR_THRESHOLD && (() => {
+                const curLv = getSkillLevel(stars)
+                const nextLv = getSkillLevel(nextStars)
                 const effTemplates = getEffectTemplatesCache()
                 const effLinks = getSkillEffectsCache()
                 const allSkills = [
@@ -1329,7 +1329,7 @@ function HeroDetail({ hero, instance, onClose, skills, heroSkills }: HeroDetailP
         {selectedSkill && (() => {
           const effTemplates = getEffectTemplatesCache()
           const effLinks = getSkillEffectsCache()
-          const skillLevel = stars > 6 ? stars - 5 : 1
+          const skillLevel = getSkillLevel(stars)
           const effects = resolveSkillEffects(selectedSkill.skill.skillId, skillLevel, effTemplates, effLinks)
           // 各等級效果對比（只有等級間確實有差異時才顯示）
           const allLevels = new Map<number, typeof effects>()
