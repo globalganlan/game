@@ -256,16 +256,6 @@ export function Hero({
           <DamagePopup key={pop.id} value={pop.value} damageType={pop.damageType} position={[0, 2.5, 0]} textScale={textScale} />
         ))}
 
-        {/* 技能名稱浮動標示（頭頂上方，避免遮擋身體閃光/粒子） */}
-        {skillToasts.map((t) => (
-          <SkillToast3D key={t.id} heroName={t.heroName} skillName={t.skillName} position={[0, 2.8, 0]} textScale={textScale} />
-        ))}
-
-        {/* 被動觸發浮動標示（依序往上錯開避免重疊） */}
-        {passiveHints.map((ph, idx) => (
-          <PassiveHint3D key={ph.id} skillName={ph.skillName} position={[0, 1.0 + idx * 0.55, 0]} textScale={textScale} />
-        ))}
-
         {/* Buff/Debuff 施加漂浮文字 */}
         {buffApplyHints.map((bh) => (
           <BuffApplyToast3D key={bh.id} effectType={bh.effectType} isBuff={bh.isBuff} position={[0, 0.8, 0]} textScale={textScale} />
