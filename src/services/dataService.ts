@@ -28,6 +28,7 @@ import type {
   FinalStats,
 } from '../domain/types'
 import type { RawHeroInput } from '../domain/battleEngine'
+import { LEVEL_SCALE } from '../domain/progressionSystem'
 
 /* ════════════════════════════════════
    原始 Sheet Row 型別
@@ -299,7 +300,7 @@ export async function loadSkillEffectsMap(): Promise<Map<string, SkillEffectLink
  * 技能等級自動縮放倍率（Lv.1~5）
  * 當 DB 無該等級的 overrideParams 時，自動根據此倍率提升數值
  */
-const LEVEL_SCALE = [1.0, 1.15, 1.30, 1.50, 1.75]
+// LEVEL_SCALE imported from progressionSystem.ts（單一來源）
 
 /** 對數值欄位套用等級縮放 */
 function applyLevelScaling<T extends { multiplier?: number; statusValue?: number; flatValue?: number }>(

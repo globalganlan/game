@@ -20,6 +20,8 @@ export const SKILL_LEVEL_STAR_THRESHOLD = 6
 export function getSkillLevel(stars: number): number {
   return stars > SKILL_LEVEL_STAR_THRESHOLD ? stars - SKILL_LEVEL_STAR_THRESHOLD + 1 : 1
 }
+/** 技能等級自動縮放倍率（Lv.1~5） */
+export const LEVEL_SCALE = [1.0, 1.15, 1.30, 1.50, 1.75] as const
 
 /* ════════════════════════════════════
    型別

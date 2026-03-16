@@ -34,6 +34,7 @@ import { getTimerYield } from '../services/saveService'
 import { addItemsLocally, getHeroEquipment } from '../services/inventoryService'
 import { audioManager } from '../services/audioService'
 import { getItemName, toRarityNum } from '../constants/rarity'
+import { getSkillLevel } from '../domain/progressionSystem'
 import { statusZh } from '../constants/statNames'
 import { completeArenaChallenge } from '../services/arenaService'
 import type { SaveData, HeroInstance } from '../services/saveService'
@@ -240,7 +241,7 @@ export async function executeBattleLoop(ctx: BattleLoopContext, replayActions?: 
     const heroRarity = toRarityNum((p as Record<string, unknown>).Rarity)
 
     // v2.0: 根據技能等級（★7→Lv.2 … ★10→Lv.5）解析效果覆寫
-    const skillLevel = starLevel > 6 ? starLevel - 5 : 1
+    const skillLevel = getSkillLevel(starLevel)
     if (activeSkill) {
       const resolved = resolveSkillEffectsForBattle(activeSkill.skillId, skillLevel, effTemplates, effLinks)
       if (resolved) activeSkill = { ...activeSkill, effects: resolved }

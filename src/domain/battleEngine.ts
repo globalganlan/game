@@ -22,7 +22,7 @@ import type {
   StatusType,
 } from './types'
 import { calculateDamage, calculateHeal } from './damageFormula'
-import { getFinalStats, type HeroInstanceData, type BaseStats } from './progressionSystem'
+import { getFinalStats, getStarPassiveSlots, type HeroInstanceData, type BaseStats } from './progressionSystem'
 import { createSeededRng } from './seededRng'
 import {
   getBuffedStats,

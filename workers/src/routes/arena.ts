@@ -32,6 +32,7 @@ const MILESTONES = [
    ════════════════════════════════════════════ */
 
 // ── 常數（與前端 progressionSystem.ts / combatPower.ts 同步） ──
+// ⚠️ 修改前端 RARITY_STAR_MULT / STAR_PASSIVE_SLOTS 時，務必同步更新這裡的 STAR_MUL / STAR_PASSIVE
 const CP_W = { HP: 0.5, ATK: 3, DEF: 2.5, SPD: 8, CritRate: 5, CritDmg: 2 } as const;
 const RARITY_NUM: Record<string, number> = { N: 1, R: 2, SR: 3, SSR: 4 };
 const RARITY_GROWTH: Record<number, number> = { 1: 0.030, 2: 0.035, 3: 0.040, 4: 0.050 };

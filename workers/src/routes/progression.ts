@@ -9,6 +9,10 @@ import { isoNow } from '../utils/helpers.js';
 
 const progression = new Hono<{ Bindings: Env; Variables: HonoVars }>();
 
+/* ── 常數（與前端 src/domain/progressionSystem.ts 同步） ── */
+const MAX_STARS = 10;
+const MAX_ASCENSION = 5;
+
 /** 解析前端暫時 local_ ID → 查找真正的 server instanceId */
 async function resolveInstanceId(db: D1Database, playerId: string, instanceId: string): Promise<string | null> {
   if (!instanceId.startsWith('local_')) return instanceId;
@@ -124,7 +128,7 @@ progression.post('/ascend-hero', async (c) => {
   ).bind(instanceId, playerId).first<HeroInstanceRow>();
   if (!hero) return c.json({ success: false, error: 'hero_not_found' });
 
-  if (hero.ascension >= 5) return c.json({ success: false, error: 'max_ascension' });
+  if (hero.ascension >= MAX_ASCENSION) return c.json({ success: false, error: 'max_ascension' });
   const levelCap = ASCENSION_LEVEL_CAP[hero.ascension] ?? 20;
   if (hero.level < levelCap) return c.json({ success: false, error: 'level_not_at_cap' });
 
@@ -194,7 +198,7 @@ progression.post('/star-up-hero', async (c) => {
     'SELECT * FROM hero_instances WHERE instanceId = ? AND playerId = ?'
   ).bind(instanceId, playerId).first<HeroInstanceRow>();
   if (!hero) return c.json({ success: false, error: 'hero_not_found' });
-  if (hero.stars >= 10) return c.json({ success: false, error: 'max_stars' });
+  if (hero.stars >= MAX_STARS) return c.json({ success: false, error: 'max_stars' });
 
   const fragId = `asc_fragment_${hero.heroId}`;
   const cost = STAR_FRAGMENT_COST[hero.stars] ?? 999;
