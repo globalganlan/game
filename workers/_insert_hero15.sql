@@ -54,3 +54,70 @@ VALUES (
 -- 7) 英雄技能配置
 INSERT OR IGNORE INTO hero_skills (heroId, activeSkillId, passive1_skillId, passive2_skillId, passive3_skillId, passive4_skillId)
 VALUES (15, 'SKL_PLAGUE_SPREAD', 'PAS_15_1', 'PAS_15_2', 'PAS_15_3', 'PAS_15_4');
+
+-- ═══════════════════════════════════════════════
+-- v2.0 效果模組化（effect_templates + skill_effects）
+-- ═══════════════════════════════════════════════
+
+-- 8) effect_templates（9 筆效果）
+
+-- 主動技：瘟疫蔓延
+INSERT OR IGNORE INTO effect_templates (effectId, name, category, trigger_type, target, scalingStat, multiplier)
+VALUES ('EFF_DAMAGE_SKL_PLAGUE_SPREAD_1', '瘟疫傷害', 'damage', 'immediate', 'all_enemies', 'ATK', 1.0);
+
+INSERT OR IGNORE INTO effect_templates (effectId, name, category, trigger_type, target, status, statusChance, statusValue, statusDuration)
+VALUES ('EFF_DEBUFF_SKL_PLAGUE_SPREAD_2', '瘟疫中毒', 'debuff', 'immediate', 'all_enemies', 'dot_poison', 0.5, 0.4, 2);
+
+INSERT OR IGNORE INTO effect_templates (effectId, name, category, trigger_type, target, status, statusChance, statusValue, statusDuration)
+VALUES ('EFF_DEBUFF_SKL_PLAGUE_SPREAD_3', '瘟疫降防', 'debuff', 'immediate', 'all_enemies', 'def_down', 0.4, 0.15, 2);
+
+-- 被動1：瘴氣體質
+INSERT OR IGNORE INTO effect_templates (effectId, name, category, trigger_type, target, status, statusValue)
+VALUES ('EFF_BUFF_PAS_15_1_1', '瘴氣體質防禦', 'buff', 'always', 'self', 'def_up', 0.1);
+
+-- 被動2：劇毒調配
+INSERT OR IGNORE INTO effect_templates (effectId, name, category, trigger_type, target, status, statusChance, statusValue, statusDuration)
+VALUES ('EFF_DEBUFF_PAS_15_2_1', '劇毒調配中毒', 'debuff', 'on_attack', 'single_enemy', 'dot_poison', 0.25, 0.35, 2);
+
+-- 被動3：疫病研究
+INSERT OR IGNORE INTO effect_templates (effectId, name, category, trigger_type, target, scalingStat, multiplier, triggerParam)
+VALUES ('EFF_HEAL_PAS_15_3_1', '疫病研究治療', 'heal', 'every_n_turns', 'all_allies', 'HP', 0.05, '2');
+
+INSERT OR IGNORE INTO effect_templates (effectId, name, category, trigger_type, target, triggerParam)
+VALUES ('EFF_DISPEL_PAS_15_3_2', '疫病研究淨化', 'dispel_debuff', 'every_n_turns', 'all_allies', '2');
+
+-- 被動4：終末瘟疫
+INSERT OR IGNORE INTO effect_templates (effectId, name, category, trigger_type, target, status, statusChance, statusValue, statusDuration)
+VALUES ('EFF_DEBUFF_PAS_15_4_1', '終末瘟疫流血', 'debuff', 'on_attack', 'single_enemy', 'dot_bleed', 0.35, 0.4, 2);
+
+INSERT OR IGNORE INTO effect_templates (effectId, name, category, trigger_type, target, status, statusChance, statusValue, statusDuration)
+VALUES ('EFF_DEBUFF_PAS_15_4_2', '終末瘟疫降攻', 'debuff', 'on_attack', 'single_enemy', 'atk_down', 0.15, 0.12, 2);
+
+-- 9) skill_effects 關聯表（9 筆）
+
+INSERT OR IGNORE INTO skill_effects (skillId, effectId, sortOrder, overrideParams, dependsOn)
+VALUES ('SKL_PLAGUE_SPREAD', 'EFF_DAMAGE_SKL_PLAGUE_SPREAD_1', 1, '{}', NULL);
+
+INSERT OR IGNORE INTO skill_effects (skillId, effectId, sortOrder, overrideParams, dependsOn)
+VALUES ('SKL_PLAGUE_SPREAD', 'EFF_DEBUFF_SKL_PLAGUE_SPREAD_2', 2, '{}', 'EFF_DAMAGE_SKL_PLAGUE_SPREAD_1');
+
+INSERT OR IGNORE INTO skill_effects (skillId, effectId, sortOrder, overrideParams, dependsOn)
+VALUES ('SKL_PLAGUE_SPREAD', 'EFF_DEBUFF_SKL_PLAGUE_SPREAD_3', 3, '{}', 'EFF_DAMAGE_SKL_PLAGUE_SPREAD_1');
+
+INSERT OR IGNORE INTO skill_effects (skillId, effectId, sortOrder, overrideParams, dependsOn)
+VALUES ('PAS_15_1', 'EFF_BUFF_PAS_15_1_1', 1, '{}', NULL);
+
+INSERT OR IGNORE INTO skill_effects (skillId, effectId, sortOrder, overrideParams, dependsOn)
+VALUES ('PAS_15_2', 'EFF_DEBUFF_PAS_15_2_1', 1, '{}', NULL);
+
+INSERT OR IGNORE INTO skill_effects (skillId, effectId, sortOrder, overrideParams, dependsOn)
+VALUES ('PAS_15_3', 'EFF_HEAL_PAS_15_3_1', 1, '{}', NULL);
+
+INSERT OR IGNORE INTO skill_effects (skillId, effectId, sortOrder, overrideParams, dependsOn)
+VALUES ('PAS_15_3', 'EFF_DISPEL_PAS_15_3_2', 2, '{}', NULL);
+
+INSERT OR IGNORE INTO skill_effects (skillId, effectId, sortOrder, overrideParams, dependsOn)
+VALUES ('PAS_15_4', 'EFF_DEBUFF_PAS_15_4_1', 1, '{}', NULL);
+
+INSERT OR IGNORE INTO skill_effects (skillId, effectId, sortOrder, overrideParams, dependsOn)
+VALUES ('PAS_15_4', 'EFF_DEBUFF_PAS_15_4_2', 2, '{}', NULL);
