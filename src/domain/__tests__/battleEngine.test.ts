@@ -98,7 +98,7 @@ describe('battleEngine', () => {
         ],
       })
       const result = checkLethalPassive(hero, 100, [hero])
-      expect(result).toBe(true)
+      expect(result).toBeTruthy()
       expect(hero.currentHP).toBe(Math.max(1, Math.floor(1000 * 0.1))) // 100
     })
 

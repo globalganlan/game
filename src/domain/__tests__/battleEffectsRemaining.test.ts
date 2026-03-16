@@ -419,13 +419,13 @@ describe('on_lethal 被動（補齊）', () => {
 
     // 受到致命傷害 → checkLethalPassive 保命
     const saved = checkLethalPassive(p1, 99999, [p1])
-    expect(saved).toBe(true)
+    expect(saved).toBeTruthy()
     expect(p1.currentHP).toBeGreaterThan(0)
 
     // PAS_1_4 可觸發 2 次
     p1.currentHP = 100
     const saved2 = checkLethalPassive(p1, 99999, [p1])
-    expect(saved2).toBe(true)
+    expect(saved2).toBeTruthy()
     expect(p1.currentHP).toBeGreaterThan(0)
 
     // 第 3 次不再保命

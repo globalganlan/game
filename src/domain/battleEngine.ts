@@ -445,6 +445,7 @@ async function executeNormalAttack(
         const saved = checkLethalPassive(target, result.damage, allHeroes)
         if (saved) {
           attacker.totalDamageDealt += Math.max(0, hpBefore - target.currentHP)
+          await cfg.onAction({ type: 'PASSIVE_TRIGGER', heroUid: target.uid, skillId: saved.skillId, skillName: saved.skillName })
         } else {
           target.currentHP = Math.max(0, target.currentHP - result.damage)
           attacker.totalDamageDealt += result.damage
@@ -515,6 +516,7 @@ async function executeNormalAttack(
     const hpBefore = target.currentHP
     const saved = checkLethalPassive(target, result.damage, allHeroes)
     if (saved) {
+      await cfg.onAction({ type: 'PASSIVE_TRIGGER', heroUid: target.uid, skillId: saved.skillId, skillName: saved.skillName })
       // checkLethalPassive 已設�?target.currentHP ??統�?實�?????�而�??��??�害
       attacker.totalDamageDealt += Math.max(0, hpBefore - target.currentHP)
       killed = false
@@ -669,6 +671,7 @@ async function executeSkill(
             if (saved) {
               attacker.totalDamageDealt += Math.max(0, skillHpBefore - target.currentHP)
               killed = false
+              cfg.onAction({ type: 'PASSIVE_TRIGGER', heroUid: target.uid, skillId: saved.skillId, skillName: saved.skillName })
             } else {
               target.currentHP = Math.max(0, target.currentHP - result.damage)
               attacker.totalDamageDealt += result.damage
@@ -815,7 +818,10 @@ async function executeSkill(
           if (tHpPct < threshold && !_hasStatus(target, 'immunity')) {
             // §8.5: ?�殺?�檢??on_lethal 被�?（�?復活/保命�?
             const saved = checkLethalPassive(target, target.currentHP, allHeroes)
-            if (saved) break
+            if (saved) {
+              cfg.onAction({ type: 'PASSIVE_TRIGGER', heroUid: target.uid, skillId: saved.skillId, skillName: saved.skillName })
+              break
+            }
             target.currentHP = 0
             attacker.killCount++
             killedUids.push(target.uid)
@@ -962,11 +968,13 @@ function triggerPassives(
  * ?�命?�觸?��??��??��?�?
  * ?�扣血?�呼?��??��? on_lethal 被�?且�??�即將死亡�?觸發保命
  */
+export type LethalSaveInfo = { saved: true; skillId: string; skillName: string } | false
+
 export function checkLethalPassive(
   hero: BattleHero,
   incomingDamage: number,
   _allHeroes: BattleHero[],
-): boolean {
+): LethalSaveInfo {
   const wouldDie = hero.currentHP - incomingDamage <= 0
 
   if (!wouldDie) return false
@@ -983,12 +991,12 @@ export function checkLethalPassive(
       if (effect.type === 'revive') {
         hero.currentHP = Math.max(1, Math.floor(hero.maxHP * (effect.multiplier ?? 0.01)))
         hero.passiveUsage[usageKey] = usageCount + 1
-        return true
+        return { saved: true, skillId: passive.skillId, skillName: passive.name }
       }
       if (effect.type === 'heal') {
         hero.currentHP = Math.max(1, Math.floor(hero.maxHP * (effect.multiplier ?? 0.1)))
         hero.passiveUsage[usageKey] = usageCount + 1
-        return true
+        return { saved: true, skillId: passive.skillId, skillName: passive.name }
       }
     }
   }
@@ -1282,7 +1290,10 @@ function executePassiveEffect(
       if (_hasStatus(execTarget, 'immunity')) return false
       // §8.5: 檢查 on_lethal 被�?
       const saved = checkLethalPassive(execTarget, execTarget.currentHP, context.allAllies.concat(context.allEnemies))
-      if (saved) return true
+      if (saved) {
+        cfg.onAction({ type: 'PASSIVE_TRIGGER', heroUid: execTarget.uid, skillId: saved.skillId, skillName: saved.skillName })
+        return true
+      }
       execTarget.currentHP = 0
       hero.killCount++
       cfg.onAction({

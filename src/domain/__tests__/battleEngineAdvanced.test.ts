@@ -441,7 +441,7 @@ describe('battleEngine - 進階測試', () => {
 
       const saved = checkLethalPassive(hero, 200, [hero])
 
-      expect(saved).toBe(true)
+      expect(saved).toBeTruthy()
       expect(hero.currentHP).toBe(500) // 50% of maxHP
     })
 
