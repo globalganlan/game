@@ -1,8 +1,8 @@
 /**
  * SkillDescPanel — 技能描述面板
  *
- * 對應 .ai/specs/effect-system.md v2.4 §12
- * 顯示技能效果列表、等級對比、依賴提示
+ * 對應 .ai/specs/effect-system.md v2.26 §11
+ * 顯示技能效果列表、觸發/目標/機率標籤、等級逐效果對比、依賴提示
  */
 
 import { useMemo } from 'react'
@@ -43,6 +43,15 @@ const TARGET_ZH: Record<string, string> = {
   all_allies: '全體隊友', self: '自身', trigger_source: '觸發來源',
 }
 
+const CATEGORY_ZH: Partial<Record<EffectCategory, string>> = {
+  damage: '傷害', dot: '持續傷害', heal: '治療', buff: '增益', debuff: '減益',
+  cc: '控制', shield: '護盾', energy: '能量', extra_turn: '額外行動',
+  counter_attack: '反擊', chase_attack: '追擊', revive: '復活',
+  dispel_debuff: '淨化', dispel_buff: '驅散', reflect: '反傷',
+  steal_buff: '偷取', transfer_debuff: '轉移', execute: '斬殺',
+  modify_target: '目標變更',
+}
+
 /* ════════════════════════════════════
    Props
    ════════════════════════════════════ */
@@ -58,7 +67,7 @@ interface SkillDescPanelProps {
 }
 
 /* ════════════════════════════════════
-   元件
+   輔助函式
    ════════════════════════════════════ */
 
 function formatTrigger(trigger: EffectTrigger, triggerParam?: number | string): string {
@@ -71,9 +80,10 @@ function formatTrigger(trigger: EffectTrigger, triggerParam?: number | string): 
   return template.replace(/ \{param\}[%時]?/, '')
 }
 
+const pct = (v: number) => `${Math.round(v * 100)}%`
+
 export function effectDescription(eff: ResolvedEffect): string {
   const icon = getCategoryEmoji(eff.category) || '❓'
-  const pct = (v: number) => `${Math.round(v * 100)}%`
 
   /** 倍率文字：「攻擊×180%」或「180%」 */
   const scalingPct = () => {
@@ -135,6 +145,7 @@ export function effectDescription(eff: ResolvedEffect): string {
         text += `（每回合 ${parts.join(' + ')}${hasHp ? '，HP傷害上限10萬' : ''}）`
       }
       if (duration) text += `，持續 ${duration}`
+      if (eff.statusMaxStacks && eff.statusMaxStacks > 1) text += `（最高 ${eff.statusMaxStacks} 層）`
       desc = `${chancePrefix}施加 ${text}`
       break
     }
@@ -204,6 +215,106 @@ export function effectDescription(eff: ResolvedEffect): string {
   return `${icon} ${desc}`
 }
 
+/* ── 效果附加標籤（目標/觸發/機率/上限/疊層） ── */
+function EffectTags({ eff }: { eff: ResolvedEffect }) {
+  const tags: { label: string; cls: string }[] = []
+
+  // 目標
+  const targetLabel = TARGET_ZH[eff.target]
+  if (targetLabel && eff.target !== 'single_enemy') {
+    tags.push({ label: `🎯 ${targetLabel}`, cls: 'sdp-tag-target' })
+  }
+
+  // 觸發條件（只有被動效果 trigger !== immediate 才顯示）
+  if (eff.trigger && eff.trigger !== 'immediate') {
+    tags.push({ label: formatTrigger(eff.trigger, eff.triggerParam), cls: 'sdp-tag-trigger' })
+  }
+
+  // 觸發機率
+  if (eff.triggerChance != null && eff.triggerChance < 1) {
+    tags.push({ label: `${pct(eff.triggerChance)} 機率觸發`, cls: 'sdp-tag-chance' })
+  }
+
+  // 每場上限
+  if (eff.triggerLimit && eff.triggerLimit > 0) {
+    tags.push({ label: `每場限 ${eff.triggerLimit} 次`, cls: 'sdp-tag-limit' })
+  }
+
+  // 最大疊層（buff/debuff/dot 類）
+  if (eff.statusMaxStacks && eff.statusMaxStacks > 1 && eff.category !== 'dot') {
+    tags.push({ label: `最高 ${eff.statusMaxStacks} 層`, cls: 'sdp-tag-stacks' })
+  }
+
+  if (tags.length === 0) return null
+
+  return (
+    <div className="sdp-effect-tags">
+      {tags.map((t, i) => (
+        <span key={i} className={`sdp-tag ${t.cls}`}>{t.label}</span>
+      ))}
+    </div>
+  )
+}
+
+/* ── 等級對比：逐效果展開 ── */
+function LevelComparison({
+  allLevelEffects,
+  skillLevel,
+}: {
+  allLevelEffects: Map<number, ResolvedEffect[]>
+  skillLevel: number
+}) {
+  // 取所有等級列表
+  const levels = Array.from(allLevelEffects.keys()).sort((a, b) => a - b)
+  // 取效果數最多的等級作為基準
+  const maxEffCt = Math.max(...Array.from(allLevelEffects.values()).map(e => e.length))
+
+  return (
+    <div className="sdp-levels">
+      <div className="sdp-levels-title">📊 等級對比</div>
+      <div className="sdp-levels-table">
+        {/* 表頭 */}
+        <div className="sdp-lv-header">
+          <span className="sdp-lv-cell sdp-lv-label"></span>
+          {levels.map(lv => (
+            <span key={lv} className={`sdp-lv-cell ${lv === skillLevel ? 'sdp-lv-current' : ''}`}>
+              Lv.{lv}{lv === skillLevel ? ' ★' : ''}
+            </span>
+          ))}
+        </div>
+        {/* 逐效果行 */}
+        {Array.from({ length: maxEffCt }, (_, ei) => {
+          // 取各等級此效果的描述
+          const descriptions = levels.map(lv => {
+            const effs = allLevelEffects.get(lv)
+            const e = effs?.[ei]
+            return e ? effectDescription(e) : '—'
+          })
+          // 如果所有等級描述相同→跳過（無變化不顯示）
+          if (new Set(descriptions).size <= 1) return null
+          // 取 category icon
+          const baseEff = allLevelEffects.get(levels[0])?.[ei]
+          const catLabel = baseEff ? (CATEGORY_ZH[baseEff.category] || baseEff.category) : `效果 ${ei + 1}`
+          return (
+            <div key={ei} className="sdp-lv-row">
+              <span className="sdp-lv-cell sdp-lv-label">{catLabel}</span>
+              {levels.map((lv, li) => (
+                <span key={lv} className={`sdp-lv-cell ${lv === skillLevel ? 'sdp-lv-current' : ''}`}>
+                  {descriptions[li]}
+                </span>
+              ))}
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+/* ════════════════════════════════════
+   主元件
+   ════════════════════════════════════ */
+
 export function SkillDescPanel({
   skill,
   effects,
@@ -219,50 +330,63 @@ export function SkillDescPanel({
     return formatTrigger(trigger)
   }, [skill])
 
+  const typeClass = skill.type === 'active' ? 'sdp-badge-active' : 'sdp-badge-passive'
+
   return (
     <div className="skill-desc-panel" onClick={e => e.stopPropagation()}>
+      {/* ── 頂部裝飾線 ── */}
+      <div className="sdp-top-accent" />
+
+      {/* ── Header ── */}
       <div className="skill-desc-header">
-        <span className="skill-desc-name">
-          {skill.icon || '⚔️'} {skill.name}
+        <div className="skill-desc-name">
+          <span className="sdp-skill-icon">{skill.icon || '⚔️'}</span>
+          <span>{skill.name}</span>
           {skillLevel > 1 && <span className="skill-desc-level">Lv.{skillLevel}</span>}
-        </span>
+        </div>
         <button className="skill-desc-close" onClick={onClose}>✕</button>
       </div>
 
-      <div className="skill-desc-type">
-        {triggerLabel}
-        {isLocked && unlockStar && <span className="skill-desc-locked">🔒 ★{unlockStar} 解鎖</span>}
+      {/* ── 類型標籤列 ── */}
+      <div className="sdp-type-row">
+        <span className={`sdp-badge ${typeClass}`}>{triggerLabel}</span>
+        {effects.length > 0 && effects[0].target && (
+          <span className="sdp-badge sdp-badge-target">🎯 {TARGET_ZH[effects[0].target] || effects[0].target}</span>
+        )}
+        {isLocked && unlockStar && <span className="sdp-badge sdp-badge-locked">🔒 ★{unlockStar} 解鎖</span>}
       </div>
 
+      {/* ── 技能描述 ── */}
       {skill.description && (
         <div className="skill-desc-text">{skill.description}</div>
       )}
 
+      {/* ── 效果列表 ── */}
       <div className="skill-desc-effects">
-        {effects.map((eff, i) => (
-          <div key={eff.effectId || i} className="skill-desc-effect-row"
-               style={{ borderLeftColor: getCategoryColor(eff.category) }}>
-            <span className="skill-desc-effect-num">效果 {i + 1}:</span>
-            <span className="skill-desc-effect-desc">{effectDescription(eff)}</span>
-            {eff.dependsOnName && (
-              <span className="skill-desc-depends">└ 需要「{eff.dependsOnName}」生效</span>
-            )}
-          </div>
-        ))}
+        {effects.map((eff, i) => {
+          const color = getCategoryColor(eff.category)
+          return (
+            <div key={eff.effectId || i} className="skill-desc-effect-row"
+                 style={{ borderLeftColor: color }}>
+              <div className="sdp-effect-header">
+                <span className="sdp-effect-cat" style={{ color }}>
+                  {getCategoryEmoji(eff.category)} {CATEGORY_ZH[eff.category] || eff.category}
+                </span>
+                {eff.name && <span className="sdp-effect-name">{eff.name}</span>}
+              </div>
+              <div className="skill-desc-effect-desc">{effectDescription(eff)}</div>
+              <EffectTags eff={eff} />
+              {eff.dependsOnName && (
+                <span className="skill-desc-depends">└ 需要「{eff.dependsOnName}」生效</span>
+              )}
+            </div>
+          )
+        })}
       </div>
 
+      {/* ── 等級對比 ── */}
       {allLevelEffects && allLevelEffects.size > 1 && (
-        <div className="skill-desc-levels">
-          <div className="skill-desc-levels-title">等級對比</div>
-          {Array.from(allLevelEffects.entries()).map(([lv, effs]) => (
-            <div key={lv} className={`skill-desc-level-row ${lv === skillLevel ? 'current' : ''}`}>
-              <span className="skill-desc-lv">Lv.{lv}{lv === skillLevel ? ' ★' : ''}</span>
-              <span className="skill-desc-lv-desc">
-                {effs.map(e => effectDescription(e)).join('；')}
-              </span>
-            </div>
-          ))}
-        </div>
+        <LevelComparison allLevelEffects={allLevelEffects} skillLevel={skillLevel} />
       )}
     </div>
   )

@@ -2212,24 +2212,33 @@ span.hd2-skill-icon {
   position: fixed;
   inset: 0;
   z-index: 900;
-  background: rgba(0,0,0,0.6);
+  background: rgba(0,0,0,0.65);
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 16px;
+  backdrop-filter: blur(4px);
 }
 .skill-desc-panel {
+  position: relative;
   background: linear-gradient(160deg, #1e1e2e 0%, #181825 100%);
   border: 1px solid rgba(255,255,255,0.12);
-  border-radius: 12px;
-  padding: 16px;
-  max-width: 380px;
+  border-radius: 14px;
+  padding: 0 16px 16px;
+  max-width: 400px;
   width: 100%;
   max-height: 80vh;
   overflow-y: auto;
-  box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+  box-shadow: 0 8px 40px rgba(0,0,0,0.6), 0 0 60px rgba(92,124,250,0.08);
   color: #cdd6f4;
   font-size: 0.85rem;
+}
+/* 頂部裝飾漸層線 */
+.sdp-top-accent {
+  height: 3px;
+  margin: 0 -16px 12px;
+  background: linear-gradient(90deg, #5c7cfa 0%, #f0c040 50%, #fa5c5c 100%);
+  border-radius: 14px 14px 0 0;
 }
 .skill-desc-header {
   display: flex;
@@ -2238,118 +2247,228 @@ span.hd2-skill-icon {
   margin-bottom: 8px;
 }
 .skill-desc-name {
-  font-size: 1rem;
+  font-size: 1.05rem;
   font-weight: 700;
-  color: #e8e8e8;
+  color: #eee;
   display: flex;
   align-items: center;
   gap: 6px;
 }
+.sdp-skill-icon {
+  font-size: 1.3rem;
+  filter: drop-shadow(0 0 4px rgba(255,255,255,0.3));
+}
 .skill-desc-level {
-  font-size: 0.72rem;
-  background: #5c7cfa;
+  font-size: 0.7rem;
+  background: linear-gradient(135deg, #5c7cfa, #6e8fff);
   color: #fff;
-  padding: 1px 6px;
-  border-radius: 4px;
+  padding: 1px 7px;
+  border-radius: 10px;
   font-weight: 600;
+  letter-spacing: 0.5px;
 }
 .skill-desc-close {
   background: none;
   border: none;
-  color: #888;
+  color: #666;
   font-size: 1.1rem;
   cursor: pointer;
   padding: 4px 8px;
-  border-radius: 4px;
+  border-radius: 50%;
+  transition: all 0.15s;
 }
 .skill-desc-close:hover {
   color: #fff;
   background: rgba(255,255,255,0.1);
 }
-.skill-desc-type {
-  font-size: 0.78rem;
-  color: #8ba4ff;
-  margin-bottom: 6px;
+
+/* ── 類型標籤列 ── */
+.sdp-type-row {
   display: flex;
-  align-items: center;
-  gap: 8px;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 8px;
 }
-.skill-desc-locked {
-  color: #f87171;
-  font-size: 0.72rem;
+.sdp-badge {
+  font-size: 0.7rem;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
 }
-.skill-desc-text {
+.sdp-badge-active {
+  background: rgba(92,124,250,0.2);
+  color: #8ba4ff;
+  border: 1px solid rgba(92,124,250,0.3);
+}
+.sdp-badge-passive {
+  background: rgba(120,200,120,0.15);
+  color: #8cd898;
+  border: 1px solid rgba(120,200,120,0.25);
+}
+.sdp-badge-target {
+  background: rgba(255,255,255,0.06);
   color: #aaa;
-  font-size: 0.8rem;
-  line-height: 1.45;
-  margin-bottom: 10px;
-  padding: 6px 8px;
-  background: rgba(255,255,255,0.04);
-  border-radius: 6px;
+  border: 1px solid rgba(255,255,255,0.1);
 }
+.sdp-badge-locked {
+  background: rgba(248,113,113,0.15);
+  color: #f87171;
+  border: 1px solid rgba(248,113,113,0.25);
+}
+
+/* ── 技能描述 ── */
+.skill-desc-text {
+  color: #999;
+  font-size: 0.8rem;
+  line-height: 1.5;
+  margin-bottom: 10px;
+  padding: 8px 10px;
+  background: rgba(255,255,255,0.03);
+  border-radius: 8px;
+  border-left: 2px solid rgba(255,255,255,0.08);
+}
+
+/* ── 效果列表 ── */
 .skill-desc-effects {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
   margin-bottom: 10px;
 }
 .skill-desc-effect-row {
-  padding: 6px 8px;
+  padding: 8px 10px;
   background: rgba(255,255,255,0.04);
-  border-radius: 6px;
+  border-radius: 8px;
   border-left: 3px solid #555;
   font-size: 0.8rem;
+  transition: background 0.15s;
 }
-.skill-desc-effect-num {
+.skill-desc-effect-row:hover {
+  background: rgba(255,255,255,0.07);
+}
+/* 效果行 header：類型標籤 + 效果名 */
+.sdp-effect-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 3px;
+}
+.sdp-effect-cat {
+  font-size: 0.7rem;
+  font-weight: 600;
+  opacity: 0.85;
+}
+.sdp-effect-name {
+  font-size: 0.68rem;
   color: #888;
-  font-size: 0.72rem;
-  margin-right: 4px;
+  font-style: italic;
 }
 .skill-desc-effect-desc {
   color: #cdd6f4;
+  line-height: 1.4;
 }
+
+/* ── 效果附加標籤 ── */
+.sdp-effect-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 5px;
+}
+.sdp-tag {
+  font-size: 0.62rem;
+  padding: 1px 6px;
+  border-radius: 8px;
+  font-weight: 500;
+}
+.sdp-tag-target {
+  background: rgba(180,180,255,0.1);
+  color: #a0b0e8;
+  border: 1px solid rgba(180,180,255,0.15);
+}
+.sdp-tag-trigger {
+  background: rgba(120,200,120,0.1);
+  color: #8cd898;
+  border: 1px solid rgba(120,200,120,0.15);
+}
+.sdp-tag-chance {
+  background: rgba(240,192,64,0.12);
+  color: #f0c040;
+  border: 1px solid rgba(240,192,64,0.2);
+}
+.sdp-tag-limit {
+  background: rgba(248,113,113,0.1);
+  color: #f09090;
+  border: 1px solid rgba(248,113,113,0.15);
+}
+.sdp-tag-stacks {
+  background: rgba(180,140,255,0.1);
+  color: #b8a0f0;
+  border: 1px solid rgba(180,140,255,0.15);
+}
+
+/* ── 依賴提示 ── */
 .skill-desc-depends {
   display: block;
   color: #f0c040;
   font-size: 0.7rem;
-  margin-top: 3px;
+  margin-top: 4px;
   padding-left: 4px;
 }
-.skill-desc-levels {
+
+/* ── 等級對比（表格式逐效果） ── */
+.sdp-levels {
   border-top: 1px solid rgba(255,255,255,0.08);
-  padding-top: 8px;
+  padding-top: 10px;
 }
-.skill-desc-levels-title {
-  font-size: 0.75rem;
-  color: #888;
-  margin-bottom: 6px;
-  font-weight: 600;
-}
-.skill-desc-level-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 3px 6px;
-  border-radius: 4px;
+.sdp-levels-title {
   font-size: 0.78rem;
-}
-.skill-desc-level-row.current {
-  background: rgba(92, 124, 250, 0.15);
-  border: 1px solid rgba(92, 124, 250, 0.3);
-}
-.skill-desc-lv {
-  color: #888;
-  min-width: 40px;
+  color: #aaa;
+  margin-bottom: 8px;
   font-weight: 600;
 }
-.skill-desc-level-row.current .skill-desc-lv {
-  color: #8ba4ff;
+.sdp-levels-table {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 0.72rem;
+  overflow-x: auto;
 }
-.skill-desc-lv-desc {
-  color: #aaa;
+.sdp-lv-header {
+  display: flex;
+  gap: 2px;
+  font-weight: 600;
+  color: #888;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  padding-bottom: 4px;
+  margin-bottom: 2px;
 }
-.skill-desc-level-row.current .skill-desc-lv-desc {
-  color: #cdd6f4;
+.sdp-lv-row {
+  display: flex;
+  gap: 2px;
+  padding: 3px 0;
+  border-bottom: 1px solid rgba(255,255,255,0.03);
+}
+.sdp-lv-cell {
+  flex: 1;
+  min-width: 0;
+  padding: 2px 4px;
+  border-radius: 4px;
+  word-break: break-word;
+  line-height: 1.35;
+  color: #999;
+}
+.sdp-lv-label {
+  flex: 0 0 52px;
+  color: #888;
+  font-weight: 600;
+  font-size: 0.68rem;
+}
+.sdp-lv-current {
+  background: rgba(92,124,250,0.12);
+  color: #b0c0ff;
+  font-weight: 600;
 }
 
 /* ── Equipment ── */
