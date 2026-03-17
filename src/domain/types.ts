@@ -37,7 +37,8 @@ export type StatusType =
 
 export interface StatusEffect {
   type: StatusType
-  value: number          // 效果數值（如 0.2 = 20%）
+  value: number          // 效果數值（如 0.2 = 20%）；DOT 時為 ATK 係數
+  hpValue?: number       // DOT 專用：maxHP 百分比係數（如 0.02 = 2%）
   duration: number       // 剩餘回合數（0 = 永久直到戰鬥結束）
   stacks: number         // 當前疊加層數
   maxStacks: number      // 最大疊加層數

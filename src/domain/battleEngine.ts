@@ -732,9 +732,11 @@ async function executeSkill(
         case 'debuff': {
           const chance = effect.statusChance ?? 1.0
           if (Math.random() < chance && effect.status) {
+            const isDot = effect.status.startsWith('dot_')
             const success = applyStatus(target, {
               type: effect.status,
               value: effect.statusValue ?? 0,
+              ...(isDot && effect.multiplier ? { hpValue: effect.multiplier } : {}),
               duration: effect.statusDuration ?? 2,
               maxStacks: effect.statusMaxStacks ?? 1,
               sourceHeroId: attacker.uid,
@@ -857,9 +859,11 @@ async function executeSkill(
         case 'dot': {
           const chance = effect.statusChance ?? 1.0
           if (Math.random() < chance && effect.status) {
+            const isDot = effect.status.startsWith('dot_')
             const success = applyStatus(target, {
               type: effect.status,
               value: effect.statusValue ?? 0,
+              ...(isDot && effect.multiplier ? { hpValue: effect.multiplier } : {}),
               duration: effect.statusDuration ?? 2,
               maxStacks: effect.statusMaxStacks ?? 1,
               sourceHeroId: attacker.uid,
@@ -1098,9 +1102,11 @@ function executePassiveEffect(
         effectValue *= aliveAllies
       }
       for (const t of targets) {
+        const isDot = effect.status!.startsWith('dot_')
         applyStatus(t, {
           type: effect.status,
           value: effectValue,
+          ...(isDot && effect.multiplier ? { hpValue: effect.multiplier } : {}),
           duration: effect.statusDuration ?? 0, // 0 = permanent for passive
           maxStacks: effect.statusMaxStacks ?? 1,
           sourceHeroId: hero.uid,
@@ -1327,6 +1333,7 @@ function executePassiveEffect(
         applyStatus(t, {
           type: effect.status,
           value: effect.statusValue ?? 0.3,
+          ...(effect.multiplier ? { hpValue: effect.multiplier } : {}),
           duration: effect.statusDuration ?? 2,
           maxStacks: effect.statusMaxStacks ?? 3,
           sourceHeroId: hero.uid,

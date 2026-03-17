@@ -120,6 +120,9 @@ export function applyStatusV2(
     if (existing.stacks < existing.maxStacks) {
       existing.stacks++
       existing.value += effect.value
+      if (effect.hpValue) {
+        existing.hpValue = (existing.hpValue || 0) + effect.hpValue
+      }
     }
     return true
   }
@@ -131,6 +134,9 @@ export function applyStatusV2(
       if (existing.stacks < existing.maxStacks) {
         existing.stacks++
         existing.value += effect.value
+        if (effect.hpValue) {
+          existing.hpValue = (existing.hpValue || 0) + effect.hpValue
+        }
       }
       existing.duration = Math.max(existing.duration, effect.duration)
       return true
@@ -253,23 +259,12 @@ export function processDotEffects(hero: BattleHero, allHeroes: BattleHero[]): Do
     const source = allHeroes.find(h => h.uid === status.sourceHeroId)
     let dmg = 0
 
-    // status.value 已包含疊層合計（3 層各 0.3 → value=0.9），不需再乘 stacks
-    switch (status.type) {
-      case 'dot_burn':
-        // 施加者 ATK × value（預設 30%/層）
-        dmg = Math.floor((source?.finalStats.ATK ?? 0) * (status.value || 0.3))
-        break
-      case 'dot_poison': {
-        // 目標 maxHP × value（預設 3%/層），HP 上限防 Boss 破格
-        const cappedHP = Math.min(hero.maxHP, DOT_POISON_HP_CAP)
-        dmg = Math.floor(cappedHP * (status.value || 0.03))
-        break
-      }
-      case 'dot_bleed':
-        // 施加者 ATK × value（預設 25%/層）
-        dmg = Math.floor((source?.finalStats.ATK ?? 0) * (status.value || 0.25))
-        break
-    }
+    // 統一 DOT 計算：ATK × value + min(maxHP, HP_CAP) × hpValue
+    const sourceAtk = source?.finalStats.ATK ?? 0
+    const cappedHP = Math.min(hero.maxHP, DOT_POISON_HP_CAP)
+    const atkDmg = Math.floor(sourceAtk * (status.value || 0))
+    const hpDmg = Math.floor(cappedHP * (status.hpValue || 0))
+    dmg = atkDmg + hpDmg
 
     if (dmg > 0) {
       hero.currentHP = Math.max(0, hero.currentHP - dmg)

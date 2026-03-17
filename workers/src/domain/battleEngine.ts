@@ -41,6 +41,7 @@ export interface BattleHero {
 interface StatusEffect {
   type: string;
   value: number;
+  hpValue?: number;  // DOT 專用：maxHP 百分比係數
   duration: number;
   stacks: number;
   maxStacks: number;
@@ -159,6 +160,7 @@ function applyStatus(target: BattleHero, effect: Omit<StatusEffect, 'stacks'>): 
     if (existing.stacks < existing.maxStacks) {
       existing.stacks++;
       existing.value += effect.value;
+      if (effect.hpValue) existing.hpValue = (existing.hpValue || 0) + effect.hpValue;
     }
     existing.duration = Math.max(existing.duration, effect.duration);
     return true;
@@ -194,13 +196,12 @@ function processDotEffects(hero: BattleHero, allHeroes: BattleHero[]) {
   for (const status of hero.statusEffects) {
     if (!DOT_TYPES.includes(status.type)) continue;
     const source = allHeroes.find(h => h.uid === status.sourceHeroId);
-    let dmg = 0;
-    // status.value 已包含疊層合計，不需再乘 stacks
-    switch (status.type) {
-      case 'dot_burn': dmg = Math.floor((source?.finalStats.ATK ?? 0) * (status.value || 0.3)); break;
-      case 'dot_poison': dmg = Math.floor(Math.min(hero.maxHP, DOT_POISON_HP_CAP) * (status.value || 0.03)); break;
-      case 'dot_bleed': dmg = Math.floor((source?.finalStats.ATK ?? 0) * (status.value || 0.25)); break;
-    }
+    // 統一 DOT 計算：ATK × value + min(maxHP, HP_CAP) × hpValue
+    const sourceAtk = source?.finalStats.ATK ?? 0;
+    const cappedHP = Math.min(hero.maxHP, DOT_POISON_HP_CAP);
+    const atkDmg = Math.floor(sourceAtk * (status.value || 0));
+    const hpDmg = Math.floor(cappedHP * (status.hpValue || 0));
+    const dmg = atkDmg + hpDmg;
     if (dmg > 0) {
       hero.currentHP = Math.max(0, hero.currentHP - dmg);
       results.push({ type: status.type, damage: dmg, sourceUid: status.sourceHeroId });
@@ -441,8 +442,10 @@ function executePassiveEffect(
         effectValue *= aliveAllies;
       }
       for (const t of targets) {
+        const isDot = effect.status!.startsWith('dot_');
         applyStatus(t, {
           type: effect.status, value: effectValue,
+          ...(isDot && effect.multiplier ? { hpValue: effect.multiplier } : {}),
           duration: effect.statusDuration ?? 0, maxStacks: effect.statusMaxStacks ?? 1,
           sourceHeroId: hero.uid,
         });
@@ -515,6 +518,32 @@ function executePassiveEffect(
     case 'revive':
       return true;
     case 'extra_turn': extraTurnQueue.push(hero.uid); return true;
+    case 'cc': {
+      if (!effect.status) return false;
+      const ccTargets = resolvePassiveTargets(hero, 'debuff', passiveTargetType, context);
+      for (const t of ccTargets) {
+        applyStatus(t, {
+          type: effect.status, value: effect.statusValue ?? 0,
+          duration: effect.statusDuration ?? 1, maxStacks: 1,
+          sourceHeroId: hero.uid,
+        });
+      }
+      return true;
+    }
+    case 'dot': {
+      if (!effect.status) return false;
+      const dotTargets = resolvePassiveTargets(hero, 'debuff', passiveTargetType, context);
+      for (const t of dotTargets) {
+        const isDot = effect.status.startsWith('dot_');
+        applyStatus(t, {
+          type: effect.status, value: effect.statusValue ?? 0.3,
+          ...(isDot && effect.multiplier ? { hpValue: effect.multiplier } : {}),
+          duration: effect.statusDuration ?? 2, maxStacks: effect.statusMaxStacks ?? 3,
+          sourceHeroId: hero.uid,
+        });
+      }
+      return true;
+    }
     case 'random_debuff': {
       const debuffPool: string[] = ['atk_down', 'def_down', 'spd_down', 'silence'];
       const randomDebuff = debuffPool[Math.floor(rng() * debuffPool.length)];
@@ -687,8 +716,10 @@ function executeSkill(
         case 'buff': case 'debuff': {
           const chance = effect.statusChance ?? 1.0;
           if (rng() < chance && effect.status) {
+            const isDot = effect.status.startsWith('dot_');
             const success = applyStatus(target, {
               type: effect.status, value: effect.statusValue ?? 0,
+              ...(isDot && effect.multiplier ? { hpValue: effect.multiplier } : {}),
               duration: effect.statusDuration ?? 2, maxStacks: effect.statusMaxStacks ?? 1,
               sourceHeroId: attacker.uid,
             });
@@ -703,6 +734,27 @@ function executeSkill(
           break;
         }
         case 'energy': addEnergy(target, effect.flatValue ?? 0); break;
+        case 'cc':
+        case 'dot': {
+          const dotChance = effect.statusChance ?? 1.0;
+          if (rng() < dotChance && effect.status) {
+            const isDot = effect.status.startsWith('dot_');
+            const success = applyStatus(target, {
+              type: effect.status, value: effect.statusValue ?? 0,
+              ...(isDot && effect.multiplier ? { hpValue: effect.multiplier } : {}),
+              duration: effect.statusDuration ?? 2, maxStacks: effect.statusMaxStacks ?? 1,
+              sourceHeroId: attacker.uid,
+            });
+            if (success) {
+              emit({ type: 'BUFF_APPLY', targetUid: target.uid, effect: {
+                type: effect.status, value: effect.statusValue ?? 0,
+                duration: effect.statusDuration ?? 2, stacks: 1,
+                maxStacks: effect.statusMaxStacks ?? 1, sourceHeroId: attacker.uid,
+              }});
+            }
+          }
+          break;
+        }
         case 'dispel_debuff': cleanse(target, 1); break;
         default: break;
       }
