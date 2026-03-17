@@ -41,6 +41,7 @@ import {
 } from '../services/inventoryService'
 import { getEquipDisplayName, SET_NAMES } from '../domain/equipmentGacha'
 import { getGlbForSuspense } from '../loaders/glbLoader'
+import { generateSkillIcon } from '../utils/effectIconGenerator'
 import { RedDot } from './RedDot'
 // 3D idle animation is the hero detail showcase; Thumbnail3D kept for grid cards only
 import { Thumbnail3D } from './UIOverlay'
@@ -90,11 +91,42 @@ function getPassiveUnlockStars(passiveIndex: number): number {
 }
 
 /** 解析技能圖標：若 icon 是純文字 key（如 "flame_burst"）則回傳 fallback emoji */
-function resolveSkillIcon(icon: string, type: 'active' | 'passive'): string {
+function resolveSkillEmoji(icon: string, type: 'active' | 'passive'): string {
   if (!icon) return type === 'active' ? '⚔️' : '🔮'
-  // 若全為英文字母/數字/底線，判定為 text key → 用 fallback
   if (/^[a-z0-9_]+$/i.test(icon)) return type === 'active' ? '⚔️' : '🔮'
   return icon
+}
+
+/** emoji → 配色主題對照 */
+const EMOJI_THEME: Record<string, string> = {
+  '🔥': 'fire', '☄️': 'fire', '💥': 'fire', '😤': 'fire', '💪': 'fire',
+  '❄️': 'ice', '🧊': 'ice',
+  '☠️': 'poison', '🧪': 'poison', '💉': 'poison', '🦠': 'poison',
+  '🩸': 'blood', '🗡️': 'blood',
+  '🌑': 'shadow', '👻': 'shadow', '🌙': 'shadow', '👣': 'shadow',
+  '⚔️': 'steel', '🔨': 'steel', '🛡️': 'steel', '🏰': 'steel',
+  '💚': 'nature', '🌿': 'nature', '🍃': 'nature',
+  '⚡': 'wind', '🌪️': 'wind', '🌊': 'wind',
+  '✨': 'light', '☀️': 'light', '🌟': 'holy', '⭐': 'holy',
+  '💀': 'death', '🦴': 'death', '👁️': 'death',
+  '🔮': 'arcane', '📜': 'arcane', '💫': 'arcane',
+  '💖': 'light', '❤️': 'blood',
+}
+
+function resolveSkillTheme(emoji: string): string {
+  for (const [key, theme] of Object.entries(EMOJI_THEME)) {
+    if (emoji.includes(key)) return theme
+  }
+  return 'steel'
+}
+
+/** 技能圖標元件：使用 Canvas 生成精緻圓角方塊圖標 */
+function SkillIcon({ icon, type }: { icon: string; type: 'active' | 'passive' }) {
+  const emoji = resolveSkillEmoji(icon, type)
+  const theme = resolveSkillTheme(emoji)
+  const src = useMemo(() => generateSkillIcon(emoji, theme, type === 'active'), [emoji, theme, type])
+  if (!src) return <span className="hd2-skill-icon">{emoji}</span>
+  return <img className="hd2-skill-icon" src={src} alt="" draggable={false} />
 }
 
 /* ────────────────────────────
@@ -706,7 +738,7 @@ function HeroDetail({ hero, instance, onClose, skills, heroSkills }: HeroDetailP
           {skillSet.activeSkill ? (
             <div className="hd2-skill hd2-skill-active hd2-skill-clickable"
                  onClick={() => setSelectedSkill({ skill: skillSet.activeSkill! })}>
-              <div className="hd2-skill-icon">{resolveSkillIcon(skillSet.activeSkill.icon, 'active')}</div>
+              <SkillIcon icon={skillSet.activeSkill.icon} type="active" />
               <div className="hd2-skill-body">
                 <div className="hd2-skill-name"><span className="hd2-skill-badge active">主動</span> {skillSet.activeSkill.name}</div>
                 <SkillDescWithTags skill={skillSet.activeSkill} skillLevel={skillLevel} />
@@ -728,7 +760,7 @@ function HeroDetail({ hero, instance, onClose, skills, heroSkills }: HeroDetailP
             return (
               <div key={i} className={`hd2-skill ${unlocked ? '' : 'hd2-skill-locked'} ${passive ? 'hd2-skill-clickable' : ''}`}
                    onClick={() => passive && setSelectedSkill({ skill: passive, isLocked: !unlocked, unlockStar: reqStars })}>
-                <div className="hd2-skill-icon">{passive ? resolveSkillIcon(passive.icon, 'passive') : '🔒'}</div>
+                {passive ? <SkillIcon icon={passive.icon} type="passive" /> : <span className="hd2-skill-icon">🔒</span>}
                 <div className="hd2-skill-body">
                   {passive ? (
                     <>
@@ -1040,7 +1072,7 @@ function HeroDetail({ hero, instance, onClose, skills, heroSkills }: HeroDetailP
                   {unlockPassive ? (
                     <>
                       <div className="hd2-star-skill-info">
-                        <span className="hd2-star-skill-icon">{resolveSkillIcon(unlockPassive.icon, 'passive')}</span>
+                        <span className="hd2-star-skill-icon"><SkillIcon icon={unlockPassive.icon} type="passive" /></span>
                         <span className="hd2-star-skill-name">{unlockPassive.name}</span>
                       </div>
                       {unlockPassive.description && (
@@ -1087,7 +1119,7 @@ function HeroDetail({ hero, instance, onClose, skills, heroSkills }: HeroDetailP
                         <div key={skill.skillId} className="hd2-star-skill-upgrade-item">
                           <div className="hd2-star-skill-upgrade-name">
                             <span className={`hd2-skill-badge ${type === '主動' ? 'active' : 'passive'}`}>{type}{slotIdx > 0 ? slotIdx : ''}</span>
-                            {' '}{resolveSkillIcon(skill.icon, type === '主動' ? 'active' : 'passive')} {skill.name}
+                            {' '}<SkillIcon icon={skill.icon} type={type === '主動' ? 'active' : 'passive'} /> {skill.name}
                           </div>
                           {hasChange ? (
                             <div className="hd2-star-skill-upgrade-compare">

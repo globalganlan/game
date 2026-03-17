@@ -188,16 +188,18 @@ function isSilenced(hero: BattleHero) { return hasStatus(hero, 'silence'); }
 function isFeared(hero: BattleHero) { return hasStatus(hero, 'fear'); }
 function hasTaunt(hero: BattleHero) { return hasStatus(hero, 'taunt'); }
 
+const DOT_POISON_HP_CAP = 100_000;
 function processDotEffects(hero: BattleHero, allHeroes: BattleHero[]) {
   const results: Array<{ type: string; damage: number; sourceUid: string }> = [];
   for (const status of hero.statusEffects) {
     if (!DOT_TYPES.includes(status.type)) continue;
     const source = allHeroes.find(h => h.uid === status.sourceHeroId);
     let dmg = 0;
+    // status.value 已包含疊層合計，不需再乘 stacks
     switch (status.type) {
-      case 'dot_burn': dmg = Math.floor((source?.finalStats.ATK ?? 0) * 0.3 * status.stacks); break;
-      case 'dot_poison': dmg = Math.floor(hero.maxHP * 0.03 * status.stacks); break;
-      case 'dot_bleed': dmg = Math.floor((source?.finalStats.ATK ?? 0) * 0.25 * status.stacks); break;
+      case 'dot_burn': dmg = Math.floor((source?.finalStats.ATK ?? 0) * (status.value || 0.3)); break;
+      case 'dot_poison': dmg = Math.floor(Math.min(hero.maxHP, DOT_POISON_HP_CAP) * (status.value || 0.03)); break;
+      case 'dot_bleed': dmg = Math.floor((source?.finalStats.ATK ?? 0) * (status.value || 0.25)); break;
     }
     if (dmg > 0) {
       hero.currentHP = Math.max(0, hero.currentHP - dmg);
@@ -211,7 +213,8 @@ function processRegen(hero: BattleHero): number {
   let total = 0;
   for (const s of hero.statusEffects) {
     if (s.type !== 'regen') continue;
-    const heal = Math.floor(hero.maxHP * s.value * s.stacks);
+    // value 已包含疊層合計，不需再乘 stacks
+    const heal = Math.floor(hero.maxHP * s.value);
     if (heal > 0) {
       const actual = Math.min(heal, hero.maxHP - hero.currentHP);
       hero.currentHP += actual;

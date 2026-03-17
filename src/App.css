@@ -2105,11 +2105,24 @@
 }
 
 .hd2-skill-icon {
-  font-size: 1.2rem;
-  width: 28px;
-  text-align: center;
+  width: 36px;
+  height: 36px;
   flex-shrink: 0;
-  line-height: 1.4;
+  border-radius: 8px;
+  object-fit: contain;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.2rem;
+  line-height: 1;
+}
+img.hd2-skill-icon {
+  display: block;
+}
+span.hd2-skill-icon {
+  background: linear-gradient(135deg, #3a2f4d 0%, #1a1225 100%);
+  border: 2px solid #5a4a6a;
+  color: #aaa;
 }
 
 .hd2-skill-body {

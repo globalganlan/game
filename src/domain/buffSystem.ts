@@ -241,6 +241,9 @@ export interface DotTickResult {
  * 回合開始時結算 DOT 傷害
  * @returns DOT 傷害列表
  */
+/** 中毒 DOT 計算時使用的 HP 上限（防止 Boss 99,999,999 HP 導致破格傷害） */
+const DOT_POISON_HP_CAP = 100_000
+
 export function processDotEffects(hero: BattleHero, allHeroes: BattleHero[]): DotTickResult[] {
   const results: DotTickResult[] = []
 
@@ -250,18 +253,21 @@ export function processDotEffects(hero: BattleHero, allHeroes: BattleHero[]): Do
     const source = allHeroes.find(h => h.uid === status.sourceHeroId)
     let dmg = 0
 
+    // status.value 已包含疊層合計（3 層各 0.3 → value=0.9），不需再乘 stacks
     switch (status.type) {
       case 'dot_burn':
-        // 施加者 ATK × 30%
-        dmg = Math.floor((source?.finalStats.ATK ?? 0) * 0.3 * status.stacks)
+        // 施加者 ATK × value（預設 30%/層）
+        dmg = Math.floor((source?.finalStats.ATK ?? 0) * (status.value || 0.3))
         break
-      case 'dot_poison':
-        // 目標 max HP × 3%（無視 DEF）
-        dmg = Math.floor(hero.maxHP * 0.03 * status.stacks)
+      case 'dot_poison': {
+        // 目標 maxHP × value（預設 3%/層），HP 上限防 Boss 破格
+        const cappedHP = Math.min(hero.maxHP, DOT_POISON_HP_CAP)
+        dmg = Math.floor(cappedHP * (status.value || 0.03))
         break
+      }
       case 'dot_bleed':
-        // 施加者 ATK × 25%，無視 50% DEF
-        dmg = Math.floor((source?.finalStats.ATK ?? 0) * 0.25 * status.stacks)
+        // 施加者 ATK × value（預設 25%/層）
+        dmg = Math.floor((source?.finalStats.ATK ?? 0) * (status.value || 0.25))
         break
     }
 
@@ -281,7 +287,8 @@ export function processRegen(hero: BattleHero): number {
   let totalHeal = 0
   for (const status of hero.statusEffects) {
     if (status.type !== 'regen') continue
-    const heal = Math.floor(hero.maxHP * status.value * status.stacks)
+    // status.value 已包含疊層合計，不需再乘 stacks
+    const heal = Math.floor(hero.maxHP * status.value)
     if (heal > 0) {
       const actual = Math.min(heal, hero.maxHP - hero.currentHP)
       hero.currentHP += actual
