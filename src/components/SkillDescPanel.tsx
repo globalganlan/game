@@ -126,7 +126,14 @@ export function effectDescription(eff: ResolvedEffect): string {
     }
     case 'dot': {
       let text = statusName || '持續傷害'
-      if (eff.statusValue) text += ` ${pct(eff.statusValue)}`
+      if (eff.statusValue) {
+        // 毒傷基於目標 maxHP，燃燒/流血基於施加者 ATK
+        if (eff.status === 'dot_poison') {
+          text += `（每回合 目標HP×${pct(eff.statusValue)}）`
+        } else {
+          text += `（每回合 攻擊×${pct(eff.statusValue)}）`
+        }
+      }
       if (duration) text += `，持續 ${duration}`
       desc = `${chancePrefix}施加 ${text}`
       break
