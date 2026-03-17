@@ -184,7 +184,7 @@ INSERT INTO hero_skills VALUES (30,'ACT_30','PAS_30_1','PAS_30_2','PAS_30_3','PA
 
 -- ────── Hero 16: 腐蝕蟲 (N) ──────
 INSERT INTO effect_templates (effectId,name,category,trigger_type,target,scalingStat,multiplier) VALUES ('EFF_DMG_16_ACT_1','蝕咬傷害','damage','immediate','all_enemies','ATK',0.7);
-INSERT INTO effect_templates (effectId,name,category,trigger_type,target,status,statusChance,statusValue,statusDuration) VALUES ('EFF_DOT_16_PAS1_1','毒液中毒','dot','on_attack','single_enemy','dot_poison',0.2,0.02,2);
+INSERT INTO effect_templates (effectId,name,category,trigger_type,target,status,statusChance,statusValue,statusDuration) VALUES ('EFF_DOT_16_PAS1_1','毒液中毒','dot','on_attack','single_enemy','dot_poison',0.2,0.08,2);
 INSERT INTO effect_templates (effectId,name,category,trigger_type,target,status,statusValue,statusDuration) VALUES ('EFF_BUFF_16_PAS2_1','蟲殼防禦','buff','always','self','def_up',0.1,0);
 INSERT INTO effect_templates (effectId,name,category,trigger_type,target,scalingStat,multiplier) VALUES ('EFF_HEAL_16_PAS3_1','寄生回復','heal','on_kill','self','ATK',0.3);
 INSERT INTO effect_templates (effectId,name,category,trigger_type,target,status,statusChance,statusValue,statusDuration) VALUES ('EFF_DEBUFF_16_PAS4_1','侵蝕降防','debuff','on_attack','single_enemy','def_down',0.15,0.1,2);
@@ -205,9 +205,9 @@ INSERT INTO effect_templates (effectId,name,category,trigger_type,target,targetH
 
 -- ────── Hero 19: 毒蕈師 (R) ──────
 INSERT INTO effect_templates (effectId,name,category,trigger_type,target,scalingStat,multiplier) VALUES ('EFF_DMG_19_ACT_1','孢子爆破','damage','immediate','all_enemies','ATK',0.9);
-INSERT INTO effect_templates (effectId,name,category,trigger_type,target,status,statusChance,statusValue,statusDuration) VALUES ('EFF_DOT_19_ACT_2','孢子中毒','dot','immediate','all_enemies','dot_poison',0.4,0.02,2);
+INSERT INTO effect_templates (effectId,name,category,trigger_type,target,status,statusChance,multiplier,statusDuration) VALUES ('EFF_DOT_19_ACT_2','孢子中毒','dot','immediate','all_enemies','dot_poison',0.4,0.02,2);
 INSERT INTO effect_templates (effectId,name,category,trigger_type,target,status,statusValue,statusDuration) VALUES ('EFF_BUFF_19_PAS1_1','菌絲防禦','buff','always','self','def_up',0.12,0);
-INSERT INTO effect_templates (effectId,name,category,trigger_type,target,status,statusChance,statusValue,statusDuration) VALUES ('EFF_DOT_19_PAS2_1','毒素中毒','dot','on_attack','single_enemy','dot_poison',0.25,0.02,2);
+INSERT INTO effect_templates (effectId,name,category,trigger_type,target,status,statusChance,multiplier,statusDuration) VALUES ('EFF_DOT_19_PAS2_1','毒素中毒','dot','on_attack','single_enemy','dot_poison',0.25,0.02,2);
 INSERT INTO effect_templates (effectId,name,category,trigger_type,target,scalingStat,multiplier,triggerParam) VALUES ('EFF_HEAL_19_PAS3_1','再生孢子','heal','every_n_turns','all_allies','ATK',0.4,'3');
 INSERT INTO effect_templates (effectId,name,category,trigger_type,target,status,statusChance,statusDuration) VALUES ('EFF_CC_19_PAS4_1','致幻暈眩','cc','on_skill_cast','all_enemies','stun',0.2,1);
 
@@ -248,7 +248,7 @@ INSERT INTO effect_templates (effectId,name,category,trigger_type,target,scaling
 INSERT INTO effect_templates (effectId,name,category,trigger_type,target,status,statusChance,statusValue,statusDuration) VALUES ('EFF_DOT_23_PAS2_2','灼燒觸發','dot','on_be_attacked','single_enemy','dot_burn',0.3,0.25,2);
 INSERT INTO effect_templates (effectId,name,category,trigger_type,target,multiplier) VALUES ('EFF_REFLECT_23_PAS3_1','熔岩反彈','reflect','always','self',0.1);
 INSERT INTO effect_templates (effectId,name,category,trigger_type,target,status,statusValue,statusDuration,triggerParam) VALUES ('EFF_BUFF_23_PAS4_1','末日攻擊','buff','hp_below_pct','self','atk_up',0.4,99,'0.3');
-INSERT INTO effect_templates (effectId,name,category,trigger_type,target,status,statusChance,statusValue,statusDuration,triggerParam) VALUES ('EFF_DOT_23_PAS4_2','末日灼燒','dot','hp_below_pct','all_enemies','dot_burn',0.5,0.3,2,'0.3');
+INSERT INTO effect_templates (effectId,name,category,trigger_type,target,status,statusChance,multiplier,statusDuration,triggerParam) VALUES ('EFF_DOT_23_PAS4_2','末日灶燒','dot','hp_below_pct','all_enemies','dot_burn',0.5,0.03,2,'0.3');
 
 -- ────── Hero 24: 魂縛者 (SR) ──────
 INSERT INTO effect_templates (effectId,name,category,trigger_type,target,scalingStat,multiplier) VALUES ('EFF_DMG_24_ACT_1','鎖鏈傷害','damage','immediate','single_enemy','ATK',1.8);
@@ -292,11 +292,11 @@ INSERT INTO effect_templates (effectId,name,category,trigger_type,target,status,
 
 -- ────── Hero 28: 瘟疫女王 (SSR) ──────
 INSERT INTO effect_templates (effectId,name,category,trigger_type,target,scalingStat,multiplier) VALUES ('EFF_DMG_28_ACT_1','瘟疫傷害','damage','immediate','all_enemies','ATK',1.3);
-INSERT INTO effect_templates (effectId,name,category,trigger_type,target,status,statusChance,statusValue,statusDuration) VALUES ('EFF_DOT_28_ACT_2','瘟疫中毒','dot','immediate','all_enemies','dot_poison',0.5,0.03,2);
-INSERT INTO effect_templates (effectId,name,category,trigger_type,target,status,statusChance,statusValue,statusDuration) VALUES ('EFF_DOT_28_ACT_3','瘟疫流血','dot','immediate','all_enemies','dot_bleed',0.4,0.25,2);
+INSERT INTO effect_templates (effectId,name,category,trigger_type,target,status,statusChance,multiplier,statusDuration) VALUES ('EFF_DOT_28_ACT_2','瘟疫中毒','dot','immediate','all_enemies','dot_poison',0.5,0.03,2);
+INSERT INTO effect_templates (effectId,name,category,trigger_type,target,status,statusChance,multiplier,statusDuration) VALUES ('EFF_DOT_28_ACT_3','瘟疫流血','dot','immediate','all_enemies','dot_bleed',0.4,0.02,2);
 INSERT INTO effect_templates (effectId,name,category,trigger_type,target,status,statusValue,statusDuration) VALUES ('EFF_DEBUFF_28_PAS1_1','疫病降防','debuff','battle_start','all_enemies','def_down',0.1,3);
 INSERT INTO effect_templates (effectId,name,category,trigger_type,target,scalingStat,multiplier) VALUES ('EFF_HEAL_28_PAS2_1','毒血吸血','heal','on_attack','self','ATK',0.12);
-INSERT INTO effect_templates (effectId,name,category,trigger_type,target,status,statusChance,statusValue,statusDuration) VALUES ('EFF_DOT_28_PAS2_2','毒血施毒','dot','on_attack','single_enemy','dot_poison',0.2,0.02,2);
+INSERT INTO effect_templates (effectId,name,category,trigger_type,target,status,statusChance,multiplier,statusDuration) VALUES ('EFF_DOT_28_PAS2_2','毒血施毒','dot','on_attack','single_enemy','dot_poison',0.2,0.02,2);
 INSERT INTO effect_templates (effectId,name,category,trigger_type,target,flatValue,triggerChance) VALUES ('EFF_TRANSFER_28_PAS3_1','瘴氣轉移','transfer_debuff','turn_start','single_enemy',1,0.4);
 INSERT INTO effect_templates (effectId,name,category,trigger_type,target,status,statusValue,statusDuration) VALUES ('EFF_BUFF_28_PAS4_1','突變強攻','buff','on_kill','self','atk_up',0.25,99);
 
