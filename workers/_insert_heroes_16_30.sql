@@ -1,7 +1,7 @@
 -- ═══════════════════════════════════════════════════════════════
 -- 全球感染 — 15 位新英雄 (heroId 16~30) 完整插入 SQL
 -- 日期：2026-03-17
--- 說明：複用 zombie_1~14 模型，待模型製作完成後改 modelId
+-- 說明：每位英雄對應獨立 zombie_16~30 模型目錄
 -- ═══════════════════════════════════════════════════════════════
 
 -- ╔══════════════════════════════════╗
@@ -10,41 +10,41 @@
 
 -- N×2
 INSERT INTO heroes (heroId, name, type, rarity, baseHP, baseATK, baseDEF, baseSPD, modelId, critRate, critDmg, description)
-VALUES (16, '腐蝕蟲', '敏捷', 'N', 65, 18, 10, 11, 'zombie_6', 5, 50, '地底蠕動的腐化昆蟲，以毒液溶解獵物。');
+VALUES (16, '腐蝕蟲', '敏捷', 'N', 65, 18, 10, 11, 'zombie_16', 5, 50, '地底蠕動的腐化昆蟲，以毒液溶解獵物。');
 INSERT INTO heroes (heroId, name, type, rarity, baseHP, baseATK, baseDEF, baseSPD, modelId, critRate, critDmg, description)
-VALUES (17, '枯骨兵', '力量', 'N', 75, 22, 14, 8, 'zombie_1', 5, 50, '遠古戰場的亡者殘骸，至今仍持矛不倒。');
+VALUES (17, '枯骨兵', '力量', 'N', 75, 22, 14, 8, 'zombie_17', 5, 50, '遠古戰場的亡者殘骸，至今仍持矛不倒。');
 
 -- R×4
 INSERT INTO heroes (heroId, name, type, rarity, baseHP, baseATK, baseDEF, baseSPD, modelId, critRate, critDmg, description)
-VALUES (18, '影行者', '敏捷', 'R', 80, 32, 12, 13, 'zombie_8', 8, 55, '穿梭暗影的刺客，以迅雷之勢取敵首級。');
+VALUES (18, '影行者', '敏捷', 'R', 80, 32, 12, 13, 'zombie_18', 8, 55, '穿梭暗影的刺客，以迅雷之勢取敵首級。');
 INSERT INTO heroes (heroId, name, type, rarity, baseHP, baseATK, baseDEF, baseSPD, modelId, critRate, critDmg, description)
-VALUES (19, '毒蕈師', '智慧', 'R', 90, 25, 14, 9, 'zombie_7', 5, 50, '林間孢子的守護者，毒霧是她的武器。');
+VALUES (19, '毒蕈師', '智慧', 'R', 90, 25, 14, 9, 'zombie_19', 5, 50, '林間孢子的守護者，毒霧是她的武器。');
 INSERT INTO heroes (heroId, name, type, rarity, baseHP, baseATK, baseDEF, baseSPD, modelId, critRate, critDmg, description)
-VALUES (20, '鏽鋼衛士', '力量', 'R', 100, 22, 22, 8, 'zombie_12', 5, 50, '廢墟中鍛造的鐵壁，用身軀護衛同伴。');
+VALUES (20, '鏽鋼衛士', '力量', 'R', 100, 22, 22, 8, 'zombie_20', 5, 50, '廢墟中鍛造的鐵壁，用身軀護衛同伴。');
 INSERT INTO heroes (heroId, name, type, rarity, baseHP, baseATK, baseDEF, baseSPD, modelId, critRate, critDmg, description)
-VALUES (21, '亡靈弓手', '敏捷', 'R', 78, 35, 10, 12, 'zombie_14', 10, 60, '百步穿楊的骸骨射手，箭矢從不偏移。');
+VALUES (21, '亡靈弓手', '敏捷', 'R', 78, 35, 10, 12, 'zombie_21', 10, 60, '百步穿楊的骸骨射手，箭矢從不偏移。');
 
 -- SR×5
 INSERT INTO heroes (heroId, name, type, rarity, baseHP, baseATK, baseDEF, baseSPD, modelId, critRate, critDmg, description)
-VALUES (22, '血族伯爵', '智慧', 'SR', 95, 38, 16, 11, 'zombie_3', 7, 55, '暗夜貴族的末裔，以鮮血維持不死之軀。');
+VALUES (22, '血族伯爵', '智慧', 'SR', 95, 38, 16, 11, 'zombie_22', 7, 55, '暗夜貴族的末裔，以鮮血維持不死之軀。');
 INSERT INTO heroes (heroId, name, type, rarity, baseHP, baseATK, baseDEF, baseSPD, modelId, critRate, critDmg, description)
-VALUES (23, '炎魔', '力量', 'SR', 105, 42, 18, 9, 'zombie_4', 5, 50, '地獄裂隙爬出的烈焰惡魔，灼熱一切。');
+VALUES (23, '炎魔', '力量', 'SR', 105, 42, 18, 9, 'zombie_23', 5, 50, '地獄裂隙爬出的烈焰惡魔，灼熱一切。');
 INSERT INTO heroes (heroId, name, type, rarity, baseHP, baseATK, baseDEF, baseSPD, modelId, critRate, critDmg, description)
-VALUES (24, '魂縛者', '智慧', 'SR', 88, 36, 14, 10, 'zombie_10', 5, 50, '操控靈魂鎖鏈的禁忌術士，吞噬意志。');
+VALUES (24, '魂縛者', '智慧', 'SR', 88, 36, 14, 10, 'zombie_24', 5, 50, '操控靈魂鎖鏈的禁忌術士，吞噬意志。');
 INSERT INTO heroes (heroId, name, type, rarity, baseHP, baseATK, baseDEF, baseSPD, modelId, critRate, critDmg, description)
-VALUES (25, '冰霜巫妖', '智慧', 'SR', 92, 40, 15, 10, 'zombie_11', 5, 50, '永凍荒原的統治者，寒氣凝結萬物。');
+VALUES (25, '冰霜巫妖', '智慧', 'SR', 92, 40, 15, 10, 'zombie_25', 5, 50, '永凍荒原的統治者，寒氣凝結萬物。');
 INSERT INTO heroes (heroId, name, type, rarity, baseHP, baseATK, baseDEF, baseSPD, modelId, critRate, critDmg, description)
-VALUES (26, '深淵使徒', '平衡', 'SR', 98, 37, 17, 11, 'zombie_5', 6, 52, '深淵意志的代行者，闇與光的交匯。');
+VALUES (26, '深淵使徒', '平衡', 'SR', 98, 37, 17, 11, 'zombie_26', 6, 52, '深淵意志的代行者，闇與光的交匯。');
 
 -- SSR×4
 INSERT INTO heroes (heroId, name, type, rarity, baseHP, baseATK, baseDEF, baseSPD, modelId, critRate, critDmg, description)
-VALUES (27, '末日審判者', '力量', 'SSR', 120, 45, 22, 9, 'zombie_13', 5, 50, '世界末日降臨的裁決者，無人能逃審判之錘。');
+VALUES (27, '末日審判者', '力量', 'SSR', 120, 45, 22, 9, 'zombie_27', 5, 50, '世界末日降臨的裁決者，無人能逃審判之錘。');
 INSERT INTO heroes (heroId, name, type, rarity, baseHP, baseATK, baseDEF, baseSPD, modelId, critRate, critDmg, description)
-VALUES (28, '瘟疫女王', '智慧', 'SSR', 110, 42, 18, 10, 'zombie_9', 5, 50, '瘟疫的母體，所到之處萬物凋零。');
+VALUES (28, '瘟疫女王', '智慧', 'SSR', 110, 42, 18, 10, 'zombie_28', 5, 50, '瘟疫的母體，所到之處萬物凋零。');
 INSERT INTO heroes (heroId, name, type, rarity, baseHP, baseATK, baseDEF, baseSPD, modelId, critRate, critDmg, description)
-VALUES (29, '虛空獵手', '敏捷', 'SSR', 100, 48, 14, 14, 'zombie_2', 12, 65, '維度裂縫的掠食者，獵殺跨越時空。');
+VALUES (29, '虛空獵手', '敏捷', 'SSR', 100, 48, 14, 14, 'zombie_29', 12, 65, '維度裂縫的掠食者，獵殺跨越時空。');
 INSERT INTO heroes (heroId, name, type, rarity, baseHP, baseATK, baseDEF, baseSPD, modelId, critRate, critDmg, description)
-VALUES (30, '不朽將軍', '力量', 'SSR', 135, 40, 25, 8, 'zombie_12', 5, 50, '征戰千年不死的亡靈將領，軍旗所指萬軍歸心。');
+VALUES (30, '不朽將軍', '力量', 'SSR', 135, 40, 25, 8, 'zombie_30', 5, 50, '征戰千年不死的亡靈將領，軍旗所指萬軍歸心。');
 
 
 -- ╔══════════════════════════════════╗
