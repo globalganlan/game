@@ -29,6 +29,7 @@ dist-ssr
 
 # QA screenshots
 .ai/qa_screenshots/
-
+# Sensitive env files
+.ai/scripts/hero-gen.env
 # GLB PNG backup files (from PNG→JPEG conversion)
 *.png-backup
