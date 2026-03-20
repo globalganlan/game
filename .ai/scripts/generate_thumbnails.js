@@ -78,9 +78,16 @@ function writeDataUrlToFile(dataUrl, outPath) {
         console.log('no model for', name); continue;
       }
 
+      // Find separate idle animation GLB (zombie_N_idle.glb)
+      const idleAnimFile = files.find(f => f === `${name}_idle.glb`);
+
       const modelPath = `/models/${name}/${modelFile}`;
-      const url = `${baseUrl}/thumbnail.html?model=${encodeURIComponent(modelPath)}&size=512`;
-      console.log('Generating thumbnail for', name, '→', modelFile);
+      let url = `${baseUrl}/thumbnail.html?model=${encodeURIComponent(modelPath)}&size=512`;
+      if (idleAnimFile) {
+        const animPath = `/models/${name}/${idleAnimFile}`;
+        url += `&anim=${encodeURIComponent(animPath)}`;
+      }
+      console.log('Generating thumbnail for', name, '→', modelFile, idleAnimFile ? `+ ${idleAnimFile}` : '(no idle anim)');
 
       page.on('console', msg => console.log('PAGE LOG:', msg.text()));
       page.on('pageerror', err => console.error('PAGE ERROR:', err.toString()));

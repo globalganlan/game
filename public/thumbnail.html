@@ -23,6 +23,7 @@ import { DRACOLoader } from '/node_modules/three/examples/jsm/loaders/DRACOLoade
 
 const params = new URLSearchParams(location.search);
 const model = params.get('model');
+const anim = params.get('anim');   // optional separate idle animation GLB
 const size = parseInt(params.get('size') || '512', 10);
 const canvas = document.getElementById('c');
 canvas.width = size; canvas.height = size;
@@ -187,17 +188,31 @@ if (!model) {
     window.__THUMBNAIL_READY__ = true;
   }
 
-  if (isGLB) {
+  /** Load a GLB and return a Promise<GLTF> */
+  function loadGLB(url) {
     const gltfLoader = new GLTFLoader();
     const dracoLoader = new DRACOLoader();
     dracoLoader.setDecoderPath('/draco/');
     gltfLoader.setDRACOLoader(dracoLoader);
-    gltfLoader.load(decodeURIComponent(model), function(gltf) {
-      const obj = gltf.scene;
-      // Transfer animations from GLTF to the scene object
-      obj.animations = gltf.animations || [];
+    return new Promise((resolve, reject) => {
+      gltfLoader.load(decodeURIComponent(url), resolve, undefined, reject);
+    });
+  }
+
+  if (isGLB) {
+    // Load mesh, optionally load separate idle animation GLB
+    const meshPromise = loadGLB(model);
+    const animPromise = anim ? loadGLB(anim) : Promise.resolve(null);
+    Promise.all([meshPromise, animPromise]).then(([meshGltf, animGltf]) => {
+      const obj = meshGltf.scene;
+      // Merge: prefer separate idle anim, fall back to embedded animations
+      if (animGltf && animGltf.animations && animGltf.animations.length) {
+        obj.animations = animGltf.animations;
+      } else {
+        obj.animations = meshGltf.animations || [];
+      }
       onModelLoaded(obj);
-    }, undefined, onError);
+    }).catch(onError);
   } else {
     const fbxLoader = new FBXLoader();
     fbxLoader.load(decodeURIComponent(model), onModelLoaded, undefined, onError);
