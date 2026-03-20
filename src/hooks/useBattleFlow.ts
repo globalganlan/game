@@ -26,7 +26,7 @@ import { buildEnemySlotsFromStage } from '../game/helpers'
 import { getStageConfig } from '../services/stageService'
 import { waitFrames } from '../game/constants'
 import { executeBattleLoop } from '../game/runBattleLoop'
-import { preloadHeroModel } from '../loaders/glbLoader'
+import { preloadHeroModels, releaseHeroModel, getCachedModelIds, disposeDracoDecoder } from '../loaders/glbLoader'
 
 export interface BattleFlowDeps {
   /* ── Refs ── */
@@ -121,7 +121,7 @@ export function useBattleFlow(deps: BattleFlowDeps) {
   const {
     preBattlePlayerSlotsRef, battleActionsRef, turnRef, skipBattleRef,
     actorStatesRef, moveTargetsRef, arenaTargetRankRef, preBattleMenuScreenRef,
-    actionResolveRefs, moveResolveRefs,
+    actionResolveRefs, moveResolveRefs, pSlotsRef, eSlotsRef,
     setGameState, setStageId, setTurn, setShowBattleStats, setBattleResult,
     setVictoryRewards, setMenuScreen,
     updatePlayerSlots, updateEnemySlots,
@@ -256,6 +256,18 @@ export function useBattleFlow(deps: BattleFlowDeps) {
 
   /* ── 回大廳（返回進入戰鬥前的場景，不含過場動畫） ── */
   const backToLobby = useCallback(() => {
+    // ★ 先記下要釋放的敵方模型 ID（離場後不再需要的模型）
+    const playerModelIds = new Set<string>()
+    for (const p of pSlotsRef.current) {
+      if (p?._modelId) playerModelIds.add(p._modelId)
+    }
+    const enemyModelsToRelease: string[] = []
+    for (const e of eSlotsRef.current) {
+      if (e?._modelId && !playerModelIds.has(e._modelId)) {
+        enemyModelsToRelease.push(e._modelId)
+      }
+    }
+
     updatePlayerSlots(() => Array(6).fill(null))
     updateEnemySlots(() => Array(6).fill(null))
     resetBattleState()
@@ -269,6 +281,16 @@ export function useBattleFlow(deps: BattleFlowDeps) {
     setMenuScreen(returnScreen)
     preBattleMenuScreenRef.current = 'none'
     setGameState('MAIN_MENU')
+
+    // ★ 延遲釋放敵方模型快取 — 等 React unmount 完成後才 dispose GPU 資源
+    //   避免正在 unmount 的 ZombieModel 讀到已 dispose 的紋理
+    if (enemyModelsToRelease.length > 0) {
+      setTimeout(() => {
+        for (const mid of enemyModelsToRelease) {
+          releaseHeroModel(mid)
+        }
+      }, 500)
+    }
   }, [stageMode, resetBattleState, updatePlayerSlots, updateEnemySlots, setVictoryRewards, setMenuScreen, setGameState]) // eslint-disable-line react-hooks/exhaustive-deps
 
   /* ── 下一關（勝利後推進） ── */
@@ -285,9 +307,14 @@ export function useBattleFlow(deps: BattleFlowDeps) {
       updatePlayerSlots(() => restored)
       setStageId(String(nextFloor))
       const nextEnemySlots = buildEnemySlotsFromStage('tower', String(nextFloor), heroesList)
-      // ── 預載入下一層敵人模型（25 秒超時安全網）──
+      // ── 釋放舊敵方模型（不與玩家或新敵人重疊的），再預載下一層 ──
       const towerModelIds = nextEnemySlots.filter(Boolean).map(s => s!._modelId).filter(Boolean) as string[]
-      await Promise.race([Promise.all(towerModelIds.map(mid => preloadHeroModel(mid).catch(() => {}))), new Promise<void>(r => setTimeout(r, 25_000))])
+      const keepIds = new Set([...towerModelIds, ...restored.filter(Boolean).map(s => s!._modelId).filter(Boolean)])
+      for (const e of eSlotsRef.current) {
+        if (e?._modelId && !keepIds.has(e._modelId)) releaseHeroModel(e._modelId)
+      }
+      await Promise.race([preloadHeroModels(towerModelIds), new Promise<void>(r => setTimeout(r, 25_000))])
+      disposeDracoDecoder()
       updateEnemySlots(() => nextEnemySlots)
       resetBattleState()
       setVictoryRewards(null)
@@ -316,9 +343,14 @@ export function useBattleFlow(deps: BattleFlowDeps) {
       try { const cfg = await getStageConfig(nextId); if (cfg) injectedEnemies = cfg.enemies } catch {}
     }
     const nextEnemySlots = buildEnemySlotsFromStage(stageMode, nextId, heroesList, injectedEnemies)
-    // ── 預載入下一關敵人模型（25 秒超時安全網）──
+    // ── 釋放舊敵方模型（不與玩家或新敵人重疊的），再預載下一關 ──
     const nextModelIds = nextEnemySlots.filter(Boolean).map(s => s!._modelId).filter(Boolean) as string[]
-    await Promise.race([Promise.all(nextModelIds.map(mid => preloadHeroModel(mid).catch(() => {}))), new Promise<void>(r => setTimeout(r, 25_000))])
+    const keepStoryIds = new Set([...nextModelIds, ...restored.filter(Boolean).map(s => s!._modelId).filter(Boolean)])
+    for (const e of eSlotsRef.current) {
+      if (e?._modelId && !keepStoryIds.has(e._modelId)) releaseHeroModel(e._modelId)
+    }
+    await Promise.race([preloadHeroModels(nextModelIds), new Promise<void>(r => setTimeout(r, 25_000))])
+    disposeDracoDecoder()
     updateEnemySlots(() => nextEnemySlots)
 
     resetBattleState()

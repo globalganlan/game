@@ -226,6 +226,20 @@ loadGlbShared(url)         非同步載入，全域 Map 快取，去重複
         
 getGlbForSuspense(url)     同步介面，配合 React Suspense
         
+preloadHeroModel(id)       預載單一英雄的 6 個 GLB（mesh + 5 動畫）
+
+preloadHeroModels(ids, 2)  批次預載，並發限制 2 隻（iOS 防 OOM）
+
+releaseHeroModel(id)       深度釋放模型 GPU 資源 + 從快取移除
+
+releaseAllModels()         清空全部快取（登出時用）
+
+deepDisposeAsset(asset)    遞迴 dispose 幾何體/紋理/材質
+
+disposeDracoDecoder()      釋放 Draco WASM 解碼器記憶體
+
+getCachedModelIds()        診斷：回傳目前快取的英雄 ID Set
+        
 THREE.Cache.enabled = true  Three.js HTTP 快取
 ```
 
@@ -639,3 +653,4 @@ POST { "action": "invalidate-cache" }
 | v2.8 | 2026-03-08 | **Troika 字型預載修復**：(1) 根因：drei v10 `<Text>` 內部使用 `suspend-react.suspend()` 載入字型，key `['troika-text', font, characters]` — 戰鬥開始時 PassiveHint3D 首次渲染 `<Text>` → 字型未快取 → throw Promise → 觸發 per-hero `<Suspense>` fallback（旋轉方塊），即使模型已全部載入；(2) SceneWidgets.tsx 新增 `preloadTroikaFont()` 使用 `suspend-react.preload()` 非拋出 API 預熱快取；(3) App.tsx 新增 `FontPreloader` 元件在 Canvas 掛載時呼叫；(4) 先前嘗試 a9e97b7（改 curtain/preload 時序）已 revert |
 | v2.9 | 2026-03-15 | **Spec 校正 — 文件清單對齊實際程式碼**：① domain/ 新增 combatPower.ts、arenaSystem.ts、equipmentGacha.ts ② components/ 新增 ArenaPanel.tsx、CombatPowerHUD.tsx、CheckinPanel.tsx、TutorialOverlay.tsx、CodexPanel.tsx、ChestLootPreview.tsx、AcquireToast.tsx、ItemInfoPopup.tsx、SceneProps.tsx ③ hooks/ 新增 useCombatPower.ts、useAcquireToast.ts ④ 修正 audioService/authService 兩條目合併問題 ⑤ 版本號從 v2.6 同步至 v2.9 |
 | v3.0 | 2026-03-16 | **Workers battleEngine 同步**：Workers 端 `battleEngine.ts` 同步前端三項被動欄位：`perAlly`（依存活隊友數倍乘 buff value）、`targetHpThreshold`（HP 門檻條件式觸發 damage_mult）、`random_debuff`（隨機施加 debuff）；`executePassiveEffect` 改為返回 `boolean` + `triggerPassives` 條件式 emit，確保前後端戰鬥結果一致 |
+| v3.1 | 2026-03-12 | **iOS PWA 記憶體管理**：(1) glbLoader 新增 `deepDisposeAsset`/`releaseHeroModel`/`releaseAllModels`/`preloadHeroModels`(concurrency=2)/`getCachedModelIds` 五個記憶體管理 API；(2) useStageHandlers 三處預載改為 `preloadHeroModels` 序列化 + `disposeDracoDecoder`；(3) useBattleFlow `backToLobby` 戰鬥後延遲釋放敵方獨佔模型、`goNextStage` 跨關釋放舊敵方；(4) App.tsx 登出呼叫 `releaseAllModels`；(5) HeroListPanel IdlePreviewModel unmount dispose 材質；(6) WebGL context lost Toast 通知 |

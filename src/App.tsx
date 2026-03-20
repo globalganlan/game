@@ -62,6 +62,7 @@ import { registerAcquireHandler, registerTextHandler } from './services/acquireT
 import { callApi } from './services/apiClient'
 import { isStandalone, claimPwaReward } from './services/pwaService'
 import { getAuthState } from './services/authService'
+import { releaseAllModels } from './loaders/glbLoader'
 
 import { getArenaRankings, getCachedChallengesLeft } from './services/arenaService'
 import { canStarUp, getInitialStars } from './domain/progressionSystem'
@@ -337,6 +338,9 @@ export default function App() {
     // 2. hooks 守門旗標重設
     gameInit.resetInitRefs()
 
+    // 2.5 釋放所有 3D 模型快取（GPU 記憶體歸還）
+    releaseAllModels()
+
     // 3. 過場幕重設
     curtain.resetCurtain()
 
@@ -561,6 +565,8 @@ export default function App() {
               canvas.addEventListener('webglcontextlost', (e) => {
                 e.preventDefault()
                 console.warn('[WebGL] Context Lost — waiting for restore…')
+                // iOS Safari 記憶體不足時 GPU 會回收 context，通知使用者
+                try { showToast('GPU 記憶體不足，等待恢復中…') } catch {}
               })
               canvas.addEventListener('webglcontextrestored', () => {
                 console.info('[WebGL] Context Restored — reinitializing renderer')

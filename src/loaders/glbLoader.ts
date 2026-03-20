@@ -178,3 +178,107 @@ export function isGlbFallback(asset: GlbAsset): boolean {
 export function disposeDracoDecoder(): void {
   try { dracoLoader.dispose() } catch { /* ignore */ }
 }
+
+/* ─── iOS 記憶體管理 ──────────────────────────────── */
+
+/**
+ * 深度釋放 GlbAsset 的所有 GPU 資源（geometry / texture / material）。
+ * ⚠️ 呼叫後，任何仍在使用此 asset 的 clone 會失去紋理。
+ * 只在所有使用此 asset 的元件 unmount 後才能呼叫。
+ */
+function deepDisposeAsset(asset: GlbAsset): void {
+  asset.scene.traverse((obj) => {
+    if ((obj as THREE.Mesh).isMesh) {
+      const mesh = obj as THREE.Mesh
+      // 釋放幾何體（Draco 解壓後的 BufferGeometry）
+      mesh.geometry?.dispose()
+      // 釋放材質及其所有紋理貼圖
+      const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material]
+      for (const mat of mats) {
+        if (!mat) continue
+        // 遍歷材質上的所有紋理屬性（map / normalMap / roughnessMap ...）
+        for (const key of Object.keys(mat)) {
+          const val = (mat as unknown as Record<string, unknown>)[key]
+          if (val && typeof val === 'object' && (val as THREE.Texture).isTexture) {
+            ;(val as THREE.Texture).dispose()
+          }
+        }
+        mat.dispose()
+      }
+    }
+  })
+}
+
+/**
+ * 釋放單一英雄的所有 GLB 快取（mesh + 5 個動畫檔），連同 GPU 資源。
+ * ★ 只在所有使用此 modelId 的 Hero/ZombieModel 元件 unmount 之後才能呼叫。
+ * 常見時機：離開戰鬥場景 → 敵方模型不再需要。
+ */
+export function releaseHeroModel(modelId: string): void {
+  const folder = `${import.meta.env.BASE_URL}models/${modelId}`
+  const urls = [
+    `${folder}/${modelId}.glb`,
+    `${folder}/${modelId}_idle.glb`,
+    `${folder}/${modelId}_attack.glb`,
+    `${folder}/${modelId}_hurt.glb`,
+    `${folder}/${modelId}_dying.glb`,
+    `${folder}/${modelId}_run.glb`,
+  ]
+  let released = false
+  for (const url of urls) {
+    const asset = cache.get(url)
+    if (asset && !asset.isFallback) {
+      deepDisposeAsset(asset)
+      released = true
+    }
+    cache.delete(url)
+    pending.delete(url)
+    failedUrls.delete(url)
+  }
+  if (released) {
+    console.info(`[glbLoader] Released ${modelId} (GPU resources freed)`)
+  }
+}
+
+/**
+ * 釋放所有快取的 GLB 模型 — 登出或硬重設時使用。
+ */
+export function releaseAllModels(): void {
+  for (const [, asset] of cache) {
+    if (!asset.isFallback) deepDisposeAsset(asset)
+  }
+  const count = cache.size
+  cache.clear()
+  pending.clear()
+  failedUrls.clear()
+  if (count > 0) console.info(`[glbLoader] Released all ${count} cached assets`)
+}
+
+/**
+ * 批次預載多個英雄，限制同時載入的併發數（預設 2 個英雄並行）。
+ * iOS 上同時載入太多 GLB（每個英雄 6 檔）會造成記憶體尖峰 → OOM kill。
+ * @param modelIds  要預載的 modelId 陣列
+ * @param concurrency 同時預載的最大英雄數（預設 2，即最多 12 個檔案並行）
+ */
+export async function preloadHeroModels(
+  modelIds: string[],
+  concurrency = 2,
+): Promise<void> {
+  const unique = [...new Set(modelIds)]
+  for (let i = 0; i < unique.length; i += concurrency) {
+    const batch = unique.slice(i, i + concurrency)
+    await Promise.all(batch.map(mid => preloadHeroModel(mid).catch(() => {})))
+  }
+}
+
+/**
+ * 取得目前快取中的所有 modelId（診斷用途）。
+ */
+export function getCachedModelIds(): Set<string> {
+  const ids = new Set<string>()
+  for (const url of cache.keys()) {
+    const match = url.match(/models\/(zombie_\d+)\//)
+    if (match) ids.add(match[1])
+  }
+  return ids
+}

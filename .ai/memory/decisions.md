@@ -488,3 +488,25 @@
   - `hero-schema.md` v2.4 → v2.5
   - `core-combat.md`、`skill-system.md`、`tech-architecture.md`、`ui-flow.md`、`gacha.md` — 移除屬性引用
   - `specs/README.md` — 標記為已廢棄
+
+---
+
+### ADR-023: iOS PWA 記憶體管理 — 快取驅逐 + 序列預載 + GPU 資源釋放
+
+- **狀態**：✅ 已定案（KTX2 紋理壓縮為後續任務）
+- **日期**：2026-03-12
+- **背景**：iOS Safari WKWebView 有嚴格的記憶體限制（~1.4GB），原始架構中 `Promise.all()` 同時載入 12 隻英雄的 72 個 GLB 檔案容易觸發 OOM Kill，且模型快取永不釋放導致多場戰鬥後 GPU 記憶體持續增長。
+- **決定**：
+  1. **序列化預載**：`preloadHeroModels(ids, concurrency=2)` 每次最多同時載入 2 隻英雄（12 個 GLB），避免記憶體峰值
+  2. **快取驅逐**：`releaseHeroModel(modelId)` 深度釋放模型的所有 geometry、texture、material，從快取 Map 中移除
+  3. **戰鬥結束釋放敵方模型**：`backToLobby()` 延遲 500ms 釋放敵方獨佔模型（避免 unmount 中的 ZombieModel 讀到已 dispose 的資源）
+  4. **跨關釋放舊敵方**：`goNextStage()` tower/story 路徑先釋放不再需要的舊敵方模型再載入新的
+  5. **登出完全清理**：`handleLogoutResetState()` 呼叫 `releaseAllModels()` 清空所有快取
+  6. **Draco WASM 即時釋放**：每次預載完成後呼叫 `disposeDracoDecoder()` 釋放 WASM 解碼器記憶體
+  7. **HeroListPanel 材質清理**：IdlePreviewModel unmount 時 dispose 克隆的 MeshBasicMaterial
+  8. **WebGL context lost 通知**：顯示 Toast 提醒使用者 GPU 記憶體不足
+- **影響檔案**：glbLoader.ts、useStageHandlers.ts、useBattleFlow.ts、App.tsx、HeroListPanel.tsx
+- **理由**：
+  1. iOS WKWebView 記憶體限制嚴格，不主動釋放 GPU 資源會導致 WebGL context lost 或 App 被殺
+  2. 玩家模型保留在快取中（切關常用），敵方模型用完即釋放
+  3. 延遲釋放避免 React unmount 與 dispose 的競態條件

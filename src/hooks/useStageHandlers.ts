@@ -15,7 +15,7 @@ import { buildEnemySlotsFromStage, normalizeModelId } from '../game/helpers'
 import { getStageConfig } from '../services/stageService'
 import { waitFrames } from '../game/constants'
 import { EMPTY_SLOTS } from '../game/constants'
-import { preloadHeroModel } from '../loaders/glbLoader'
+import { preloadHeroModels, disposeDracoDecoder } from '../loaders/glbLoader'
 import { getSaveState } from '../services/saveService'
 
 /* ── 場景輪替配色池（基於 stageId 做確定性選取） ── */
@@ -130,7 +130,8 @@ export function useStageHandlers(deps: StageHandlerDeps) {
         })
       }
     } catch { /* ignore save read errors */ }
-    const preloadPromise = Promise.all([...modelIds].map(mid => preloadHeroModel(mid).catch(() => {})))
+    // ★ 序列批次預載（iOS 限制併發，避免記憶體尖峰）
+    const preloadPromise = preloadHeroModels([...modelIds])
 
     // ★ 立即掛載 3D 場景（過場幕遮蓋 Suspense 載入佔位符）
     setShowBattleScene(true)
@@ -147,6 +148,7 @@ export function useStageHandlers(deps: StageHandlerDeps) {
     // ★ 等待所有模型預載完成再收幕，避免使用者看到 Suspense 旋轉方塊
     //   安全網：最多等 25 秒（loadGlbShared 內建 20s/次 + 2 次重試）
     await Promise.race([preloadPromise, new Promise<void>(r => setTimeout(r, 25_000))])
+    disposeDracoDecoder() // ★ 預載完成後釋放 Draco WASM 記憶體
     await waitFrames(5)
     closeCurtain()
     showToast(`已選擇: ${displayName}`)
@@ -236,7 +238,7 @@ export function useStageHandlers(deps: StageHandlerDeps) {
           })
         }
       } catch { /* ignore */ }
-      const arenaPreload = Promise.all([...arenaModelIds].map(mid => preloadHeroModel(mid).catch(() => {})))
+      const arenaPreload = preloadHeroModels([...arenaModelIds])
 
       // ── 立即掛載 Canvas + 設定戰鬥狀態（過場幕遮蓋 Suspense 佔位符）──
       arenaEnemyPowerRef.current = res.defenderData?.power ?? 0
@@ -251,6 +253,7 @@ export function useStageHandlers(deps: StageHandlerDeps) {
       setGameState('IDLE')
       // ★ 等待所有模型預載完成再收幕，避免使用者看到 Suspense 旋轉方塊
       await Promise.race([arenaPreload, new Promise<void>(r => setTimeout(r, 25_000))])
+      disposeDracoDecoder()
       await waitFrames(5)
       closeCurtain()
     } catch (e) {
@@ -303,7 +306,7 @@ export function useStageHandlers(deps: StageHandlerDeps) {
         })
         // ── 預載入防守陣型模型 ──
         const defModelIds = restored.filter(Boolean).map(h => h!._modelId).filter(Boolean) as string[]
-        const defPreload = Promise.all(defModelIds.map(mid => preloadHeroModel(mid).catch(() => {})))
+        const defPreload = preloadHeroModels(defModelIds)
         if (restored.some(Boolean)) {
           updatePlayerSlots(() => restored)
         } else {
@@ -315,6 +318,7 @@ export function useStageHandlers(deps: StageHandlerDeps) {
         setGameState('IDLE')
         // ★ 等待模型預載完成再收幕
         await Promise.race([defPreload, new Promise<void>(r => setTimeout(r, 25_000))])
+        disposeDracoDecoder()
         await waitFrames(5)
         closeCurtain()
       } else {

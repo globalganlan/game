@@ -251,6 +251,20 @@ function IdlePreviewModel({ modelId }: { modelId: string }) {
     return { scene: cloned, modelScale: s, centerOffset: yOffset }
   }, [meshAsset])
 
+  // ★ 卸載時釋放克隆的 MeshBasicMaterial（紋理為共用快取，不 dispose）
+  useEffect(() => {
+    const cloned = clonedScene
+    return () => {
+      cloned.traverse((child) => {
+        if ((child as THREE.Mesh).isMesh) {
+          const mesh = child as THREE.Mesh
+          const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material]
+          mats.forEach(m => m?.dispose())
+        }
+      })
+    }
+  }, [clonedScene])
+
   const { actions } = useAnimations(idleAsset.animations, groupRef)
 
   useEffect(() => {

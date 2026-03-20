@@ -1,1 +1,117 @@
-我希望增加英雄, 增加技能, 戰鬥場景優化
+iOS 的 Safari 對 PWA 的記憶體限制比原生 APP 更嚴格，當 PWA 試圖載入過大或過多檔案（如大量高解析度圖片、大型 JS 檔案），瀏覽器為了維持系統穩定，會強制終止占用過多記憶體（RAM）的網頁
+
+iOS 的 PWA（Safari WebView）記憶體上限遠低於原生 App，3D + 多個 .glb 很容易直接被系統 kill（閃退）
+
+絕對不要「同時載入多個 GLB」
+改成：
+
+👉 用到才載（lazy load）
+👉 用完就 dispose
+
+scene.remove(model)
+model.traverse(obj => {
+  if (obj.geometry) obj.geometry.dispose()
+  if (obj.material) {
+    if (obj.material.map) obj.material.map.dispose()
+    obj.material.dispose()
+  }
+})
+
+壓縮 GLB（這是最關鍵）
+
+用：
+
+Draco compression
+
+Meshopt
+
+KTX2 texture
+
+👉 推薦 pipeline：
+Blender
+↓
+gltf-transform
+↓
+draco + webp/ktx2
+
+工具：
+
+gltf-transform
+
+gltfpack
+
+👉 目標：
+| 項目        | 建議     |
+| --------- | ------ |
+| texture   | ≤ 1024 |
+| format    | KTX2   |
+| polygon   | 壓低     |
+| animation | 刪沒用的   |
+
+不要 preload 全部資源
+
+很多人會這樣：
+
+Promise.all([
+  loadModel(a),
+  loadModel(b),
+  loadModel(c),
+])
+
+👉 在 iOS = 自殺
+
+改成：
+
+await loadModel(a)
+// 用完 unload
+await loadModel(b)
+
+texture 才是最大兇手（不是 mesh）
+
+👉 你要優先優化：
+
+貼圖尺寸
+
+貼圖格式
+
+建議：
+
+PNG → ❌
+
+JPG → 普通
+
+KTX2 → ✅（GPU friendly）
+
+WebGL context 也會爆
+
+iOS 有時候會：
+
+👉 WebGL context lost → 直接閃退
+
+你要監聽：
+
+canvas.addEventListener("webglcontextlost", (e) => {
+  e.preventDefault()
+  console.log("context lost")
+})
+
+更進階（你這種遊戲應該會用到）
+👉 資源池（Asset Pool）
+
+不要一直 new / dispose：
+
+👉 改成 cache + reuse
+
+分場景（Scene streaming）
+
+像遊戲引擎那樣：
+
+區域 A → 載 A
+
+離開 → unload A
+
+最關鍵一句話
+
+👉 在 iOS PWA：
+
+你不是在做 Web Game，你是在做「記憶體管理遊戲」

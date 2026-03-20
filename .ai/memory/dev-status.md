@@ -1,8 +1,17 @@
 # 開發狀態快照 — Dev Status
 
-> 最後更新：2026-03-12（第七十一次更新 — Boss 回合限制下修 + 戰力顯示 + 被動飄字防疊 + 回合計數器）
+> 最後更新：2026-03-12（第七十二次更新 — iOS PWA 記憶體管理優化）
 
 ## 截至 2026-03-12 的開發狀態
+
+### iOS PWA 記憶體管理優化
+- [x] **glbLoader.ts 記憶體管理 API** — 新增 5 個函式：`deepDisposeAsset()`（遞迴釋放幾何體/紋理/材質）、`releaseHeroModel(modelId)`（從快取中移除並釋放 GPU 資源）、`releaseAllModels()`（清空全部快取）、`preloadHeroModels(ids, concurrency=2)`（並發控制批次載入）、`getCachedModelIds()`（診斷用）
+- [x] **useStageHandlers.ts 序列化預載** — 3 處 `Promise.all([...].map(preloadHeroModel))` 改為 `preloadHeroModels([...])` 並發限制 2 隻；3 處預載完成後呼叫 `disposeDracoDecoder()` 釋放 WASM 記憶體
+- [x] **useBattleFlow.ts 快取驅逐** — `backToLobby()` 戰鬥結束後延遲 500ms 釋放敵方獨佔模型（不與玩家重疊的）；`goNextStage()` 推進時先釋放舊敵方模型再預載新的；tower/story 兩條路徑均已轉換為 `preloadHeroModels` + `disposeDracoDecoder`
+- [x] **App.tsx 登出清理** — `handleLogoutResetState()` 呼叫 `releaseAllModels()` 完全釋放 GPU 記憶體
+- [x] **HeroListPanel.tsx 材質清理** — `IdlePreviewModel` 新增 unmount effect，釋放克隆的 MeshBasicMaterial
+- [x] **WebGL context lost 增強** — context lost 時顯示 Toast 通知使用者「GPU 記憶體不足，等待恢復中…」
+- [ ] **KTX2 紋理壓縮**（後續任務）— 需建立 gltf-transform 工具鏈將所有 GLB 紋理轉為 KTX2/ETC1S
 
 ### Boss 平衡調整 + UI 改善（4 項）
 - [x] **被動技能飄字防疊** — Hero.tsx `PassiveHint3D` 多個同時觸發時依 `idx * 0.55` 垂直偏移，避免文字重疊
