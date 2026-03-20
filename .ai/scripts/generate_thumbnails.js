@@ -33,6 +33,13 @@ function writeDataUrlToFile(dataUrl, outPath) {
   const publicRoot = path.join(projectRoot, 'public');
   const modelsRoot = path.join(publicRoot, 'models');
 
+  // --force flag: regenerate even if thumbnail exists
+  // --only=zombie_17,zombie_19: regenerate specific models only
+  const args = process.argv.slice(2);
+  const force = args.includes('--force');
+  const onlyArg = args.find(a => a.startsWith('--only='));
+  const onlyList = onlyArg ? onlyArg.slice(7).split(',') : null;
+
   if (!fs.existsSync(modelsRoot)) {
     console.error('models folder not found:', modelsRoot);
     process.exit(1);
@@ -51,23 +58,29 @@ function writeDataUrlToFile(dataUrl, outPath) {
       if (!e.isDirectory()) continue;
       const name = e.name;
       if (!/^zombie/i.test(name)) continue;
+      if (onlyList && !onlyList.includes(name)) continue;
       const dir = path.join(modelsRoot, name);
       const files = fs.readdirSync(dir);
       
       const outPath = path.join(dir, 'thumbnail.png');
-      if (fs.existsSync(outPath)) {
+      if (fs.existsSync(outPath) && !force && !onlyList) {
         console.log('Thumbnail exists, skipping:', name);
         continue;
       }
 
-      const fbx = files.find(f => /idle.*\.fbx$/i.test(f)) || files.find(f => /\.fbx$/i.test(f));
-      if (!fbx) {
-        console.log('no fbx for', name); continue;
+      // Try FBX first, then GLB mesh
+      let modelFile = files.find(f => /idle.*\.fbx$/i.test(f)) || files.find(f => /\.fbx$/i.test(f));
+      if (!modelFile) {
+        // Fall back to GLB mesh file (zombie_N.glb, not animation files)
+        modelFile = files.find(f => f === `${name}.glb`);
+      }
+      if (!modelFile) {
+        console.log('no model for', name); continue;
       }
 
-      const modelPath = `/models/${name}/${fbx}`;
+      const modelPath = `/models/${name}/${modelFile}`;
       const url = `${baseUrl}/thumbnail.html?model=${encodeURIComponent(modelPath)}&size=512`;
-      console.log('Generating thumbnail for', name, '→', modelPath);
+      console.log('Generating thumbnail for', name, '→', modelFile);
 
       page.on('console', msg => console.log('PAGE LOG:', msg.text()));
       page.on('pageerror', err => console.error('PAGE ERROR:', err.toString()));

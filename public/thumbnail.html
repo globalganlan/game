@@ -18,6 +18,8 @@
 <script type="module">
 import * as THREE from 'three';
 import { FBXLoader } from '/node_modules/three/examples/jsm/loaders/FBXLoader.js';
+import { GLTFLoader } from '/node_modules/three/examples/jsm/loaders/GLTFLoader.js';
+import { DRACOLoader } from '/node_modules/three/examples/jsm/loaders/DRACOLoader.js';
 
 const params = new URLSearchParams(location.search);
 const model = params.get('model');
@@ -40,13 +42,7 @@ const dir = new THREE.DirectionalLight(0xffffff, 1.0);
 dir.position.set(1, 2, 1);
 scene.add(dir);
 
-if (!model) {
-  window.__THUMBNAIL_READY__ = true;
-} else {
-  const loader = new FBXLoader();
-  loader.load(decodeURIComponent(model), function(obj) {
-    scene.add(obj);
-
+function processModel(obj) {
     // play idle animation if present so we don't capture T-pose
     let mixer = null;
     if (obj.animations && obj.animations.length) {
@@ -54,7 +50,6 @@ if (!model) {
       const idleClip = obj.animations.find(c=>/idle/i.test(c.name)) || obj.animations[0];
       const action = mixer.clipAction(idleClip);
       action.play();
-      // step mixer to apply pose
       mixer.update(0.6);
     }
 
@@ -80,15 +75,37 @@ if (!model) {
     const center = new THREE.Vector3();
     box.getCenter(center);
 
+    // GLB from Blender may use Z-up: if height (Y) is near zero, swap Y and Z
+    let useZ = sizeVec.y < sizeVec.z * 0.3;
+    const height = useZ ? sizeVec.z : sizeVec.y;
+    const headY = useZ ? (box.min.z + sizeVec.z * 0.82) : (box.min.y + sizeVec.y * 0.82);
+
+    return { mixer, box, sizeVec, center, height, headY, useZ };
+}
+
+if (!model) {
+  window.__THUMBNAIL_READY__ = true;
+} else {
+  const isGLB = /\.glb$/i.test(model);
+
+  function onModelLoaded(obj) {
+    scene.add(obj);
+    const { mixer, box, sizeVec, center, height, headY, useZ } = processModel(obj);
+
     // aim at head (approx 80-85% height) and zoom in
-    const headTargetY = box.min.y + sizeVec.y * 0.82; 
+    const headTargetY = headY; 
     const maxDim = Math.max(sizeVec.x, sizeVec.y, sizeVec.z);
     // closer distance for headshot
     const distance = maxDim * 0.6; 
     
     // Position camera at head height but pulled back
-    camera.position.set(center.x, headTargetY + sizeVec.y * 0.05, center.z + distance);
-    camera.lookAt(center.x, headTargetY, center.z);
+    if (useZ) {
+      camera.position.set(center.x, center.y + distance, headTargetY + height * 0.05);
+      camera.lookAt(center.x, center.y, headTargetY);
+    } else {
+      camera.position.set(center.x, headTargetY + height * 0.05, center.z + distance);
+      camera.lookAt(center.x, headTargetY, center.z);
+    }
 
     const amb = new THREE.AmbientLight(0xffffff, 0.3);
     scene.add(amb);
@@ -99,10 +116,14 @@ if (!model) {
       renderer.render(scene, camera);
 
       // compute head crop region: take top 40% of model bbox as head area
-      const headTop = box.max.y;
-      const headBottom = box.min.y + sizeVec.y * 0.6; // lower bound for head
-      const headMin = new THREE.Vector3(box.min.x, headBottom, box.min.z);
-      const headMax = new THREE.Vector3(box.max.x, headTop, box.max.z);
+      const headTop = useZ ? box.max.z : box.max.y;
+      const headBottom = useZ ? (box.min.z + sizeVec.z * 0.6) : (box.min.y + sizeVec.y * 0.6);
+      const headMin = useZ
+        ? new THREE.Vector3(box.min.x, box.min.y, headBottom)
+        : new THREE.Vector3(box.min.x, headBottom, box.min.z);
+      const headMax = useZ
+        ? new THREE.Vector3(box.max.x, box.max.y, headTop)
+        : new THREE.Vector3(box.max.x, headTop, box.max.z);
 
       // get 8 corners of head box
       const corners = [];
@@ -159,10 +180,28 @@ if (!model) {
 
       window.__THUMBNAIL_READY__ = true;
     }, 250);
-  }, undefined, function(err) {
+  }
+
+  function onError(err) {
     console.error(err);
     window.__THUMBNAIL_READY__ = true;
-  });
+  }
+
+  if (isGLB) {
+    const gltfLoader = new GLTFLoader();
+    const dracoLoader = new DRACOLoader();
+    dracoLoader.setDecoderPath('/draco/');
+    gltfLoader.setDRACOLoader(dracoLoader);
+    gltfLoader.load(decodeURIComponent(model), function(gltf) {
+      const obj = gltf.scene;
+      // Transfer animations from GLTF to the scene object
+      obj.animations = gltf.animations || [];
+      onModelLoaded(obj);
+    }, undefined, onError);
+  } else {
+    const fbxLoader = new FBXLoader();
+    fbxLoader.load(decodeURIComponent(model), onModelLoaded, undefined, onError);
+  }
 }
 </script>
 </body>
