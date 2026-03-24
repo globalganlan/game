@@ -221,25 +221,44 @@ function IdlePreviewModel({ modelId }: { modelId: string }) {
 
   const { scene: clonedScene, modelScale, centerOffset } = useMemo(() => {
     const cloned = SkeletonUtils.clone(meshAsset.scene)
+    // 某些模型貼圖極暗，保留 MeshStandardMaterial 讓場景光照正常作用
+    const PBR_EMISSIVE: Record<string, number> = { zombie_27: 3.0, zombie_29: 5.0 }
+    const emissiveVal = PBR_EMISSIVE[modelId] ?? 0
     cloned.traverse((child) => {
       if ((child as THREE.Mesh).isMesh) {
         const mesh = child as THREE.Mesh
-        const convertMat = (m: THREE.Material): THREE.MeshBasicMaterial => {
-          const src = m as THREE.MeshStandardMaterial
-          const basic = new THREE.MeshBasicMaterial({
-            color: src.color?.clone() ?? new THREE.Color(0xffffff),
-            map: src.map ?? null,
-            transparent: src.transparent,
-            opacity: src.opacity,
-            alphaMap: src.alphaMap ?? null,
-            side: src.side,
-            wireframe: src.wireframe,
-          })
-          basic.needsUpdate = true
-          return basic
+        if (!emissiveVal) {
+          const convertMat = (m: THREE.Material): THREE.MeshBasicMaterial => {
+            const src = m as THREE.MeshStandardMaterial
+            const basic = new THREE.MeshBasicMaterial({
+              color: src.color?.clone() ?? new THREE.Color(0xffffff),
+              map: src.map ?? null,
+              transparent: src.transparent,
+              opacity: src.opacity,
+              alphaMap: src.alphaMap ?? null,
+              side: src.side,
+              wireframe: src.wireframe,
+            })
+            basic.needsUpdate = true
+            return basic
+          }
+          if (Array.isArray(mesh.material)) mesh.material = mesh.material.map(convertMat)
+          else if (mesh.material) mesh.material = convertMat(mesh.material)
+        } else {
+          // 暗色 PBR 模型：降低金屬度 + 增加自發光亮度（無環境貼圖時全黑）
+          const fixPbr = (m: THREE.Material) => {
+            const std = m as THREE.MeshStandardMaterial
+            if (std.isMeshStandardMaterial) {
+              std.metalness = 0
+              std.roughness = 0.8
+              std.emissive = new THREE.Color(0xffffff)
+              std.emissiveMap = std.map
+              std.emissiveIntensity = emissiveVal
+            }
+          }
+          if (Array.isArray(mesh.material)) mesh.material.forEach(fixPbr)
+          else if (mesh.material) fixPbr(mesh.material)
         }
-        if (Array.isArray(mesh.material)) mesh.material = mesh.material.map(convertMat)
-        else if (mesh.material) mesh.material = convertMat(mesh.material)
       }
     })
     const bbox = new THREE.Box3().setFromObject(cloned)
@@ -299,7 +318,7 @@ function HeroModelPreview({ modelId }: { modelId: string }) {
         </div>
       )}
       <Canvas
-        camera={{ position: [0, 0, 4.5], fov: 28 }}
+        camera={{ position: [0, 0, 6], fov: 28 }}
         className="hero-model-canvas"
         gl={{ alpha: true, antialias: true, powerPreference: 'low-power' }}
         onCreated={() => {

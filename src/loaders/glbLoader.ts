@@ -29,13 +29,29 @@ export interface GlbAsset {
 }
 
 // Draco 解碼器（Draco 壓縮的 GLB 必須）
-const dracoLoader = new DRACOLoader()
-// 使用本地 Draco WASM 解碼器（從 public/draco/ 提供）
+let dracoLoader = new DRACOLoader()
 dracoLoader.setDecoderPath(`${import.meta.env.BASE_URL}draco/`)
 dracoLoader.setDecoderConfig({ type: 'wasm' })
 
 const loader = new GLTFLoader()
 loader.setDRACOLoader(dracoLoader)
+
+/** DRACOLoader 是否已被 dispose（Worker 已終止） */
+let _dracoDisposed = false
+
+/**
+ * 確保 DRACOLoader 可用。如果之前被 dispose 過，重新建立一個。
+ * ★ 在每次 loadAsync 前呼叫，避免「Draco 已死 → 解壓掛住 → timeout」的問題。
+ */
+function ensureDracoAlive(): void {
+  if (!_dracoDisposed) return
+  dracoLoader = new DRACOLoader()
+  dracoLoader.setDecoderPath(`${import.meta.env.BASE_URL}draco/`)
+  dracoLoader.setDecoderConfig({ type: 'wasm' })
+  loader.setDRACOLoader(dracoLoader)
+  _dracoDisposed = false
+  console.info('[glbLoader] Draco decoder re-initialized')
+}
 
 const cache = new Map<string, GlbAsset>()
 const pending = new Map<string, Promise<GlbAsset>>()
@@ -44,7 +60,57 @@ const failedUrls = new Map<string, { count: number; lastFail: number }>()
 
 const MAX_RETRIES = 2
 const FALLBACK_EXPIRE_MS = 30_000 // fallback 快取 30 秒後過期可重試
-const LOAD_TIMEOUT_MS = 20_000    // 單次載入超時（iOS WASM/4G 安全網）
+const LOAD_TIMEOUT_MS = 60_000    // 單次載入超時（Draco 解壓尖峰時避免誤判 timeout）
+const MAX_CONCURRENT_FILE_LOADS = 8 // 全域同時載入上限（每英雄 6 檔，至少能讓 1 隻完整並行）
+
+let activeFileLoads = 0
+const fileLoadQueue: Array<() => void> = []
+
+/**
+ * 追蹤「底層 loadAsync 真正還在跑」的數量。
+ * 與 activeFileLoads 不同：timeout reject 會讓 activeFileLoads 歸零（以便佇列流動），
+ * 但 realLoadsInFlight 只在底層 Three.js loadAsync 真正結束後才遞減。
+ * Draco dispose 必須同時滿足 activeFileLoads=0 && realLoadsInFlight=0。
+ */
+let realLoadsInFlight = 0
+
+function tryAutoDisposeDraco(): void {
+  if (activeFileLoads === 0 && fileLoadQueue.length === 0
+    && realLoadsInFlight === 0 && _autoDisposeDraco) {
+    _autoDisposeDraco = false
+    try { dracoLoader.dispose() } catch { /* ignore */ }
+    _dracoDisposed = true
+    console.info('[glbLoader] Draco decoder auto-disposed (queue empty)')
+  }
+}
+
+function pumpFileLoadQueue(): void {
+  while (activeFileLoads < MAX_CONCURRENT_FILE_LOADS && fileLoadQueue.length > 0) {
+    const next = fileLoadQueue.shift()
+    if (!next) return
+    activeFileLoads += 1
+    next()
+  }
+  tryAutoDisposeDraco()
+}
+
+/** 標記：佇列清空時自動釋放 Draco 解碼器 */
+let _autoDisposeDraco = false
+
+function enqueueFileLoad<T>(job: () => Promise<T>): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    fileLoadQueue.push(() => {
+      job()
+        .then(resolve)
+        .catch(reject)
+        .finally(() => {
+          activeFileLoads = Math.max(0, activeFileLoads - 1)
+          pumpFileLoadQueue()
+        })
+    })
+    pumpFileLoadQueue()
+  })
+}
 
 /**
  * 建立空的 fallback asset（載入失敗時使用）。
@@ -55,18 +121,33 @@ function createFallbackAsset(): GlbAsset {
   return { scene: group, animations: [], isFallback: true }
 }
 
-/** 帶超時的 loadAsync 包裝 */
+/**
+ * 帶超時的 loadAsync 包裝。
+ * ★ timeout 只是讓上層 Promise reject（佇列可繼續流動），
+ *   但底層 loadAsync 會繼續跑到結束（Three.js 不支援 abort）。
+ *   realLoadsInFlight 追蹤底層真正結束的時機，確保 Draco 不被提早 dispose。
+ */
 function loadWithTimeout(url: string, timeoutMs: number): Promise<GLTF> {
+  ensureDracoAlive()
+  realLoadsInFlight += 1
   return new Promise<GLTF>((resolve, reject) => {
+    let settled = false
     const timer = setTimeout(() => {
-      reject(new Error(`[glbLoader] Load timeout after ${timeoutMs}ms: ${url}`))
+      if (!settled) {
+        settled = true
+        reject(new Error(`[glbLoader] Load timeout after ${timeoutMs}ms: ${url}`))
+      }
     }, timeoutMs)
     loader.loadAsync(url).then((gltf) => {
       clearTimeout(timer)
-      resolve(gltf)
+      if (!settled) { settled = true; resolve(gltf) }
     }).catch((err) => {
       clearTimeout(timer)
-      reject(err)
+      if (!settled) { settled = true; reject(err) }
+    }).finally(() => {
+      // ★ 底層 loadAsync 真正結束 → 遞減並檢查是否可 dispose Draco
+      realLoadsInFlight = Math.max(0, realLoadsInFlight - 1)
+      tryAutoDisposeDraco()
     })
   })
 }
@@ -93,7 +174,7 @@ export function loadGlbShared(url: string): Promise<GlbAsset> {
   const inflight = pending.get(url)
   if (inflight) return inflight
 
-  const task = loadWithTimeout(url, LOAD_TIMEOUT_MS).then((gltf) => {
+  const task = enqueueFileLoad(() => loadWithTimeout(url, LOAD_TIMEOUT_MS)).then((gltf) => {
     const asset: GlbAsset = {
       scene: gltf.scene,
       animations: gltf.animations || [],
@@ -172,11 +253,18 @@ export function isGlbFallback(asset: GlbAsset): boolean {
 }
 
 /**
- * 釋放 Draco WASM 解碼器佔用的記憶體。
- * 所有模型載入完成後呼叫，減少 iOS WKWebView 記憶體壓力。
+ * 標記在所有載入（含底層 loadAsync）結束後自動釋放 Draco WASM 解碼器。
+ * ★ 不會立即 dispose — 等佇列清空 + 底層真實載入全部結束才執行，
+ *   避免 timeout reject 讓佇列提前歸零卻殺掉仍在解壓的 Draco worker → blob cancel。
  */
 export function disposeDracoDecoder(): void {
-  try { dracoLoader.dispose() } catch { /* ignore */ }
+  if (activeFileLoads === 0 && fileLoadQueue.length === 0 && realLoadsInFlight === 0) {
+    try { dracoLoader.dispose() } catch { /* ignore */ }
+    _dracoDisposed = true
+    console.info('[glbLoader] Draco decoder disposed (idle)')
+  } else {
+    _autoDisposeDraco = true
+  }
 }
 
 /* ─── iOS 記憶體管理 ──────────────────────────────── */
@@ -255,20 +343,29 @@ export function releaseAllModels(): void {
 }
 
 /**
- * 批次預載多個英雄，限制同時載入的併發數（預設 2 個英雄並行）。
- * iOS 上同時載入太多 GLB（每個英雄 6 檔）會造成記憶體尖峰 → OOM kill。
+ * 批次預載多個英雄，限制同時載入的併發數（預設 4 個英雄並行）。
+ * 每個英雄 6 個 GLB 檔，搭配 MAX_CONCURRENT_FILE_LOADS=8 的全域節流，
+ * 確保 Draco 解壓不會同時佔滿 CPU，同時避免佇列消化太慢導致 timeout。
  * @param modelIds  要預載的 modelId 陣列
- * @param concurrency 同時預載的最大英雄數（預設 2，即最多 12 個檔案並行）
+ * @param concurrency 同時預載的最大英雄數（預設 4）
  */
 export async function preloadHeroModels(
   modelIds: string[],
-  concurrency = 2,
+  concurrency = 4,
 ): Promise<void> {
   const unique = [...new Set(modelIds)]
   for (let i = 0; i < unique.length; i += concurrency) {
     const batch = unique.slice(i, i + concurrency)
     await Promise.all(batch.map(mid => preloadHeroModel(mid).catch(() => {})))
   }
+}
+
+/**
+ * 根據模型數量計算合理的預載等待上限（毫秒）。
+ * 每個英雄至少給 5 秒，下限 15 秒、上限 90 秒。
+ */
+export function preloadTimeoutMs(modelCount: number): number {
+  return Math.min(90_000, Math.max(15_000, modelCount * 5_000))
 }
 
 /**

@@ -15,7 +15,7 @@ import { buildEnemySlotsFromStage, normalizeModelId } from '../game/helpers'
 import { getStageConfig } from '../services/stageService'
 import { waitFrames } from '../game/constants'
 import { EMPTY_SLOTS } from '../game/constants'
-import { preloadHeroModels, disposeDracoDecoder } from '../loaders/glbLoader'
+import { preloadHeroModels, disposeDracoDecoder, preloadTimeoutMs } from '../loaders/glbLoader'
 import { getSaveState } from '../services/saveService'
 
 /* ── 場景輪替配色池（基於 stageId 做確定性選取） ── */
@@ -146,9 +146,9 @@ export function useStageHandlers(deps: StageHandlerDeps) {
     setGameState('IDLE')
 
     // ★ 等待所有模型預載完成再收幕，避免使用者看到 Suspense 旋轉方塊
-    //   安全網：最多等 25 秒（loadGlbShared 內建 20s/次 + 2 次重試）
-    await Promise.race([preloadPromise, new Promise<void>(r => setTimeout(r, 25_000))])
-    disposeDracoDecoder() // ★ 預載完成後釋放 Draco WASM 記憶體
+    //   安全網：根據模型數量動態計算（每英雄 5 秒，下限 15 秒、上限 90 秒）
+    await Promise.race([preloadPromise, new Promise<void>(r => setTimeout(r, preloadTimeoutMs(modelIds.size)))])
+    disposeDracoDecoder() // ★ 標記佇列清空後自動釋放 Draco（不會殺掉仍在排隊的解碼）
     await waitFrames(5)
     closeCurtain()
     showToast(`已選擇: ${displayName}`)
@@ -252,8 +252,8 @@ export function useStageHandlers(deps: StageHandlerDeps) {
       setMenuScreen('none')
       setGameState('IDLE')
       // ★ 等待所有模型預載完成再收幕，避免使用者看到 Suspense 旋轉方塊
-      await Promise.race([arenaPreload, new Promise<void>(r => setTimeout(r, 25_000))])
-      disposeDracoDecoder()
+      await Promise.race([arenaPreload, new Promise<void>(r => setTimeout(r, preloadTimeoutMs(arenaModelIds.size)))])
+      disposeDracoDecoder() // ★ 標記延遲釋放
       await waitFrames(5)
       closeCurtain()
     } catch (e) {
@@ -317,8 +317,8 @@ export function useStageHandlers(deps: StageHandlerDeps) {
         setMenuScreen('none')
         setGameState('IDLE')
         // ★ 等待模型預載完成再收幕
-        await Promise.race([defPreload, new Promise<void>(r => setTimeout(r, 25_000))])
-        disposeDracoDecoder()
+        await Promise.race([defPreload, new Promise<void>(r => setTimeout(r, preloadTimeoutMs(defModelIds.length)))])
+        disposeDracoDecoder() // ★ 標記延遲釋放
         await waitFrames(5)
         closeCurtain()
       } else {

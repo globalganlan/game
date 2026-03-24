@@ -4,6 +4,476 @@
 
 ---
 
+### [2026-03-24] #96 — RUN 動畫接地修正：Hips position 凍結首幀而非移除全部
+- **觸發者**：使用者回報 viewer 跑步動畫飄浮但遊戲中不會
+- **執行角色**：🏃 ANIMATION
+- **根因**：移除全部 `.position` tracks 後，Hips 回到 rest pose 高度（比 idle 動畫的 Hips 位置高），造成 idle→run 切換時模型跳高飄浮
+- **變更摘要**：
+  1. `src/components/ZombieModel.tsx`：RUN 動畫的 Hips.position 軌道改為凍結首幀值，其他骨骼 position 仍移除
+  2. `public/model-viewer.html`：同步相同變更
+- **影響檔案**：
+  - `src/components/ZombieModel.tsx`
+  - `public/model-viewer.html`
+  - `.ai/specs/tech-architecture.md`
+
+---
+
+### [2026-03-24] #95 — Draco 重新初始化機制：解決 dispose 後無法再解壓的問題
+- **觸發者**：使用者提供 console log 證明 Draco disposed 在後續模型載入之前執行
+- **執行角色**：🔧 ENGINE
+- **根因**：`DRACOLoader.dispose()` 是單向操作，Worker 終止後無法恢復，後續戰鬥載入模型時解壓掊住→ 60s timeout
+- **變更摘要**：
+  1. `src/loaders/glbLoader.ts`：`dracoLoader` 改為 `let`，新增 `_dracoDisposed` 旗標 + `ensureDracoAlive()` 函數
+  2. `src/loaders/glbLoader.ts`：`loadWithTimeout()` 前呼叫 `ensureDracoAlive()`，若已 dispose 則重建 DRACOLoader
+  3. Playwright 三次連續戰鬥驗證通過
+- **影響檔案**：
+  - `src/loaders/glbLoader.ts`
+  - `.ai/specs/tech-architecture.md`
+
+---
+
+### [2026-03-24] #94 — 修正 blob cancel — 新增 realLoadsInFlight 計數器，確保 Draco 只在底層 loadAsync 全部真正結束後才 dispose
+- **觸發者**：使用者回報 blob URL 被瀏覽器 cancel
+- **執行角色**：🔧 ENGINE
+- **根因**：`loadWithTimeout` timeout reject 後底層 `loadAsync` 仍在跑（Three.js 不支援 abort），佇列計數器已歸零 → `tryAutoDisposeDraco()` 誤判佇列已空 → terminate Draco worker → blob URL 被 cancel
+- **變更摘要**：
+  1. `src/loaders/glbLoader.ts`：新增 `realLoadsInFlight` 計數器，追蹤底層 `loadAsync` 真正完成的數量
+  2. `src/loaders/glbLoader.ts`：`tryAutoDisposeDraco()` 條件加上 `realLoadsInFlight === 0`
+  3. `src/loaders/glbLoader.ts`：`loadWithTimeout` 在 `loader.loadAsync().finally()` 才遞減 `realLoadsInFlight`（timeout reject 不影響）
+  4. `src/loaders/glbLoader.ts`：`disposeDracoDecoder()` 立即 dispose 條件也加上 `realLoadsInFlight === 0`
+- **影響檔案**：
+  - `src/loaders/glbLoader.ts`
+  - `.ai/specs/tech-architecture.md`
+  - `.ai/specs/README.md`
+
+---
+
+### [2026-03-24] #93 — 修正 disposeDracoDecoder 時機 bug：race timeout 先到時不再立即殺掉解碼器，改由佇列清空後自動釋放
+- **觸發者**：使用者回報 Promise.race timeout 先勝出時 Draco 解碼器被立即摧毀，佇列中等待解壓檔案全部失敗
+- **執行角色**：🔧 ENGINE
+- **變更摘要**：
+  1. `src/loaders/glbLoader.ts`：`disposeDracoDecoder()` 不再立即 dispose；改設 `_autoDisposeDraco` 旗標，佇列清空時由 `pumpFileLoadQueue()` 自動觸發實際釋放
+  2. `src/hooks/useStageHandlers.ts`、`src/hooks/useBattleFlow.ts`：5 處 `disposeDracoDecoder()` 呼叫不變，但語意從「立即釋放」改為「標記延遲釋放」
+- **影響檔案**：
+  - `src/loaders/glbLoader.ts`
+  - `src/hooks/useStageHandlers.ts`
+  - `src/hooks/useBattleFlow.ts`
+  - `.ai/specs/tech-architecture.md`
+  - `.ai/specs/README.md`
+
+---
+
+### [2026-03-24] #92 — 載入併發數提升：file 4→8、hero 2→4、等待上限動態化
+- **觸發者**：使用者要求提升載入併發量與動態化 timeout
+- **執行角色**：🔧 ENGINE
+- **變更摘要**：
+  1. `src/loaders/glbLoader.ts`：`MAX_CONCURRENT_FILE_LOADS` 4→8（每英雄 6 檔，至少能讓 1 隻完整並行）
+  2. `src/loaders/glbLoader.ts`：`preloadHeroModels` concurrency 2→4
+  3. `src/loaders/glbLoader.ts`：新增 `preloadTimeoutMs(modelCount)` 根據模型數量動態計算等待上限（每英雄 5s，下限 15s、上限 90s）
+  4. `src/hooks/useStageHandlers.ts`、`src/hooks/useBattleFlow.ts`：5 處 `Promise.race` 硬編碼 25s 改用 `preloadTimeoutMs()` 動態計算
+- **影響檔案**：
+  - `src/loaders/glbLoader.ts`
+  - `src/hooks/useStageHandlers.ts`
+  - `src/hooks/useBattleFlow.ts`
+  - `.ai/specs/tech-architecture.md`
+  - `.ai/specs/README.md`
+
+---
+
+### [2026-03-24] #91 — Hero 載入 timeout 修正：localhost 停用 SW + GLB 併發節流
+- **觸發者**：使用者回報上陣英雄大量 timeout（多個 `zombie_x.glb` 在 30s 內載入失敗）
+- **執行角色**：🔧 ENGINE + 🧪 QA
+- **根因判斷**：
+  1. 非資料欄位對齊問題，而是 GLB 載入鏈路壅塞
+  2. 開發環境 localhost 仍註冊 SW，易與 dev 模式資源更新/快取策略互相干擾
+  3. 每個英雄預載 6 檔 GLB，疊加多英雄同時預載時造成 Draco 解壓尖峰，30s 容易誤判 timeout
+- **變更摘要**：
+  1. `src/main.tsx`：localhost（`localhost/127.0.0.1/::1`）改為不註冊 SW，並主動 unregister + 清快取
+  2. `src/loaders/glbLoader.ts`：新增全域檔案併發節流 `MAX_CONCURRENT_FILE_LOADS = 4`
+  3. `src/loaders/glbLoader.ts`：`LOAD_TIMEOUT_MS` 由 30s 提升到 60s
+- **影響檔案**：
+  - `src/main.tsx`
+  - `src/loaders/glbLoader.ts`
+  - `.ai/specs/tech-architecture.md`
+  - `.ai/specs/README.md`
+
+---
+
+### [2026-03-24] #90 — RUN 飄浮修正：移除全部 position 軌道
+- **觸發者**：使用者回報「跑步動畫會飄起來」
+- **執行角色**：🏃 ANIMATION + 🔧 ENGINE + 🧪 QA
+- **變更摘要**：
+  1. `ZombieModel.tsx`：RUN 後處理由「僅移除 `Hips.position` + 其餘 position 鎖首幀」改為「移除所有 `.position` tracks」
+  2. `model-viewer.html`：`applyRuntimeTrackFixes` 同步同一策略，確保檢查器與遊戲 Runtime 一致
+  3. 保留既有 Head/Neck/Spine1/Spine2 quaternion 移除策略，避免跑步時頭部/上半身異常扭轉
+- **預期效果**：即使 RUN 動畫首幀存在垂直偏移，也不會再被鎖定成整段懸空
+- **影響檔案**：
+  - `src/components/ZombieModel.tsx`
+  - `public/model-viewer.html`
+  - `.ai/specs/tech-architecture.md`
+  - `.ai/specs/README.md`
+
+---
+
+### [2026-03-24] #89 — 動畫品質修復：z16 攻擊改斧頭 + 跑步浮空修復 + 頭部扭曲修復
+- **觸發者**：使用者提出 8 項動畫品質問題
+- **執行角色**：🏃 ANIMATION + 🔧 ENGINE + 🧪 QA
+- **變更摘要**：
+  1. **z16 攻擊動畫改用 Bayonet Slash（斧頭揮砍）**：
+     - Mixamo 下載 z16 全 5 動畫 FBX → Blender fbx_to_glb.py 轉 GLB → git 還原 mesh
+  2. **跑步浮空修復**：RUN filter 增加移除 `Hips.position` track（Y 軸升降）
+  3. **頭部/脊椎扭曲修復**：
+     - RUN：移除 `Head, Neck, Spine1, Spine2` quaternion tracks（保留 base Spine 維持自然軀幹擺動）
+     - HURT/ATTACKING：移除 `Head, Neck, Spine`（全 Spine 變體）quaternion tracks
+  4. **model-viewer.html** 同步更新所有 track filter 邏輯
+- **驗證**：
+  - tsc --noEmit: 零錯誤 ✅
+  - vite build: 成功 (1806.59 KB) ✅ 
+  - workers tsc: 零錯誤 ✅
+  - Model-viewer 逐一截圖：z7/z8/z19 attack/hurt 正常 ✅
+  - Playwright 遊戲戰鬥測試（試煉場 x2）：0 errors，動畫無浮空、頭部無扭曲 ✅
+- **影響檔案**：
+  - `src/components/ZombieModel.tsx` — RUN/HURT/ATTACKING track filters 擴展
+  - `public/model-viewer.html` — applyRuntimeTrackFixes 同步
+  - `public/models/zombie_16/` — 新 attack GLB (Bayonet Slash) + 其他 4 動畫重新下載
+
+---
+
+### [2026-03-23] #88 — z16 荒拳鬥士：修正右手握斧（恆定 quaternion 取代移除策略）
+- **觸發者**：使用者回報 z16 所有動畫右手應該握住斧頭
+- **執行角色**：🏃 ANIMATION + 🔧 ENGINE
+- **根因分析**：
+  - 之前策略：移除 RightHand 手指 quaternion tracks → 手指回到 bind pose（伸直）= 不握斧
+  - 根本原因：mesh GLB 的 bind pose 手指是伸直的，移除 quaternion 反而讓手指打開
+  - 正確做法：從 idle 動畫取得握斧 quaternion 值，用恆定值取代所有動畫的手指 tracks
+- **變更摘要**：
+  - ZombieModel.tsx z16 block：
+    - 之前：filter 移除 RightHand finger quaternion tracks
+    - 之後：filter 移除 + push 9 個 QuaternionKeyframeTrack（Thumb1-3, Index1-3, Pinky1-3）恆定握斧值
+  - model-viewer.html `applyRuntimeTrackFixes`：同步更新，加入 GRIP 常數 + 恆定 tracks
+  - anim-inspect.html：暴露 `__OBJ__`、`__THREE__`、`__RAW_CLIP__` 供 Playwright 診斷
+  - model-viewer.html：暴露 `window.THREE`、`__scene`、`__currentModel`、`__mixer`
+- **驗證**：
+  - anim-inspect 取得 idle 動畫原始 finger quaternion（全部恆定值）
+  - model-viewer 5 個動畫全部確認 9 個 grip tracks 正確
+  - tsc + vite build + workers tsc = 零錯誤
+  - Playwright 戰鬥測試：反擊測試 ✅ 玩家勝利，0 errors
+- **影響檔案**：
+  - `src/components/ZombieModel.tsx` — z16 finger grip fix
+  - `public/model-viewer.html` — runtime alignment + window exports
+  - `public/anim-inspect.html` — window exports for diagnostics
+
+---
+
+### [2026-03-23] #86 — 第四輪動畫修復：HURT/ATTACKING 加入 Spine1+Spine2 上半身穩定
+- **觸發者**：使用者回報 #85 修復不足，頭部下轉問題仍存在
+- **執行角色**：🏃 ANIMATION + 🔧 ENGINE
+- **根因分析**：
+  - Model-viewer 逐一檢查 z7/z8/z16/z19/z22/z25/z26 全部動畫
+  - 發現**僅移除 Head+Neck quaternion 不夠**，Spine1/Spine2 的前彎才是導致上半身摺疊的根本原因
+  - z19 hurt/attack、z26 hurt 上半身幾乎彎成 90 度
+- **變更摘要**：
+  - ZombieModel.tsx HURT + ATTACKING filter:
+    - 之前: Head + Neck quaternion 移除
+    - 之後: Head + Neck + **Spine1** + **Spine2** quaternion 移除
+  - 效果：上半身在受傷/攻擊時保持更直立
+- **驗證**：tsc + vite build OK, Playwright 戰鬥流程 0 errors
+- **影響檔案**：`src/components/ZombieModel.tsx`
+
+---
+
+### [2026-03-23] #85 — 第三輪動畫修復：9 動畫替換 + Attack/Hurt 頭部統一修復 + z16 握斧
+- **觸發者**：使用者回報 #84 修復不足，z7/z8/z19/z25/z26 動畫品質仍有問題
+- **執行角色**：🏃 ANIMATION + 🔧 ENGINE
+- **變更摘要**：
+  - ZombieModel.tsx 三項修正：
+    - RUN: 新增 Spine2 .quaternion tracks 移除（上半身不再過度前傾）
+    - HURT + ATTACKING: 統一移除 Head + Neck .quaternion（之前 ATTACKING 無處理）
+    - z16: 移除 RightHand 手指 quaternion tracks（保持 rest-pose 握斧）
+  - 9 個動畫 GLB 替換：
+    - z7 attack → ZombiePunching, hurt → ZombieStumbleBack, run → ZombieRun
+    - z8 attack → ZombiePunching（不再刺刀動作）
+    - z19 attack → ZombieOverheadTwoHand
+    - z25 hurt → ZombieStumbleBack, run → ZombieRun
+    - z26 hurt → ZombieStumbleBack, run → ZombieRun
+- **驗證**：Model-viewer 視覺驗證 7 英雄 OK, tsc 零錯誤, vite build OK, Playwright 戰鬥流程 0 errors
+- **影響檔案**：
+  - `src/components/ZombieModel.tsx` — Spine2 + Attack Head/Neck + z16 finger fix
+  - `public/models/zombie_{7,8,19,25,26}/` — 9 個動畫 GLB
+  - `.ai/scripts/download_targeted_anims_v3.mjs` — 第三輪下載腳本
+
+---
+
+### [2026-03-23] #84 — 第二輪動畫修復：10 動畫替換 + 飄浮位置鎖定 + RUN/HURT 頭部穩定
+- **觸發者**：使用者回報 #83 修復不足，跑步仍飄浮、頭部仍有問題、部分動畫不合適
+- **執行角色**：🏃 ANIMATION + 🔧 ENGINE
+- **變更摘要**：
+  - ZombieModel.tsx：
+    - RUN clips `.position` tracks 改為鎖定首幀值（非刪除），防止 crossFade 導致漂移
+    - RUN clips 移除 Head/Neck `.quaternion` tracks → 跑步頭部保持直立
+    - HURT clips 移除 Head `.quaternion` tracks → 受傷頭部不再縮進胸腔
+  - 10 個動畫 GLB 替換：
+    - z7 attack → DaggerStab, run → RunningLeaning
+    - z8 attack → BayonetSlash
+    - z16 idle → ZombieTwitch, attack → ZombieRightHand（右手持斧揮砍）
+    - z19 attack → Roar
+    - z20 attack → ElbowUppercut
+    - z25/z26/z28 run → RunningLeaning
+  - download_hero_anims.mjs 配置同步 8 英雄
+- **驗證**：tsc 零錯誤, vite build 0 errors, Playwright 關卡戰鬥 0 errors
+- **影響檔案**：
+  - `src/components/ZombieModel.tsx` — RUN position lock + Head/Neck rotation removal
+  - `public/models/zombie_{7,8,16,19,20,25,26,28}/` — 10 個動畫 GLB
+  - `.ai/scripts/download_hero_anims.mjs` — 動畫配置
+
+---
+
+### [2026-03-23] #83 — 11 英雄 18 動畫替換 + 跑步飄浮根治 + 受傷頭部下轉修復
+- **觸發者**：使用者回報多英雄動畫不合適、跑步仍然飄浮、受傷頭部不自然下轉
+- **執行角色**：🏃 ANIMATION + 🔧 ENGINE
+- **變更摘要**：
+  - ZombieModel.tsx：RUN clips 完全移除 `.position` tracks（之前保留 Y 導致飄浮）
+  - 18 個動畫 GLB 替換（attack ×6, hurt ×6, run ×6）：
+    - z5/z7/z8/z16/z19/z20 attack 替換為更符合角色定位的動畫
+    - z7/z16/z19/z22/z25/z26 hurt 替換（消除 ZombieStumbleBack 造成的頭部異常）
+    - z7/z15/z20/z25/z26/z28 run 替換（JogSlowly → ZombieRun/ZombieRunning）
+  - download_hero_anims.mjs 配置同步 11 英雄
+- **驗證**：tsc 零錯誤, vite build 0 errors, Playwright 全流程 0 animation errors
+- **影響檔案**：
+  - `src/components/ZombieModel.tsx` — RUN position track removal
+  - `public/models/zombie_{5,7,8,15,16,19,20,22,25,26,28}/` — 18 個動畫 GLB
+  - `.ai/scripts/download_hero_anims.mjs` — animation config updates
+
+### [2026-03-22] #82 — 15 英雄動畫大規模替換 + 跑步飄浮修復 + z28 載入修復
+- **觸發者**：使用者回報 15 英雄的 attack/hurt/run 動畫不合適；所有跑步動畫飄浮；z28 載入超時
+- **執行角色**：🏃 ANIMATION + 🔧 ENGINE
+- **核心發現**：
+  - 建立安全轉換腳本 `convert_anim_safe.py`（export_apply=False），解決 bone orientation 問題
+  - 跑步飄浮原因：ZombieModel.tsx 移除了所有 position tracks，包括垂直 Y 分量
+  - z28 載入超時：mesh GLB Draco 壓縮格式有問題，重新匯出後修復
+- **修改清單**：
+  - 15 英雄 27 個動畫 GLB 替換（attack×8, hurt×13, run×6）
+  - `ZombieModel.tsx`：跑步動畫改為保留 Y 軸垂直分量，僅清零 X/Z 水平位移
+  - `glbLoader.ts`：超時從 20s → 30s
+  - z28 mesh GLB 重新匯出修復 Draco 相容性
+  - `download_hero_anims.mjs`：更新 15 英雄動畫配置
+- **新動畫摘要**：
+  - attack: Elbow-Uppercut(z7,z24), Zombie Headbutt(z5), Overhead Two-Hand(z8), Jab-Elbow Combo(z18), Conjuring Magic(z19), Advancing Punch(z20), Roundhouse Kick(z29)
+  - hurt: Zombie Stumble Back(z7,z15,z18,z19,z20,z21,z22,z24,z25,z26,z28,z29,z30)
+  - run: Jogging Slowly(z7,z15,z20,z25,z26,z28)
+- **新腳本**：`convert_anim_safe.py`, `download_selective.mjs`, `download_round2.mjs`, `search_mixamo.mjs`
+- **驗證**：z26 骨架 0/69 不匹配 ✅; z28/z26/z29 Playwright 視覺正常 ✅; tsc + vite build ✅
+
+---
+
+### [2026-03-22] z26 面部扭曲修復 + 5 英雄 idle 動畫還原 + z20 新 idle
+- **觸發者**：z26 老獵魔人面部扭曲未改善；z11/z19/z20/z22/z25 待機動畫看地板
+- **執行角色**：🏃 ANIMATION + 🔍 DIAGNOSTICS
+- **根因分析**：
+  1. `convert_all_fbx.py` 轉換的動畫 GLB rest pose 與原始 mesh 不匹配（z26: 65/69 骨骼 rest pose 不同）
+  2. Mixamo skin=true/false + Blender `automatic_bone_orientation=True` 組合導致不同 rest pose
+  3. 唯一正確的版本是原始 batch 下載 + `fbx_to_glb.py` 轉換的動畫（bak_mixamo_rebind / bak_anim_audit）
+- **修改項目**：
+  1. z26: 還原 bak_mixamo_rebind 版本（69 骨骼，0 rest pose 不匹配 → 面部正常）
+  2. z19/z25: 還原 bak_mixamo_rebind 版本
+  3. z11/z22: 還原 bak_anim_audit 版本（原始 batch 下載）
+  4. z20: 保留新的 IdleLookAround (107820901) — Vanguard 的 rest pose 剛好能匹配
+  5. `download_hero_anims.mjs` 改回 skin=false + 加入骨骼不匹配警告註解
+  6. 建立 `diag_z26.py` 診斷工具（比較 mesh 骨骼 vs 動畫骨骼 rest pose）
+  7. 5 英雄縮圖重新生成
+- **技術發現**：`convert_all_fbx.py` 的 FBX import 產生的 bone orientation 與 `fbx_to_glb.py` 不一致，導致所有後續下載的動畫 GLB rest pose 失準。需要 retarget 方案才能安全更換動畫。
+- **影響範圍**：30 動畫 GLB 檔案（還原）、5 縮圖 PNG、download_hero_anims.mjs
+
+### [2026-03-22] 消滅跨 proxy 動畫複製 — 7 英雄全部用自身 charId 重新下載
+- **觸發者**：z26 老獵魔人面部嚴重扭曲 → 使用者要求「不要複製來複製去，所有動畫都要用英雄自己的 3D 模型去綁定」
+- **執行角色**：🏃 ANIMATION + 🎨 3D_ARTIST
+- **根因**：跨 proxy 複製動畫（例如把 ExoGray 的動畫套到 Warrok）會因 rest pose 完全不同導致骨架扭曲
+- **修改項目**：
+  1. 全 30 英雄動畫來源審計 — 揪出 7 位跨 proxy 複製英雄：z2, z11, z15, z16, z19, z25, z26
+  2. 用 Mixamo API + 各英雄自身 charId 重新下載全部 35 個 FBX（7×5 動畫）
+  3. Blender 5.0 FBX→GLB 批次轉換 35 檔案
+  4. 7 英雄縮圖重新生成
+  5. download_hero_anims.mjs 移除所有跨 proxy 複製註解
+  6. 建立永久規則：禁止跨 proxy 複製動畫、Mixamo token 過期走 Playwright 登入流程
+- **驗證**：Playwright 逐一截圖確認 z26/z19/z25/z2/z16 全部正確無扭曲
+- **影響範圍**：35 個動畫 GLB 檔案、7 縮圖 PNG、download_hero_anims.mjs、/memories/globalganlan-workflow.md
+
+### [2026-03-22] z27/z29 亮度再提升 + 9 英雄動畫第二輪替換
+- **觸發者**：使用者反饋「z27/29 還是太黑了、9 英雄動畫還是不滿意」
+- **執行角色**：🏃 ANIMATION + 🎨 3D_ARTIST
+- **修改項目**：
+  1. `PBR_EMISSIVE` z27: 0.6→3.0, z29: 2.0→5.0，三處同步（HeroListPanel/ZombieModel/thumbnail.html）
+  2. 9 英雄動畫第二輪替換 — 完全重選更符合角色概念的動畫：
+     - z2 idle→ZombieTwitch (from z17 Skeleton), z11 idle→ZombieTwitch+attack→LungeBite (Vampire swap + z5)
+     - z15 idle→ReadyToCombat+attack→CastWideTwoArms (Vampire swap + z28 Medea)
+     - z16 idle→FightIdleEmpty+attack→AdvancingPunch (z14 Ninja + z3 Mutant)
+     - z19 idle→UprightTwitch (z5 Skeleton), z20 idle→ReadyToCombat (z1 Vanguard)
+     - z22 idle→UprightTwitch (Vampire swap), z25 idle→ReadyToCombat (z1 Vanguard)
+     - z26 idle→IdleLookAround+attack→DaggerStab (z24 ExoGray + z4 Ninja)
+  3. Blender 5.0 layered animation API 位移軌道剝離（8 檔共 1392 tracks）
+  4. Vampire z11/z15/z22 三方循環交換
+  5. 11 英雄縮圖重新生成
+- **技術發現**：Blender 5.0 移除 `Action.fcurves`，改用 `action.layers[].strips[].channelbags[].fcurves`
+- **影響範圍**：HeroListPanel.tsx、ZombieModel.tsx、thumbnail.html、download_hero_anims.mjs、13+ 動畫 GLB 檔案
+- **spec 更新**：tech-architecture.md v3.3
+
+### [2026-03-22] 英雄 3D 預覽優化 + 9 英雄動畫替換（第一輪）
+- **觸發者**：使用者反饋「z27/29 太黑、9 英雄動畫不滿意、英雄資訊鏡頭太近、z6 縮圖重照」
+- **執行角色**：🏃 ANIMATION + 🎨 3D_ARTIST
+- **修改項目**：
+  1. `KEEP_PBR` Set → `PBR_EMISSIVE` Record（z27: 0.6, z29: 2.0），三處同步（HeroListPanel/ZombieModel/thumbnail.html）
+  2. 英雄詳情鏡頭 `[0,0,4.5]` → `[0,0,6]`，可看到模型全貌
+  3. 9 英雄動畫替換（z2/z11/z15/z16/z19/z20/z22/z25/z26），含 4 個跨 proxy 位移軌道剝離
+  4. download_hero_anims.mjs 配置同步更新
+  5. 12 英雄縮圖重新生成
+- **影響範圍**：HeroListPanel.tsx、ZombieModel.tsx、thumbnail.html、download_hero_anims.mjs、15+ 動畫 GLB 檔案
+- **spec 更新**：tech-architecture.md v3.2
+
+---
+
+### [2026-03-22] 全部 30 英雄動畫多樣性升級
+- **觸發者**：使用者要求「英雄動畫掃一遍，多樣性與適合度都要高，不高的換掉」
+- **執行角色**：🏃 ANIMATION（經 AI 團隊調度系統分派）
+- **問題根因**：之前 7 個重綁模型都使用相同的通用動畫（Zombie Headbutt / Hit Reaction / Dying），多樣性為零
+- **修復方法**：
+  1. Mixamo 動畫相容性大規模測試 — 測試 4 角色 × 98 動畫，發現 Mixamo API 部分動畫 export 故障
+  2. 建立「已驗證可用動畫池」：9 idle + 19 attack + 6 hurt + 6 dying + 5 run = 45 種可用動畫
+  3. 為 30 英雄各自分配符合角色定位的動畫組合（20 種獨立 attack 動畫、9 種 idle 動畫）
+  4. z1-z15 無 Mixamo charId，使用代理角色下載（所有動畫 skin=false，曲線通用）
+  5. 武器檢查：只有 z16 有武器(BattleAxe)，其他 29 個模型無武器 → 避開武器動畫
+- **動畫分配概要**：
+  - Attack 獨佔：z4 匕首刺、z5 噬咬衝、z9 頭錘、z13 怒吼、z18 擒拿踢、z22 蝙蝠咬、z26 迴旋踢 等
+  - Idle 多樣：殭屍警戒/搔抓/抽搐、格鬥/戰鬥待機、凝視四周 9 種
+  - Run 分組：Zombie Run/Running/Walking/Running Leaning/Jogging 5 種
+- **技術步驟**：
+  - 150 FBX 從 Mixamo API 下載（30 英雄 × 5 動畫，0 失敗）
+  - Blender 5.0 批次 FBX→GLB 轉換（150 個，移除 mesh 只保留骨架動畫）
+  - 總大小：17.9MB（150 個 GLB 檔案）
+- **驗證**：tsc 零錯誤、vite build 成功、Playwright 全流程（登入→關卡→戰鬥→結果→返回）0 errors 0 warnings
+- **工具腳本**：
+  - `.ai/scripts/download_hero_anims.mjs` — 30 英雄個別動畫配置 + Mixamo 下載
+  - `.ai/scripts/convert_all_fbx.py` — 150 個 FBX → GLB 批次轉換
+  - `.ai/scripts/test_working_ids.mjs` — Mixamo 動畫相容性大規模測試
+  - `.ai/scripts/working_anims.json` — 已驗證可用動畫清單
+
+---
+
+### [2026-03-21] Mixamo 正式重綁動畫（消除 THREE.js PropertyBinding 警告）
+- **觸發者**：使用者報告 console 大量 `No target node found for track: mixamorigBackCloth` 警告
+- **執行角色**：🏃 ANIMATION + 🎨 3D_ASSET + 🧪 QA
+- **問題根因**：7 個模型的動畫 GLB 使用了其他角色的動畫（如 z4 動畫套在 z17、z27 動畫套在 z19），導致動畫包含 mesh 不存在的骨骼 tracks
+- **修復方法**：
+  1. 從 Mixamo API 使用各角色自身的 charId 重新下載 5 組動畫 FBX（35 個檔案，全部成功）
+  2. Blender 5.0 將 FBX 轉為動畫 GLB（移除 mesh，只保留骨架+動畫）
+  3. 清理 Mixamo 標準動畫中多餘的骨骼 tracks（Mixamo 角色骨架 > 我們優化過的 mesh 骨架）
+- **修復模型**：z16(Mutant)、z17(Skeletonzombie)、z19(Pumpkinhulk)、z21(Erika Archer)、z25(Warzombie)、z26(Warrok)、z28(Medea)
+- **結果**：全部 30 模型 × 5 動畫零 `anim_only`（動畫無多餘骨骼 tracks）
+- **前端補充**：`suppressWarnings.ts` 加入 `No target node found for track` 抑制（安全網）
+- **工具腳本**：
+  - `.ai/scripts/rebind_mixamo_anims.mjs` — Mixamo API 動畫重綁下載
+  - `.ai/scripts/convert_rebind_fbx.py` — 重綁 FBX → GLB 轉換
+  - `.ai/scripts/diag_bone_mismatch.py` — 全域骨骼不匹配診斷
+  - `.ai/scripts/fix_anim_tracks.py` — 批次清理多餘動畫 tracks
+- **驗證**：diag_bone_mismatch.py 確認 anim_only=0，tsc + vite build 通過，Playwright 測試 z17/z28 英雄預覽 + 1-4 戰鬥全流程 0 errors 0 warnings
+
+---
+
+### [2026-03-21] 動畫骨骼匹配修復（完整重做）+ 前綴統一
+- **觸發者**：使用者指令 — 審查全部 30 英雄動畫骨骼數是否一致
+- **執行角色**：🏃 ANIMATION + 🎨 3D_ASSET + 🧪 QA
+- **方法**：使用 `inspect_animations.mjs` 掃描全部 30 模型 × 5 動畫的骨骼數，建立完整矩陣，逐一匹配替換
+- **變更內容**：
+  1. **z17 全部動畫修復**（idle=73, 原 attack/hurt/dying/run=65 → 73）：
+     - attack/hurt/dying/run 全部替換為 z4 來源（73 骨骼完全匹配）
+  2. **z19 全部動畫修復**（idle=67, 原 attack/hurt/dying=49, run=65 → 67）：
+     - attack/hurt/dying 替換為 z27 來源（67 骨骼）
+     - run 替換為 z7 來源（67 骨骼）
+  3. **z8 attack 修復**（模型=65 骨骼, 原 attack=67 → 65）：
+     - 替換為 z29 掃擊（65 骨骼，3.43s，武士風格）
+  4. **z18 attack 修復**（模型=65 骨骼, 原 attack 不匹配 → 65）：
+     - 替換為 z20 射擊（65 骨骼，5.0s 瞄準射擊）
+  5. **z21 attack + run 修復**（模型=67 骨骼, 原=65 → 67）：
+     - attack 替換為 z10 刺擊（67 骨骼，2.67s）
+     - run 替換為 z7（67 骨骼）
+  6. **z16~z28 run.glb 骨骼匹配替換**：
+     - z16 run ← z12（72 骨骼 ✅）
+     - z25 run ← z15（99 骨骼 ✅）
+     - z26 run ← z5（69 骨骼 ✅）
+     - z27 run ← z7（67 骨骼 ✅）
+     - z28 run ← z5（69 骨骼 ✅）
+  7. **仍未匹配（無同骨骼數來源）**：
+     - z22: run=65 vs idle=68（無 68 骨來源）
+     - z23: run=65 vs idle=79（無 79 骨來源）
+     - z24: run=65 vs idle=112（無 112 骨來源）
+     - z30: run=65 vs idle=68（無 68 骨來源）
+     - 需 Mixamo token 續期後下載專屬動畫
+  8. **Blender 5.0 腳本修復 z22/z23/z24/z30 run.glb**：
+     - 發現 z6 run.glb 使用 `mixamorig5:` 前綴，z16-z30 模型使用 `mixamorig:` 前綴
+     - 用 Blender Python 腳本 in-place 重命名骨骼前綴 + 新增缺失骨骼 rest-pose tracks
+     - z22: 65→68 骨 (mixamorig5:→mixamorig:, +3 Ribbon 骨) ✅
+     - z23: 65→79 骨 (mixamorig5:→mixamorig:, +14 裙擺/眼球骨) ✅
+     - z24: 65→112 骨 (mixamorig5:→mixamorig:, +47 臉部骨骼) ✅
+     - z30: 65→68 骨 (mixamorig5:→mixamorig:, +3 眼球/頸骨) ✅
+  9. **順帶修復 z18/z20/z29 前綴不匹配**：
+     - 這三者 run.glb 骨骼數雖匹配(65)但前綴是 mixamorig5:，模型用 mixamorig:
+     - Blender 腳本 in-place 重命名前綴，無需加骨骼
+- **驗證**：
+  - inspect_animations.mjs 重跑確認 **30/30** 模型全動畫骨骼一致
+  - Blender 前綴檢查確認 z16-z30 所有模型 idle/run 前綴一致
+  - tsc --noEmit 零錯誤
+  - vite build 成功
+  - Playwright 瀏覽器測試：登入→大廳→關卡→戰鬥→勝利→返回，Console 零錯誤
+- **Blender 工具腳本**：
+  - `.ai/scripts/fix_run_bones_v2.py` — Blender 5.0 Baklava API 骨骼前綴重映射 + 額外骨骼注入
+  - `.ai/scripts/diag_prefix_all.py` — 前綴一致性檢查 z16-z30
+- **審計工具**（QA 用途，非生產代碼）：
+  - `public/anim-inspect.html` — 動畫預覽頁面
+  - `.ai/scripts/inspect_animations.mjs` — 批次動畫 metadata 擷取
+  - `.ai/scripts/screenshot_animations.mjs` — 批次動畫截圖
+- **改動檔案**：
+  - `public/models/zombie_17/` — attack/hurt/dying/run（4 個替換 ← z4）
+  - `public/models/zombie_19/` — attack/hurt/dying/run（4 個替換 ← z27/z7）
+  - `public/models/zombie_8/zombie_8_attack.glb`（替換 ← z29，原備份 .bak）
+  - `public/models/zombie_18/zombie_18_attack.glb`（替換 ← z20，原備份 .bak）
+  - `public/models/zombie_21/zombie_21_attack.glb + run.glb`（替換 ← z10/z7，原備份 .bak）
+  - `public/models/zombie_16/zombie_16_run.glb`（替換 ← z12）
+  - `public/models/zombie_25/zombie_25_run.glb`（替換 ← z15）
+  - `public/models/zombie_26/zombie_26_run.glb`（替換 ← z5）
+  - `public/models/zombie_27/zombie_27_run.glb`（替換 ← z7）
+  - `public/models/zombie_28/zombie_28_run.glb`（替換 ← z5）
+  - `public/models/zombie_18/zombie_18_run.glb`（Blender 前綴修復）
+  - `public/models/zombie_20/zombie_20_run.glb`（Blender 前綴修復）
+  - `public/models/zombie_22/zombie_22_run.glb`（Blender 前綴+骨骼修復）
+  - `public/models/zombie_23/zombie_23_run.glb`（Blender 前綴+骨骼修復）
+  - `public/models/zombie_24/zombie_24_run.glb`（Blender 前綴+骨骼修復）
+  - `public/models/zombie_29/zombie_29_run.glb`（Blender 前綴修復）
+  - `public/models/zombie_30/zombie_30_run.glb`（Blender 前綴+骨骼修復）
+
+---
+
+### [2026-03-12] 英雄設計審查：17 英雄改名 + 縮圖系統修復
+- **觸發者**：使用者指令 — 3D_ASSET / ANIMATION / GAME_DESIGN 角色審查所有英雄名稱 vs 3D 模型外觀
+- **執行角色**：🎨 GAME_DESIGN + 🔧 CODING
+- **變更內容**：
+  1. **17 英雄改名**（D1 遠端 heroes + skill_templates 表）：
+     - SSR: #13 南瓜魔→狂暴巨獸, #28 瘟疫女王→末日歌姬, #30 不朽將軍→傭兵頭子
+     - SR: #7 腐學者→屍警, #8 夜鬼→怨武者, #15 瘟疫醫生→暗焰祭司, #22 血族伯爵→魔瞳領主, #23 炎魔→霜角魔, #24 魂縛者→鏈甲獵兵, #25 冰霜巫妖→骸骨騎士, #26 深淵使徒→老獵魔人
+     - R: #9 倖存者→噬骨者, #19 毒蕈師→星蝕者, #21 亡靈弓手→暗影弓手
+     - N: #16 腐蝕蟲→荒拳鬥士, #17 枯骨兵→蠕行屍
+     - 描述更新: #2 異變者
+  2. **~60 技能改名**（對應上述 17 英雄的主動+被動技能）
+  3. **縮圖系統修復**（thumbnail.html）：新增 per-model override 機制（`MODEL_OVERRIDES`），解決 zombie_3（怪獸）和 zombie_14（囚服喪屍）因 bounding box 不對稱導致的裁切失敗；非標準模型使用像素內容偵測裁切替代投影裁切
+  4. **全部 30 個縮圖重新生成**
+- **改動檔案**：
+  - `workers/_rename_heroes.sql`（新建，已執行於遠端 D1）
+  - `workers/_insert_hero15.sql`、`workers/_insert_heroes_16_30.sql`（更新）
+  - `.ai/scripts/skill_data_zh.json`（更新 heroes 7,8,9,13 技能名）
+  - `.ai/specs/hero-schema.md`（更新英雄名）
+  - `public/thumbnail.html`（per-model override + pixel-based crop）
+  - `public/models/zombie_*/thumbnail.png`（30 張全部重新生成）
+
+---
+
 ### [2026-03-12] Boss 回合限制下修 + 戰力顯示 + 被動飄字防疊 + 回合計數器
 - **觸發者**：使用者指令 — Boss 平衡調整 + UI 改善
 - **執行角色**：🔧 CODING

@@ -9,6 +9,7 @@ const SUPPRESSED_WARNINGS = [
   'THREE.Clock: This module has been deprecated',
   'PCFSoftShadowMap has been deprecated',
   "'skinning' is not a property of THREE",
+  'No target node found for track',
 ]
 
 const _origWarn = console.warn.bind(console)

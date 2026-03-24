@@ -1,6 +1,6 @@
 # 英雄資料結構 Spec
 
-> 版本：v2.6 ｜ 狀態：🟢 已實作
+> 版本：v2.7 ｜ 狀態：🟢 已實作
 > 最後更新：2026-03-15
 > 負賬角色：🎯 GAME_DESIGN → 🔧 CODING
 > 原始碼：`src/types.ts`（表現層）、`src/domain/types.ts`（domain 層）、`src/services/dataService.ts`（資料轉換）、`src/services/saveService.ts`（HeroInstance）
@@ -241,13 +241,13 @@ function getHeroSpeed(h: RawHeroData): number {
 | 4 | 屠宰者 | 刺客 | ★★★★ | 100 | 60 | 12 | 11 | 15% | 80% |
 | 5 | 口器者 | 特殊 | ★★★ | 110 | 40 | 18 | 10 | 5% | 50% |
 | 6 | 無名活屍 | 均衡 | ★★ | 100 | 30 | 20 | 8 | 5% | 50% |
-| 7 | 腐學者 | 輔助 | ★★★ | 105 | 35 | 22 | 9 | 5% | 50% |
-| 8 | 夜鬼 | 力量 | ★★★★ | 130 | 45 | 25 | 9 | 5% | 50% |
-| 9 | 倖存者 | 均衡 | ★★★ | 115 | 35 | 20 | 9 | 5% | 50% |
+| 7 | 屍警 | 輔助 | ★★★ | 105 | 35 | 22 | 9 | 5% | 50% |
+| 8 | 怨武者 | 力量 | ★★★★ | 130 | 45 | 25 | 9 | 5% | 50% |
+| 9 | 噬骨者 | 均衡 | ★★★ | 115 | 35 | 20 | 9 | 5% | 50% |
 | 10 | 童魘 | 敏捷 | ★★★★ | 95 | 45 | 14 | 12 | 10% | 60% |
 | 11 | 白面鬼 | 特殊 | ★★ | 100 | 40 | 16 | 10 | 5% | 50% |
 | 12 | 戰厄 | 坦克 | ★★★ | 160 | 35 | 40 | 7 | 5% | 50% |
-| 13 | 南瓜魔 | 力量 | ★★★★ | 150 | 55 | 30 | 6 | 10% | 70% |
+| 13 | 狂暴巨獸 | 力量 | ★★★★ | 150 | 55 | 30 | 6 | 10% | 70% |
 | 14 | 脫逃者 | 敏捷 | ★ | 90 | 30 | 10 | 13 | 8% | 50% |
 
 ### 職業分佈
@@ -317,9 +317,17 @@ public/models/zombie_N/
  zombie_N_attack.glb    攻擊動畫
  zombie_N_hurt.glb      受擊動畫
  zombie_N_dying.glb     死亡動畫
- zombie_N_run.glb       跑步動畫
+ zombie_N_run.glb       跑步動畫（所有模型通用 Mixamo 標準骨骼）
  thumbnail.png          大頭照
 ```
+
+> **動畫互換性**：由於所有模型都使用 Mixamo 標準骨骼（`mixamorig:*`），
+> 動畫 GLB 可跨模型使用。Three.js AnimationMixer 按骨骼名稱映射 — 
+> 多餘的骨骼 track 被忽略，缺少的骨骼保持 bind pose。
+>
+> **已知限制（v2.7）**：
+> - zombie_17：idle 73 骨骼 vs 其他動畫 65 骨骼（手指延伸骨不匹配）
+> - zombie_19：idle 67 骨骼 vs 其他動畫 49 骨骼（較大差異但視覺無瑕疵）
 
 ---
 
@@ -343,3 +351,5 @@ public/models/zombie_N/
 | v2.5 | 2026-03-06 | 修正 Rarity 欄位型別：D1 存 TEXT 非 number。新增共用 `toRarity(v)` / `toRarityNum(v)` 工具函式於 `constants/rarity.ts`，取代各元件 inline `numToRarity()` |
 | v2.5 | 2026-03-11 | **移除 Element 欄位**：Element 型別、BattleHero.element、RawHeroInput.element、toElement() 全部移除。DB 欄位保留但不再讀取。英雄一覽表移除屬性欄。 |
 | v2.6 | 2026-03-15 | **Spec 校正**：確認 RawHeroInput 位置為 `src/domain/battleEngine.ts`（非 types.ts）；確認 createBattleHero 預設 starLevel=1；版本號更新 |
+| v2.7 | 2026-03-21 | **動畫適配性修復**：補齊 z16-30 的 _run.glb（15 個）；替換 z8/z18/z21 不匹配攻擊動畫；新增動畫互換性說明與骨骼不匹配已知限制 |
+| v2.8 | 2026-03-23 | **英雄動畫品質修復（#85/#86）**：替換 z7/z8/z19/z25/z26 共 9 個 attack/hurt/run 動畫（避免刺刀錯位、頭部縮胸、跑步姿態不合理）；並在表現層 `ZombieModel` 新增 Spine 鏈旋轉過濾（HURT/ATTACKING: Spine1/Spine2 + Head/Neck，RUN: Spine2 + Head/Neck）與 z16 右手手指旋轉過濾，提升握斧穩定度與跨模型動畫適配性 |

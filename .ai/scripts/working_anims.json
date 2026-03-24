@@ -1,0 +1,1076 @@
+{
+  "working": [
+    {
+      "mid": 102250901,
+      "name": "Zombie Alert Idle",
+      "query": "zombie idle"
+    },
+    {
+      "mid": 104110901,
+      "name": "Zombie Twitching Idle",
+      "query": "zombie idle"
+    },
+    {
+      "mid": 102250901,
+      "name": "Zombie Alert Idle",
+      "query": "creature idle"
+    },
+    {
+      "mid": 102250902,
+      "name": "Zombie Looking Around",
+      "query": "creature idle"
+    },
+    {
+      "mid": 104110901,
+      "name": "Zombie Twitching Idle",
+      "query": "creature idle"
+    },
+    {
+      "mid": 101470907,
+      "name": "Male Fight Idle Boxing Stance",
+      "query": "fight idle"
+    },
+    {
+      "mid": 101470903,
+      "name": "Male Fight Idle Empty Stance",
+      "query": "fight idle"
+    },
+    {
+      "mid": 104210901,
+      "name": "Ready To Combat To Defensive Idle",
+      "query": "combat idle"
+    },
+    {
+      "mid": 104110901,
+      "name": "Zombie Twitching Idle",
+      "query": "twitching idle"
+    },
+    {
+      "mid": 104110902,
+      "name": "Zombie Upright Twitching Idle",
+      "query": "twitching idle"
+    },
+    {
+      "mid": 104360901,
+      "name": "Zombie Scratching Idle",
+      "query": "scratching idle"
+    },
+    {
+      "mid": 107820901,
+      "name": "Idle Stand Looking Around",
+      "query": "looking around"
+    },
+    {
+      "mid": 102320906,
+      "name": "Zombie Overhead Two-Hand Attack",
+      "query": "zombie attack"
+    },
+    {
+      "mid": 102320902,
+      "name": "Zombie Attack With Right Hand",
+      "query": "zombie attack"
+    },
+    {
+      "mid": 102320903,
+      "name": "Zombie Headbutt With Hand Grab",
+      "query": "zombie headbutt"
+    },
+    {
+      "mid": 113920901,
+      "name": "Elbow-Uppercut Strike Combo",
+      "query": "elbow strike"
+    },
+    {
+      "mid": 113650901,
+      "name": "Vertical Elbow And Solar Plexus Strike",
+      "query": "elbow strike"
+    },
+    {
+      "mid": 113640901,
+      "name": "A Roundhouse Kick To The Side Of An Opponent",
+      "query": "roundhouse kick"
+    },
+    {
+      "mid": 101500901,
+      "name": "Roundhouse Kick With Front Foot Advancing",
+      "query": "roundhouse kick"
+    },
+    {
+      "mid": 100930901,
+      "name": "Double Front Snap Kick",
+      "query": "front kick"
+    },
+    {
+      "mid": 100970901,
+      "name": "Spinning Back Kick Advancing",
+      "query": "spinning kick"
+    },
+    {
+      "mid": 102700901,
+      "name": "Static Double Dagger Stab With Outward Grip",
+      "query": "dagger stab"
+    },
+    {
+      "mid": 114830901,
+      "name": "Casting A Ressurection Or Summon Spell",
+      "query": "casting spell"
+    },
+    {
+      "mid": 114890902,
+      "name": "Casting A Spell With One Hand",
+      "query": "casting spell"
+    },
+    {
+      "mid": 114810902,
+      "name": "Casting A Magic Spell Wide With Two Arms",
+      "query": "casting spell"
+    },
+    {
+      "mid": 112900901,
+      "name": "Belting Out A Load Roar",
+      "query": "roar"
+    },
+    {
+      "mid": 116790901,
+      "name": "Rifle Prone Hit Reaction",
+      "query": "hit reaction rifle"
+    },
+    {
+      "mid": 115720901,
+      "name": "Hit Reaction From Rifle Crouched",
+      "query": "hit reaction rifle"
+    },
+    {
+      "mid": 104250908,
+      "name": "Hit Reaction While Holding A Rifle",
+      "query": "hit reaction rifle"
+    },
+    {
+      "mid": 102460901,
+      "name": "Zombie Reaction Hit Flinches",
+      "query": "zombie flinch"
+    },
+    {
+      "mid": 101170903,
+      "name": "Dying With Front Impact To The Head And Fall On One Knee",
+      "query": "dying impact"
+    },
+    {
+      "mid": 101220904,
+      "name": "Dying Front Head Impact To Two Knees",
+      "query": "dying impact"
+    },
+    {
+      "mid": 101250904,
+      "name": "Dying Rear Impact Falling On Two Knees",
+      "query": "dying impact"
+    },
+    {
+      "mid": 107070901,
+      "name": "Shot To The Chest Falling Backwards",
+      "query": "dying backward"
+    },
+    {
+      "mid": 104020901,
+      "name": "Zombie Run",
+      "query": "zombie run"
+    },
+    {
+      "mid": 121370901,
+      "name": "Zombie Running",
+      "query": "zombie run"
+    },
+    {
+      "mid": 121340901,
+      "name": "Zombie Walking",
+      "query": "zombie walk"
+    },
+    {
+      "mid": 105940901,
+      "name": "Running Leaning Back Or Forth",
+      "query": "running"
+    },
+    {
+      "mid": 111290902,
+      "name": "Running Sideways Facing Forward",
+      "query": "dash"
+    },
+    {
+      "mid": 104230902,
+      "name": "Jogging Slowly In Reverse Varying Angles Of Twist",
+      "query": "slow run"
+    },
+    {
+      "mid": 104230901,
+      "name": "Jogging Slowly Varying Angles Of Twist",
+      "query": "slow run"
+    },
+    {
+      "mid": 116680901,
+      "name": "Throw Grenade While Running",
+      "query": "heavy run"
+    },
+    {
+      "mid": 116690901,
+      "name": "Hit Reaction When Running With Rifle",
+      "query": "react hit"
+    },
+    {
+      "mid": 104250907,
+      "name": "Hit Reaction While Holding A Pistol",
+      "query": "react hit"
+    },
+    {
+      "mid": 104380907,
+      "name": "Agony Holding The Head",
+      "query": "pain"
+    },
+    {
+      "mid": 116070901,
+      "name": "Death From Standing Idle",
+      "query": "death"
+    },
+    {
+      "mid": 102320904,
+      "name": "Zombie Snap Kick With Rear Foot",
+      "query": "dead"
+    },
+    {
+      "mid": 101220903,
+      "name": "Dying Shot To The Head Falling On Two Knees",
+      "query": "shot dead"
+    },
+    {
+      "mid": 101210901,
+      "name": "Dying Shot To Back Of Head Falling On Two Knees",
+      "query": "shot dead"
+    },
+    {
+      "mid": 104820901,
+      "name": "Slashing Forward With A Bayonet",
+      "query": "slash"
+    },
+    {
+      "mid": 115210901,
+      "name": "Lunging Forward To Bite",
+      "query": "bite"
+    },
+    {
+      "mid": 110300903,
+      "name": "Running To Tackle",
+      "query": "tackle"
+    },
+    {
+      "mid": 113700901,
+      "name": "Grab Attacker Then Twist Arm And Kick Head",
+      "query": "grab attack"
+    },
+    {
+      "mid": 104840901,
+      "name": "Advancing And Punching With Butt Of A Rifle",
+      "query": "advancing punch"
+    },
+    {
+      "mid": 108100901,
+      "name": "Standing Up From Lying On Stomach",
+      "query": "standing"
+    },
+    {
+      "mid": 101780901,
+      "name": "Male Writing While Seated",
+      "query": "waiting"
+    }
+  ],
+  "failing": [
+    {
+      "mid": 121350901,
+      "name": "Zombie Standing Idle",
+      "query": "zombie idle"
+    },
+    {
+      "mid": 111280904,
+      "name": "Mutant Stretching Idle",
+      "query": "mutant idle"
+    },
+    {
+      "mid": 111280903,
+      "name": "Mutant Breathing Idle",
+      "query": "mutant idle"
+    },
+    {
+      "mid": 111280902,
+      "name": "Mutant Stretching Idle With Breathing",
+      "query": "mutant idle"
+    },
+    {
+      "mid": 124300901,
+      "name": "Transition From Fight Idle To Standing Idle",
+      "query": "fight idle"
+    },
+    {
+      "mid": 115690901,
+      "name": "Rifle Standing Aiming Idle",
+      "query": "combat idle"
+    },
+    {
+      "mid": 119720902,
+      "name": "Bouncing Fight Idle With Guard Up",
+      "query": "combat idle"
+    },
+    {
+      "mid": 119720902,
+      "name": "Bouncing Fight Idle With Guard Up",
+      "query": "guard idle"
+    },
+    {
+      "mid": 127690943,
+      "name": "Crouching Looking Around With Bow",
+      "query": "looking around"
+    },
+    {
+      "mid": 115090901,
+      "name": "Looking Around With Duel Wielded Pistols",
+      "query": "looking around"
+    },
+    {
+      "mid": 121360901,
+      "name": "Zombie Swipe Attack",
+      "query": "zombie attack"
+    },
+    {
+      "mid": 121360901,
+      "name": "Zombie Swipe Attack",
+      "query": "zombie swipe"
+    },
+    {
+      "mid": 113540901,
+      "name": "A Cross Punch",
+      "query": "cross punch"
+    },
+    {
+      "mid": 113830902,
+      "name": "Four Punch Combo",
+      "query": "cross punch"
+    },
+    {
+      "mid": 113930902,
+      "name": "Eight Punch Combo",
+      "query": "cross punch"
+    },
+    {
+      "mid": 113550901,
+      "name": "A Hook Punch",
+      "query": "hook punch"
+    },
+    {
+      "mid": 110460905,
+      "name": "Short Hook Punch To The Head",
+      "query": "hook punch"
+    },
+    {
+      "mid": 110460903,
+      "name": "Long Hook Punch To The Body",
+      "query": "hook punch"
+    },
+    {
+      "mid": 118380901,
+      "name": "Standing Left Uppercut Punch",
+      "query": "uppercut"
+    },
+    {
+      "mid": 125360901,
+      "name": "Attacker Chase Down Give Surprise Uppercut",
+      "query": "uppercut"
+    },
+    {
+      "mid": 116920903,
+      "name": "Getting Hit By An Uppercut",
+      "query": "uppercut"
+    },
+    {
+      "mid": 135980901,
+      "name": "Roll Kick Landing On Hands And Knees",
+      "query": "roundhouse kick"
+    },
+    {
+      "mid": 121260901,
+      "name": "Capoeira Front Kick",
+      "query": "front kick"
+    },
+    {
+      "mid": 121270901,
+      "name": "Capoeira Front Kick",
+      "query": "front kick"
+    },
+    {
+      "mid": 120370901,
+      "name": "Spinning Flip Kick",
+      "query": "spinning kick"
+    },
+    {
+      "mid": 124070902,
+      "name": "Mma Spinning Back Kick",
+      "query": "spinning kick"
+    },
+    {
+      "mid": 121020901,
+      "name": "Capoeira Side Kick",
+      "query": "capoeira kick"
+    },
+    {
+      "mid": 121270901,
+      "name": "Capoeira Front Kick",
+      "query": "capoeira kick"
+    },
+    {
+      "mid": 121040901,
+      "name": "Capoeira Forward Kick",
+      "query": "capoeira kick"
+    },
+    {
+      "mid": 128670912,
+      "name": "One Handed Casting Spell Upward Sweep",
+      "query": "magic attack"
+    },
+    {
+      "mid": 128670916,
+      "name": "Two Handed Casting Spell Fowards",
+      "query": "magic attack"
+    },
+    {
+      "mid": 128670914,
+      "name": "Two Handed Casting Spell Towards Ground",
+      "query": "magic attack"
+    },
+    {
+      "mid": 119810901,
+      "name": "Grabbing And Slamming Someone To The Ground",
+      "query": "slam ground"
+    },
+    {
+      "mid": 121560902,
+      "name": "Mutant Roaring",
+      "query": "roar"
+    },
+    {
+      "mid": 116240901,
+      "name": "Short Yell While Standing",
+      "query": "roar"
+    },
+    {
+      "mid": 126640901,
+      "name": "Hit To Side Of The Body With Object While Running",
+      "query": "body slam"
+    },
+    {
+      "mid": 126570901,
+      "name": "Getting Hit On The Right Side Of The Body With An Object When Running",
+      "query": "body slam"
+    },
+    {
+      "mid": 126580901,
+      "name": "Getting Hit On The Left Side Of The Body With An Object When Running",
+      "query": "body slam"
+    },
+    {
+      "mid": 116880908,
+      "name": "Receiving A Big Hit In The Stomach",
+      "query": "big hit"
+    },
+    {
+      "mid": 116880902,
+      "name": "Receiving A Big Hit In The Kidneys",
+      "query": "big hit"
+    },
+    {
+      "mid": 116880906,
+      "name": "Receiving A Big Hit In The Side",
+      "query": "big hit"
+    },
+    {
+      "mid": 121450901,
+      "name": "Brief Stumble While Jogging",
+      "query": "stumble"
+    },
+    {
+      "mid": 125310901,
+      "name": "Injured Stumbling Idle",
+      "query": "stumble"
+    },
+    {
+      "mid": 137180901,
+      "name": "Slip And Fall Backwards",
+      "query": "stumble"
+    },
+    {
+      "mid": 128170901,
+      "name": "Dying Falling Forward",
+      "query": "dying forward"
+    },
+    {
+      "mid": 127690903,
+      "name": "Death Reaction Falling Forwards With Bow",
+      "query": "dying forward"
+    },
+    {
+      "mid": 127690958,
+      "name": "Death Reaction Falling Forwards With Bow",
+      "query": "dying forward"
+    },
+    {
+      "mid": 128190901,
+      "name": "Dying Falling Backward",
+      "query": "dying backward"
+    },
+    {
+      "mid": 127690957,
+      "name": "Death Reaction Falling Backwards With Bow",
+      "query": "dying backward"
+    },
+    {
+      "mid": 128190901,
+      "name": "Dying Falling Backward",
+      "query": "dying falling"
+    },
+    {
+      "mid": 128170901,
+      "name": "Dying Falling Forward",
+      "query": "dying falling"
+    },
+    {
+      "mid": 128180901,
+      "name": "Dying Falling Backward",
+      "query": "dying falling"
+    },
+    {
+      "mid": 104020902,
+      "name": "Mutant Running",
+      "query": "mutant run"
+    },
+    {
+      "mid": 90048,
+      "name": "Zombie Walking",
+      "query": "zombie walk"
+    },
+    {
+      "mid": 100710901,
+      "name": "Creeping Zombie Walk",
+      "query": "zombie walk"
+    },
+    {
+      "mid": 128620901,
+      "name": "Rifle Run Forward",
+      "query": "run forward rifle"
+    },
+    {
+      "mid": 128620905,
+      "name": "Rifle Run Forward Right",
+      "query": "run forward rifle"
+    },
+    {
+      "mid": 128620906,
+      "name": "Rifle Run Forward Left",
+      "query": "run forward rifle"
+    },
+    {
+      "mid": 125710901,
+      "name": "Soccer Jog Forward",
+      "query": "jog forward"
+    },
+    {
+      "mid": 125750901,
+      "name": "Soccer Jog Diagonal Forward Right",
+      "query": "jog forward"
+    },
+    {
+      "mid": 125760901,
+      "name": "Soccer Jog Diagonal Forward Left",
+      "query": "jog forward"
+    },
+    {
+      "mid": 128670931,
+      "name": "Jumping While Running",
+      "query": "running"
+    },
+    {
+      "mid": 118340901,
+      "name": "Turning 180 Degrees While Running",
+      "query": "running"
+    },
+    {
+      "mid": 123370901,
+      "name": "Running Up Stairs",
+      "query": "running"
+    },
+    {
+      "mid": 118090901,
+      "name": "Running With Intention",
+      "query": "running"
+    },
+    {
+      "mid": 124510901,
+      "name": "Happy Run Backward",
+      "query": "dash"
+    },
+    {
+      "mid": 124580901,
+      "name": "Female Run Forward",
+      "query": "dash"
+    },
+    {
+      "mid": 123590901,
+      "name": "Backwards Running",
+      "query": "dash"
+    },
+    {
+      "mid": 123870901,
+      "name": "Happy Run Forward",
+      "query": "dash"
+    },
+    {
+      "mid": 128670950,
+      "name": "Sprinting Forward",
+      "query": "sprint forward"
+    },
+    {
+      "mid": 128620909,
+      "name": "Rifle Sprint Forward",
+      "query": "sprint forward"
+    },
+    {
+      "mid": 127690971,
+      "name": "Sprinting Forward With Bow",
+      "query": "sprint forward"
+    },
+    {
+      "mid": 128620910,
+      "name": "Rifle Sprint Forward Right",
+      "query": "sprint forward"
+    },
+    {
+      "mid": 120430902,
+      "name": "Sprint To Forward Roll To Sprinting",
+      "query": "sprint forward"
+    },
+    {
+      "mid": 128630905,
+      "name": "Running Fast",
+      "query": "fast run"
+    },
+    {
+      "mid": 118840901,
+      "name": "Fast Stop From Full Run",
+      "query": "fast run"
+    },
+    {
+      "mid": 136450901,
+      "name": "Fast Run To 180 Degree Turn",
+      "query": "fast run"
+    },
+    {
+      "mid": 121480902,
+      "name": "Standard Sprint",
+      "query": "fast run"
+    },
+    {
+      "mid": 121510901,
+      "name": "Crouch To Sprinting",
+      "query": "fast run"
+    },
+    {
+      "mid": 128630901,
+      "name": "Slow Run Forward",
+      "query": "slow run"
+    },
+    {
+      "mid": 128630908,
+      "name": "Running On A Treadmill From Slow To Fast",
+      "query": "slow run"
+    },
+    {
+      "mid": 125970901,
+      "name": "Two Hand Lowered Gun Rifle Idle",
+      "query": "slow run"
+    },
+    {
+      "mid": 122760901,
+      "name": "Sword And Shield Backward Run",
+      "query": "monster run"
+    },
+    {
+      "mid": 122280901,
+      "name": "Great Sword Bacward Run",
+      "query": "monster run"
+    },
+    {
+      "mid": 122660901,
+      "name": "Sword And Shield Run",
+      "query": "monster run"
+    },
+    {
+      "mid": 122320901,
+      "name": "Great Sword Running Jump",
+      "query": "monster run"
+    },
+    {
+      "mid": 122740901,
+      "name": "Sword And Shield Right Run Strafe",
+      "query": "monster run"
+    },
+    {
+      "mid": 126460901,
+      "name": "Rifle Kneeling Getting Hit To Back",
+      "query": "hit back"
+    },
+    {
+      "mid": 126560901,
+      "name": "Getting Hit On The Back Of Head With An Object When Running",
+      "query": "hit back"
+    },
+    {
+      "mid": 126700901,
+      "name": "Getting Hit On The Back With An Object While Running",
+      "query": "hit back"
+    },
+    {
+      "mid": 126450901,
+      "name": "Rifle Getting Hit To Ground",
+      "query": "hit back"
+    },
+    {
+      "mid": 120540902,
+      "name": "Getting Hit And Flipping Backwards",
+      "query": "hit back"
+    },
+    {
+      "mid": 127330901,
+      "name": "Sporty Granny Back Pain Gesture",
+      "query": "pain"
+    },
+    {
+      "mid": 136520901,
+      "name": "Laying On Back Writhing In Pain",
+      "query": "pain"
+    },
+    {
+      "mid": 137860901,
+      "name": "Shake Off Head Pain And Focus",
+      "query": "pain"
+    },
+    {
+      "mid": 135490901,
+      "name": "Painfully Getting Spat On In The Face",
+      "query": "pain"
+    },
+    {
+      "mid": 110720901,
+      "name": "Knocked Out Falling To Back",
+      "query": "knocked back"
+    },
+    {
+      "mid": 128670934,
+      "name": "Death Falling Backwards",
+      "query": "death"
+    },
+    {
+      "mid": 123120901,
+      "name": "Falling Back Death",
+      "query": "death"
+    },
+    {
+      "mid": 128620944,
+      "name": "Rifle Death From Right Side",
+      "query": "death"
+    },
+    {
+      "mid": 128620948,
+      "name": "Rifle Death From The Front",
+      "query": "death"
+    },
+    {
+      "mid": 121380901,
+      "name": "Zombie Getting Hit And Falling Onto Back",
+      "query": "dead"
+    },
+    {
+      "mid": 150000908,
+      "name": "Jab With Right Hand",
+      "query": "knockout"
+    },
+    {
+      "mid": 119800901,
+      "name": "Jumping Knee Followed By A Punch",
+      "query": "knockout"
+    },
+    {
+      "mid": 118370901,
+      "name": "Right Hook Punch From Idle",
+      "query": "knockout"
+    },
+    {
+      "mid": 150000907,
+      "name": "Exaggerated Punch With Right Hand",
+      "query": "knockout"
+    },
+    {
+      "mid": 135600901,
+      "name": "Frantically Fall Over With Rifle",
+      "query": "fall over"
+    },
+    {
+      "mid": 131120901,
+      "name": "Falling Over A Rope Down To The Floor",
+      "query": "fall over"
+    },
+    {
+      "mid": 123170901,
+      "name": "Running Fall Over A Soccer Slide Tackle",
+      "query": "fall over"
+    },
+    {
+      "mid": 123210901,
+      "name": "Standing Fall Over A Soccer Slide Tackle",
+      "query": "fall over"
+    },
+    {
+      "mid": 136870901,
+      "name": "Knocked Over And Falling To The Ground",
+      "query": "fall over"
+    },
+    {
+      "mid": 119790901,
+      "name": "Flipping Backwards To Kick",
+      "query": "kick"
+    },
+    {
+      "mid": 124070906,
+      "name": "Mma Roundhouse Kick",
+      "query": "kick"
+    },
+    {
+      "mid": 124070901,
+      "name": "Mma Side Kick",
+      "query": "kick"
+    },
+    {
+      "mid": 124070903,
+      "name": "Mma Low Kick",
+      "query": "kick"
+    },
+    {
+      "mid": 115180901,
+      "name": "Thrust And Slash With Blade",
+      "query": "slash"
+    },
+    {
+      "mid": 122790901,
+      "name": "Sword And Shield Cross Slash",
+      "query": "slash"
+    },
+    {
+      "mid": 122350901,
+      "name": "Great Sword Combo Slash",
+      "query": "slash"
+    },
+    {
+      "mid": 122360901,
+      "name": "Great Sword Low Slash",
+      "query": "slash"
+    },
+    {
+      "mid": 121390901,
+      "name": "Zombie Repeatedly Biting A Neck",
+      "query": "bite"
+    },
+    {
+      "mid": 122170902,
+      "name": "Zombie Biting Victim On The Ground",
+      "query": "bite"
+    },
+    {
+      "mid": 122170901,
+      "name": "Zombie Standing To Biting On The Ground",
+      "query": "bite"
+    },
+    {
+      "mid": 131040901,
+      "name": "Getting Bit On Arm",
+      "query": "bite"
+    },
+    {
+      "mid": 123200901,
+      "name": "Soccer Slide Tackle",
+      "query": "tackle"
+    },
+    {
+      "mid": 123180901,
+      "name": "Tripping Over A Soccer Tackle",
+      "query": "tackle"
+    },
+    {
+      "mid": 119870901,
+      "name": "Front Flip To Kick",
+      "query": "grab attack"
+    },
+    {
+      "mid": 120420901,
+      "name": "Hand Stand Kick With Both Feet To Kip Up",
+      "query": "grab attack"
+    },
+    {
+      "mid": 119750901,
+      "name": "Male Kicking With Both Legs",
+      "query": "grab attack"
+    },
+    {
+      "mid": 116890905,
+      "name": "Receiving A Body Hit By A Straight Punch",
+      "query": "straight punch"
+    },
+    {
+      "mid": 116900909,
+      "name": "Receiving A Medium Hit From A Straight Punch",
+      "query": "straight punch"
+    },
+    {
+      "mid": 116910908,
+      "name": "Receiving A Big Hit To The Head From A Straight Punch",
+      "query": "straight punch"
+    },
+    {
+      "mid": 116900908,
+      "name": "Receiving A Big Hit From A Straight Punch",
+      "query": "straight punch"
+    },
+    {
+      "mid": 116900910,
+      "name": "Receiving A Light Hit From A Straight Punch",
+      "query": "straight punch"
+    },
+    {
+      "mid": 110470904,
+      "name": "Mid Body Jab",
+      "query": "jab"
+    },
+    {
+      "mid": 110440907,
+      "name": "Short Jab Cross",
+      "query": "jab"
+    },
+    {
+      "mid": 110440905,
+      "name": "Boxing Jab Cross Long",
+      "query": "jab"
+    },
+    {
+      "mid": 110440903,
+      "name": "Boxing Body Jab Cross Medium",
+      "query": "jab"
+    },
+    {
+      "mid": 110470903,
+      "name": "Long Body Jab",
+      "query": "jab"
+    },
+    {
+      "mid": 128650912,
+      "name": "Downward Attack With Axe",
+      "query": "axe attack"
+    },
+    {
+      "mid": 128650913,
+      "name": "Right To Left Attack With Axe",
+      "query": "axe attack"
+    },
+    {
+      "mid": 128650920,
+      "name": "Two Hit Combo Attack With Axe",
+      "query": "axe attack"
+    },
+    {
+      "mid": 128650914,
+      "name": "Left To Right Spin Attack With Axe",
+      "query": "axe attack"
+    },
+    {
+      "mid": 128650911,
+      "name": "Backhanded Upward Attack With Axe",
+      "query": "axe attack"
+    },
+    {
+      "mid": 128130901,
+      "name": "One Handed Club Combo Attack",
+      "query": "club attack"
+    },
+    {
+      "mid": 128150901,
+      "name": "Two Handed Club Combo Attack",
+      "query": "club attack"
+    },
+    {
+      "mid": 124320901,
+      "name": "Transition From Action Idle To Standing Idle",
+      "query": "idle"
+    },
+    {
+      "mid": 124330901,
+      "name": "Transition From Action Idle To Fight Idle",
+      "query": "idle"
+    },
+    {
+      "mid": 124200901,
+      "name": "Transition From Standing Idle To Fight Idle",
+      "query": "idle"
+    },
+    {
+      "mid": 117780901,
+      "name": "Standing Idle",
+      "query": "idle"
+    },
+    {
+      "mid": 131220901,
+      "name": "Standing Idle",
+      "query": "standing"
+    },
+    {
+      "mid": 130670901,
+      "name": "Sitting To Standing",
+      "query": "standing"
+    },
+    {
+      "mid": 116240905,
+      "name": "Standing Long Yell",
+      "query": "standing"
+    },
+    {
+      "mid": 130010901,
+      "name": "Standing Up And Looking Around",
+      "query": "standing"
+    },
+    {
+      "mid": 107900901,
+      "name": "Breathing Idle",
+      "query": "breathing"
+    },
+    {
+      "mid": 123380901,
+      "name": "Sitting With Breathing Idle",
+      "query": "breathing"
+    },
+    {
+      "mid": 120140901,
+      "name": "Male Fitness Idle With Breathing",
+      "query": "breathing"
+    },
+    {
+      "mid": 123410901,
+      "name": "Sitting And Impatiently Waiting",
+      "query": "waiting"
+    },
+    {
+      "mid": 117910901,
+      "name": "Crying And Rubbing Eyes",
+      "query": "waiting"
+    }
+  ]
+}

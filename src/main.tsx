@@ -27,16 +27,17 @@ createRoot(document.getElementById('root')!).render(
 if ('serviceWorker' in navigator) {
   // ★ iOS 偵測（所有 iOS 瀏覽器都用 WKWebView，SW 生命週期有已知問題）
   const _isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent)
+  const _isLocalhost = ['localhost', '127.0.0.1', '::1'].includes(window.location.hostname)
 
   // 偵測 standalone 模式（從主畫面開啟）
   const _isStandalone =
     window.matchMedia('(display-mode: standalone)').matches ||
     (navigator as unknown as { standalone?: boolean }).standalone === true
 
-  // ★ iOS 或 Standalone → 完全不使用 SW
+  // ★ iOS / Standalone / localhost(dev) → 完全不使用 SW
   // 理由：iOS WKWebView 中 SW skipWaiting 會觸發 reload 迴圈，即使不監聽
   // controllerchange，新舊 SW 交接仍可能導致頁面重載
-  if (_isStandalone || _isIOS) {
+  if (_isStandalone || _isIOS || _isLocalhost) {
     // 移除所有已註冊的 SW
     navigator.serviceWorker.getRegistrations().then((regs) => {
       for (const reg of regs) {
@@ -49,7 +50,7 @@ if ('serviceWorker' in navigator) {
         for (const name of names) caches.delete(name)
       })
     }
-    console.log(`[SW] disabled — iOS=${_isIOS}, standalone=${_isStandalone}`)
+    console.log(`[SW] disabled — iOS=${_isIOS}, standalone=${_isStandalone}, localhost=${_isLocalhost}`)
   } else {
     // ★ 非 iOS Browser 模式：正常註冊 SW（快取加速 + 更新提示）
     window.addEventListener('load', () => {

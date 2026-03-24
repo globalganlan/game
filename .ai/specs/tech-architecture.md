@@ -1,7 +1,7 @@
 # 技術架構 Spec
 
-> 版本：v3.0 ｜ 狀態：🟢 定稿（含 Domain Engine + Services 層 + Optimistic Queue + Audio Engine + CurrencyIcon 統一 icon + PWA + App 模組化拆分 + D1 原子批次寫入 + InfoTip/RedDot/ClickableItemIcon 新元件 + 獎勵一致性修復 + 大廳/戰鬥場景分離架構 + 英雄名稱 HTML Overlay + iOS WebGL 深度紋理修復 + 戰力系統 + 競技場 + 字型預載）
-> 最後更新：2026-03-15
+> 版本：v3.12 ｜ 狀態：🟢 定稿（含 Domain Engine + Services 層 + Optimistic Queue + Audio Engine + CurrencyIcon 統一 icon + PWA + App 模組化拆分 + D1 原子批次寫入 + InfoTip/RedDot/ClickableItemIcon 新元件 + 獎勵一致性修復 + 大廳/戰鬥場景分離架構 + 英雄名稱 HTML Overlay + iOS WebGL 深度紋理修復 + 戰力系統 + 競技場 + 字型預載 + 載入併發數提升 + Draco 延遲釋放 + realLoadsInFlight 防護 + Draco 重新初始化 + RUN Hips 凍結接地）
+> 最後更新：2026-03-24
 > 負責角色：🔧 CODING → 🏗️ ARCHITECT
 
 ## 概述
@@ -228,7 +228,9 @@ getGlbForSuspense(url)     同步介面，配合 React Suspense
         
 preloadHeroModel(id)       預載單一英雄的 6 個 GLB（mesh + 5 動畫）
 
-preloadHeroModels(ids, 2)  批次預載，並發限制 2 隻（iOS 防 OOM）
+preloadHeroModels(ids, 4)  批次預載，並發限制 4 隻（MAX_CONCURRENT_FILE_LOADS=8 可容納）
+
+preloadTimeoutMs(count)    動態計算預載等待上限（每英雄 5s，下限 15s、上限 90s）
 
 releaseHeroModel(id)       深度釋放模型 GPU 資源 + 從快取移除
 
@@ -236,7 +238,12 @@ releaseAllModels()         清空全部快取（登出時用）
 
 deepDisposeAsset(asset)    遞迴 dispose 幾何體/紋理/材質
 
-disposeDracoDecoder()      釋放 Draco WASM 解碼器記憶體
+disposeDracoDecoder()      標記延遲釋放 Draco WASM 解碼器（設 _autoDisposeDraco 旗標，佇列清空時由 tryAutoDisposeDraco 自動觸發實際 dispose）
+
+realLoadsInFlight          計數器：追蹤底層 loadAsync 真正仍在執行的數量（timeout reject 不遞減，僅 loadAsync .finally 遞減）
+tryAutoDisposeDraco()      條件：_autoDisposeDraco && 佇列空 && realLoadsInFlight === 0 時才真正 dispose
+
+ensureDracoAlive()         每次 loadAsync 前檢查：若 _dracoDisposed=true 則重新建立 DRACOLoader（解決 dispose 後無法再解壓的問題）
 
 getCachedModelIds()        診斷：回傳目前快取的英雄 ID Set
         
@@ -654,3 +661,14 @@ POST { "action": "invalidate-cache" }
 | v2.9 | 2026-03-15 | **Spec 校正 — 文件清單對齊實際程式碼**：① domain/ 新增 combatPower.ts、arenaSystem.ts、equipmentGacha.ts ② components/ 新增 ArenaPanel.tsx、CombatPowerHUD.tsx、CheckinPanel.tsx、TutorialOverlay.tsx、CodexPanel.tsx、ChestLootPreview.tsx、AcquireToast.tsx、ItemInfoPopup.tsx、SceneProps.tsx ③ hooks/ 新增 useCombatPower.ts、useAcquireToast.ts ④ 修正 audioService/authService 兩條目合併問題 ⑤ 版本號從 v2.6 同步至 v2.9 |
 | v3.0 | 2026-03-16 | **Workers battleEngine 同步**：Workers 端 `battleEngine.ts` 同步前端三項被動欄位：`perAlly`（依存活隊友數倍乘 buff value）、`targetHpThreshold`（HP 門檻條件式觸發 damage_mult）、`random_debuff`（隨機施加 debuff）；`executePassiveEffect` 改為返回 `boolean` + `triggerPassives` 條件式 emit，確保前後端戰鬥結果一致 |
 | v3.1 | 2026-03-12 | **iOS PWA 記憶體管理**：(1) glbLoader 新增 `deepDisposeAsset`/`releaseHeroModel`/`releaseAllModels`/`preloadHeroModels`(concurrency=2)/`getCachedModelIds` 五個記憶體管理 API；(2) useStageHandlers 三處預載改為 `preloadHeroModels` 序列化 + `disposeDracoDecoder`；(3) useBattleFlow `backToLobby` 戰鬥後延遲釋放敵方獨佔模型、`goNextStage` 跨關釋放舊敵方；(4) App.tsx 登出呼叫 `releaseAllModels`；(5) HeroListPanel IdlePreviewModel unmount dispose 材質；(6) WebGL context lost Toast 通知 |
+| v3.2 | 2026-03-21 | **英雄 3D 預覽優化**：(1) `KEEP_PBR` Set → `PBR_EMISSIVE` Record\<string, number\> 支援逐模型 emissive 亮度（z27: 0.6、z29: 2.0），同步更新 HeroListPanel/ZombieModel/thumbnail.html 三處；(2) 英雄詳情面板鏡頭 `[0,0,4.5]` → `[0,0,6]`，讓玩家看到模型全貌；(3) 9 位英雄動畫替換（z2/z11/z15/z16/z19/z20/z22/z25/z26），含跨 proxy 位移軌道剝離；(4) 重新生成 12 位英雄縮圖 |
+| v3.3 | 2026-03-22 | **z27/z29 亮度再提升 + 9 英雄動畫第二輪替換**：(1) `PBR_EMISSIVE` z27: 0.6→3.0、z29: 2.0→5.0，同步 HeroListPanel/ZombieModel/thumbnail.html 三處；(2) 9 英雄動畫第二輪替換 — z2 idle→ZombieTwitch、z11 idle→ZombieTwitch+attack→LungeBite、z15 idle→ReadyToCombat+attack→CastWideTwoArms、z16 idle→FightIdleEmpty+attack→AdvancingPunch、z19 idle→UprightTwitch、z20 idle→ReadyToCombat、z22 idle→UprightTwitch、z25 idle→ReadyToCombat、z26 idle→IdleLookAround+attack→DaggerStab；(3) Blender 5.0 layered animation API 位移軌道剝離（8 檔 1392 tracks）；(4) 11 英雄縮圖重新生成 |
+| v3.4 | 2026-03-23 | **第三/四輪動畫穩定修復（#85/#86）**：(1) 9 個動畫替換：z7 attack/hurt/run、z8 attack、z19 attack、z25 hurt/run、z26 hurt/run（改用 ZombiePunching / ZombieStumbleBack / ZombieRun / ZombieOverheadTwoHand）；(2) `ZombieModel.tsx` RUN 後處理新增 `Spine2` quaternion 移除 + `.position` 鎖首幀（抑制跑步飄浮）；(3) HURT/ATTACKING 後處理從 Head+Neck 擴大為 Head+Neck+Spine1+Spine2（修復上半身前彎導致頭部下轉/縮胸）；(4) z16 右手手指 quaternion 移除（保持握斧姿勢）；(5) model-viewer + Playwright 戰鬥流程驗證通過 |
+| v3.5 | 2026-03-23 | **動畫 QA 檢查器對齊實戰 Runtime**：修正 `public/model-viewer.html`、`public/anim-inspect.html` 在 `/game/` base path 下的資源路徑（`/node_modules`/`/models`/`/draco` → `/game/...`），並將 model-viewer 的 clip 後處理對齊 `ZombieModel.tsx`（RUN：Head/Neck/Spine2 quaternion 移除 + position 鎖首幀；HURT/ATTACK：Head/Neck/Spine1/Spine2 quaternion 移除；z16：RightHand 手指 quaternion 移除），確保檢查畫面與遊戲內實際動畫品質一致 |
+| v3.6 | 2026-03-24 | **跑步飄浮修正（RUN 軌道策略調整）**：`ZombieModel.tsx` 與 `public/model-viewer.html` 的 RUN 後處理由「保留 `.position` 並鎖首幀（僅移除 Hips.position）」改為「移除全部 `.position` 軌道」，避免部分動畫首幀自帶抬高偏移造成整段懸空；同時保留 Head/Neck/Spine1/Spine2 quaternion 移除策略，確保頭部與上半身姿態穩定。 |
+| v3.7 | 2026-03-24 | **Hero 載入 timeout 穩定性修復**：`main.tsx` 在 localhost 開發環境停用 SW（避免 dev 模式下 SW cache-first 攔截造成 GLB 請求卡住）；`glbLoader.ts` 新增全域檔案載入併發節流（`MAX_CONCURRENT_FILE_LOADS=4`）並將單次載入超時提升至 60s，降低多英雄同時預載時的 Draco 解壓塞車與誤判 timeout。 |
+| v3.8 | 2026-03-24 | **載入併發數提升**：(1) `glbLoader.ts` `MAX_CONCURRENT_FILE_LOADS` 4→8（每英雄 6 檔，至少能讓 1 隻完整並行）；(2) `preloadHeroModels` concurrency 2→4；(3) 新增 `preloadTimeoutMs(modelCount)` 函數：根據模型數量動態計算等待上限（每英雄 5s，下限 15s、上限 90s）；(4) `useStageHandlers.ts`、`useBattleFlow.ts` 共 5 處 `Promise.race` 硬編碼 25s 改用 `preloadTimeoutMs()` 動態計算。 |
+| v3.9 | 2026-03-24 | **Draco 延遲釋放策略**：修正 `disposeDracoDecoder()` 在 `Promise.race` timeout 先勝出時立即摧毀解碼器，導致佇列中等待解壓的檔案全部失敗。改法：`glbLoader.ts` 的 `disposeDracoDecoder()` 不再立即 dispose，改為設 `_autoDisposeDraco` 旗標；佇列清空時由 `pumpFileLoadQueue()` 檢查旗標自動觸發實際釋放。呼叫端（`useStageHandlers.ts`、`useBattleFlow.ts` 共 5 處）語意從「立即釋放」變為「標記延遲釋放」，確保併發載入佇列不會被中途截斷。 |
+| v3.10 | 2026-03-24 | **修正 blob cancel 根因 — realLoadsInFlight 計數器**：`loadWithTimeout` timeout reject 後底層 `loadAsync` 仍在執行（Three.js 不支援 abort），但佇列計數器已歸零 → `tryAutoDisposeDraco()` 誤判佇列已空 → terminate 掉仍在解壓的 Draco worker → blob URL 被瀏覽器 cancel。改法：(1) 新增 `realLoadsInFlight` 計數器，在 `loadAsync` 啟動時遞增、`.finally()` 才遞減（timeout reject 不影響）；(2) `tryAutoDisposeDraco()` 條件加上 `realLoadsInFlight === 0`；(3) `disposeDracoDecoder()` 立即 dispose 條件也加上 `realLoadsInFlight === 0`。 |
+| v3.11 | 2026-03-24 | **Draco 重新初始化機制**：`DRACOLoader.dispose()` 是單向操作（Worker 終止後無法恢復），導致二次戰鬥載入模型時 Draco 已死 → 解壓掊住 → 60s timeout。改法：(1) `dracoLoader` 改為 `let`；(2) 新增 `_dracoDisposed` 旗標 + `ensureDracoAlive()` 函數，在每次 `loadWithTimeout` 前檢查，若已 dispose 則重新建立 DRACOLoader；(3) Playwright 三次連續戰鬥驗證通過。 |
+| v3.12 | 2026-03-24 | **RUN 動畫接地修正**：原先移除全部 `.position` tracks 導致根骨骼回到 rest pose 高度（比 idle 動畫高），造成 idle→run 切換時可見飄浮。改法：RUN 動畫的 Hips.position 軌道改為凍結首幀值（保持接地高度），其他骨骼 position 仍移除（去除 root motion）。同步 `model-viewer.html`。 |

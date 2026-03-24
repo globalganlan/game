@@ -171,13 +171,18 @@
   </div>
 </div>
 
-<script type="importmap">
-{
-  "imports": {
-    "three": "/node_modules/three/build/three.module.js",
-    "three/addons/": "/node_modules/three/examples/jsm/"
+<script>
+// 動態偵測 base path：Vite dev server 用 /game/，npm run viewer 用 /
+const BASE = location.pathname.startsWith('/game/') ? '/game' : '';
+const imScript = document.createElement('script');
+imScript.type = 'importmap';
+imScript.textContent = JSON.stringify({
+  imports: {
+    "three": BASE + "/node_modules/three/build/three.module.js",
+    "three/addons/": BASE + "/node_modules/three/examples/jsm/"
   }
-}
+});
+document.currentScript.after(imScript);
 </script>
 <script type="module">
 import * as THREE from 'three';
@@ -188,6 +193,11 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 // ─── 全域狀態 ───
 let scene, camera, renderer, controls, mixer, clock;
 let currentModel = null;
+// 暴露給 Playwright / DevTools 使用
+window.THREE = THREE;
+Object.defineProperty(window, '__scene', { get: () => scene });
+Object.defineProperty(window, '__currentModel', { get: () => currentModel });
+Object.defineProperty(window, '__mixer', { get: () => mixer });
 let animActions = {};   // { idle, attack, hurt, dying, run }
 let activeAction = null;
 let activeAnimName = 'idle';
@@ -200,10 +210,11 @@ let hemiLight, dirLight, fillLight, rimLight;
 
 const ANIM_NAMES = ['idle', 'attack', 'hurt', 'dying', 'run'];
 const FADE_DUR = 0.25;
+const ASSET_BASE = location.pathname.startsWith('/game/') ? '/game' : '';
 
 // ─── Loader 設定 ───
 const dracoLoader = new DRACOLoader();
-dracoLoader.setDecoderPath(`/draco/`);
+dracoLoader.setDecoderPath(`${ASSET_BASE}/draco/`);
 dracoLoader.setDecoderConfig({ type: 'js' });
 
 const gltfLoader = new GLTFLoader();
@@ -316,7 +327,7 @@ async function loadHero(zombieId) {
   animActions = {};
   activeAction = null;
 
-  const base = `/models/${zombieId}`;
+  const base = `${ASSET_BASE}/models/${zombieId}`;
   try {
     // 並行載入 Mesh + 5 動畫
     const [meshGltf, ...animGltfs] = await Promise.all([
@@ -388,11 +399,7 @@ async function loadHero(zombieId) {
     ANIM_NAMES.forEach((name, i) => {
       const gltf = animGltfs[i];
       if (!gltf || !gltf.animations || !gltf.animations.length) return;
-      const clip = gltf.animations[0];
-      // 過濾 root position track（移除 root motion）
-      if (name === 'run') {
-        clip.tracks = clip.tracks.filter(t => !t.name.endsWith('.position'));
-      }
+      const clip = applyRuntimeTrackFixes(gltf.animations[0].clone(), name, zombieId, model);
       const action = mixer.clipAction(clip);
       if (name === 'idle' || name === 'run') {
         action.setLoop(THREE.LoopRepeat);
@@ -427,6 +434,72 @@ function loadGlb(url) {
   return new Promise((resolve, reject) => {
     gltfLoader.load(url, resolve, undefined, reject);
   });
+}
+
+function getBoneNameFromTrack(trackName) {
+  const dot = trackName.indexOf('.');
+  return dot >= 0 ? trackName.slice(0, dot) : trackName;
+}
+
+function applyRuntimeTrackFixes(clip, animName, zombieId, model) {
+  let tracks = clip.tracks.filter((t) => {
+    const bone = getBoneNameFromTrack(t.name);
+    return !!model.getObjectByName(bone);
+  });
+
+  if (animName === 'run') {
+    tracks = tracks
+      .filter((t) => {
+        if ((t.name.includes('Head') || t.name.includes('Neck')
+          || t.name.includes('Spine1') || t.name.includes('Spine2'))
+          && t.name.endsWith('.quaternion')) return false;
+        // Hips position → 凍結首幀（保留接地高度，避免 idle→run 跳高）
+        if (t.name.endsWith('.position') && t.name.includes('Hips')) {
+          const v = t.values.slice(0, 3);
+          t.times = new Float32Array([0, clip.duration]);
+          t.values = new Float32Array([...v, ...v]);
+          return true;
+        }
+        // 其他骨骼 position → 移除（去除 root motion 漂移）
+        if (t.name.endsWith('.position')) return false;
+        return true;
+      });
+  }
+
+  if (animName === 'hurt' || animName === 'attack') {
+    tracks = tracks.filter((t) => {
+      if ((t.name.includes('Head') || t.name.includes('Neck') || t.name.includes('Spine'))
+        && t.name.endsWith('.quaternion')) return false;
+      return true;
+    });
+  }
+
+  if (zombieId === 'zombie_16') {
+    const fingerRe = /RightHand(Thumb|Index|Middle|Ring|Pinky)/;
+    const GRIP = {
+      mixamorigRightHandThumb1: [0.1815, -0.0187, -0.4028, 0.8969],
+      mixamorigRightHandThumb2: [-0.0450, -0.2231, 0.2851, 0.9311],
+      mixamorigRightHandThumb3: [-0.0592, -0.1257, 0.0951, 0.9857],
+      mixamorigRightHandIndex1: [-0.1386, 0.0225, -0.2185, 0.9657],
+      mixamorigRightHandIndex2: [0.2197, 0, 0.0056, 0.9755],
+      mixamorigRightHandIndex3: [0.1105, -0.0007, 0.0027, 0.9939],
+      mixamorigRightHandPinky1: [0.0565, 0.6988, -0.2525, 0.6669],
+      mixamorigRightHandPinky2: [-0.0056, 0, 0.2197, 0.9755],
+      mixamorigRightHandPinky3: [-0.0028, 0, 0.1105, 0.9939],
+    };
+    tracks = tracks.filter((t) => {
+      if (fingerRe.test(t.name) && t.name.endsWith('.quaternion')) return false;
+      return true;
+    });
+    for (const [bone, q] of Object.entries(GRIP)) {
+      tracks.push(new THREE.QuaternionKeyframeTrack(
+        `${bone}.quaternion`, [0, clip.duration], [...q, ...q]
+      ));
+    }
+  }
+
+  clip.tracks = tracks;
+  return clip;
 }
 
 // ─── 動畫控制 ───
@@ -565,7 +638,7 @@ async function buildHeroList() {
   for (let i = 1; i <= 50; i++) {
     const id = `zombie_${i}`;
     checks.push(
-      fetch(`/models/${id}/${id}.glb`, { method: 'HEAD' })
+      fetch(`${ASSET_BASE}/models/${id}/${id}.glb`, { method: 'HEAD' })
         .then(res => {
           const ct = res.headers.get('content-type') || '';
           if (res.ok && !ct.includes('text/html')) {
@@ -587,7 +660,7 @@ async function buildHeroList() {
 
     // 嘗試載入大頭照
     const img = document.createElement('img');
-    img.src = `/models/${id}/thumbnail.png`;
+    img.src = `${ASSET_BASE}/models/${id}/thumbnail.png`;
     img.alt = id;
     img.onerror = function() {
       // 如果沒有大頭照，用色塊替代

@@ -1,52 +1,52 @@
 -- ═══════════════════════════════════════════════
--- Hero #15 — 瘟疫醫生 (SR, 特殊)
+-- Hero #15 — 暗焰祭司 (SR, 特殊)
 -- ═══════════════════════════════════════════════
 
 -- 1) 英雄基礎數值
 INSERT OR IGNORE INTO heroes (heroId, name, type, rarity, baseHP, baseATK, baseDEF, baseSPD, modelId, critRate, critDmg, description)
-VALUES (15, '瘟疫醫生', '特殊', 'SR', 115, 42, 18, 10, 'zombie_15', 5, 50, '精通毒藥與疫病的末日醫者，以瘟疫為武器削弱敵人');
+VALUES (15, '暗焰祭司', '特殊', 'SR', 115, 42, 18, 10, 'zombie_15', 5, 50, '操控暗焰的亡靈祭司，冥藍火焰燒盡一切生機');
 
--- 2) 主動技能：瘟疫蔓延 — 全體傷害 + 中毒 + 降防
+-- 2) 主動技能：暗焰爆發 — 全體傷害 + 中毒 + 降防
 INSERT OR IGNORE INTO skill_templates (skillId, name, type, target, description, effects, passive_trigger, icon)
 VALUES (
-  'SKL_PLAGUE_SPREAD', '瘟疫蔓延', 'active', 'all_enemies',
-  '向全體敵人釋放致命瘟疫，造成傷害並施加中毒與降防',
+  'SKL_PLAGUE_SPREAD', '暗焰爆發', 'active', 'all_enemies',
+  '向全體敵人釋放暗焰，造成傷害並施加灼燒與降防',
   '[{"type":"damage","scalingStat":"ATK","multiplier":1.0},{"type":"debuff","status":"dot_poison","statusChance":0.5,"statusValue":0.4,"statusDuration":2},{"type":"debuff","status":"def_down","statusChance":0.4,"statusValue":0.15,"statusDuration":2}]',
   '', ''
 );
 
--- 3) 被動1：瘴氣體質 — 永久自身 DEF+10%
+-- 3) 被動1：冥火護體 — 永久自身 DEF+10%
 INSERT OR IGNORE INTO skill_templates (skillId, name, type, target, description, effects, passive_trigger, icon)
 VALUES (
-  'PAS_15_1', '瘴氣體質', 'passive', 'self',
-  '長期接觸毒物的身體產生了抗性，永久提升防禦力',
+  'PAS_15_1', '冥火護體', 'passive', 'self',
+  '暗焰包覆全身產生抗性，永久提升防禦力',
   '[{"type":"buff","status":"def_up","statusValue":0.1}]',
   'always', ''
 );
 
--- 4) 被動2：劇毒調配 — 攻擊時 25% 機率施加中毒
+-- 4) 被動2：暗焰灼蝕 — 攻擊時 25% 機率施加中毒
 INSERT OR IGNORE INTO skill_templates (skillId, name, type, target, description, effects, passive_trigger, icon)
 VALUES (
-  'PAS_15_2', '劇毒調配', 'passive', 'single_enemy',
-  '精心調配的毒藥附著在攻擊上，有機率使敵人中毒',
+  'PAS_15_2', '暗焰灼蝕', 'passive', 'single_enemy',
+  '冥藍火焰附著在攻擊上，有機率使敵人中毒',
   '[{"type":"debuff","status":"dot_poison","statusChance":0.25,"statusValue":0.35,"statusDuration":2}]',
   'on_attack', ''
 );
 
--- 5) 被動3：疫病研究 — 每2回合全隊回血 + 淨化
+-- 5) 被動3：冥焰淨化 — 每2回合全隊回血 + 淨化
 INSERT OR IGNORE INTO skill_templates (skillId, name, type, target, description, effects, passive_trigger, icon)
 VALUES (
-  'PAS_15_3', '疫病研究', 'passive', 'all_allies',
-  '深入研究疫病的知識讓醫生能定期為隊友治療並淨化毒素',
+  'PAS_15_3', '冥焰淨化', 'passive', 'all_allies',
+  '暗焰燒盡體內毒素，每2回合全隊回血+淨化',
   '[{"type":"heal","scalingStat":"HP","multiplier":0.05},{"type":"dispel_debuff"}]',
   'every_n_turns', ''
 );
 
--- 6) 被動4：終末瘟疫 — 攻擊時 35% 流血 + 15% 降攻
+-- 6) 被動4：暗焰終焉 — 攻擊時 35% 流血 + 15% 降攻
 INSERT OR IGNORE INTO skill_templates (skillId, name, type, target, description, effects, passive_trigger, icon)
 VALUES (
-  'PAS_15_4', '終末瘟疫', 'passive', 'single_enemy',
-  '瘟疫的終極形態，攻擊時使敵人流血並削弱其攻擊力',
+  'PAS_15_4', '暗焰終焉', 'passive', 'single_enemy',
+  '暗焰的終極形態，攻擊時使敵人流血並削弱攻擊力',
   '[{"type":"debuff","status":"dot_bleed","statusChance":0.35,"statusValue":0.4,"statusDuration":2},{"type":"debuff","status":"atk_down","statusChance":0.15,"statusValue":0.12,"statusDuration":2}]',
   'on_attack', ''
 );

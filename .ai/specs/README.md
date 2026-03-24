@@ -21,7 +21,7 @@
 | `.ai/specs/skill-system.md` | 技能系統（SkillTemplate + SkillEffect + Sheets 資料管線） | v1.7 | 🟢 已實作 |
 | `.ai/specs/effect-system.md` | 效果模組化系統（EffectTemplate + skill_effects 關聯 + dependsOn + 6 種新機制） | v2.4 | ✅ 已實作 |
 | ~~`.ai/specs/element-system.md`~~ | ~~屬性剋制系統（7 屬性矩陣 + 動態載入 + 中英對照）~~ — 2026-03-11 完整移除 | v1.1 | 🔴 已廢棄 |
-| `.ai/specs/tech-architecture.md` | 技術架構（含 Domain + Services 分層 + Audio Engine + CurrencyIcon + 戰力 + 競技場） | v2.9 | 🟢 定稿 |
+| `.ai/specs/tech-architecture.md` | 技術架構（含 Domain + Services 分層 + Audio Engine + CurrencyIcon + 戰力 + 競技場） | v3.12 | 🟢 定稿 |
 | `.ai/specs/progression.md` | 養成系統（等級/突破/星級/裝備模板制 v2/套裝 + UI 全面實作） | v2.8 | 🟢 已實作 |
 | `.ai/specs/auth-system.md` | 帳號系統（訪客 + 綁定帳密 + 登出保留 token） | v1.6 | 🟢 已實作 |
 | `.ai/specs/save-system.md` | 存檔系統（Google Sheets 存進度 + 資源計時器 + 初始 3 英雄自動陣型 + 登出重置 + equipment JSON） | v1.6 | 🟢 已實作 |

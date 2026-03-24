@@ -43,6 +43,14 @@ const dir = new THREE.DirectionalLight(0xffffff, 1.0);
 dir.position.set(1, 2, 1);
 scene.add(dir);
 
+// Per-model overrides for models whose bounding box is misleading
+const MODEL_OVERRIDES = {
+  'zombie_3':  { focusPct: 0.50, distanceMul: 1.2, pixelCrop: true },
+  'zombie_14': { focusPct: 0.50, distanceMul: 1.2, pixelCrop: true },
+};
+const modelName = model ? model.replace(/.*\/models\//, '').split('/')[0] : '';
+const overrides = MODEL_OVERRIDES[modelName] || null;
+
 function processModel(obj) {
     // play idle animation if present so we don't capture T-pose
     let mixer = null;
@@ -54,17 +62,25 @@ function processModel(obj) {
       mixer.update(0.6);
     }
 
+    // Models that need PBR brightness fix (dark metallic textures)
+    const PBR_EMISSIVE = { zombie_27: 3.0, zombie_29: 5.0 };
+    const emissiveVal = PBR_EMISSIVE[modelName] || 0;
+
     // ensure textures use correct encoding and update materials
     obj.traverse(function(node){
       if (node.isMesh) {
         node.frustumCulled = false;
         const mat = node.material;
-        if (Array.isArray(mat)) {
-          mat.forEach(m=>{ if (m.map) { m.map.encoding = THREE.sRGBEncoding; m.map.needsUpdate = true; } if (m.needsUpdate!==undefined) m.needsUpdate = true; });
-        } else if (mat) {
-          if (mat.map) { mat.map.encoding = THREE.sRGBEncoding; mat.map.needsUpdate = true; }
-          if (mat.needsUpdate!==undefined) mat.needsUpdate = true;
-        }
+        const fixMat = m => {
+          if (m.map) { m.map.encoding = THREE.sRGBEncoding; m.map.needsUpdate = true; }
+          if (emissiveVal && m.isMeshStandardMaterial) {
+            m.metalness = 0;
+            m.roughness = 0.8;
+            if (m.map) { m.emissive = new THREE.Color(0xffffff); m.emissiveMap = m.map; m.emissiveIntensity = emissiveVal; }
+          }
+          if (m.needsUpdate !== undefined) m.needsUpdate = true;
+        };
+        if (Array.isArray(mat)) { mat.forEach(fixMat); } else if (mat) { fixMat(mat); }
       }
     });
 
@@ -79,7 +95,11 @@ function processModel(obj) {
     // GLB from Blender may use Z-up: if height (Y) is near zero, swap Y and Z
     let useZ = sizeVec.y < sizeVec.z * 0.3;
     const height = useZ ? sizeVec.z : sizeVec.y;
-    const headY = useZ ? (box.min.z + sizeVec.z * 0.82) : (box.min.y + sizeVec.y * 0.82);
+    const width = Math.max(sizeVec.x, useZ ? sizeVec.y : sizeVec.z);
+
+    // Head focus point: default 82% (humanoid head). Overridden for non-standard models.
+    const focusPct = overrides ? overrides.focusPct : 0.82;
+    const headY = useZ ? (box.min.z + sizeVec.z * focusPct) : (box.min.y + sizeVec.y * focusPct);
 
     return { mixer, box, sizeVec, center, height, headY, useZ };
 }
@@ -96,8 +116,8 @@ if (!model) {
     // aim at head (approx 80-85% height) and zoom in
     const headTargetY = headY; 
     const maxDim = Math.max(sizeVec.x, sizeVec.y, sizeVec.z);
-    // closer distance for headshot
-    const distance = maxDim * 0.6; 
+    const distMul = overrides ? overrides.distanceMul : 0.6;
+    const distance = maxDim * distMul;
     
     // Position camera at head height but pulled back
     if (useZ) {
@@ -116,45 +136,79 @@ if (!model) {
       if (mixer) mixer.update(0.2);
       renderer.render(scene, camera);
 
-      // compute head crop region: take top 40% of model bbox as head area
-      const headTop = useZ ? box.max.z : box.max.y;
-      const headBottom = useZ ? (box.min.z + sizeVec.z * 0.6) : (box.min.y + sizeVec.y * 0.6);
-      const headMin = useZ
-        ? new THREE.Vector3(box.min.x, box.min.y, headBottom)
-        : new THREE.Vector3(box.min.x, headBottom, box.min.z);
-      const headMax = useZ
-        ? new THREE.Vector3(box.max.x, box.max.y, headTop)
-        : new THREE.Vector3(box.max.x, headTop, box.max.z);
+      // --- Crop strategy: pixel-based for overridden models, projection-based for others ---
+      const pad = Math.max(canvas.width, canvas.height) * 0.05;
+      let sx, sy, ex, ey;
 
-      // get 8 corners of head box
-      const corners = [];
-      for (const x of [headMin.x, headMax.x]) for (const y of [headMin.y, headMax.y]) for (const z of [headMin.z, headMax.z]) {
-        corners.push(new THREE.Vector3(x,y,z));
+      if (overrides && overrides.pixelCrop) {
+        // Pixel-based content detection for non-humanoid models (beasts, wide-pose models)
+        const gl = renderer.getContext();
+        const pixels = new Uint8Array(canvas.width * canvas.height * 4);
+        gl.readPixels(0, 0, canvas.width, canvas.height, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
+
+        let pxMinX = canvas.width, pxMaxX = 0, pxMinY = canvas.height, pxMaxY = 0;
+        for (let y = 0; y < canvas.height; y++) {
+          for (let x = 0; x < canvas.width; x++) {
+            const idx = (y * canvas.width + x) * 4;
+            if (pixels[idx + 3] > 10) {
+              const screenY = canvas.height - 1 - y;
+              if (x < pxMinX) pxMinX = x;
+              if (x > pxMaxX) pxMaxX = x;
+              if (screenY < pxMinY) pxMinY = screenY;
+              if (screenY > pxMaxY) pxMaxY = screenY;
+            }
+          }
+        }
+
+        if (pxMaxX <= pxMinX || pxMaxY <= pxMinY) {
+          sx = 0; sy = 0; ex = canvas.width; ey = canvas.height;
+        } else {
+          const contentH = pxMaxY - pxMinY;
+          const cropBottomY = pxMinY + contentH * 0.80;
+          sx = Math.max(0, pxMinX - pad);
+          sy = Math.max(0, pxMinY - pad);
+          ex = Math.min(canvas.width, pxMaxX + pad);
+          ey = Math.min(canvas.height, cropBottomY + pad);
+        }
+      } else {
+        // Projection-based head crop for humanoid models (works well for standard proportions)
+        const headTop = useZ ? box.max.z : box.max.y;
+        const headBottom = useZ ? (box.min.z + sizeVec.z * 0.6) : (box.min.y + sizeVec.y * 0.6);
+        const headMin = useZ
+          ? new THREE.Vector3(box.min.x, box.min.y, headBottom)
+          : new THREE.Vector3(box.min.x, headBottom, box.min.z);
+        const headMax = useZ
+          ? new THREE.Vector3(box.max.x, box.max.y, headTop)
+          : new THREE.Vector3(box.max.x, headTop, box.max.z);
+
+        const corners = [];
+        for (const x of [headMin.x, headMax.x]) for (const y of [headMin.y, headMax.y]) for (const z of [headMin.z, headMax.z]) {
+          corners.push(new THREE.Vector3(x,y,z));
+        }
+
+        const px = [], py = [];
+        for (const c of corners) {
+          const v = c.clone();
+          v.project(camera);
+          px.push((v.x * 0.5 + 0.5) * canvas.width);
+          py.push((-v.y * 0.5 + 0.5) * canvas.height);
+        }
+
+        sx = Math.max(0, Math.min(...px));
+        sy = Math.max(0, Math.min(...py));
+        ex = Math.min(canvas.width, Math.max(...px));
+        ey = Math.min(canvas.height, Math.max(...py));
       }
 
-      const px = [];
-      const py = [];
-      for (const c of corners) {
-        const v = c.clone();
-        v.project(camera);
-        const cx = (v.x * 0.5 + 0.5) * canvas.width;
-        const cy = ( -v.y * 0.5 + 0.5) * canvas.height;
-        px.push(cx); py.push(cy);
-      }
-
-      let sx = Math.max(0, Math.min(...px));
-      let sy = Math.max(0, Math.min(...py));
-      let ex = Math.min(canvas.width, Math.max(...px));
-      let ey = Math.min(canvas.height, Math.max(...py));
-
-      // fallback: if computed box is too small, enlarge to center area
+      // Ensure minimum crop size
       const minCropSize = Math.min(canvas.width, canvas.height) * 0.25;
       let sw = ex - sx;
       let sh = ey - sy;
       if (sw < minCropSize) { const add = (minCropSize - sw)/2; sx = Math.max(0, sx - add); ex = Math.min(canvas.width, ex + add); sw = ex - sx; }
       if (sh < minCropSize) { const add = (minCropSize - sh)/2; sy = Math.max(0, sy - add); ey = Math.min(canvas.height, ey + add); sh = ey - sy; }
 
-      // square crop: expand to square centered
+      // Square crop: expand to square centered on content
+      sw = ex - sx; sh = ey - sy;
       const cropSize = Math.max(sw, sh);
       const cxC = sx + sw/2; const cyC = sy + sh/2;
       sx = Math.max(0, Math.round(cxC - cropSize/2));

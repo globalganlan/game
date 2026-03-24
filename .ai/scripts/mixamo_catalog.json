@@ -1,0 +1,1134 @@
+{
+  "zombie idle": [
+    {
+      "modelId": 102250901,
+      "name": "Zombie Alert Idle",
+      "duration": null
+    },
+    {
+      "modelId": 104110901,
+      "name": "Zombie Twitching Idle",
+      "duration": null
+    },
+    {
+      "modelId": 121350901,
+      "name": "Zombie Standing Idle",
+      "duration": null
+    },
+    {
+      "modelId": 104110902,
+      "name": "Zombie Upright Twitching Idle",
+      "duration": null
+    },
+    {
+      "modelId": 104360901,
+      "name": "Zombie Scratching Idle",
+      "duration": null
+    },
+    {
+      "modelId": 102250902,
+      "name": "Zombie Looking Around",
+      "duration": null
+    },
+    {
+      "modelId": 102330902,
+      "name": "Zombie Transition Alert To Ready",
+      "duration": null
+    },
+    {
+      "modelId": 102330901,
+      "name": "Zombie Transition Ready To Alert",
+      "duration": null
+    }
+  ],
+  "breathing idle": [
+    {
+      "modelId": 107900901,
+      "name": "Breathing Idle",
+      "duration": null
+    },
+    {
+      "modelId": 111280903,
+      "name": "Mutant Breathing Idle",
+      "duration": null
+    },
+    {
+      "modelId": 123380901,
+      "name": "Sitting With Breathing Idle",
+      "duration": null
+    },
+    {
+      "modelId": 120140901,
+      "name": "Male Fitness Idle With Breathing",
+      "duration": null
+    },
+    {
+      "modelId": 111280902,
+      "name": "Mutant Stretching Idle With Breathing",
+      "duration": null
+    }
+  ],
+  "fighting idle": [
+    {
+      "modelId": 101470907,
+      "name": "Male Fight Idle Boxing Stance",
+      "duration": null
+    }
+  ],
+  "guard idle": [
+    {
+      "modelId": 119720902,
+      "name": "Bouncing Fight Idle With Guard Up",
+      "duration": null
+    }
+  ],
+  "alert idle": [
+    {
+      "modelId": 102250901,
+      "name": "Zombie Alert Idle",
+      "duration": null
+    }
+  ],
+  "standing idle": [
+    {
+      "modelId": 131220901,
+      "name": "Standing Idle",
+      "duration": null
+    },
+    {
+      "modelId": 124300901,
+      "name": "Transition From Fight Idle To Standing Idle",
+      "duration": null
+    },
+    {
+      "modelId": 124320901,
+      "name": "Transition From Action Idle To Standing Idle",
+      "duration": null
+    },
+    {
+      "modelId": 124200901,
+      "name": "Transition From Standing Idle To Fight Idle",
+      "duration": null
+    },
+    {
+      "modelId": 118910901,
+      "name": "Standing Idle Holding Suitcase",
+      "duration": null
+    },
+    {
+      "modelId": 128690911,
+      "name": "Standing Idle",
+      "duration": null
+    },
+    {
+      "modelId": 118920901,
+      "name": "Standing Idle Holding Suitcase",
+      "duration": null
+    },
+    {
+      "modelId": 128690914,
+      "name": "Standing Idle Looking Behind",
+      "duration": null
+    }
+  ],
+  "defensive idle": [
+    {
+      "modelId": 104210901,
+      "name": "Ready To Combat To Defensive Idle",
+      "duration": null
+    }
+  ],
+  "sword idle": [
+    {
+      "modelId": 122580901,
+      "name": "Great Sword Look Around Idle",
+      "duration": null
+    },
+    {
+      "modelId": 122610901,
+      "name": "Great Sword Look Around Idle",
+      "duration": null
+    },
+    {
+      "modelId": 122190901,
+      "name": "Great Sword Idle",
+      "duration": null
+    },
+    {
+      "modelId": 122600901,
+      "name": "Great Sword Admiring Idle",
+      "duration": null
+    },
+    {
+      "modelId": 122590901,
+      "name": "Great Sword Strike A Pose Idle",
+      "duration": null
+    },
+    {
+      "modelId": 122990901,
+      "name": "Sword And Shield Look Around Idle",
+      "duration": null
+    },
+    {
+      "modelId": 122890901,
+      "name": "Sword And Shield Left Crouch Idle- Loop",
+      "duration": null
+    },
+    {
+      "modelId": 123000901,
+      "name": "Sword And Shield Sword Play Idle",
+      "duration": null
+    }
+  ],
+  "creature idle": [
+    {
+      "modelId": 102250901,
+      "name": "Zombie Alert Idle",
+      "duration": null
+    },
+    {
+      "modelId": 102250902,
+      "name": "Zombie Looking Around",
+      "duration": null
+    },
+    {
+      "modelId": 104110901,
+      "name": "Zombie Twitching Idle",
+      "duration": null
+    },
+    {
+      "modelId": 121350901,
+      "name": "Zombie Standing Idle",
+      "duration": null
+    },
+    {
+      "modelId": 104110902,
+      "name": "Zombie Upright Twitching Idle",
+      "duration": null
+    },
+    {
+      "modelId": 104360901,
+      "name": "Zombie Scratching Idle",
+      "duration": null
+    },
+    {
+      "modelId": 102330902,
+      "name": "Zombie Transition Alert To Ready",
+      "duration": null
+    },
+    {
+      "modelId": 102330901,
+      "name": "Zombie Transition Ready To Alert",
+      "duration": null
+    }
+  ],
+  "floating idle": [
+    {
+      "modelId": 108000901,
+      "name": "Floating In Air Flailing Arms",
+      "duration": null
+    }
+  ],
+  "sword slash": [
+    {
+      "modelId": 122790901,
+      "name": "Sword And Shield Cross Slash",
+      "duration": null
+    },
+    {
+      "modelId": 122350901,
+      "name": "Great Sword Combo Slash",
+      "duration": null
+    },
+    {
+      "modelId": 122360901,
+      "name": "Great Sword Low Slash",
+      "duration": null
+    },
+    {
+      "modelId": 122370901,
+      "name": "Great Sword Power Slash",
+      "duration": null
+    },
+    {
+      "modelId": 122340901,
+      "name": "Great Sword Downward Slash",
+      "duration": null
+    },
+    {
+      "modelId": 122470901,
+      "name": "Great Sword Crouching Slash",
+      "duration": null
+    },
+    {
+      "modelId": 122800901,
+      "name": "Sword And Shield Power Slash",
+      "duration": null
+    },
+    {
+      "modelId": 122770901,
+      "name": "Sword And Shield Downward Slash",
+      "duration": null
+    }
+  ],
+  "sword attack": [
+    {
+      "modelId": 122960901,
+      "name": "Sword And Shield Jump Attack",
+      "duration": null
+    },
+    {
+      "modelId": 122550901,
+      "name": "Great Sword High Spin Attack From Run",
+      "duration": null
+    },
+    {
+      "modelId": 122980901,
+      "name": "Sword And Shield Low Attack",
+      "duration": null
+    },
+    {
+      "modelId": 122970901,
+      "name": "Sword And Shield High Attack",
+      "duration": null
+    },
+    {
+      "modelId": 122530901,
+      "name": "Great Sword Jump Attack From Run",
+      "duration": null
+    },
+    {
+      "modelId": 122540901,
+      "name": "Great Sword Low Slide Attack From Run",
+      "duration": null
+    },
+    {
+      "modelId": 128140901,
+      "name": "Two Handed Sword Combo Attack",
+      "duration": null
+    },
+    {
+      "modelId": 122640901,
+      "name": "Great Sword Hilt Melee",
+      "duration": null
+    }
+  ],
+  "claw attack": [],
+  "creature attack": [
+    {
+      "modelId": 102320906,
+      "name": "Zombie Overhead Two-Hand Attack",
+      "duration": null
+    },
+    {
+      "modelId": 121360901,
+      "name": "Zombie Swipe Attack",
+      "duration": null
+    }
+  ],
+  "ground slam": [
+    {
+      "modelId": 119810901,
+      "name": "Grabbing And Slamming Someone To The Ground",
+      "duration": null
+    }
+  ],
+  "ground smash": [],
+  "ninja attack": [],
+  "stab": [
+    {
+      "modelId": 100800901,
+      "name": "Male Knife Stab With The Rear Hand And Reverse Grip",
+      "duration": null
+    },
+    {
+      "modelId": 102700901,
+      "name": "Static Double Dagger Stab With Outward Grip",
+      "duration": null
+    },
+    {
+      "modelId": 104800901,
+      "name": "Advancing And Stabbing With Rifle Bayonet Or Spear",
+      "duration": null
+    },
+    {
+      "modelId": 100770901,
+      "name": "Male Knife Stab With Lead Hand And Fore Grip",
+      "duration": null
+    },
+    {
+      "modelId": 100790901,
+      "name": "Male Knife Stab With The Rear Hand And Fore Grip",
+      "duration": null
+    },
+    {
+      "modelId": 128690929,
+      "name": "Forward Stab Attack With Torch",
+      "duration": null
+    },
+    {
+      "modelId": 104990901,
+      "name": "Inward Slashing With A Sword Standing Stable",
+      "duration": null
+    },
+    {
+      "modelId": 104990902,
+      "name": "Outward Slashing With A Sword Standing Stable",
+      "duration": null
+    }
+  ],
+  "dagger attack": [
+    {
+      "modelId": 102700901,
+      "name": "Static Double Dagger Stab With Outward Grip",
+      "duration": null
+    }
+  ],
+  "punch combo": [
+    {
+      "modelId": 113830902,
+      "name": "Four Punch Combo",
+      "duration": null
+    },
+    {
+      "modelId": 113930902,
+      "name": "Eight Punch Combo",
+      "duration": null
+    },
+    {
+      "modelId": 119800901,
+      "name": "Jumping Knee Followed By A Punch",
+      "duration": null
+    },
+    {
+      "modelId": 113650901,
+      "name": "Vertical Elbow And Solar Plexus Strike",
+      "duration": null
+    },
+    {
+      "modelId": 113830901,
+      "name": "Quad Punch Combo",
+      "duration": null
+    },
+    {
+      "modelId": 104840901,
+      "name": "Advancing And Punching With Butt Of A Rifle",
+      "duration": null
+    },
+    {
+      "modelId": 127690921,
+      "name": "Punch Attack With Bow",
+      "duration": null
+    },
+    {
+      "modelId": 100750904,
+      "name": "Male Elbow Punch",
+      "duration": null
+    }
+  ],
+  "kick combo": [
+    {
+      "modelId": 101020901,
+      "name": "Aerial 360 Degree Front Side Rotation Kick With Rear Foot",
+      "duration": null
+    },
+    {
+      "modelId": 100930901,
+      "name": "Double Front Snap Kick",
+      "duration": null
+    },
+    {
+      "modelId": 121210901,
+      "name": "Capoeira High Kick With Forward Step",
+      "duration": null
+    },
+    {
+      "modelId": 121020901,
+      "name": "Capoeira Side Kick",
+      "duration": null
+    },
+    {
+      "modelId": 120960901,
+      "name": "Capoeira Spin Kick To Escape",
+      "duration": null
+    },
+    {
+      "modelId": 121250901,
+      "name": "Capoeira Side Step Spin Kick",
+      "duration": null
+    },
+    {
+      "modelId": 119870901,
+      "name": "Front Flip To Kick",
+      "duration": null
+    },
+    {
+      "modelId": 120370901,
+      "name": "Spinning Flip Kick",
+      "duration": null
+    }
+  ],
+  "magic attack": [
+    {
+      "modelId": 128670912,
+      "name": "One Handed Casting Spell Upward Sweep",
+      "duration": null
+    },
+    {
+      "modelId": 128670916,
+      "name": "Two Handed Casting Spell Fowards",
+      "duration": null
+    },
+    {
+      "modelId": 128670914,
+      "name": "Two Handed Casting Spell Towards Ground",
+      "duration": null
+    },
+    {
+      "modelId": 128670915,
+      "name": "Two Handed Casting Spell Pull In Blast Out",
+      "duration": null
+    },
+    {
+      "modelId": 128670918,
+      "name": "Two Handed Casting Spell Forwards Sustained",
+      "duration": null
+    },
+    {
+      "modelId": 128670910,
+      "name": "One Handed Casting Spell Fowards",
+      "duration": null
+    },
+    {
+      "modelId": 128670920,
+      "name": "Two Handed Casting Spell Pull Up And Clap Hands",
+      "duration": null
+    },
+    {
+      "modelId": 128670919,
+      "name": "Two Handed Casting Spell Forwards Sustained",
+      "duration": null
+    }
+  ],
+  "fireball": [
+    {
+      "modelId": 103010901,
+      "name": "Street Fighter Hadouken",
+      "duration": null
+    }
+  ],
+  "bite attack": [],
+  "monster attack": [
+    {
+      "modelId": 128130901,
+      "name": "One Handed Club Combo Attack",
+      "duration": null
+    },
+    {
+      "modelId": 102320906,
+      "name": "Zombie Overhead Two-Hand Attack",
+      "duration": null
+    },
+    {
+      "modelId": 122960901,
+      "name": "Sword And Shield Jump Attack",
+      "duration": null
+    },
+    {
+      "modelId": 122550901,
+      "name": "Great Sword High Spin Attack From Run",
+      "duration": null
+    },
+    {
+      "modelId": 122970901,
+      "name": "Sword And Shield High Attack",
+      "duration": null
+    },
+    {
+      "modelId": 122980901,
+      "name": "Sword And Shield Low Attack",
+      "duration": null
+    },
+    {
+      "modelId": 122530901,
+      "name": "Great Sword Jump Attack From Run",
+      "duration": null
+    },
+    {
+      "modelId": 122640901,
+      "name": "Great Sword Hilt Melee",
+      "duration": null
+    }
+  ],
+  "heavy punch": [],
+  "cross punch": [
+    {
+      "modelId": 113540901,
+      "name": "A Cross Punch",
+      "duration": null
+    },
+    {
+      "modelId": 113830902,
+      "name": "Four Punch Combo",
+      "duration": null
+    },
+    {
+      "modelId": 113930902,
+      "name": "Eight Punch Combo",
+      "duration": null
+    },
+    {
+      "modelId": 90009,
+      "name": "Cross Punch",
+      "duration": null
+    },
+    {
+      "modelId": 110410904,
+      "name": "Illegal Cross Elbow",
+      "duration": null
+    },
+    {
+      "modelId": 110410903,
+      "name": "Illegal Elbow Uppercut",
+      "duration": null
+    },
+    {
+      "modelId": 110410902,
+      "name": "Illegal Elbow To The Head",
+      "duration": null
+    },
+    {
+      "modelId": 110460905,
+      "name": "Short Hook Punch To The Head",
+      "duration": null
+    }
+  ],
+  "hook punch": [
+    {
+      "modelId": 113550901,
+      "name": "A Hook Punch",
+      "duration": null
+    },
+    {
+      "modelId": 110460905,
+      "name": "Short Hook Punch To The Head",
+      "duration": null
+    },
+    {
+      "modelId": 110460903,
+      "name": "Long Hook Punch To The Body",
+      "duration": null
+    },
+    {
+      "modelId": 110460902,
+      "name": "Short Hook Punch To The Body",
+      "duration": null
+    },
+    {
+      "modelId": 110460907,
+      "name": "Mid Hook Punch To The Head",
+      "duration": null
+    },
+    {
+      "modelId": 110460906,
+      "name": "Long Hook Punch To The Head",
+      "duration": null
+    },
+    {
+      "modelId": 110460904,
+      "name": "Mid Hook Punch To The Body",
+      "duration": null
+    },
+    {
+      "modelId": 118370901,
+      "name": "Right Hook Punch From Idle",
+      "duration": null
+    }
+  ],
+  "palm strike": [
+    {
+      "modelId": 113870901,
+      "name": "Uppercut Jab And Open Palm Strike Combo",
+      "duration": null
+    }
+  ],
+  "hit reaction": [
+    {
+      "modelId": 115720901,
+      "name": "Hit Reaction From Rifle Crouched",
+      "duration": null
+    },
+    {
+      "modelId": 104250907,
+      "name": "Hit Reaction While Holding A Pistol",
+      "duration": null
+    },
+    {
+      "modelId": 104250908,
+      "name": "Hit Reaction While Holding A Rifle",
+      "duration": null
+    },
+    {
+      "modelId": 116690901,
+      "name": "Hit Reaction When Running With Rifle",
+      "duration": null
+    },
+    {
+      "modelId": 113860902,
+      "name": "Hit Reaction",
+      "duration": null
+    },
+    {
+      "modelId": 104250904,
+      "name": "Left Reaction To Front Hit Holding A Rifle",
+      "duration": null
+    },
+    {
+      "modelId": 102460901,
+      "name": "Zombie Reaction Hit Flinches",
+      "duration": null
+    },
+    {
+      "modelId": 102460902,
+      "name": "Zombie Reaction Hit Stumble Back",
+      "duration": null
+    }
+  ],
+  "getting hit": [
+    {
+      "modelId": 120540902,
+      "name": "Getting Hit And Flipping Backwards",
+      "duration": null
+    },
+    {
+      "modelId": 110780901,
+      "name": "Getting Hit From Back",
+      "duration": null
+    },
+    {
+      "modelId": 116920903,
+      "name": "Getting Hit By An Uppercut",
+      "duration": null
+    },
+    {
+      "modelId": 122180901,
+      "name": "Zombie Getting Hit And Falling Forward",
+      "duration": null
+    },
+    {
+      "modelId": 111420901,
+      "name": "Getting Hit In The Face From Various Angles",
+      "duration": null
+    },
+    {
+      "modelId": 126450901,
+      "name": "Rifle Getting Hit To Ground",
+      "duration": null
+    },
+    {
+      "modelId": 126460901,
+      "name": "Rifle Kneeling Getting Hit To Back",
+      "duration": null
+    },
+    {
+      "modelId": 121380901,
+      "name": "Zombie Getting Hit And Falling Onto Back",
+      "duration": null
+    }
+  ],
+  "standing react": [
+    {
+      "modelId": 128670937,
+      "name": "Death Falling To The Right",
+      "duration": null
+    },
+    {
+      "modelId": 128670935,
+      "name": "Death Falling Forwards",
+      "duration": null
+    },
+    {
+      "modelId": 128670945,
+      "name": "Small Hit Reaction From The Right",
+      "duration": null
+    },
+    {
+      "modelId": 128650904,
+      "name": "Large Block Reaction With Axe",
+      "duration": null
+    },
+    {
+      "modelId": 128670942,
+      "name": "Small Hit Reaction From The Back",
+      "duration": null
+    },
+    {
+      "modelId": 128670940,
+      "name": "Large Hit Reaction From The Left",
+      "duration": null
+    },
+    {
+      "modelId": 128650922,
+      "name": "Hit Reaction From The Left With Axe",
+      "duration": null
+    },
+    {
+      "modelId": 127690964,
+      "name": "Hit Reaction From The Front With Bow",
+      "duration": null
+    }
+  ],
+  "stumble backward": [
+    {
+      "modelId": 137180901,
+      "name": "Slip And Fall Backwards",
+      "duration": null
+    }
+  ],
+  "big hit": [
+    {
+      "modelId": 116880908,
+      "name": "Receiving A Big Hit In The Stomach",
+      "duration": null
+    },
+    {
+      "modelId": 116880906,
+      "name": "Receiving A Big Hit In The Side",
+      "duration": null
+    },
+    {
+      "modelId": 116880902,
+      "name": "Receiving A Big Hit In The Kidneys",
+      "duration": null
+    },
+    {
+      "modelId": 116900902,
+      "name": "Receiving A Big Hit From A Left Punch",
+      "duration": null
+    },
+    {
+      "modelId": 116900905,
+      "name": "Receiving A Big Hit From A Right Punch",
+      "duration": null
+    },
+    {
+      "modelId": 116900908,
+      "name": "Receiving A Big Hit From A Straight Punch",
+      "duration": null
+    },
+    {
+      "modelId": 116880904,
+      "name": "Receiving A Big Hit In The Ribs",
+      "duration": null
+    },
+    {
+      "modelId": 116910905,
+      "name": "Receiving A Big Hit To The Head From A Right Punch",
+      "duration": null
+    }
+  ],
+  "damage reaction": [],
+  "dying backward": [
+    {
+      "modelId": 107070901,
+      "name": "Shot To The Chest Falling Backwards",
+      "duration": null
+    },
+    {
+      "modelId": 128190901,
+      "name": "Dying Falling Backward",
+      "duration": null
+    },
+    {
+      "modelId": 127690957,
+      "name": "Death Reaction Falling Backwards With Bow",
+      "duration": null
+    },
+    {
+      "modelId": 128200901,
+      "name": "Dying Flying Backward",
+      "duration": null
+    },
+    {
+      "modelId": 128180901,
+      "name": "Dying Falling Backward",
+      "duration": null
+    },
+    {
+      "modelId": 128670934,
+      "name": "Death Falling Backwards",
+      "duration": null
+    },
+    {
+      "modelId": 127690902,
+      "name": "Death Reaction Falling Backwards With Bow",
+      "duration": null
+    }
+  ],
+  "dramatic death": [],
+  "death fall": [
+    {
+      "modelId": 128190901,
+      "name": "Dying Falling Backward",
+      "duration": null
+    },
+    {
+      "modelId": 128170901,
+      "name": "Dying Falling Forward",
+      "duration": null
+    },
+    {
+      "modelId": 128180901,
+      "name": "Dying Falling Backward",
+      "duration": null
+    },
+    {
+      "modelId": 128670934,
+      "name": "Death Falling Backwards",
+      "duration": null
+    },
+    {
+      "modelId": 123120901,
+      "name": "Falling Back Death",
+      "duration": null
+    },
+    {
+      "modelId": 123130901,
+      "name": "Falling Forward Death",
+      "duration": null
+    },
+    {
+      "modelId": 128670935,
+      "name": "Death Falling Forwards",
+      "duration": null
+    },
+    {
+      "modelId": 127690959,
+      "name": "Death Reaction Falling Left With Bow",
+      "duration": null
+    }
+  ],
+  "zombie death": [
+    {
+      "modelId": 121380901,
+      "name": "Zombie Getting Hit And Falling Onto Back",
+      "duration": null
+    }
+  ],
+  "creature death": [
+    {
+      "modelId": 121380901,
+      "name": "Zombie Getting Hit And Falling Onto Back",
+      "duration": null
+    }
+  ],
+  "falling death": [
+    {
+      "modelId": 128190901,
+      "name": "Dying Falling Backward",
+      "duration": null
+    },
+    {
+      "modelId": 128170901,
+      "name": "Dying Falling Forward",
+      "duration": null
+    },
+    {
+      "modelId": 128180901,
+      "name": "Dying Falling Backward",
+      "duration": null
+    },
+    {
+      "modelId": 128670934,
+      "name": "Death Falling Backwards",
+      "duration": null
+    },
+    {
+      "modelId": 123120901,
+      "name": "Falling Back Death",
+      "duration": null
+    },
+    {
+      "modelId": 127690960,
+      "name": "Death Reaction Falling Left With Bow",
+      "duration": null
+    },
+    {
+      "modelId": 123070901,
+      "name": "Sword And Shield Falling Forward Death",
+      "duration": null
+    },
+    {
+      "modelId": 127690958,
+      "name": "Death Reaction Falling Forwards With Bow",
+      "duration": null
+    }
+  ],
+  "sprint forward": [
+    {
+      "modelId": 128670950,
+      "name": "Sprinting Forward",
+      "duration": null
+    },
+    {
+      "modelId": 128620909,
+      "name": "Rifle Sprint Forward",
+      "duration": null
+    },
+    {
+      "modelId": 127690971,
+      "name": "Sprinting Forward With Bow",
+      "duration": null
+    },
+    {
+      "modelId": 128620910,
+      "name": "Rifle Sprint Forward Right",
+      "duration": null
+    },
+    {
+      "modelId": 120430902,
+      "name": "Sprint To Forward Roll To Sprinting",
+      "duration": null
+    },
+    {
+      "modelId": 128620911,
+      "name": "Rifle Sprint Forward Left",
+      "duration": null
+    },
+    {
+      "modelId": 123710901,
+      "name": "Running Forward In A Sad Disposition",
+      "duration": null
+    },
+    {
+      "modelId": 124580901,
+      "name": "Female Run Forward",
+      "duration": null
+    }
+  ],
+  "heavy run": [
+    {
+      "modelId": 104020902,
+      "name": "Mutant Running",
+      "duration": null
+    },
+    {
+      "modelId": 116680901,
+      "name": "Throw Grenade While Running",
+      "duration": null
+    }
+  ],
+  "creature run": [
+    {
+      "modelId": 104020901,
+      "name": "Zombie Run",
+      "duration": null
+    },
+    {
+      "modelId": 121370901,
+      "name": "Zombie Running",
+      "duration": null
+    }
+  ],
+  "jog forward": [
+    {
+      "modelId": 125710901,
+      "name": "Soccer Jog Forward",
+      "duration": null
+    },
+    {
+      "modelId": 125750901,
+      "name": "Soccer Jog Diagonal Forward Right",
+      "duration": null
+    },
+    {
+      "modelId": 125760901,
+      "name": "Soccer Jog Diagonal Forward Left",
+      "duration": null
+    },
+    {
+      "modelId": 123480901,
+      "name": "Jogging And Kicking A Soccerball Forward",
+      "duration": null
+    },
+    {
+      "modelId": 112450901,
+      "name": "Forward Jog Dribbling Soccer Ball",
+      "duration": null
+    },
+    {
+      "modelId": 123710901,
+      "name": "Running Forward In A Sad Disposition",
+      "duration": null
+    },
+    {
+      "modelId": 124580901,
+      "name": "Female Run Forward",
+      "duration": null
+    },
+    {
+      "modelId": 123870901,
+      "name": "Happy Run Forward",
+      "duration": null
+    }
+  ],
+  "run forward": [
+    {
+      "modelId": 124430901,
+      "name": "Running Forward While Drunk",
+      "duration": null
+    },
+    {
+      "modelId": 128620901,
+      "name": "Rifle Run Forward",
+      "duration": null
+    },
+    {
+      "modelId": 128650943,
+      "name": "Running Forward",
+      "duration": null
+    },
+    {
+      "modelId": 128670947,
+      "name": "Running Forwards",
+      "duration": null
+    },
+    {
+      "modelId": 123710901,
+      "name": "Running Forward In A Sad Disposition",
+      "duration": null
+    },
+    {
+      "modelId": 127690956,
+      "name": "Running Jump To Run Forward",
+      "duration": null
+    },
+    {
+      "modelId": 127690928,
+      "name": "Running Forward With Bow",
+      "duration": null
+    },
+    {
+      "modelId": 128690931,
+      "name": "Running Forwards With Torch",
+      "duration": null
+    }
+  ],
+  "zombie walk": [
+    {
+      "modelId": 121340901,
+      "name": "Zombie Walking",
+      "duration": null
+    },
+    {
+      "modelId": 90048,
+      "name": "Zombie Walking",
+      "duration": null
+    },
+    {
+      "modelId": 100710901,
+      "name": "Creeping Zombie Walk",
+      "duration": null
+    }
+  ]
+}

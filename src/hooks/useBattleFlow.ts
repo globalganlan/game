@@ -26,7 +26,7 @@ import { buildEnemySlotsFromStage } from '../game/helpers'
 import { getStageConfig } from '../services/stageService'
 import { waitFrames } from '../game/constants'
 import { executeBattleLoop } from '../game/runBattleLoop'
-import { preloadHeroModels, releaseHeroModel, getCachedModelIds, disposeDracoDecoder } from '../loaders/glbLoader'
+import { preloadHeroModels, releaseHeroModel, getCachedModelIds, disposeDracoDecoder, preloadTimeoutMs } from '../loaders/glbLoader'
 
 export interface BattleFlowDeps {
   /* ── Refs ── */
@@ -313,8 +313,8 @@ export function useBattleFlow(deps: BattleFlowDeps) {
       for (const e of eSlotsRef.current) {
         if (e?._modelId && !keepIds.has(e._modelId)) releaseHeroModel(e._modelId)
       }
-      await Promise.race([preloadHeroModels(towerModelIds), new Promise<void>(r => setTimeout(r, 25_000))])
-      disposeDracoDecoder()
+      await Promise.race([preloadHeroModels(towerModelIds), new Promise<void>(r => setTimeout(r, preloadTimeoutMs(towerModelIds.length)))])
+      disposeDracoDecoder() // ★ 標記延遲釋放
       updateEnemySlots(() => nextEnemySlots)
       resetBattleState()
       setVictoryRewards(null)
@@ -349,8 +349,8 @@ export function useBattleFlow(deps: BattleFlowDeps) {
     for (const e of eSlotsRef.current) {
       if (e?._modelId && !keepStoryIds.has(e._modelId)) releaseHeroModel(e._modelId)
     }
-    await Promise.race([preloadHeroModels(nextModelIds), new Promise<void>(r => setTimeout(r, 25_000))])
-    disposeDracoDecoder()
+    await Promise.race([preloadHeroModels(nextModelIds), new Promise<void>(r => setTimeout(r, preloadTimeoutMs(nextModelIds.length)))])
+    disposeDracoDecoder() // ★ 標記延遲釋放
     updateEnemySlots(() => nextEnemySlots)
 
     resetBattleState()

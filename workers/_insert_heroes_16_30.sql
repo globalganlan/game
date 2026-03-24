@@ -10,60 +10,60 @@
 
 -- N×2
 INSERT INTO heroes (heroId, name, type, rarity, baseHP, baseATK, baseDEF, baseSPD, modelId, critRate, critDmg, description)
-VALUES (16, '腐蝕蟲', '敏捷', 'N', 65, 18, 10, 11, 'zombie_16', 5, 50, '地底蠕動的腐化昆蟲，以毒液溶解獵物。');
+VALUES (16, '荒拳鬥士', '敏捷', 'N', 65, 18, 10, 11, 'zombie_16', 5, 50, '末日荒野中磨練的格鬥家，鐵拳就是最強武器。');
 INSERT INTO heroes (heroId, name, type, rarity, baseHP, baseATK, baseDEF, baseSPD, modelId, critRate, critDmg, description)
-VALUES (17, '枯骨兵', '力量', 'N', 75, 22, 14, 8, 'zombie_17', 5, 50, '遠古戰場的亡者殘骸，至今仍持矛不倒。');
+VALUES (17, '蠠行屍', '力量', 'N', 75, 22, 14, 8, 'zombie_17', 5, 50, '失去頭顱仍蠠動前行的異變體，以血肉感知獵物。');
 
 -- R×4
 INSERT INTO heroes (heroId, name, type, rarity, baseHP, baseATK, baseDEF, baseSPD, modelId, critRate, critDmg, description)
 VALUES (18, '影行者', '敏捷', 'R', 80, 32, 12, 13, 'zombie_18', 8, 55, '穿梭暗影的刺客，以迅雷之勢取敵首級。');
 INSERT INTO heroes (heroId, name, type, rarity, baseHP, baseATK, baseDEF, baseSPD, modelId, critRate, critDmg, description)
-VALUES (19, '毒蕈師', '智慧', 'R', 90, 25, 14, 9, 'zombie_19', 5, 50, '林間孢子的守護者，毒霧是她的武器。');
+VALUES (19, '星蝕者', '智慧', 'R', 90, 25, 14, 9, 'zombie_19', 5, 50, '來自深空的異種生物，星光能量護甲覆蓋全身。');
 INSERT INTO heroes (heroId, name, type, rarity, baseHP, baseATK, baseDEF, baseSPD, modelId, critRate, critDmg, description)
 VALUES (20, '鏽鋼衛士', '力量', 'R', 100, 22, 22, 8, 'zombie_20', 5, 50, '廢墟中鍛造的鐵壁，用身軀護衛同伴。');
 INSERT INTO heroes (heroId, name, type, rarity, baseHP, baseATK, baseDEF, baseSPD, modelId, critRate, critDmg, description)
-VALUES (21, '亡靈弓手', '敏捷', 'R', 78, 35, 10, 12, 'zombie_21', 10, 60, '百步穿楊的骸骨射手，箭矢從不偏移。');
+VALUES (21, '暗影弓手', '敏捷', 'R', 78, 35, 10, 12, 'zombie_21', 10, 60, '隱匿暗處的神射手，箭矢無聲卻致命。');
 
 -- SR×5
 INSERT INTO heroes (heroId, name, type, rarity, baseHP, baseATK, baseDEF, baseSPD, modelId, critRate, critDmg, description)
-VALUES (22, '血族伯爵', '智慧', 'SR', 95, 38, 16, 11, 'zombie_22', 7, 55, '暗夜貴族的末裔，以鮮血維持不死之軀。');
+VALUES (22, '魔瞳領主', '智慧', 'SR', 95, 38, 16, 11, 'zombie_22', 7, 55, '以魔眼統御群魔的異界貴族，綠焰是其力量象徵。');
 INSERT INTO heroes (heroId, name, type, rarity, baseHP, baseATK, baseDEF, baseSPD, modelId, critRate, critDmg, description)
-VALUES (23, '炎魔', '力量', 'SR', 105, 42, 18, 9, 'zombie_23', 5, 50, '地獄裂隙爬出的烈焰惡魔，灼熱一切。');
+VALUES (23, '霜角魔', '力量', 'SR', 105, 42, 18, 9, 'zombie_23', 5, 50, '永凍深淵的惡魔領主，寒氣足以凍結靈魂。');
 INSERT INTO heroes (heroId, name, type, rarity, baseHP, baseATK, baseDEF, baseSPD, modelId, critRate, critDmg, description)
-VALUES (24, '魂縛者', '智慧', 'SR', 88, 36, 14, 10, 'zombie_24', 5, 50, '操控靈魂鎖鏈的禁忌術士，吞噬意志。');
+VALUES (24, '鏈甲獵兵', '智慧', 'SR', 88, 36, 14, 10, 'zombie_24', 5, 50, '穿戴高科技裝甲的精銳獵人，目標鎖定絕不放手。');
 INSERT INTO heroes (heroId, name, type, rarity, baseHP, baseATK, baseDEF, baseSPD, modelId, critRate, critDmg, description)
-VALUES (25, '冰霜巫妖', '智慧', 'SR', 92, 40, 15, 10, 'zombie_25', 5, 50, '永凍荒原的統治者，寒氣凝結萬物。');
+VALUES (25, '骸骨騎士', '智慧', 'SR', 92, 40, 15, 10, 'zombie_25', 5, 50, '披掛亡者骨甲的暗黑騎士，散發不祥死亡氣息。');
 INSERT INTO heroes (heroId, name, type, rarity, baseHP, baseATK, baseDEF, baseSPD, modelId, critRate, critDmg, description)
-VALUES (26, '深淵使徒', '平衡', 'SR', 98, 37, 17, 11, 'zombie_26', 6, 52, '深淵意志的代行者，闇與光的交匯。');
+VALUES (26, '老獵魔人', '平衡', 'SR', 98, 37, 17, 11, 'zombie_26', 6, 52, '歷經百戰的獵魔老手，傷疤就是最好的勳章。');
 
 -- SSR×4
 INSERT INTO heroes (heroId, name, type, rarity, baseHP, baseATK, baseDEF, baseSPD, modelId, critRate, critDmg, description)
 VALUES (27, '末日審判者', '力量', 'SSR', 120, 45, 22, 9, 'zombie_27', 5, 50, '世界末日降臨的裁決者，無人能逃審判之錘。');
 INSERT INTO heroes (heroId, name, type, rarity, baseHP, baseATK, baseDEF, baseSPD, modelId, critRate, critDmg, description)
-VALUES (28, '瘟疫女王', '智慧', 'SSR', 110, 42, 18, 10, 'zombie_28', 5, 50, '瘟疫的母體，所到之處萬物凋零。');
+VALUES (28, '末日歌姬', '智慧', 'SSR', 110, 42, 18, 10, 'zombie_28', 5, 50, '末日餘生的妖姬，以歌聲蛀惑人心，美貌下藏致命殺機。');
 INSERT INTO heroes (heroId, name, type, rarity, baseHP, baseATK, baseDEF, baseSPD, modelId, critRate, critDmg, description)
 VALUES (29, '虛空獵手', '敏捷', 'SSR', 100, 48, 14, 14, 'zombie_29', 12, 65, '維度裂縫的掠食者，獵殺跨越時空。');
 INSERT INTO heroes (heroId, name, type, rarity, baseHP, baseATK, baseDEF, baseSPD, modelId, critRate, critDmg, description)
-VALUES (30, '不朽將軍', '力量', 'SSR', 135, 40, 25, 8, 'zombie_30', 5, 50, '征戰千年不死的亡靈將領，軍旗所指萬軍歸心。');
+VALUES (30, '傭兵頭子', '力量', 'SSR', 135, 40, 25, 8, 'zombie_30', 5, 50, '叼著雪茄的老兵油子，用經驗而非蠻力統領戰場。');
 
 
 -- ╔══════════════════════════════════╗
 -- ║   PART 2: skill_templates 表     ║
 -- ╚══════════════════════════════════╝
 
--- === Hero 16: 腐蝕蟲 (N) ===
-INSERT INTO skill_templates VALUES ('ACT_16','蝕咬','active','all_enemies','對全體敵人噴射腐蝕液，造成傷害','[]','','☠️');
-INSERT INTO skill_templates VALUES ('PAS_16_1','毒液分泌','passive','self','攻擊時有機率使敵人中毒','[]','on_attack','🧪');
-INSERT INTO skill_templates VALUES ('PAS_16_2','蟲殼護甲','passive','self','永久提升防禦力','[]','always','🛡️');
-INSERT INTO skill_templates VALUES ('PAS_16_3','寄生','passive','self','擊殺敵人時回復生命','[]','on_kill','💚');
-INSERT INTO skill_templates VALUES ('PAS_16_4','侵蝕蔓延','passive','single_enemy','攻擊時有機率降低敵人防禦','[]','on_attack','🦠');
+-- === Hero 16: 荒拳鬥士 (N) ===
+INSERT INTO skill_templates VALUES ('ACT_16','拳風破','active','all_enemies','向全體敵人揮出暴風拳擊，造成傷害','[]','','☠️');
+INSERT INTO skill_templates VALUES ('PAS_16_1','衝擊波','passive','self','攻擊時有機率以拳壓產生衝擊使敵人中毒','[]','on_attack','🧪');
+INSERT INTO skill_templates VALUES ('PAS_16_2','鬥者之軀','passive','self','千鎚百煉的身軀，永久提升防禦力','[]','always','🛡️');
+INSERT INTO skill_templates VALUES ('PAS_16_3','勝者為王','passive','self','擊殺敵人時回復生命','[]','on_kill','💚');
+INSERT INTO skill_templates VALUES ('PAS_16_4','破甲拳','passive','single_enemy','攻擊時有機率降低敵人防禦','[]','on_attack','🦠');
 
--- === Hero 17: 枯骨兵 (N) ===
-INSERT INTO skill_templates VALUES ('ACT_17','骨矛投擲','active','single_enemy','投擲骨矛造成高額單體傷害','[]','','🦴');
-INSERT INTO skill_templates VALUES ('PAS_17_1','白骨堅韌','passive','self','永久提升防禦力','[]','always','🛡️');
+-- === Hero 17: 蠠行屍 (N) ===
+INSERT INTO skill_templates VALUES ('ACT_17','肉觸鞭擊','active','single_enemy','以血肉觸手猛擊單一敵人，造成高額傷害','[]','','🦴');
+INSERT INTO skill_templates VALUES ('PAS_17_1','異化皮膜','passive','self','異變肉體形成的保護膜，永久提升防禦力','[]','always','🛡️');
 INSERT INTO skill_templates VALUES ('PAS_17_2','不死軀體','passive','self','受致命傷時復活','[]','on_lethal','💀');
-INSERT INTO skill_templates VALUES ('PAS_17_3','骨刺反擊','passive','self','被攻擊時反擊','[]','on_be_attacked','⚔️');
-INSERT INTO skill_templates VALUES ('PAS_17_4','骨牆','passive','self','HP低時獲得護盾','[]','hp_below_pct','🏰');
+INSERT INTO skill_templates VALUES ('PAS_17_3','肉刺反擊','passive','self','被攻擊時以體表肉刺反擊','[]','on_be_attacked','⚔️');
+INSERT INTO skill_templates VALUES ('PAS_17_4','血肉壁壘','passive','self','HP低時以血肉構築護盾','[]','hp_below_pct','🏰');
 
 -- === Hero 18: 影行者 (R) ===
 INSERT INTO skill_templates VALUES ('ACT_18','暗影連擊','active','random_enemies_3','隨機攻擊3名敵人','[]','','🗡️');
@@ -72,12 +72,12 @@ INSERT INTO skill_templates VALUES ('PAS_18_2','致命突襲','passive','single_
 INSERT INTO skill_templates VALUES ('PAS_18_3','無影步','passive','self','每2回合提升速度','[]','every_n_turns','🌪️');
 INSERT INTO skill_templates VALUES ('PAS_18_4','暗殺','passive','single_enemy','攻擊時斬殺低血量敵人','[]','on_attack','💀');
 
--- === Hero 19: 毒蕈師 (R) ===
-INSERT INTO skill_templates VALUES ('ACT_19','孢子爆破','active','all_enemies','對全體敵人釋放毒孢子','[]','','🍄');
-INSERT INTO skill_templates VALUES ('PAS_19_1','菌絲甲','passive','self','永久提升防禦','[]','always','🛡️');
-INSERT INTO skill_templates VALUES ('PAS_19_2','毒素累積','passive','single_enemy','攻擊時施加中毒','[]','on_attack','💉');
-INSERT INTO skill_templates VALUES ('PAS_19_3','再生孢子','passive','all_allies','每3回合治療全體隊友','[]','every_n_turns','💚');
-INSERT INTO skill_templates VALUES ('PAS_19_4','致幻毒霧','passive','all_enemies','施放大招時有機率暈眩敵人','[]','on_skill_cast','💫');
+-- === Hero 19: 星蝕者 (R) ===
+INSERT INTO skill_templates VALUES ('ACT_19','星能脈衝','active','all_enemies','對全體敵人釋放星光能量波','[]','','🌟');
+INSERT INTO skill_templates VALUES ('PAS_19_1','能量護甲','passive','self','星光能量構成的護甲，永久提升防禦','[]','always','🛡️');
+INSERT INTO skill_templates VALUES ('PAS_19_2','離子灼射','passive','single_enemy','攻擊時施加離子灼傷','[]','on_attack','💉');
+INSERT INTO skill_templates VALUES ('PAS_19_3','能量共鳴','passive','all_allies','每3回合以星能治療全體隊友','[]','every_n_turns','💚');
+INSERT INTO skill_templates VALUES ('PAS_19_4','星蝕干擾','passive','all_enemies','施放大招時有機率以星能干擾暈眩敵人','[]','on_skill_cast','💫');
 
 -- === Hero 20: 鏽鋼衛士 (R) ===
 INSERT INTO skill_templates VALUES ('ACT_20','鐵壁衝擊','active','front_row_enemies','衝撞前排敵人造成傷害並降防','[]','','🔨');
@@ -86,47 +86,47 @@ INSERT INTO skill_templates VALUES ('PAS_20_2','鏽蝕甲','passive','self','被
 INSERT INTO skill_templates VALUES ('PAS_20_3','守護決心','passive','self','HP低於50%時獲得護盾','[]','hp_below_pct','🏰');
 INSERT INTO skill_templates VALUES ('PAS_20_4','不屈意志','passive','self','受致命傷時復活並提升攻擊','[]','on_lethal','❤️');
 
--- === Hero 21: 亡靈弓手 (R) ===
-INSERT INTO skill_templates VALUES ('ACT_21','穿心箭雨','active','random_enemies_3','隨機射擊3名敵人並造成流血','[]','','🏹');
+-- === Hero 21: 暗影弓手 (R) ===
+INSERT INTO skill_templates VALUES ('ACT_21','暗影箭雨','active','random_enemies_3','隨機射擊3名敵人並造成流血','[]','','🏹');
 INSERT INTO skill_templates VALUES ('PAS_21_1','銳利之眼','passive','self','永久提升暴擊率','[]','always','👁️');
 INSERT INTO skill_templates VALUES ('PAS_21_2','連射','passive','self','暴擊時恢復能量','[]','on_crit','⚡');
 INSERT INTO skill_templates VALUES ('PAS_21_3','影射','passive','single_enemy','攻擊時追加傷害','[]','on_attack','🎯');
 INSERT INTO skill_templates VALUES ('PAS_21_4','致命射擊','passive','self','擊殺時提升攻速','[]','on_kill','🌟');
 
--- === Hero 22: 血族伯爵 (SR) ===
-INSERT INTO skill_templates VALUES ('ACT_22','鮮血風暴','active','all_enemies','對全體造成傷害並吸血回復','[]','','🩸');
-INSERT INTO skill_templates VALUES ('PAS_22_1','吸血本能','passive','self','攻擊時回復自身生命','[]','on_attack','❤️');
-INSERT INTO skill_templates VALUES ('PAS_22_2','血族韌性','passive','self','HP低於40%時提升防禦+回復','[]','hp_below_pct','🛡️');
-INSERT INTO skill_templates VALUES ('PAS_22_3','夜行術','passive','self','戰鬥開始時提升閃避和速度','[]','battle_start','🌙');
-INSERT INTO skill_templates VALUES ('PAS_22_4','血之契約','passive','self','隊友死亡時提升攻擊並回復','[]','on_ally_death','💀');
+-- === Hero 22: 魔瞳領主 (SR) ===
+INSERT INTO skill_templates VALUES ('ACT_22','魔瞳風暴','active','all_enemies','以魔眼之力對全體造成傷害並汲取生命','[]','','🩸');
+INSERT INTO skill_templates VALUES ('PAS_22_1','魔力汲取','passive','self','攻擊時以魔眼汲取生命回復自身','[]','on_attack','❤️');
+INSERT INTO skill_templates VALUES ('PAS_22_2','魔瞳防壁','passive','self','HP低於40%時魔眼激活防禦結界+回復','[]','hp_below_pct','🛡️');
+INSERT INTO skill_templates VALUES ('PAS_22_3','暗能覺醒','passive','self','戰鬥開始時魔瞳全開，提升閃避和速度','[]','battle_start','🌙');
+INSERT INTO skill_templates VALUES ('PAS_22_4','魔瞳契約','passive','self','隊友死亡時魔瞳吸收殘餘力量，提升攻擊並回復','[]','on_ally_death','💀');
 
--- === Hero 23: 炎魔 (SR) ===
-INSERT INTO skill_templates VALUES ('ACT_23','地獄火焰','active','all_enemies','對全體造成傷害並施加灼燒','[]','','🔥');
-INSERT INTO skill_templates VALUES ('PAS_23_1','烈焰之體','passive','self','永久提升攻擊力','[]','always','💪');
-INSERT INTO skill_templates VALUES ('PAS_23_2','灼燒光環','passive','self','被攻擊時反擊並灼燒敵人','[]','on_be_attacked','☄️');
-INSERT INTO skill_templates VALUES ('PAS_23_3','熔岩甲','passive','self','永久反彈傷害','[]','always','🔃');
-INSERT INTO skill_templates VALUES ('PAS_23_4','末日之焰','passive','self','HP低於30%時暴走','[]','hp_below_pct','🌋');
+-- === Hero 23: 霜角魔 (SR) ===
+INSERT INTO skill_templates VALUES ('ACT_23','極寒吐息','active','all_enemies','對全體敵人吐出極寒氣息，造成傷害並施加凍傷','[]','','❄️');
+INSERT INTO skill_templates VALUES ('PAS_23_1','寒霜之軀','passive','self','冰霜構成的身軀，永久提升攻擊力','[]','always','💪');
+INSERT INTO skill_templates VALUES ('PAS_23_2','凍氣反擊','passive','self','被攻擊時釋放冰寒之氣反擊並凍傷敵人','[]','on_be_attacked','☄️');
+INSERT INTO skill_templates VALUES ('PAS_23_3','冰晶甲','passive','self','冰晶形成的護甲，永久反彈傷害','[]','always','🔃');
+INSERT INTO skill_templates VALUES ('PAS_23_4','極寒領域','passive','self','HP低於30%時進入極寒暴走狀態','[]','hp_below_pct','🌊');
 
--- === Hero 24: 魂縛者 (SR) ===
-INSERT INTO skill_templates VALUES ('ACT_24','靈魂鎖鏈','active','single_enemy','對單體造成傷害+暈眩+吸能','[]','','⛓️');
-INSERT INTO skill_templates VALUES ('PAS_24_1','靈魂護盾','passive','self','戰鬥開始時獲得護盾','[]','battle_start','🛡️');
-INSERT INTO skill_templates VALUES ('PAS_24_2','魂力吸取','passive','single_enemy','攻擊時偷取敵方增益','[]','on_attack','🖐️');
-INSERT INTO skill_templates VALUES ('PAS_24_3','幽冥領域','passive','all_enemies','每3回合驅散全體敵方增益','[]','every_n_turns','🚫');
-INSERT INTO skill_templates VALUES ('PAS_24_4','靈體轉換','passive','single_enemy','受傷時轉移減益給敵人','[]','on_take_damage','➡️');
+-- === Hero 24: 鏈甲獵兵 (SR) ===
+INSERT INTO skill_templates VALUES ('ACT_24','制式鎖定','active','single_enemy','以裝甲武裝系統鎖定單體，造成傷害+暈眩+吸能','[]','','⛓️');
+INSERT INTO skill_templates VALUES ('PAS_24_1','動力護盾','passive','self','戰鬥開始時啟動動力裝甲護盾','[]','battle_start','🛡️');
+INSERT INTO skill_templates VALUES ('PAS_24_2','系統入侵','passive','single_enemy','攻擊時偷取敵方增益效果','[]','on_attack','🖐️');
+INSERT INTO skill_templates VALUES ('PAS_24_3','EMP干擾','passive','all_enemies','每3回合發射電磁脈衝驅散全體敵方增益','[]','every_n_turns','🚫');
+INSERT INTO skill_templates VALUES ('PAS_24_4','傷害轉移','passive','single_enemy','受傷時將減益效果轉移給敵人','[]','on_take_damage','➡️');
 
--- === Hero 25: 冰霜巫妖 (SR) ===
-INSERT INTO skill_templates VALUES ('ACT_25','冰封世界','active','all_enemies','對全體造成傷害並冰凍','[]','','❄️');
-INSERT INTO skill_templates VALUES ('PAS_25_1','寒冰護甲','passive','self','永久提升防禦+反傷','[]','always','🧊');
-INSERT INTO skill_templates VALUES ('PAS_25_2','冰結之觸','passive','single_enemy','攻擊時降低敵人速度','[]','on_attack','🌊');
-INSERT INTO skill_templates VALUES ('PAS_25_3','絕對零度','passive','all_enemies','每4回合冰凍全體敵人','[]','every_n_turns','💫');
-INSERT INTO skill_templates VALUES ('PAS_25_4','冰棺復甦','passive','self','受致命傷時復活並獲得護盾','[]','on_lethal','💖');
+-- === Hero 25: 骸骨騎士 (SR) ===
+INSERT INTO skill_templates VALUES ('ACT_25','死亡俯衝','active','all_enemies','以亡者之力俯衝全場，造成傷害並束縛敵人','[]','','⚔️');
+INSERT INTO skill_templates VALUES ('PAS_25_1','骨甲防禦','passive','self','亡者骨甲永久提升防禦+反傷','[]','always','🧴');
+INSERT INTO skill_templates VALUES ('PAS_25_2','亡者之觸','passive','single_enemy','攻擊時以死亡之力降低敵人速度','[]','on_attack','🌊');
+INSERT INTO skill_templates VALUES ('PAS_25_3','死域展開','passive','all_enemies','每4回合展開死亡領域束縛全體敵人','[]','every_n_turns','💫');
+INSERT INTO skill_templates VALUES ('PAS_25_4','亡者復甦','passive','self','受致命傷時以亡者之力復活並獲得護盾','[]','on_lethal','💖');
 
--- === Hero 26: 深淵使徒 (SR) ===
-INSERT INTO skill_templates VALUES ('ACT_26','深淵凝視','active','back_row_enemies','對後排造成傷害並降低屬性','[]','','👁️');
-INSERT INTO skill_templates VALUES ('PAS_26_1','深淵之力','passive','self','永久提升攻擊和防禦','[]','always','💪');
-INSERT INTO skill_templates VALUES ('PAS_26_2','虛空步','passive','self','閃避時反擊','[]','on_dodge','👻');
-INSERT INTO skill_templates VALUES ('PAS_26_3','暗影追擊','passive','self','隊友施放大招時追擊','[]','on_ally_skill','⚡');
-INSERT INTO skill_templates VALUES ('PAS_26_4','末日審判','passive','single_enemy','HP低於20%時斬殺敵人','[]','on_attack','💀');
+-- === Hero 26: 老獵魔人 (SR) ===
+INSERT INTO skill_templates VALUES ('ACT_26','獵魔弩箭','active','back_row_enemies','對後排發射附魔弩箭，造成傷害並削弱屬性','[]','','👁️');
+INSERT INTO skill_templates VALUES ('PAS_26_1','老練身手','passive','self','百戰磨練的身手，永久提升攻擊和防禦','[]','always','💪');
+INSERT INTO skill_templates VALUES ('PAS_26_2','閃身反擊','passive','self','老練地閃避後立刻反擊','[]','on_dodge','👻');
+INSERT INTO skill_templates VALUES ('PAS_26_3','助攻射擊','passive','self','隊友施放大招時配合射擊追擊','[]','on_ally_skill','⚡');
+INSERT INTO skill_templates VALUES ('PAS_26_4','致命一擊','passive','single_enemy','HP低於20%的目標會被直接擊殺','[]','on_attack','💀');
 
 -- === Hero 27: 末日審判者 (SSR) ===
 INSERT INTO skill_templates VALUES ('ACT_27','審判之錘','active','single_enemy','對單體造成巨額傷害+降防+暈眩','[]','','🔨');
@@ -135,12 +135,12 @@ INSERT INTO skill_templates VALUES ('PAS_27_2','正義之怒','passive','self','
 INSERT INTO skill_templates VALUES ('PAS_27_3','制裁','passive','single_enemy','攻擊時斬殺低HP目標','[]','on_attack','☠️');
 INSERT INTO skill_templates VALUES ('PAS_27_4','不滅意志','passive','self','致命傷復活+護盾+免疫','[]','on_lethal','✨');
 
--- === Hero 28: 瘟疫女王 (SSR) ===
-INSERT INTO skill_templates VALUES ('ACT_28','瘟疫之雨','active','all_enemies','全體傷害+中毒+流血','[]','','☠️');
-INSERT INTO skill_templates VALUES ('PAS_28_1','疫病光環','passive','all_enemies','戰鬥開始時降低全體敵人防禦','[]','battle_start','🦠');
-INSERT INTO skill_templates VALUES ('PAS_28_2','毒血共生','passive','self','攻擊時吸血+施毒','[]','on_attack','🩸');
-INSERT INTO skill_templates VALUES ('PAS_28_3','瘴氣蔓延','passive','single_enemy','回合開始時轉移減益','[]','turn_start','💨');
-INSERT INTO skill_templates VALUES ('PAS_28_4','致命突變','passive','self','擊殺時大幅提升攻擊','[]','on_kill','🧬');
+-- === Hero 28: 末日歌姬 (SSR) ===
+INSERT INTO skill_templates VALUES ('ACT_28','魅音風暴','active','all_enemies','以致命歌聲攻擊全體，造成傷害+中毒+流血','[]','','☠️');
+INSERT INTO skill_templates VALUES ('PAS_28_1','弱化歌聲','passive','all_enemies','戰鬥開始時以歌聲削弱全體敵人防禦','[]','battle_start','🦠');
+INSERT INTO skill_templates VALUES ('PAS_28_2','魅惑之歌','passive','self','攻擊時以歌聲汲取生命並施加毒素','[]','on_attack','🩸');
+INSERT INTO skill_templates VALUES ('PAS_28_3','夢魘低語','passive','single_enemy','回合開始時以低語將自身減益轉移給敵人','[]','turn_start','💨');
+INSERT INTO skill_templates VALUES ('PAS_28_4','瘋狂安可','passive','self','擊殺時觀眾瘋狂，大幅提升攻擊','[]','on_kill','🧬');
 
 -- === Hero 29: 虛空獵手 (SSR) ===
 INSERT INTO skill_templates VALUES ('ACT_29','維度斬','active','all_enemies','對全體造成傷害+吸取能量','[]','','🌀');
@@ -149,12 +149,12 @@ INSERT INTO skill_templates VALUES ('PAS_29_2','獵殺本能','passive','self','
 INSERT INTO skill_templates VALUES ('PAS_29_3','虛空標記','passive','single_enemy','攻擊時降低全屬性','[]','on_attack','🎯');
 INSERT INTO skill_templates VALUES ('PAS_29_4','維度撕裂','passive','single_enemy','攻擊時斬殺+額外傷害','[]','on_attack','💀');
 
--- === Hero 30: 不朽將軍 (SSR) ===
-INSERT INTO skill_templates VALUES ('ACT_30','軍令如山','active','all_allies','全體隊友增攻+加速+護盾','[]','','🏴');
-INSERT INTO skill_templates VALUES ('PAS_30_1','鐵軍意志','passive','all_allies','戰鬥開始時全體提升防禦','[]','battle_start','🛡️');
+-- === Hero 30: 傭兵頭子 (SSR) ===
+INSERT INTO skill_templates VALUES ('ACT_30','老大號令','active','all_allies','全體隊友增攻+加速+護盾','[]','','🏴');
+INSERT INTO skill_templates VALUES ('PAS_30_1','老兵壓陣','passive','all_allies','戰鬥開始時以老兵氣場全體提升防禦','[]','battle_start','🛡️');
 INSERT INTO skill_templates VALUES ('PAS_30_2','指揮若定','passive','self','隊友施放大招時追擊','[]','on_ally_skill','⚡');
 INSERT INTO skill_templates VALUES ('PAS_30_3','身先士卒','passive','self','被攻擊時嘲諷+反傷','[]','on_be_attacked','🗿');
-INSERT INTO skill_templates VALUES ('PAS_30_4','不朽傳說','passive','self','致命傷復活+全體回復','[]','on_lethal','✨');
+INSERT INTO skill_templates VALUES ('PAS_30_4','九死一生','passive','self','致命傷時憑藉豐富經驗復活+全體回復','[]','on_lethal','✨');
 
 
 -- ╔══════════════════════════════════╗

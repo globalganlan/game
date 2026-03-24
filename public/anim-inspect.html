@@ -1,0 +1,174 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Animation Inspector</title>
+  <style>
+    html,body{height:100%;margin:0;background:#222;color:#fff;font-family:monospace}
+    canvas{display:block}
+    #info{position:absolute;top:10px;left:10px;z-index:10;font-size:14px;background:rgba(0,0,0,0.7);padding:8px;border-radius:4px}
+  </style>
+</head>
+<body>
+<div id="info">Loading...</div>
+<canvas id="c"></canvas>
+<script>
+const BASE = location.pathname.startsWith('/game/') ? '/game' : '';
+const im = document.createElement('script');
+im.type = 'importmap';
+im.textContent = JSON.stringify({ imports: {
+  "three": BASE + "/node_modules/three/build/three.module.js",
+  "three/addons/": BASE + "/node_modules/three/examples/jsm/"
+}});
+document.currentScript.after(im);
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
+
+const params = new URLSearchParams(location.search);
+const modelId = params.get('model') || 'zombie_1';
+const animType = params.get('anim') || 'idle'; // idle, attack, hurt, dying, run
+const ASSET_BASE = location.pathname.startsWith('/game/') ? '/game' : '';
+const size = 512;
+const canvas = document.getElementById('c');
+canvas.width = size; canvas.height = size;
+
+const renderer = new THREE.WebGLRenderer({canvas, preserveDrawingBuffer:true, alpha:true, antialias:true});
+renderer.setSize(size, size);
+renderer.setClearColor(0x333333, 1);
+if ('outputColorSpace' in renderer) renderer.outputColorSpace = THREE.SRGBColorSpace;
+
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 1000);
+
+const hemi = new THREE.HemisphereLight(0xffffff, 0x444444, 1.0);
+scene.add(hemi);
+const dir = new THREE.DirectionalLight(0xffffff, 1.0);
+dir.position.set(1, 2, 1);
+scene.add(dir);
+const amb = new THREE.AmbientLight(0xffffff, 0.3);
+scene.add(amb);
+
+const gltfLoader = new GLTFLoader();
+const dracoLoader = new DRACOLoader();
+dracoLoader.setDecoderPath(`${ASSET_BASE}/draco/`);
+gltfLoader.setDRACOLoader(dracoLoader);
+
+function loadGLB(url) {
+  return new Promise((resolve, reject) => {
+    gltfLoader.load(url, resolve, undefined, reject);
+  });
+}
+
+const info = document.getElementById('info');
+
+try {
+  const meshPath = `${ASSET_BASE}/models/${modelId}/${modelId}.glb`;
+  const animPath = `${ASSET_BASE}/models/${modelId}/${modelId}_${animType}.glb`;
+
+  info.textContent = `Loading ${modelId} + ${animType}...`;
+
+  const [meshGltf, animGltf] = await Promise.all([loadGLB(meshPath), loadGLB(animPath)]);
+
+  const obj = meshGltf.scene;
+  scene.add(obj);
+  window.__OBJ__ = obj;
+  window.__THREE__ = THREE;
+
+  // Apply animation
+  const mixer = new THREE.AnimationMixer(obj);
+  const clip = animGltf.animations[0];
+  window.__RAW_CLIP__ = clip;
+
+  if (!clip) {
+    info.textContent = `${modelId}_${animType}: NO ANIMATION CLIP FOUND`;
+    window.__INSPECT_DONE__ = true;
+  } else {
+    const action = mixer.clipAction(clip);
+    action.play();
+
+    // Advance to 40% of animation for a good preview frame
+    const previewTime = clip.duration * 0.4;
+    mixer.update(previewTime);
+
+    // Compute bounding box
+    const box = new THREE.Box3().setFromObject(obj);
+    const sizeVec = new THREE.Vector3();
+    box.getSize(sizeVec);
+    const center = new THREE.Vector3();
+    box.getCenter(center);
+
+    let useZ = sizeVec.y < sizeVec.z * 0.3;
+    const height = useZ ? sizeVec.z : sizeVec.y;
+    const maxDim = Math.max(sizeVec.x, sizeVec.y, sizeVec.z);
+
+    // Full body view
+    const distance = maxDim * 1.5;
+    const centerY = useZ ? center.z : center.y;
+
+    if (useZ) {
+      camera.position.set(center.x, center.y + distance, center.z);
+      camera.lookAt(center.x, center.y, center.z);
+    } else {
+      camera.position.set(center.x, centerY, center.z + distance);
+      camera.lookAt(center.x, centerY, center.z);
+    }
+
+    renderer.render(scene, camera);
+
+    const toDeg = (rad) => Number((rad * 180 / Math.PI).toFixed(2));
+    const getBoneEuler = (key) => {
+      let found = null;
+      obj.traverse((n) => {
+        if (!found && n.isBone && typeof n.name === 'string' && n.name.includes(key)) {
+          found = n;
+        }
+      });
+      if (!found) return null;
+      const e = new THREE.Euler().setFromQuaternion(found.quaternion, 'XYZ');
+      return { x: toDeg(e.x), y: toDeg(e.y), z: toDeg(e.z), name: found.name };
+    };
+
+    const pose = {
+      head: getBoneEuler('Head'),
+      neck: getBoneEuler('Neck'),
+      spine1: getBoneEuler('Spine1'),
+      spine2: getBoneEuler('Spine2'),
+    };
+
+    // Collect clip info
+    const trackNames = clip.tracks.map(t => t.name.split('.')[0]).filter((v,i,a) => a.indexOf(v) === i);
+    
+    info.textContent = [
+      `${modelId} — ${animType}`,
+      `Clip: "${clip.name}"`,
+      `Duration: ${clip.duration.toFixed(2)}s`,
+      `Tracks: ${clip.tracks.length}`,
+      `Bones: ${trackNames.length}`,
+    ].join('\n');
+
+    // Export info to window
+    window.__ANIM_REPORT__ = {
+      modelId,
+      animType,
+      clipName: clip.name,
+      duration: parseFloat(clip.duration.toFixed(3)),
+      trackCount: clip.tracks.length,
+      boneCount: trackNames.length,
+      bboxMinY: Number(box.min.y.toFixed(4)),
+      bboxMaxY: Number(box.max.y.toFixed(4)),
+      pose,
+    };
+
+    window.__INSPECT_DONE__ = true;
+  }
+} catch (err) {
+  info.textContent = `ERROR: ${err.message}`;
+  window.__ANIM_REPORT__ = { modelId, animType, error: err.message };
+  window.__INSPECT_DONE__ = true;
+}
+</script>
+</body>
+</html>

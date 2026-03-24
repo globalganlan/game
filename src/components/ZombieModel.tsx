@@ -95,6 +95,10 @@ export function ZombieModel({
 
     const cloned = SkeletonUtils.clone(meshAsset.scene)
 
+    // 某些模型貼圖極暗，保留 MeshStandardMaterial 讓場景光照正常作用
+    const PBR_EMISSIVE: Record<string, number> = { zombie_27: 3.0, zombie_29: 5.0 }
+    const emissiveVal = PBR_EMISSIVE[zombieId] ?? 0
+
     // 材質轉換 — GLB 原始為 MeshStandardMaterial，轉為 MeshBasicMaterial（不受光照、效能更好）
     cloned.traverse((child) => {
       if ((child as THREE.Mesh).isMesh) {
@@ -104,26 +108,39 @@ export function ZombieModel({
         // ★ 關閉視錐剔除 — SkinnedMesh 骨架動畫的包圍盒可能不準確，
         //   在 iOS 上會導致模型被錯誤剔除（完全不渲染）
         mesh.frustumCulled = false
-        const convertMat = (m: THREE.Material): THREE.MeshBasicMaterial => {
-          const src = m as THREE.MeshStandardMaterial
-          const basic = new THREE.MeshBasicMaterial({
-            color: src.color?.clone() ?? new THREE.Color(0xffffff),
-            map: src.map ?? null,
-            transparent: src.transparent,
-            opacity: src.opacity,
-            alphaMap: src.alphaMap ?? null,
-            side: src.side,
-            wireframe: src.wireframe,
-          })
-          // 釋放舊 PBR 材質（不 dispose 共享紋理）
-          // m.dispose() — 這裡不 dispose 因為是 clone 前的引用
-          basic.needsUpdate = true
-          return basic
-        }
-        if (Array.isArray(mesh.material)) {
-          mesh.material = mesh.material.map(convertMat)
-        } else if (mesh.material) {
-          mesh.material = convertMat(mesh.material)
+        if (!emissiveVal) {
+          const convertMat = (m: THREE.Material): THREE.MeshBasicMaterial => {
+            const src = m as THREE.MeshStandardMaterial
+            const basic = new THREE.MeshBasicMaterial({
+              color: src.color?.clone() ?? new THREE.Color(0xffffff),
+              map: src.map ?? null,
+              transparent: src.transparent,
+              opacity: src.opacity,
+              alphaMap: src.alphaMap ?? null,
+              side: src.side,
+              wireframe: src.wireframe,
+            })
+            basic.needsUpdate = true
+            return basic
+          }
+          if (Array.isArray(mesh.material)) {
+            mesh.material = mesh.material.map(convertMat)
+          } else if (mesh.material) {
+            mesh.material = convertMat(mesh.material)
+          }
+        } else {
+          const fixPbr = (m: THREE.Material) => {
+            const std = m as THREE.MeshStandardMaterial
+            if (std.isMeshStandardMaterial) {
+              std.metalness = 0
+              std.roughness = 0.8
+              std.emissive = new THREE.Color(0xffffff)
+              std.emissiveMap = std.map
+              std.emissiveIntensity = emissiveVal
+            }
+          }
+          if (Array.isArray(mesh.material)) mesh.material.forEach(fixPbr)
+          else if (mesh.material) fixPbr(mesh.material)
         }
       }
     })
@@ -153,12 +170,61 @@ export function ZombieModel({
         const clip = anim.clone()
         clip.name = `${label}_${zombieId}`
 
-        // RUN 動畫需移除根骨骼的 position track（root motion），
-        // 否則 Mixamo 的位移 + useFrame lerp 會疊加，造成跑過頭和上下彈跳。
+        // ── 動畫軌道後處理 ──
+        // RUN：凍結 Hips position 在首幀（去除 root motion 漂移，同時保持正確接地高度）
+        //       移除其他骨骼的 position tracks + Head/Neck/Spine1/Spine2 rotation
         if (label === 'RUN') {
-          clip.tracks = clip.tracks.filter(
-            (t) => !t.name.endsWith('.position'),
-          )
+          clip.tracks = clip.tracks
+            .filter((t) => {
+              if ((t.name.includes('Head') || t.name.includes('Neck')
+                || t.name.includes('Spine1') || t.name.includes('Spine2'))
+                  && t.name.endsWith('.quaternion')) return false
+              // Hips position → 凍結首幀（保留接地高度，避免 idle→run 跳高）
+              if (t.name.endsWith('.position') && t.name.includes('Hips')) {
+                const v = t.values.slice(0, 3) // 首幀 [x, y, z]
+                t.times = new Float32Array([0, clip.duration])
+                t.values = new Float32Array([...v, ...v])
+                return true
+              }
+              // 其他骨骼 position → 移除（去除 root motion 漂移）
+              if (t.name.endsWith('.position')) return false
+              return true
+            })
+        }
+
+        // HURT / ATTACKING：移除 Spine+Head+Neck rotation（防止上半身前彎 / 頭部不自然下轉/縮進胸腔/轉向）
+        if (label === 'HURT' || label === 'ATTACKING') {
+          clip.tracks = clip.tracks.filter((t) => {
+            if ((t.name.includes('Head') || t.name.includes('Neck') || t.name.includes('Spine'))
+                && t.name.endsWith('.quaternion')) return false
+            return true
+          })
+        }
+
+        // z16 荒拳鬥士：強制右手手指保持握斧姿勢（用 idle 動畫的恆定 quaternion 取代）
+        if (zombieId === 'zombie_16') {
+          const fingerRe = /RightHand(Thumb|Index|Middle|Ring|Pinky)/
+          // idle 動畫第 0 幀的握斧 quaternion（手指彎曲握住斧柄）
+          const GRIP: Record<string, [number, number, number, number]> = {
+            mixamorigRightHandThumb1: [0.1815, -0.0187, -0.4028, 0.8969],
+            mixamorigRightHandThumb2: [-0.0450, -0.2231, 0.2851, 0.9311],
+            mixamorigRightHandThumb3: [-0.0592, -0.1257, 0.0951, 0.9857],
+            mixamorigRightHandIndex1: [-0.1386, 0.0225, -0.2185, 0.9657],
+            mixamorigRightHandIndex2: [0.2197, 0, 0.0056, 0.9755],
+            mixamorigRightHandIndex3: [0.1105, -0.0007, 0.0027, 0.9939],
+            mixamorigRightHandPinky1: [0.0565, 0.6988, -0.2525, 0.6669],
+            mixamorigRightHandPinky2: [-0.0056, 0, 0.2197, 0.9755],
+            mixamorigRightHandPinky3: [-0.0028, 0, 0.1105, 0.9939],
+          }
+          clip.tracks = clip.tracks.filter((t) => {
+            if (fingerRe.test(t.name) && t.name.endsWith('.quaternion')) return false
+            return true
+          })
+          for (const [bone, q] of Object.entries(GRIP)) {
+            clip.tracks.push(new THREE.QuaternionKeyframeTrack(
+              `${bone}.quaternion`, [0, clip.duration], [...q, ...q],
+            ))
+          }
         }
 
         clips.push(clip)
